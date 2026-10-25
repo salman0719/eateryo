@@ -99,6 +99,7 @@ import {
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
   rememberBrowserAccount,
+  shouldAutoClaimRemainingDrafts,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 
@@ -1147,12 +1148,22 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     })();
     void mergeAccountMenus();
     void refreshLibrary();
-    // The wizard just created the account's first café, so the other drafts
-    // in this browser have a home. This runs after the publish succeeds, so
-    // it cannot race the wizard for “create the restaurant”.
+    // The wizard just created a café, so the other drafts in this browser
+    // have a home — but only adopt them automatically for an effectively-new
+    // account (the merge has settled and this menu is its only one). A
+    // non-empty account never sweeps this browser silently; anything left
+    // over stays put for the offer/manual path. This runs after the publish
+    // succeeds, so it cannot race the wizard for “create the restaurant”.
     if (result.created.restaurant && accountKey) {
       const otherDrafts = localOnly.filter((menu) => menu.id !== menuId);
-      if (otherDrafts.length > 0) {
+      if (
+        shouldAutoClaimRemainingDrafts({
+          createdRestaurant: true,
+          mergeSettled: serverMenusFor === accountKey,
+          accountMenuCount: serverIdsRef.current.size,
+          otherDraftCount: otherDrafts.length,
+        })
+      ) {
         void runLocalDraftClaim(result.restaurant.id, result.restaurant.name);
       }
     }

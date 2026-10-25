@@ -49,6 +49,33 @@ export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraft
   return "offer";
 }
 
+export interface RemainingDraftsClaimInputs {
+  /** The publish wizard created a restaurant in this run. */
+  createdRestaurant: boolean;
+  /** The account menu list has settled for this account. */
+  mergeSettled: boolean;
+  /** Account menus known, including the just-published one. */
+  accountMenuCount: number;
+  /** Other browser-only drafts besides the published menu. */
+  otherDraftCount: number;
+}
+
+/**
+ * Whether the publish wizard may adopt the browser's remaining drafts.
+ * Only for an effectively-new account: anything else stays put for the
+ * offer/manual path, so a non-empty account never sweeps this browser
+ * silently. A merge that has not settled yet also declines — the offer
+ * re-evaluates once the account is actually read.
+ */
+export function shouldAutoClaimRemainingDrafts(inputs: RemainingDraftsClaimInputs): boolean {
+  return (
+    inputs.createdRestaurant &&
+    inputs.mergeSettled &&
+    inputs.otherDraftCount > 0 &&
+    inputs.accountMenuCount <= 1
+  );
+}
+
 const STORAGE_PREFIX = "eateryo:local-draft-claim:";
 const BROWSER_ACCOUNT_KEY = "eateryo:browser-account";
 

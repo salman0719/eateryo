@@ -8,6 +8,7 @@ import {
   localDraftClaimKey,
   markLocalDraftsClaimed,
   rememberBrowserAccount,
+  shouldAutoClaimRemainingDrafts,
 } from "@/features/menus/claim-local-drafts";
 
 /**
@@ -100,6 +101,32 @@ describe("decideLocalDraftClaim", () => {
         accountSeenInBrowser: false,
       })
     ).toBe("none");
+  });
+});
+
+describe("shouldAutoClaimRemainingDrafts", () => {
+  const BASE = {
+    createdRestaurant: true,
+    mergeSettled: true,
+    accountMenuCount: 1,
+    otherDraftCount: 2,
+  };
+
+  it("adopts the remaining drafts for an effectively-new account", () => {
+    expect(shouldAutoClaimRemainingDrafts(BASE)).toBe(true);
+  });
+
+  it("leaves drafts put when the account already holds other menus", () => {
+    expect(shouldAutoClaimRemainingDrafts({ ...BASE, accountMenuCount: 8 })).toBe(false);
+  });
+
+  it("waits for the merge to settle before deciding", () => {
+    expect(shouldAutoClaimRemainingDrafts({ ...BASE, mergeSettled: false })).toBe(false);
+  });
+
+  it("does nothing without remaining drafts or a created restaurant", () => {
+    expect(shouldAutoClaimRemainingDrafts({ ...BASE, otherDraftCount: 0 })).toBe(false);
+    expect(shouldAutoClaimRemainingDrafts({ ...BASE, createdRestaurant: false })).toBe(false);
   });
 });
 
