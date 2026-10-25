@@ -93,6 +93,15 @@ import {
 } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
 import {
+  clearDraftOrigin,
+  decideHeal,
+  getDraftOrigin,
+  listDraftOrigins,
+  refreshDraftSync,
+  stampDraftOrigin,
+  type DraftOrigin,
+} from "@/features/menus/draft-origins";
+import {
   decideLocalDraftClaim,
   dismissLocalDraftClaim,
   loadBrowserAccount,
@@ -110,6 +119,11 @@ const STEPS = ["Upload image", "Extract menu", "Review draft"] as const;
 /** Save status stays one word; `detail` says where the save went. */
 function savedState(detail: string): SaveState {
   return { kind: "saved", message: "Saved", detail };
+}
+
+/** Content equality ignoring the save stamp (same rule the sync uses). */
+function sameMenuContent(a: MenuDocument, b: MenuDocument): boolean {
+  return JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
 }
 
 function routeMenuId(route: AppRoute): string | null {
@@ -308,6 +322,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     session?.user?.id ?? null
   );
   const signedInRef = useRef(false);
+  /** Current account id for async work (closures may outlive the render). */
+  const accountKeyRef = useRef<string | null>(null);
   /** The server updatedAt the open menu was last synced at; null = don't push. */
   const serverBaseRef = useRef<string | null>(null);
   const [conflict, setConflict] = useState<{ serverUpdatedAt: string | null } | null>(null);
@@ -360,7 +376,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   useEffect(() => {
     signedInRef.current = signedIn;
-  }, [signedIn]);
+    accountKeyRef.current = accountKey;
+  }, [signedIn, accountKey]);
 
   // Moving a single menu needs the owned restaurants up front, so each
   // browser-only row can offer its target without opening the move panel.
@@ -491,11 +508,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     const previousAccount = loadBrowserAccount();
     browserAccountAtSignInRef.current = previousAccount === null || previousAccount === accountKey;
     if (accountKey) rememberBrowserAccount(accountKey);
-    // Sign-in: merge account menus into the library, and reconcile a menu
-    // that was already open. A menu that was never moved to the account
-    // stays local-only (serverBaseRef stays null), so this cannot loop.
+    // Sign-in: merge account menus into the library, heal interrupted work
+    // from closed menus, and reconcile a menu that was already open. A menu
+    // that was never moved to the account stays local-only (serverBaseRef
+    // stays null), so this cannot loop.
     void refreshLibrary();
     void mergeAccountMenus();
+    void healStampedDrafts();
     const doc = docRef.current;
     if (doc && serverBaseRef.current === null && !conflictRef.current) {
       void syncWithAccount(doc);
@@ -571,6 +590,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           try {
             const full = await fetchServerMenu(summary.id);
             await cacheMenu(full.doc);
+            const mergeActor = accountKeyRef.current;
+            if (mergeActor) await refreshDraftSync(summary.id, mergeActor, full.updatedAt);
             cachedAny = true;
           } catch {
             // One failed download never blocks the rest; the menu stays in
@@ -591,6 +612,52 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
   }
 
+  /**
+   * Push interrupted work from closed menus after a same-account return.
+   * Only rows stamped to this account whose server revision is untouched
+   * are pushed; anything diverged on both sides waits for the next open,
+   * which raises the explicit conflict choice instead. Best-effort: every
+   * failure mode leaves the browser copy alone for the offer/manual path.
+   */
+  async function healStampedDrafts() {
+    const actor = accountKeyRef.current;
+    if (!signedInRef.current || !actor) return;
+    let origins: DraftOrigin[];
+    try {
+      origins = await listDraftOrigins();
+    } catch {
+      return;
+    }
+    let healedAny = false;
+    for (const origin of origins.filter((item) => item.accountId === actor)) {
+      if (docRef.current?.id === origin.menuId) continue;
+      if (staffMenusRef.current.has(origin.menuId)) continue;
+      try {
+        const local = await getMenu(origin.menuId);
+        const server = await fetchServerMenu(origin.menuId);
+        if (sameMenuContent(server.doc, local)) {
+          await refreshDraftSync(origin.menuId, actor, server.updatedAt);
+          continue;
+        }
+        const decision = decideHeal({
+          contentEqual: false,
+          localUpdatedAt: local.updatedAt,
+          lastSyncedUpdatedAt: origin.lastSyncedUpdatedAt,
+          serverUpdatedAt: server.updatedAt,
+        });
+        if (decision !== "push") continue;
+        const pushed = await updateServerMenu(local.id, local, server.updatedAt);
+        await refreshDraftSync(local.id, actor, pushed.updatedAt);
+        healedAny = true;
+      } catch {
+        // Never on the server, unreachable, or unreadable: the offer/manual
+        // path or the next open handles it. Never throw from the heal.
+        continue;
+      }
+    }
+    if (healedAny) await refreshLibrary();
+  }
+
   // --- Autosave -----------------------------------------------------------
 
   async function doSave() {
@@ -606,6 +673,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const saved = await saveMenu(doc);
       lastSavedRef.current = JSON.stringify(saved);
+      // Record whose work this is while the session is live. The stamp
+      // keeps the last agreed revision when there is no new baseline, so a
+      // later return can tell interrupted work from a stale cache.
+      const actor = signedInRef.current ? accountKeyRef.current : null;
+      if (actor && !staffMenusRef.current.has(saved.id)) {
+        await stampDraftOrigin(saved.id, actor, serverBaseRef.current ?? "");
+      }
       setMenus(await listMenus());
       if (!(await pushToAccount(saved))) {
         setSaveState(
@@ -643,6 +717,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const pushed = await updateServerMenu(saved.id, saved, serverBaseRef.current);
       serverBaseRef.current = pushed.updatedAt;
+      const actor = accountKeyRef.current;
+      if (actor) await refreshDraftSync(saved.id, actor, pushed.updatedAt);
       setSaveState(savedState("Saved to your account."));
       return true;
     } catch (error) {
@@ -751,10 +827,73 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const serverMenu = await fetchServerMenu(localDoc.id);
       if (docRef.current?.id !== localDoc.id) return;
+      const actor = signedInRef.current ? accountKeyRef.current : null;
+      const staffOnly = staffMenusRef.current.has(localDoc.id);
+      const origin = actor ? await getDraftOrigin(localDoc.id).catch(() => undefined) : undefined;
+      if (origin && actor && origin.accountId !== actor) {
+        // Another account's cached row on this device: never touch it.
+        removeServerId(localDoc.id);
+        setSaveState(savedState("Saved in this browser — not in your account."));
+        return;
+      }
+      const equal = sameMenuContent(serverMenu.doc, localDoc);
+      const decision = equal
+        ? "none"
+        : decideHeal({
+            contentEqual: false,
+            localUpdatedAt: localDoc.updatedAt,
+            lastSyncedUpdatedAt: origin?.lastSyncedUpdatedAt ?? "",
+            serverUpdatedAt: serverMenu.updatedAt,
+          });
+      if (decision === "push" && actor && !staffOnly) {
+        // Interrupted work (expired session, dropped connection) outranks an
+        // untouched server revision: push it instead of adopting over it.
+        try {
+          const pushed = await updateServerMenu(localDoc.id, localDoc, serverMenu.updatedAt);
+          if (docRef.current?.id !== localDoc.id) return;
+          serverBaseRef.current = pushed.updatedAt;
+          addServerId(localDoc.id);
+          await refreshDraftSync(localDoc.id, actor, pushed.updatedAt);
+          setSaveState(savedState("Saved to your account."));
+          await refreshLibrary();
+        } catch (pushError) {
+          if (docRef.current?.id !== localDoc.id) return;
+          if (pushError instanceof SyncError && pushError.code === "conflict") {
+            conflictRef.current = { serverUpdatedAt: pushError.currentUpdatedAt };
+            setConflict(conflictRef.current);
+            setConflictError(null);
+            setSaveState({
+              kind: "error",
+              message: "Changed on your other device — choose which version wins above.",
+            });
+          } else if (pushError instanceof SyncError && pushError.code === "forbidden") {
+            serverBaseRef.current = null;
+            setSaveState(
+              savedState("Saved in this browser — you don't have write access to this menu.")
+            );
+          } else {
+            setSaveState(
+              savedState("Saved in this browser — your account can't be reached right now.")
+            );
+          }
+        }
+        return;
+      }
       serverBaseRef.current = serverMenu.updatedAt;
       addServerId(localDoc.id);
-      const stripStamp = (value: MenuDocument) => JSON.stringify({ ...value, updatedAt: "" });
-      if (stripStamp(serverMenu.doc) !== stripStamp(localDoc)) {
+      if (decision === "conflict") {
+        // Both sides moved since the last agreement: an explicit choice,
+        // never a silent adopt over unsynced work.
+        conflictRef.current = { serverUpdatedAt: serverMenu.updatedAt };
+        setConflict(conflictRef.current);
+        setConflictError(null);
+        setSaveState({
+          kind: "error",
+          message: "Changed on your other device — choose which version wins above.",
+        });
+        return;
+      }
+      if (!equal) {
         let next: MenuDocument = serverMenu.doc;
         if (!storageDownRef.current) {
           next = await saveMenu(serverMenu.doc).catch(() => serverMenu.doc);
@@ -763,10 +902,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         docRef.current = next;
         lastSavedRef.current = JSON.stringify(next);
         setActiveDoc(next);
+        if (actor && !staffOnly) await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt);
         setSaveState(savedState("Showing the version from your account."));
         await refreshLibrary();
         return;
       }
+      if (actor && !staffOnly) await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt);
       setSaveState(savedState("Saved to your account."));
     } catch (error) {
       if (docRef.current?.id !== localDoc.id) return;
@@ -803,6 +944,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       serverBaseRef.current = serverMenu.updatedAt;
       conflictRef.current = null;
       setConflict(null);
+      const loadActor = accountKeyRef.current;
+      if (loadActor && !staffMenusRef.current.has(doc.id)) {
+        await refreshDraftSync(doc.id, loadActor, serverMenu.updatedAt);
+      }
       setSaveState(savedState("Showing the version from your account."));
       await refreshLibrary();
     } catch (error) {
@@ -827,6 +972,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const pushed = await updateServerMenu(doc.id, doc, expected);
       serverBaseRef.current = pushed.updatedAt;
+      const keepActor = accountKeyRef.current;
+      if (keepActor) await refreshDraftSync(doc.id, keepActor, pushed.updatedAt);
       conflictRef.current = null;
       setConflict(null);
       setSaveState(savedState("Saved to your account."));
@@ -867,6 +1014,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           return null;
         });
     if (!doc) return;
+    const newMenuActor = signedInRef.current ? accountKeyRef.current : null;
+    if (newMenuActor) await stampDraftOrigin(doc.id, newMenuActor, "");
     if (!storageDownRef.current) await refreshLibrary();
     await openDoc(doc, null);
   }
@@ -874,6 +1023,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   async function handleRenameMenu(id: string, title: string) {
     try {
       const renamed = await renameMenu(id, title);
+      const renameActor = signedInRef.current ? accountKeyRef.current : null;
+      if (renameActor && !staffMenusRef.current.has(id)) {
+        // Keep the existing baseline when this menu is not open: the
+        // editor's baseline belongs to another document.
+        await stampDraftOrigin(
+          id,
+          renameActor,
+          docRef.current?.id === id ? (serverBaseRef.current ?? "") : ""
+        );
+      }
       if (signedInRef.current && serverIdsRef.current.has(id)) {
         await pushRenameToAccount(renamed);
       }
@@ -903,6 +1062,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         const pushed = await updateServerMenu(renamed.id, renamed, serverMenu.updatedAt);
         if (docRef.current?.id === renamed.id) serverBaseRef.current = pushed.updatedAt;
+        const renameSyncActor = accountKeyRef.current;
+        if (renameSyncActor) await refreshDraftSync(renamed.id, renameSyncActor, pushed.updatedAt);
       } catch (error) {
         if (error instanceof SyncError && error.code === "not_found") {
           removeServerId(renamed.id); // Gone on the server; nothing to push.
@@ -1195,6 +1356,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }
       }
       await deleteMenu(id);
+      await clearDraftOrigin(id);
       removeServerId(id);
       if (docRef.current?.id === id) {
         docRef.current = null;
