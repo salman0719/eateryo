@@ -8,10 +8,12 @@ import {
   decideHeal,
   getDraftOrigin,
   listDraftOrigins,
+  menuContentHash,
   refreshDraftSync,
   stampDraftOrigin,
   visibleMenuIds,
 } from "../src/features/menus/draft-origins";
+import { createMenuDocument } from "../src/features/menu/menu-utils";
 
 function resetDatabase(): Promise<void> {
   closeDatabase();
@@ -33,19 +35,22 @@ describe("draft origins", () => {
       menuId: "m1",
       accountId: "user-a",
       lastSyncedUpdatedAt: "",
+      lastSyncedHash: "",
     });
 
-    await refreshDraftSync("m1", "user-a", "2026-10-25T10:00:00.000Z");
+    await refreshDraftSync("m1", "user-a", "2026-10-25T10:00:00.000Z", "abc123");
     expect((await getDraftOrigin("m1"))?.lastSyncedUpdatedAt).toBe("2026-10-25T10:00:00.000Z");
+    expect((await getDraftOrigin("m1"))?.lastSyncedHash).toBe("abc123");
   });
 
   it("never reassigns a row stamped to someone else", async () => {
-    await stampDraftOrigin("m1", "user-a", "s0");
+    await stampDraftOrigin("m1", "user-a", "s0", "h0");
 
     expect(await stampDraftOrigin("m1", "user-b", "s1")).toEqual({
       menuId: "m1",
       accountId: "user-a",
       lastSyncedUpdatedAt: "s0",
+      lastSyncedHash: "h0",
     });
     await refreshDraftSync("m1", "user-b", "s1");
     expect((await getDraftOrigin("m1"))?.accountId).toBe("user-a");
@@ -56,40 +61,117 @@ describe("draft origins", () => {
   });
 
   it("keeps the agreed revision when a save carries no new baseline", async () => {
-    await stampDraftOrigin("m1", "user-a", "s0");
+    await stampDraftOrigin("m1", "user-a", "s0", "h0");
     await stampDraftOrigin("m1", "user-a", "");
     expect((await getDraftOrigin("m1"))?.lastSyncedUpdatedAt).toBe("s0");
+    expect((await getDraftOrigin("m1"))?.lastSyncedHash).toBe("h0");
+  });
+
+  it("hashes content identically regardless of key order", () => {
+    const doc = createMenuDocument({ title: "Café" });
+    const reordered = JSON.parse(
+      JSON.stringify({ updatedAt: doc.updatedAt, currency: doc.currency, title: doc.title, id: doc.id, categories: doc.categories })
+    );
+    expect(menuContentHash({ ...doc, id: reordered.id })).toBe(
+      menuContentHash({ ...doc, ...reordered })
+    );
+    expect(menuContentHash({ ...doc, title: "Changed" })).not.toBe(menuContentHash(doc));
   });
 });
 
 describe("decideHeal", () => {
+  const hashed = {
+    localHash: "local",
+    serverHash: "server",
+    lastSyncedHash: "agreed",
+  };
+
   it("does nothing when the content already agrees", () => {
     expect(
-      decideHeal({ contentEqual: true, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1" })
+      decideHeal({ contentEqual: true, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1", ...hashed })
     ).toBe("none");
   });
 
   it("pushes local work when the server is untouched", () => {
     expect(
-      decideHeal({ contentEqual: false, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s0" })
+      decideHeal({ contentEqual: false, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s0", ...hashed })
     ).toBe("push");
   });
 
   it("raises a conflict when both sides moved", () => {
     expect(
-      decideHeal({ contentEqual: false, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1" })
+      decideHeal({ contentEqual: false, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1", ...hashed })
     ).toBe("conflict");
   });
 
-  it("adopts the server when the browser copy is a stale cache", () => {
+  it("adopts the server when the browser copy is exactly what was agreed", () => {
     expect(
-      decideHeal({ contentEqual: false, localUpdatedAt: "s0", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1" })
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "s0",
+        lastSyncedUpdatedAt: "s0",
+        serverUpdatedAt: "s1",
+        localHash: "agreed",
+        serverHash: "server",
+        lastSyncedHash: "agreed",
+      })
     ).toBe("adopt");
+  });
+
+  it("adopts without trusting timestamps when the local copy is untouched", () => {
+    // Clock skew or a restamped save must not turn a stale cache into a push.
+    expect(
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "t9",
+        lastSyncedUpdatedAt: "s0",
+        serverUpdatedAt: "s1",
+        localHash: "agreed",
+        serverHash: "server",
+        lastSyncedHash: "agreed",
+      })
+    ).toBe("adopt");
+  });
+
+  it("pushes by hash when the server matches the agreement but the stamp has no timestamp", () => {
+    expect(
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "t2",
+        lastSyncedUpdatedAt: "",
+        serverUpdatedAt: "s1",
+        localHash: "local",
+        serverHash: "agreed",
+        lastSyncedHash: "agreed",
+      })
+    ).toBe("push");
+  });
+
+  it("conflicts by hash when both sides left the agreement", () => {
+    expect(
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "t2",
+        lastSyncedUpdatedAt: "",
+        serverUpdatedAt: "s1",
+        localHash: "local",
+        serverHash: "server",
+        lastSyncedHash: "agreed",
+      })
+    ).toBe("conflict");
   });
 
   it("treats a never-confirmed row with a live server as a conflict, never a silent adopt", () => {
     expect(
-      decideHeal({ contentEqual: false, localUpdatedAt: "t1", lastSyncedUpdatedAt: "", serverUpdatedAt: "s1" })
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "t1",
+        lastSyncedUpdatedAt: "",
+        serverUpdatedAt: "s1",
+        localHash: "local",
+        serverHash: "server",
+        lastSyncedHash: "",
+      })
     ).toBe("conflict");
   });
 });

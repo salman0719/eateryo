@@ -14,6 +14,7 @@
  */
 
 import { idbDelete, idbGet, idbGetAll, idbPut, ORIGINS_STORE, tx } from "@/features/menu/indexeddb";
+import type { MenuDocument } from "@/features/menu/schema";
 
 /** Device-local ownership record for one browser draft. */
 export interface DraftOrigin {
@@ -24,6 +25,36 @@ export interface DraftOrigin {
    * has never been confirmed on the server.
    */
   lastSyncedUpdatedAt: string;
+  /**
+   * Content hash of the agreed revision (updatedAt excluded); `""` for
+   * stamps written before hashing existed. Lets the heal tell "my edits"
+   * from "a stale cache" exactly, without trusting timestamps.
+   */
+  lastSyncedHash: string;
+}
+
+/** Key-order-immune serialization (the DB may normalize object key order). */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "";
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0
+  );
+  return `{${entries.map(([key, entry]) => `${JSON.stringify(key)}:${stableStringify(entry)}`).join(",")}}`;
+}
+
+function fnv1a(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index++) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+/** Content identity ignoring the save stamp; equal content hashes equal. */
+export function menuContentHash(doc: MenuDocument): string {
+  return fnv1a(stableStringify({ ...doc, updatedAt: "" }));
 }
 
 /**
@@ -34,7 +65,8 @@ export interface DraftOrigin {
 export async function stampDraftOrigin(
   menuId: string,
   accountId: string,
-  lastSyncedUpdatedAt: string
+  lastSyncedUpdatedAt: string,
+  lastSyncedHash = ""
 ): Promise<DraftOrigin> {
   const existing = await getDraftOrigin(menuId).catch(() => undefined);
   if (existing && existing.accountId !== accountId) return existing;
@@ -45,6 +77,10 @@ export async function stampDraftOrigin(
       existing && existing.accountId === accountId && !lastSyncedUpdatedAt
         ? existing.lastSyncedUpdatedAt
         : lastSyncedUpdatedAt,
+    lastSyncedHash:
+      existing && existing.accountId === accountId && !lastSyncedHash
+        ? (existing.lastSyncedHash ?? "")
+        : lastSyncedHash,
   };
   await tx(ORIGINS_STORE, "readwrite", ([store]) => idbPut(store, next)).catch(() => undefined);
   return next;
@@ -54,11 +90,12 @@ export async function stampDraftOrigin(
 export async function refreshDraftSync(
   menuId: string,
   accountId: string,
-  lastSyncedUpdatedAt: string
+  lastSyncedUpdatedAt: string,
+  lastSyncedHash = ""
 ): Promise<void> {
   const existing = await getDraftOrigin(menuId).catch(() => undefined);
   if (existing && existing.accountId !== accountId) return;
-  const next: DraftOrigin = { menuId, accountId, lastSyncedUpdatedAt };
+  const next: DraftOrigin = { menuId, accountId, lastSyncedUpdatedAt, lastSyncedHash };
   await tx(ORIGINS_STORE, "readwrite", ([store]) => idbPut(store, next)).catch(() => undefined);
 }
 
@@ -94,17 +131,33 @@ export interface HealInputs {
   lastSyncedUpdatedAt: string;
   /** The server's current updatedAt. */
   serverUpdatedAt: string;
+  /** Content hash of the browser copy. */
+  localHash: string;
+  /** Content hash of the server copy. */
+  serverHash: string;
+  /** Content hash of the last agreed revision ("" = unknown). */
+  lastSyncedHash: string;
 }
 
 /**
- * Triage for a stamped row whose content differs from the server:
- * - server untouched since we last agreed + local saved after → push ours;
- * - server moved elsewhere too → explicit conflict, never a silent adopt;
- * - otherwise the browser copy is just a stale cache → adopt the server.
+ * Triage for a row whose content differs from the server. Exact knowledge
+ * first: when the agreed hash is known, "local untouched" means adopt and
+ * "server untouched" means push, whatever the timestamps say. Without a
+ * hash (legacy stamps), fall back to timestamps — and treat "never
+ * confirmed" as a conflict, never a silent adopt.
  * Equal content needs nothing. Pure, so it is unit-tested without a browser.
  */
 export function decideHeal(inputs: HealInputs): HealDecision {
   if (inputs.contentEqual) return "none";
+  if (inputs.lastSyncedHash) {
+    // The browser copy is exactly what we last agreed on: a stale cache.
+    if (inputs.localHash === inputs.lastSyncedHash) return "adopt";
+    const serverUnchanged =
+      inputs.lastSyncedUpdatedAt !== ""
+        ? inputs.serverUpdatedAt === inputs.lastSyncedUpdatedAt
+        : inputs.serverHash === inputs.lastSyncedHash;
+    return serverUnchanged ? "push" : "conflict";
+  }
   const localAhead =
     inputs.lastSyncedUpdatedAt === "" || inputs.localUpdatedAt > inputs.lastSyncedUpdatedAt;
   const serverMoved = inputs.serverUpdatedAt !== inputs.lastSyncedUpdatedAt;

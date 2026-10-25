@@ -97,6 +97,7 @@ import {
   decideHeal,
   getDraftOrigin,
   listDraftOrigins,
+  menuContentHash,
   refreshDraftSync,
   stampDraftOrigin,
   visibleMenuIds,
@@ -595,7 +596,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             const full = await fetchServerMenu(summary.id);
             await cacheMenu(full.doc);
             const mergeActor = accountKeyRef.current;
-            if (mergeActor) await refreshDraftSync(summary.id, mergeActor, full.updatedAt);
+            if (mergeActor)
+              await refreshDraftSync(summary.id, mergeActor, full.updatedAt, menuContentHash(full.doc));
             cachedAny = true;
           } catch {
             // One failed download never blocks the rest; the menu stays in
@@ -639,8 +641,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         const local = await getMenu(origin.menuId);
         const server = await fetchServerMenu(origin.menuId);
+        const healedLocalHash = menuContentHash(local);
         if (sameMenuContent(server.doc, local)) {
-          await refreshDraftSync(origin.menuId, actor, server.updatedAt);
+          await refreshDraftSync(origin.menuId, actor, server.updatedAt, healedLocalHash);
           continue;
         }
         const decision = decideHeal({
@@ -648,10 +651,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           localUpdatedAt: local.updatedAt,
           lastSyncedUpdatedAt: origin.lastSyncedUpdatedAt,
           serverUpdatedAt: server.updatedAt,
+          localHash: healedLocalHash,
+          serverHash: menuContentHash(server.doc),
+          lastSyncedHash: origin.lastSyncedHash ?? "",
         });
         if (decision !== "push") continue;
         const pushed = await updateServerMenu(local.id, local, server.updatedAt);
-        await refreshDraftSync(local.id, actor, pushed.updatedAt);
+        await refreshDraftSync(local.id, actor, pushed.updatedAt, healedLocalHash);
         healedAny = true;
       } catch {
         // Never on the server, unreachable, or unreadable: the offer/manual
@@ -722,7 +728,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       const pushed = await updateServerMenu(saved.id, saved, serverBaseRef.current);
       serverBaseRef.current = pushed.updatedAt;
       const actor = accountKeyRef.current;
-      if (actor) await refreshDraftSync(saved.id, actor, pushed.updatedAt);
+      if (actor) await refreshDraftSync(saved.id, actor, pushed.updatedAt, menuContentHash(saved));
       setSaveState(savedState("Saved to your account."));
       return true;
     } catch (error) {
@@ -841,6 +847,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         return;
       }
       const equal = sameMenuContent(serverMenu.doc, localDoc);
+      const localHash = menuContentHash(localDoc);
       const decision = equal
         ? "none"
         : decideHeal({
@@ -848,6 +855,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             localUpdatedAt: localDoc.updatedAt,
             lastSyncedUpdatedAt: origin?.lastSyncedUpdatedAt ?? "",
             serverUpdatedAt: serverMenu.updatedAt,
+            localHash,
+            serverHash: menuContentHash(serverMenu.doc),
+            lastSyncedHash: origin?.lastSyncedHash ?? "",
           });
       if (decision === "push" && actor && !staffOnly) {
         // Interrupted work (expired session, dropped connection) outranks an
@@ -857,7 +867,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           if (docRef.current?.id !== localDoc.id) return;
           serverBaseRef.current = pushed.updatedAt;
           addServerId(localDoc.id);
-          await refreshDraftSync(localDoc.id, actor, pushed.updatedAt);
+          await refreshDraftSync(localDoc.id, actor, pushed.updatedAt, localHash);
           setSaveState(savedState("Saved to your account."));
           await refreshLibrary();
         } catch (pushError) {
@@ -906,12 +916,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         docRef.current = next;
         lastSavedRef.current = JSON.stringify(next);
         setActiveDoc(next);
-        if (actor && !staffOnly) await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt);
+        if (actor && !staffOnly)
+          await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, menuContentHash(next));
         setSaveState(savedState("Showing the version from your account."));
         await refreshLibrary();
         return;
       }
-      if (actor && !staffOnly) await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt);
+      if (actor && !staffOnly)
+        await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, localHash);
       setSaveState(savedState("Saved to your account."));
     } catch (error) {
       if (docRef.current?.id !== localDoc.id) return;
@@ -950,7 +962,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       setConflict(null);
       const loadActor = accountKeyRef.current;
       if (loadActor && !staffMenusRef.current.has(doc.id)) {
-        await refreshDraftSync(doc.id, loadActor, serverMenu.updatedAt);
+        await refreshDraftSync(doc.id, loadActor, serverMenu.updatedAt, menuContentHash(next));
       }
       setSaveState(savedState("Showing the version from your account."));
       await refreshLibrary();
@@ -977,7 +989,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       const pushed = await updateServerMenu(doc.id, doc, expected);
       serverBaseRef.current = pushed.updatedAt;
       const keepActor = accountKeyRef.current;
-      if (keepActor) await refreshDraftSync(doc.id, keepActor, pushed.updatedAt);
+      if (keepActor) await refreshDraftSync(doc.id, keepActor, pushed.updatedAt, menuContentHash(doc));
       conflictRef.current = null;
       setConflict(null);
       setSaveState(savedState("Saved to your account."));
@@ -1067,7 +1079,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         const pushed = await updateServerMenu(renamed.id, renamed, serverMenu.updatedAt);
         if (docRef.current?.id === renamed.id) serverBaseRef.current = pushed.updatedAt;
         const renameSyncActor = accountKeyRef.current;
-        if (renameSyncActor) await refreshDraftSync(renamed.id, renameSyncActor, pushed.updatedAt);
+        if (renameSyncActor)
+          await refreshDraftSync(renamed.id, renameSyncActor, pushed.updatedAt, menuContentHash(renamed));
       } catch (error) {
         if (error instanceof SyncError && error.code === "not_found") {
           removeServerId(renamed.id); // Gone on the server; nothing to push.
