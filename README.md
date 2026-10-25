@@ -67,7 +67,7 @@ sample data, so the editor, persistence, and export can all be exercised.
 | `DATABASE_URL`       | Server (optional) | Neon Postgres URL. Absent = local-only mode.                      |
 | `BETTER_AUTH_SECRET` | Server only       | Better Auth secret; generate with `openssl rand -base64 32`.      |
 | `BETTER_AUTH_URL`    | Server            | App base URL (local `http://localhost:3200`; prod = site URL).    |
-| `RESEND_API_KEY`     | Server only       | Resend key for sign-in and invitation emails (sandbox sender until a verified domain exists). |
+| `RESEND_API_KEY`     | Server only       | Resend key for sign-in and invitation emails (sends from the verified domain). |
 | `EMAIL_FROM`         | Server only       | Verified sending address for sign-in mail.                        |
 | `OPS_ALERT_EMAIL`    | Server only       | Inbox for failure and volume alerts (Step 11).                    |
 | `CONTACT_EMAIL`      | Server            | Address shown on `/privacy` and `/terms`; unset renders an explicit notice. |
@@ -115,7 +115,7 @@ Steps 7–11 are complete in code and proven against Neon locally: magic-link
 sign-in → session → restaurant → server menus → published public page →
 cross-device table ordering, plus the free-launch packaging. What's left
 before a public launch is the deploy plus the open items in
-`docs/launch-runbook.md` (Sentry project, verified sending domain, contact
+`docs/launch-runbook.md` (Sentry project, contact
 address, promotion dates):
 
 - **Sign-in** — `/sign-in` sends a one-time magic link (Better Auth, implicit

@@ -105,8 +105,8 @@ launch must not be advertised until it is fixed.
 - **Error tracking vendor**: alert emails and structured logs are live; the
   Sentry project from PHASE-2 §7 does not exist yet, so there is no third-party
   error dashboard. Add the DSN and SDK before scaling the promotion.
-- **Sending domain**: sign-in mail still uses Resend's sandbox sender, which
-  only delivers to the account owner's address. Verify a domain before
-  onboarding a café that is not you.
+- **Sending domain**: verified — sign-in mail sends from
+  `notifications@send.eateryo.com`. If sign-in mail ever fails, check that
+  `EMAIL_FROM` matches the verified sender in both `.env.local` and Vercel.
 - **Custom domains** are out of scope; the public menu lives on the app's
   domain.
