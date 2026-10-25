@@ -55,7 +55,14 @@ import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
   kind: "saved" | "saving" | "error";
+  /** Short status: "Saved", or the failure/conflict sentence. */
   message: string;
+  /**
+   * Where the save went ("Saved in this browser" / "Saved to your account").
+   * Shown as a tooltip and to screen readers so the main status stays one
+   * word; storage mode is a detail, not a concept to learn.
+   */
+  detail?: string;
 }
 
 interface MenuEditorProps {
@@ -75,8 +82,6 @@ interface MenuEditorProps {
    * signed-in account with the local copy as an offline cache (Step 8).
    */
   syncMode: "local" | "account";
-  /** Navigate to My menus with this menu's move button highlighted. */
-  onMoveToAccount?: () => void;
   imageUrl: string | null;
   onExportJson: () => void;
   onExportCsv: () => void;
@@ -95,6 +100,8 @@ interface MenuEditorProps {
    * sync to the server copy or stay in this browser.
    */
   onServer?: boolean;
+  /** Open the publish wizard for a browser-only menu (R1). */
+  onStartPublish?: () => void;
   /**
    * Publishing state and actions (Step 9). Absent when nothing can publish
    * in this context, in which case the preview simply omits the panel.
@@ -142,9 +149,9 @@ export function MenuEditor({
   onChange,
   saveState,
   syncMode,
-  onMoveToAccount,
   canManage = true,
   onServer = false,
+  onStartPublish,
   imageUrl,
   onExportJson,
   onExportCsv,
@@ -418,6 +425,7 @@ export function MenuEditor({
       )}
       <p
         role="status"
+        title={saveState.detail}
         className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
       >
         {saveState.kind === "saving" ? (
@@ -431,6 +439,7 @@ export function MenuEditor({
         ) : (
           saveState.message
         )}
+        {saveState.detail && <span className="sr-only"> — {saveState.detail}</span>}
       </p>
       <span className="flex-1" />
       {!canManage ? (
@@ -517,6 +526,7 @@ export function MenuEditor({
             themeId={previewThemeId}
             layout={previewLayout}
             controls={publishing}
+            onStartWizard={onStartPublish}
           />
         )}
         <MenuPreview
@@ -690,15 +700,39 @@ export function MenuEditor({
           stays compact and food items show sooner. Kept below (commented out)
           in case it needs to come back. */}
       <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
-        Once your menu is set,{" "}
-        <button
-          type="button"
-          onClick={() => changeMode("preview")}
-          className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-        >
-          go to Preview
-        </button>{" "}
-        to publish it and get your public link.
+        {onStartPublish && !onServer ? (
+          <>
+            Once your menu is set,{" "}
+            <button
+              type="button"
+              onClick={onStartPublish}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              get your public link
+            </button>{" "}
+            — we create your café if you don&apos;t have one yet. Or{" "}
+            <button
+              type="button"
+              onClick={() => changeMode("preview")}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              preview it first
+            </button>
+            .
+          </>
+        ) : (
+          <>
+            Once your menu is set,{" "}
+            <button
+              type="button"
+              onClick={() => changeMode("preview")}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              go to Preview
+            </button>{" "}
+            to publish it and get your public link.
+          </>
+        )}
       </p>
       {/*
       {publishing && canManage && (
@@ -796,11 +830,10 @@ export function MenuEditor({
         <AvailabilityPanel
           key={doc.id}
           menuId={doc.id}
-          // Opening hours live with the server copy: a browser-only menu has
-          // no availability row to fetch, account mode or not.
+          // Opening hours live with the menu in your account: a browser-only
+          // menu has no availability row to fetch, account mode or not.
           syncMode={onServer ? "account" : "local"}
           canManage={canManage}
-          onMoveToAccount={onMoveToAccount}
         />
       </div>
       {duplicateGroups.length > 0 && (
@@ -1139,9 +1172,11 @@ export function MenuEditor({
         </p>
       )}{" "}
       <p className="text-xs leading-5 text-stone-500">
-        {syncMode === "account"
-          ? "This menu syncs to your account — signing in on another device shows the same data. A local copy stays in this browser as an offline cache."
-          : "Menus are stored locally in this browser on this device — they don't follow you to other devices. Sign in to sync them to your account, or export JSON backups."}
+        {onServer
+          ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
+          : syncMode === "account"
+            ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
+            : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
       </p>
     </div>
   );

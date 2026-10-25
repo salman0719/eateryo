@@ -24,6 +24,7 @@ import {
   type PendingInvitation,
   type RestaurantOption,
 } from "@/features/tenancy/client";
+import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
 
 /**
  * Restaurant settings: rename inline, manage the team (owner-only writes),
@@ -79,7 +80,7 @@ export function RestaurantSettings({
 
   const owned = restaurants?.filter((r) => r.role === "owner") ?? [];
   const staffOnly = restaurants !== null && owned.length === 0 && restaurants.length > 0;
-  const selected = owned.find((r) => r.id === selectedId) ?? null;
+  const selected = selectedRestaurant(owned, selectedId);
 
   async function handleRename(name: string) {
     if (!selected) return;
@@ -167,14 +168,14 @@ export function RestaurantSettings({
           title="You don't own a restaurant yet"
           steps={[
             "Open My menus and pick a menu — upload a photo first if you don't have one yet.",
-            "Use “Move my menus to my account” on it: moving a menu creates the restaurant that owns it.",
+            "Use “Import from this browser” in My menus: adding a menu creates the café that owns it.",
             "Come back here to rename it, staff it, or delete it.",
           ]}
           action={{ href: "/menus", label: "Go to My menus" }}
         />
       )}
 
-      {owned.length > 0 && (
+      {showRestaurantPicker(owned) && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
             Restaurant
@@ -193,9 +194,13 @@ export function RestaurantSettings({
               ))}
             </select>
           </label>
-
-          {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
         </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs text-red-700">
+          {error}
+        </p>
       )}
 
       {selected && (

@@ -3,10 +3,11 @@ export type AppScreen =
 
 /**
  * The surface shown for an open menu: the edit workspace, the compact
- * reorder list, the printable table QR cards, or the customer preview.
- * Mirrors the editor modes, each with its own deep-linkable URL.
+ * reorder list, the customer preview, or the get-your-link publish wizard
+ * (R1). Table QR cards moved to the Tables tab (R0), so there is no `qr`
+ * mode. Each mode has its own deep-linkable URL.
  */
-export type EditorMode = "edit" | "reorder" | "preview";
+export type EditorMode = "edit" | "reorder" | "preview" | "publish";
 
 export type AppRoute =
   | { screen: "capture" | "library" | "orders" | "assistant" | "tables" | "settings" }
@@ -17,13 +18,19 @@ export type AppRoute =
 export function menuSelectionFromPathname(
   pathname: string
 ): { menuId: string; mode?: EditorMode; itemId?: string } | null {
-  const menuMatch = /^\/menus\/([^/]+)(?:\/(reorder|preview)|\/items\/([^/]+))?$/.exec(pathname);
+  const menuMatch = /^\/menus\/([^/]+)(?:\/(reorder|preview|publish)|\/items\/([^/]+))?$/.exec(
+    pathname
+  );
   if (!menuMatch?.[1]) return null;
   try {
     const menuId = decodeURIComponent(menuMatch[1]).trim();
     if (!menuId) return null;
     const [, , modeSegment, rawItemId] = menuMatch;
-    if (modeSegment === "reorder" || modeSegment === "preview") {
+    if (
+      modeSegment === "reorder" ||
+      modeSegment === "preview" ||
+      modeSegment === "publish"
+    ) {
       return { menuId, mode: modeSegment };
     }
     if (rawItemId !== undefined) {

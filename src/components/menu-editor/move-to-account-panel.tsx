@@ -13,26 +13,30 @@ import {
 } from "@/features/tenancy/client";
 
 /**
- * "Move my menus to my account" (PHASE-2.md §3.4). Shown in the library for
- * signed-in users: pick a restaurant you own, then copy every local menu into
- * it through the validated API. One-way — local copies are never deleted —
- * and idempotent, so re-running only reports what was already there.
- * Owners can also rename or delete the selected restaurant (delete cascades
- * its menus, published pages and orders server-side, so it warns first).
+ * "Import from this browser": the manual fallback for menus saved here.
+ * Demoted under My menus for R1: the common case is now claimed by the
+ * post-sign-in offer or imported automatically for a brand-new account, and
+ * this panel is the honest retry path for partial failures.
  *
- * Individual rows carry their own "Move to account" action in the library;
+ * Pick a restaurant you own, then copy every local menu into it through the
+ * validated API. One-way — local copies are never deleted — and idempotent,
+ * so re-running only reports what was already there. Owners can also rename
+ * or delete the selected restaurant (delete cascades its menus, published
+ * pages and orders server-side, so it warns first).
+ *
+ * Individual rows carry their own "Add to account" action in the library;
  * `onOwnedChange` keeps that action's target list in step with the
  * restaurants created, renamed, or deleted here.
  */
 
 interface MoveToAccountPanelProps {
-  /** How many local-only menus the move would consider (for the button label). */
+  /** How many browser-only menus the add would consider (button label). */
   menuCount: number;
   /** Name guessed from the local menu titles, to prefill the create field. */
   suggestedName?: string | null;
   /** Called after a run that imported at least one menu (refresh the library). */
   onMoved?: () => void;
-  /** The owned restaurants, mirrored up for the per-row move action. */
+  /** The owned restaurants, mirrored up for the per-row add action. */
   onOwnedChange?: (owned: RestaurantOption[]) => void;
 }
 
@@ -81,7 +85,7 @@ export function MoveToAccountPanel({
   const staffOnly = restaurants !== null && owned.length === 0 && restaurants.length > 0;
   const selected = owned.find((r) => r.id === selectedId) ?? null;
 
-  /** Mirror the owned restaurants up for the per-row move action. */
+  /** Mirror the owned restaurants up for the per-row add action. */
   function publishOwned(list: RestaurantOption[]) {
     onOwnedChange?.(list.filter((restaurant) => restaurant.role === "owner"));
   }
@@ -165,11 +169,11 @@ export function MoveToAccountPanel({
       if (result.imported.length > 0) onMoved?.();
     } catch (moveError) {
       // moveLocalMenusToAccount reports per-menu failures itself; a throw
-      // here means even reading the local library failed.
+      // here means even reading the browser library failed.
       setError(
         moveError instanceof Error
           ? moveError.message
-          : "Could not read your local menus. Try refreshing the page."
+          : "Could not read the menus saved in this browser. Try refreshing the page."
       );
     } finally {
       setBusy(false);
@@ -177,13 +181,13 @@ export function MoveToAccountPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-5">
+    <section className="bg-white p-4 sm:p-5">
       <h3 className="text-sm font-bold tracking-tight text-stone-900">
-        Move my menus to my account
+        Menus saved in this browser
       </h3>
       <p className="mt-1 text-xs leading-5 text-stone-500">
-        Copies your {menuCount === 1 ? "locally saved menu" : `${menuCount} locally saved menus`}
-        {""} into your account so other devices see them too. This browser keeps its copies —
+        Adds your {menuCount === 1 ? "saved menu" : `${menuCount} saved menus`} to your account so
+        other devices see {menuCount === 1 ? "it" : "them"} too. This browser keeps its copies —
         nothing is deleted.
       </p>
 
@@ -245,7 +249,7 @@ export function MoveToAccountPanel({
       {owned.length > 0 && !report && (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
           <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
-            Move into
+            Add to
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
@@ -267,7 +271,7 @@ export function MoveToAccountPanel({
             disabled={busy || !selectedId}
             className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
-            {busy ? "Moving…" : `Move ${menuCount === 1 ? "1 menu" : `${menuCount} menus`}`}
+            {busy ? "Adding…" : `Add ${menuCount === 1 ? "1 menu" : `${menuCount} menus`}`}
           </button>
         </div>
       )}
@@ -334,8 +338,8 @@ export function MoveToAccountPanel({
       {report && (
         <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
           <p className="text-sm font-medium text-stone-900">
-            Moved {report.imported.length} · already in your account {report.skipped.length} ·
-            failed {report.failed.length}
+            Added {report.imported.length} · already there {report.skipped.length} · failed{" "}
+            {report.failed.length}
           </p>
           {report.failed.length > 0 && (
             <ul className="mt-2 space-y-1">
