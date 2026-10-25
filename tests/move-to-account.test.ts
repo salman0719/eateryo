@@ -170,6 +170,22 @@ describe("moveLocalMenusToAccount", () => {
     expect(state.restaurants).toEqual(["r-1", "r-1"]);
   });
 
+  it("moves only the given ids when scoped, leaving hidden rows alone", async () => {
+    await saveMenu({ ...createSampleMenuDocument(), id: "menu-visible" });
+    await saveMenu({ ...createSampleMenuDocument(), id: "menu-hidden" });
+
+    const state: ServerState = { menus: new Map(), restaurants: [] };
+    stubServer(state);
+
+    const report = await moveLocalMenusToAccount("r-1", ["menu-visible"]);
+
+    expect(report.imported).toEqual(["menu-visible"]);
+    expect(state.menus.has("menu-hidden")).toBe(false);
+    // Nothing is deleted either way.
+    const { listMenus } = await import("@/features/menu/storage");
+    expect((await listMenus()).map((m) => m.id).sort()).toEqual(["menu-hidden", "menu-visible"]);
+  });
+
   it("is idempotent: a second run skips menus that already exist", async () => {
     await saveMenu({ ...createSampleMenuDocument(), id: "menu-once" });
 

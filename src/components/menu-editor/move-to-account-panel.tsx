@@ -32,6 +32,8 @@ import {
 interface MoveToAccountPanelProps {
   /** How many browser-only menus the add would consider (button label). */
   menuCount: number;
+  /** Ids to move; when set, hidden rows from another session are skipped. */
+  menuIds?: string[];
   /** Name guessed from the local menu titles, to prefill the create field. */
   suggestedName?: string | null;
   /** Called after a run that imported at least one menu (refresh the library). */
@@ -42,6 +44,7 @@ interface MoveToAccountPanelProps {
 
 export function MoveToAccountPanel({
   menuCount,
+  menuIds,
   suggestedName,
   onMoved,
   onOwnedChange,
@@ -164,7 +167,7 @@ export function MoveToAccountPanel({
     setError(null);
     setReport(null);
     try {
-      const result = await moveLocalMenusToAccount(selectedId);
+      const result = await moveLocalMenusToAccount(selectedId, menuIds);
       setReport(result);
       if (result.imported.length > 0) onMoved?.();
     } catch (moveError) {

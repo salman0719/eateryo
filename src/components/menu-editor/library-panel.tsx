@@ -19,6 +19,8 @@ interface LibraryPanelProps {
   loading?: boolean;
   /** Signed in: every row carries an account-status chip. */
   accountMode: boolean;
+  /** Signed out with stamped rows hidden: say so instead of "no menus". */
+  hasHiddenMenus?: boolean;
   /** Restaurants the caller owns — where a per-row add can put a menu. */
   ownedRestaurants?: RestaurantOption[];
   /**
@@ -43,6 +45,7 @@ export function LibraryPanel({
   menus,
   loading = false,
   accountMode,
+  hasHiddenMenus = false,
   ownedRestaurants = [],
   onMoveToAccount,
   unavailable,
@@ -134,9 +137,13 @@ export function LibraryPanel({
         </div>
       ) : menus.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-          <p className="font-medium text-stone-900">No saved menus yet</p>
+          <p className="font-medium text-stone-900">
+            {hasHiddenMenus ? "Signed out" : "No saved menus yet"}
+          </p>
           <p className="mt-1 text-sm text-stone-600">
-            Extract a menu or start a blank one — it will appear here and survive refreshes.
+            {hasHiddenMenus
+              ? "Your menus reappear when you sign in."
+              : "Extract a menu or start a blank one — it will appear here and survive refreshes."}
           </p>
         </div>
       ) : (

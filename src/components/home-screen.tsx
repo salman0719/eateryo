@@ -99,6 +99,7 @@ import {
   listDraftOrigins,
   refreshDraftSync,
   stampDraftOrigin,
+  visibleMenuIds,
   type DraftOrigin,
 } from "@/features/menus/draft-origins";
 import {
@@ -345,6 +346,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [restaurantCountFor, setRestaurantCountFor] = useState<string | null>(null);
   /** Which account the server menu ids belong to; null until a merge settles. */
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
+  /** Device-local ownership stamps (which account each draft belongs to). */
+  const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   /** The answer just given here; the stored per-account value is the fallback. */
   const [claimAnswer, setClaimAnswer] = useState<{
     accountKey: string;
@@ -550,6 +553,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   async function refreshLibrary() {
     try {
       setMenus(await listMenus());
+      setOriginList(await listDraftOrigins());
       setStorageDown(false);
       storageDownRef.current = false;
     } catch (error) {
@@ -1103,7 +1107,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     menuId: string,
     restaurantId: string
   ): Promise<string | null> {
-    const title = menus.find((menu) => menu.id === menuId)?.title ?? "That menu";
+    const title = visibleMenus.find((menu) => menu.id === menuId)?.title ?? "That menu";
     const outcome = await moveLocalMenuToAccount(restaurantId, menuId);
     if (outcome.status === "failed") {
       return `“${title}” could not be added — ${outcome.reason}`;
@@ -1123,7 +1127,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setClaimBusy(true);
     setClaimError(null);
     try {
-      const report = await moveLocalMenusToAccount(restaurantId);
+      // Only the visible browser-only rows move: hidden rows belong to
+      // another session and are never swept into this account.
+      const report = await moveLocalMenusToAccount(
+        restaurantId,
+        localOnly.map((menu) => menu.id)
+      );
       [...report.imported, ...report.skipped].forEach((id) => addServerId(id));
       setClaimNotice({
         imported: report.imported.length,
@@ -1714,9 +1723,22 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const activeStep = stepIndex(phase, result !== null);
   const assistantPending = sessionPending || (signedIn && featureFlagsLoading);
 
+  // Sign-out is a privacy boundary: stamped rows belong to their owner and
+  // never render for anyone else (or for nobody signed out); anonymous rows
+  // are the shared working set. Hidden rows also stay out of the claim
+  // offer, the manual import, the tab count, and the restaurant name guess.
+  const visibleIds = new Set(
+    visibleMenuIds(
+      menus.map((menu) => menu.id),
+      originList,
+      signedIn ? accountKey : null
+    )
+  );
+  const visibleMenus = menus.filter((menu) => visibleIds.has(menu.id));
+  const hasHiddenMenus = visibleMenus.length !== menus.length;
   // Library rows carry their account state: menus on the server show as
   // synced; the rest are browser-only until moved (or downloaded).
-  const libraryMenus = menus.map((menu) => ({ ...menu, onServer: serverIds.has(menu.id) }));
+  const libraryMenus = visibleMenus.map((menu) => ({ ...menu, onServer: serverIds.has(menu.id) }));
   const localOnly = libraryMenus.filter((menu) => !menu.onServer);
   const localOnlyCount = localOnly.length;
   // A list cached from another account is never offered as a move target.
@@ -1803,7 +1825,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             {(
               [
                 { id: "capture", label: "Capture" },
-                { id: "library", label: `My menus${menus.length ? ` (${menus.length})` : ""}` },
+                { id: "library", label: `My menus${visibleMenus.length ? ` (${visibleMenus.length})` : ""}` },
                 { id: "orders", label: "Orders" },
                 // R0: tabs are always rendered so the app never changes shape
                 // signed out. Tables/Settings render their own signed-out
@@ -1884,6 +1906,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               menus={libraryMenus}
               loading={libraryLoading}
               accountMode={signedIn}
+              hasHiddenMenus={hasHiddenMenus}
               ownedRestaurants={signedIn ? ownedRestaurantsForAccount : []}
               onMoveToAccount={handleMoveMenuToAccount}
               unavailable={storageDown}
@@ -1906,6 +1929,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 <div className="border-t border-stone-200">
                   <MoveToAccountPanel
                     menuCount={localOnlyCount}
+                    menuIds={localOnly.map((menu) => menu.id)}
                     suggestedName={suggestedRestaurantName}
                     onMoved={() => void mergeAccountMenus()}
                     onOwnedChange={setOwnedRestaurants}
