@@ -99,6 +99,7 @@ import {
   listDraftOrigins,
   menuContentHash,
   refreshDraftSync,
+  stampClaimedMenus,
   stampDraftOrigin,
   visibleMenuIds,
   type DraftOrigin,
@@ -1126,6 +1127,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       return `“${title}” could not be added — ${outcome.reason}`;
     }
     addServerId(menuId);
+    const moveActor = accountKeyRef.current;
+    if (moveActor) await stampClaimedMenus([menuId], moveActor, (id) => getMenu(id));
     await mergeAccountMenus();
     return null;
   }
@@ -1147,6 +1150,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         localOnly.map((menu) => menu.id)
       );
       [...report.imported, ...report.skipped].forEach((id) => addServerId(id));
+      // Claimed rows are provably the account's copies: stamp them so a
+      // later sign-out hides them instead of showing stale doppelgängers.
+      if (accountKey) {
+        await stampClaimedMenus(
+          [...report.imported, ...report.skipped],
+          accountKey,
+          (id) => getMenu(id)
+        );
+      }
       setClaimNotice({
         imported: report.imported.length,
         failed: report.failed.length,
@@ -1944,7 +1956,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                     menuCount={localOnlyCount}
                     menuIds={localOnly.map((menu) => menu.id)}
                     suggestedName={suggestedRestaurantName}
-                    onMoved={() => void mergeAccountMenus()}
+                    onMoved={(report) => {
+                      const actor = accountKeyRef.current;
+                      void (async () => {
+                        if (actor) {
+                          await stampClaimedMenus(
+                            [...report.imported, ...report.skipped],
+                            actor,
+                            (id) => getMenu(id)
+                          );
+                        }
+                        await mergeAccountMenus();
+                      })();
+                    }}
                     onOwnedChange={setOwnedRestaurants}
                   />
                 </div>

@@ -10,6 +10,7 @@ import {
   listDraftOrigins,
   menuContentHash,
   refreshDraftSync,
+  stampClaimedMenus,
   stampDraftOrigin,
   visibleMenuIds,
 } from "../src/features/menus/draft-origins";
@@ -173,6 +174,49 @@ describe("decideHeal", () => {
         lastSyncedHash: "",
       })
     ).toBe("conflict");
+  });
+});
+
+describe("stampClaimedMenus", () => {
+  const doc = (id: string, title: string) => ({
+    ...createMenuDocument({ title }),
+    id,
+  });
+
+  it("stamps imported rows with the uploaded content hash, no baseline", async () => {
+    const docs: Record<string, ReturnType<typeof doc>> = {
+      m1: doc("m1", "Lunch"),
+      m2: doc("m2", "Drinks"),
+    };
+    await stampClaimedMenus(["m1", "m2"], "user-a", async (id) => docs[id]!);
+    for (const id of ["m1", "m2"]) {
+      const origin = await getDraftOrigin(id);
+      expect(origin?.accountId).toBe("user-a");
+      expect(origin?.lastSyncedUpdatedAt).toBe("");
+      expect(origin?.lastSyncedHash).toBe(menuContentHash(docs[id]!));
+    }
+  });
+
+  it("skips unreadable rows without blocking the rest", async () => {
+    const docs: Record<string, ReturnType<typeof doc>> = { m1: doc("m1", "Lunch") };
+    await stampClaimedMenus(["m1", "missing"], "user-a", async (id) => {
+      const found = docs[id];
+      if (!found) throw new Error("not here");
+      return found;
+    });
+    expect((await getDraftOrigin("m1"))?.accountId).toBe("user-a");
+    expect(await getDraftOrigin("missing")).toBeUndefined();
+  });
+
+  it("never reassigns another account's stamp at claim time", async () => {
+    await stampDraftOrigin("m1", "user-a", "s0", "h0");
+    await stampClaimedMenus(["m1"], "user-b", async () => doc("m1", "Changed"));
+    expect(await getDraftOrigin("m1")).toEqual({
+      menuId: "m1",
+      accountId: "user-a",
+      lastSyncedUpdatedAt: "s0",
+      lastSyncedHash: "h0",
+    });
   });
 });
 

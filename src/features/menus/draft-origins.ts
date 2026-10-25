@@ -112,6 +112,28 @@ export async function listDraftOrigins(): Promise<DraftOrigin[]> {
   }
 }
 
+/**
+ * Stamp freshly claimed rows so sign-out hides them. A claimed row is
+ * provably the account's copy (the server just confirmed the same id), so
+ * it needs no baseline yet: the hash of the uploaded content is enough for
+ * the heal to tell later edits from a stale cache. Best-effort per row —
+ * an unreadable draft keeps whatever stamp it has.
+ */
+export async function stampClaimedMenus(
+  menuIds: readonly string[],
+  accountId: string,
+  readDoc: (menuId: string) => Promise<MenuDocument>
+): Promise<void> {
+  for (const menuId of menuIds) {
+    try {
+      const doc = await readDoc(menuId);
+      await stampDraftOrigin(menuId, accountId, "", menuContentHash(doc));
+    } catch {
+      // One unreadable draft never blocks the rest.
+    }
+  }
+}
+
 /** Forget the stamp when its menu is explicitly deleted. Best-effort. */
 export async function clearDraftOrigin(menuId: string): Promise<void> {
   await tx(ORIGINS_STORE, "readwrite", ([store]) => idbDelete(store, menuId)).catch(
