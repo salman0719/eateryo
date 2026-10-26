@@ -14,9 +14,12 @@ import {
   moveItem,
   moveItemToCategory,
   moveItemsToCategory,
+  defaultNewMenuTitle,
+  isPlaceholderMenuTitle,
   renameCategory,
   setItemAvailability,
   suggestRestaurantName,
+  suggestSecondMenuNames,
   updateItem,
 } from "../src/features/menu/menu-utils";
 
@@ -208,5 +211,33 @@ describe("suggestRestaurantName", () => {
     expect(suggestRestaurantName([])).toBeNull();
     expect(suggestRestaurantName(["", "   "])).toBeNull();
     expect(suggestRestaurantName(["Menu"])).toBeNull();
+  });
+});
+
+describe("menu naming (Q2)", () => {
+  it("defaults the first menu to Main menu, then numbers honestly", () => {
+    expect(defaultNewMenuTitle([])).toBe("Main menu");
+    expect(defaultNewMenuTitle(["Lunch"])).toBe("Main menu");
+    expect(defaultNewMenuTitle(["Main menu"])).toBe("Menu 2");
+    expect(defaultNewMenuTitle(["main MENU", "Menu 2"])).toBe("Menu 3");
+  });
+
+  it("suggests unused service names for the second menu", () => {
+    expect(suggestSecondMenuNames(["Main menu"])).toEqual(["Lunch", "Dinner", "Happy Hour", "Drinks"]);
+    expect(suggestSecondMenuNames(["Main menu", "Lunch", "Dinner"])).toEqual([
+      "Happy Hour",
+      "Drinks",
+      "Breakfast",
+      "Brunch",
+    ]);
+    expect(suggestSecondMenuNames(["Main menu", "lunch"])).not.toContain("Lunch");
+  });
+
+  it("spots placeholder titles the photo missed", () => {
+    expect(isPlaceholderMenuTitle("")).toBe(true);
+    expect(isPlaceholderMenuTitle("Untitled menu")).toBe(true);
+    expect(isPlaceholderMenuTitle("  MENU  ")).toBe(true);
+    expect(isPlaceholderMenuTitle("Main menu")).toBe(false);
+    expect(isPlaceholderMenuTitle("Lunch")).toBe(false);
   });
 });

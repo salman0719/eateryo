@@ -340,3 +340,44 @@ function restaurantNameCandidate(title: string): string | null {
   if (!candidate) candidate = title.trim().replace(/(\s+|^)menu$/i, "").trim();
   return candidate || null;
 }
+
+/** First menu default: never gate on a name. The owner renames inline. */
+export const DEFAULT_FIRST_MENU_TITLE = "Main menu";
+
+/** Service-name chips offered when a second menu is created. */
+export const SECOND_MENU_SUGGESTIONS = [
+  "Lunch",
+  "Dinner",
+  "Happy Hour",
+  "Drinks",
+  "Breakfast",
+  "Brunch",
+] as const;
+
+/** Titles the product treats as "the photo missed it" placeholders. */
+export function isPlaceholderMenuTitle(title: string): boolean {
+  const normalized = title.trim().toLowerCase();
+  return normalized === "" || normalized === "untitled" || normalized === "untitled menu" || normalized === "menu";
+}
+
+/**
+ * Default title for a blank new menu: "Main menu" while it is free, then
+ * "Menu 2", "Menu 3", … — honest numbering, never an invented service.
+ * Comparison is case-insensitive over trimmed titles.
+ */
+export function defaultNewMenuTitle(existingTitles: string[]): string {
+  const used = new Set(existingTitles.map((title) => title.trim().toLowerCase()));
+  if (!used.has(DEFAULT_FIRST_MENU_TITLE.toLowerCase())) return DEFAULT_FIRST_MENU_TITLE;
+  let n = 2;
+  while (used.has(`menu ${n}`)) n += 1;
+  return `Menu ${n}`;
+}
+
+/**
+ * Second-menu contextual ask: service names not already in use, capped at
+ * four. Pure so tests pin the filtering; the UI adds the why.
+ */
+export function suggestSecondMenuNames(existingTitles: string[], limit = 4): string[] {
+  const used = new Set(existingTitles.map((title) => title.trim().toLowerCase()));
+  return SECOND_MENU_SUGGESTIONS.filter((name) => !used.has(name.toLowerCase())).slice(0, limit);
+}
