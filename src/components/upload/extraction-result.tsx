@@ -14,6 +14,7 @@
 
 import { useRef, useState } from "react";
 
+import { Attention, didClearAll } from "@/components/ui/attention";
 import { MenuPreview } from "@/components/menu-editor/menu-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -191,6 +192,11 @@ export function ExtractionResult({
   // queue is clear it becomes the link step. The copy always names the
   // screen the tap actually opens.
   const checkThisRef = useRef<HTMLDivElement | null>(null);
+  // When the last flag clears, take the owner back to the Continue box at
+  // the top and pulse the freshly-unlocked "Get your link" button. Derived
+  // from the extraction-time count: only a had-work → none transition fires,
+  // so a clean extraction (0 → 0) never yanks the scroll.
+  const allClear = didClearAll(initialReviewCount ?? reviewCount, reviewCount);
   function handleContinue() {
     if (reviewCount > 0) {
       setOnlyFlagged(true);
@@ -420,7 +426,12 @@ export function ExtractionResult({
 
   return (
     <section aria-label="Extraction result" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-5">
+      <Attention
+        active={allClear}
+        pulse={false}
+        scrollBlock="start"
+        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-5 scroll-mt-4"
+      >
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-bold text-stone-900">{data.title ?? "Untitled menu"}</h2>
@@ -457,15 +468,17 @@ export function ExtractionResult({
         </div>
         <div className="flex flex-wrap gap-2">
           {onPublish && (
-            <button
-              type="button"
-              onClick={handleContinue}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-            >
-              {reviewCount > 0
-                ? `Continue → check prices (${reviewCount})`
-                : "Get your link →"}
-            </button>
+            <Attention active={allClear} scroll={false} inline className="inline-flex rounded-full">
+              <button
+                type="button"
+                onClick={handleContinue}
+                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                {reviewCount > 0
+                  ? `Continue → check prices (${reviewCount})`
+                  : "Get your link →"}
+              </button>
+            </Attention>
           )}
           {onEdit && (
             <button
@@ -488,7 +501,7 @@ export function ExtractionResult({
             Start over
           </button>
         </div>
-      </div>
+      </Attention>
 
       {previewDoc ? (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
