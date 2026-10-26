@@ -1724,6 +1724,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       }
       if (token !== draftTokenRef.current) return;
       draftDocRef.current = saved;
+      // A draft saved while signed in belongs to this account from now on:
+      // sign-out must hide it, published or not. Empty baseline — the menu
+      // is not confirmed on the server yet — and stamping never downgrades
+      // an existing stamp.
+      const autosaveActor = signedInRef.current ? accountKeyRef.current : null;
+      if (autosaveActor) await stampDraftOrigin(saved.id, autosaveActor, "");
       setDraftSave("saved");
       await refreshLibrary();
     } catch (error) {
@@ -1803,6 +1809,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const saved = await saveMenu(next);
       draftDocRef.current = saved;
+      // Same rule as the autosave: a confirmation made while signed in
+      // marks the row, so sign-out hides it. Never downgrades a stamp.
+      const confirmActor = signedInRef.current ? accountKeyRef.current : null;
+      if (confirmActor) await stampDraftOrigin(saved.id, confirmActor, "");
       setResultDoc(saved);
       setDraftSave("saved");
       await refreshLibrary();
