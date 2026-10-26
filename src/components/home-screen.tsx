@@ -367,6 +367,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimNotice, setClaimNotice] = useState<LocalDraftClaimNotice | null>(null);
+  /** Session-dismissed "Continue getting your link" resume banner (Q7). */
+  const [resumeDismissed, setResumeDismissed] = useState(false);
   /**
    * The first settled non-editor look at this account decides whether the
    * automatic import runs. Later local menus (a demo saved mid-session) are
@@ -1957,6 +1959,55 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             </div>
           </div>
         )}
+
+        {/* Q7 resume banner: the way back for anyone who wandered off (or
+            returns from the magic-link email) with a saved-but-unpublished
+            draft. Browser-only rows are by definition unpublished, so no
+            server read is needed. Hidden in the editor (it has its own
+            publish entry), while the result is on screen (it IS the continue
+            path), and while the claim surfaces speak. */}
+        {(screen === "capture" || screen === "library") &&
+          result === null &&
+          localOnlyCount > 0 &&
+          !resumeDismissed &&
+          !claimNotice &&
+          localDraftsDecision !== "offer" &&
+          (() => {
+            const resumable = localOnly.find((menu) => !menu.corrupt);
+            if (!resumable) return null;
+            return (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-amber-950">
+                    📍 Continue getting your link →
+                  </p>
+                  <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
+                    {localOnlyCount === 1
+                      ? `“${resumable.title}” is saved in this browser, not published yet.`
+                      : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
+                    }
+                    className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  >
+                    Continue →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResumeDismissed(true)}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
         {screen === "library" && (
           <div className="flex flex-col gap-4">
