@@ -339,7 +339,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // Server sync (Step 8): signed in = the account is authoritative, and the
   // IndexedDB copy stays as the offline cache. Signed out, nothing changes —
   // the whole local-first flow above keeps working untouched.
-  const { data: session, isPending: sessionPending } = authClient.useSession();
+  const {
+    data: session,
+    isPending: sessionLoading,
+    isRefetching: sessionRefetching,
+  } = authClient.useSession();
+  // A background refetch (e.g. returning to the tab) must not flash skeletons
+  // or unmount in-progress forms: only the first load counts as pending.
+  const sessionPending = sessionLoading && !sessionRefetching;
   const signedIn = session?.user != null;
   const accountKey = session?.user?.id ?? null;
   // Server-evaluated release decisions (A4). Both assistant flags default
