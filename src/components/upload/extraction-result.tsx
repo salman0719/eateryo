@@ -203,7 +203,9 @@ export function ExtractionResult({
   const linkReady = reviewCount === 0;
   function handleContinue() {
     if (reviewCount > 0) {
-      setOnlyFlagged(true);
+      // Jump to the queue without collapsing the Ready list above it: hiding
+      // it yanks the page and the scroll target out from under the owner.
+      // The "Show only items to check" toggle stays a manual choice.
       checkThisRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
@@ -398,7 +400,10 @@ export function ExtractionResult({
             )}
           </section>
         )}
-        <div ref={checkThisRef} className="flex flex-wrap items-center justify-between gap-2 scroll-mt-4">
+        <div
+          ref={checkThisRef}
+          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-[#faf8f5]/95 py-2 scroll-mt-4"
+        >
           <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
             ⚠ Check this ({reviewCount})
           </h3>
