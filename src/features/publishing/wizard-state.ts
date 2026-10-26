@@ -118,6 +118,70 @@ export function clearWizardState(menuId: string): void {
   }
 }
 
+/** How long an emailed link stays valid (mirrors the server's 5 minutes). */
+export const WIZARD_LINK_TTL_MS = 5 * 60 * 1000;
+/** A sent panel older than this is ancient history, not a pending link. */
+const WIZARD_LINK_MAX_AGE_MS = 10 * 60 * 1000;
+
+/** A magic link the owner is waiting on — restores the "check email" panel
+ * across remounts, reloads, and tab switches. */
+export interface WizardLinkSent {
+  email: string;
+  sentAt: number;
+}
+
+const LINK_STORAGE_PREFIX = "eateryo:publish-wizard-link:";
+
+export function wizardLinkStorageKey(menuId: string): string {
+  return `${LINK_STORAGE_PREFIX}${menuId}`;
+}
+
+export function loadWizardLinkSent(menuId: string): WizardLinkSent | null {
+  const storage = browserStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(wizardLinkStorageKey(menuId));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+    if (typeof parsed.email !== "string" || parsed.email.length === 0) return null;
+    if (typeof parsed.sentAt !== "number" || !Number.isFinite(parsed.sentAt)) return null;
+    if (Date.now() - parsed.sentAt > WIZARD_LINK_MAX_AGE_MS) return null;
+    return { email: parsed.email, sentAt: parsed.sentAt };
+  } catch {
+    return null;
+  }
+}
+
+export function saveWizardLinkSent(menuId: string, sent: WizardLinkSent): void {
+  const storage = browserStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(wizardLinkStorageKey(menuId), JSON.stringify(sent));
+  } catch {
+    // The panel just won't survive a reload; the emailed link still works.
+  }
+}
+
+export function clearWizardLinkSent(menuId: string): void {
+  const storage = browserStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(wizardLinkStorageKey(menuId));
+  } catch {
+    // Nothing to do: a stale panel is harmless.
+  }
+}
+
+/** Countdown copy for the sent panel; pure so tests can pin the wording. */
+export function linkExpiryCopy(sentAt: number, now: number): { expired: boolean; text: string } {
+  const remaining = Math.min(WIZARD_LINK_TTL_MS, WIZARD_LINK_TTL_MS - (now - sentAt));
+  if (remaining <= 0) return { expired: true, text: "That link has expired." };
+  const minutes = Math.ceil(remaining / 60000);
+  if (minutes <= 1) return { expired: false, text: "It expires in less than a minute." };
+  return { expired: false, text: `It expires in about ${minutes} min.` };
+}
+
 /** Where the menu will land, given the account and the form. */
 export type WizardRestaurantChoice =
   | { kind: "existing"; id: string; name: string }
