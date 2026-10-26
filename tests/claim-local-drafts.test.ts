@@ -8,7 +8,6 @@ import {
   localDraftClaimKey,
   markLocalDraftsClaimed,
   rememberBrowserAccount,
-  shouldAutoClaimRemainingDrafts,
 } from "@/features/menus/claim-local-drafts";
 
 /**
@@ -45,7 +44,6 @@ const NEW_ACCOUNT = {
   restaurantCount: 0,
   ownedRestaurantCount: 0,
   status: "unseen" as const,
-  accountSeenInBrowser: true,
 };
 
 describe("decideLocalDraftClaim", () => {
@@ -68,10 +66,10 @@ describe("decideLocalDraftClaim", () => {
     ).toBe("offer");
   });
 
-  it("offers the import when only a restaurant exists", () => {
+  it("auto-imports when the account holds no menus, even with a restaurant", () => {
     expect(
       decideLocalDraftClaim({ ...NEW_ACCOUNT, restaurantCount: 1, ownedRestaurantCount: 1 })
-    ).toBe("offer");
+    ).toBe("auto-import");
   });
 
   it("stays quiet for staff-only accounts, who have nowhere to import", () => {
@@ -90,43 +88,10 @@ describe("decideLocalDraftClaim", () => {
     expect(decideLocalDraftClaim({ ...NEW_ACCOUNT, status: "done" })).toBe("none");
   });
 
-  it("never sweeps another account's cached menus into a new account", () => {
-    expect(decideLocalDraftClaim({ ...NEW_ACCOUNT, accountSeenInBrowser: false })).toBe("none");
-    expect(
-      decideLocalDraftClaim({
-        ...NEW_ACCOUNT,
-        accountMenuCount: 2,
-        restaurantCount: 1,
-        ownedRestaurantCount: 1,
-        accountSeenInBrowser: false,
-      })
-    ).toBe("none");
-  });
-});
-
-describe("shouldAutoClaimRemainingDrafts", () => {
-  const BASE = {
-    createdRestaurant: true,
-    mergeSettled: true,
-    accountMenuCount: 1,
-    otherDraftCount: 2,
-  };
-
-  it("adopts the remaining drafts for an effectively-new account", () => {
-    expect(shouldAutoClaimRemainingDrafts(BASE)).toBe(true);
-  });
-
-  it("leaves drafts put when the account already holds other menus", () => {
-    expect(shouldAutoClaimRemainingDrafts({ ...BASE, accountMenuCount: 8 })).toBe(false);
-  });
-
-  it("waits for the merge to settle before deciding", () => {
-    expect(shouldAutoClaimRemainingDrafts({ ...BASE, mergeSettled: false })).toBe(false);
-  });
-
-  it("does nothing without remaining drafts or a created restaurant", () => {
-    expect(shouldAutoClaimRemainingDrafts({ ...BASE, otherDraftCount: 0 })).toBe(false);
-    expect(shouldAutoClaimRemainingDrafts({ ...BASE, createdRestaurant: false })).toBe(false);
+  it("swallows the browser on a shared device: whoever signs in owns what was there", () => {
+    // No fork, no queue — the first sign-in adopts the drafts, marked so
+    // they never render signed out again.
+    expect(decideLocalDraftClaim(NEW_ACCOUNT)).toBe("auto-import");
   });
 });
 

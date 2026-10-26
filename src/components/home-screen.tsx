@@ -123,11 +123,8 @@ import {
 import {
   decideLocalDraftClaim,
   dismissLocalDraftClaim,
-  loadBrowserAccount,
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
-  rememberBrowserAccount,
-  shouldAutoClaimRemainingDrafts,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 
@@ -406,8 +403,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * never swept into an account behind the owner's back.
    */
   const claimEvaluatedRef = useRef<string | null>(null);
-  /** Whether the last account in this browser is this one (or none yet). */
-  const browserAccountAtSignInRef = useRef(false);
   /** Deduplicates concurrent account merges. */
   const mergeRef = useRef<Promise<void> | null>(null);
 
@@ -565,15 +560,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
-      browserAccountAtSignInRef.current = false;
       return;
     }
-    // A browser last used by another account must never auto-import its
-    // cached menus into this one. Remember this account only after reading
-    // the previous marker.
-    const previousAccount = loadBrowserAccount();
-    browserAccountAtSignInRef.current = previousAccount === null || previousAccount === accountKey;
-    if (accountKey) rememberBrowserAccount(accountKey);
     // Sign-in: merge account menus into the library, heal interrupted work
     // from closed menus, and reconcile a menu that was already open. A menu
     // that was never moved to the account stays local-only (serverBaseRef
@@ -1450,25 +1438,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     })();
     void mergeAccountMenus();
     void refreshLibrary();
-    // The wizard just created a café, so the other drafts in this browser
-    // have a home — but only adopt them automatically for an effectively-new
-    // account (the merge has settled and this menu is its only one). A
-    // non-empty account never sweeps this browser silently; anything left
-    // over stays put for the offer/manual path. This runs after the publish
-    // succeeds, so it cannot race the wizard for “create the restaurant”.
-    if (result.created.restaurant && accountKey) {
-      const otherDrafts = localOnly.filter((menu) => menu.id !== menuId);
-      if (
-        shouldAutoClaimRemainingDrafts({
-          createdRestaurant: true,
-          mergeSettled: serverMenusFor === accountKey,
-          accountMenuCount: serverIdsRef.current.size,
-          otherDraftCount: otherDrafts.length,
-        })
-      ) {
-        void runLocalDraftClaim(result.restaurant.id, result.restaurant.name);
-      }
-    }
+    // Auto-import happens at sign-in only. Publishing never sweeps the
+    // browser: anything left over stays put for the offer/manual path.
     // The published menu may be the capture draft: once it has a link,
     // Capture goes back to a fresh upload instead of showing the old draft
     // as if it were still being worked on. Other menus leave capture alone.
@@ -2019,7 +1990,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           restaurantCount,
           ownedRestaurantCount: ownedRestaurantsForAccount.length,
           status: claimStatus,
-          accountSeenInBrowser: browserAccountAtSignInRef.current,
         })
       : "none";
 
