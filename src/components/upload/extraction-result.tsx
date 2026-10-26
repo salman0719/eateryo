@@ -1,17 +1,18 @@
 "use client";
 
 /**
- * Read-only summary of an extracted (or demo) menu. Takes the narrow
+ * Review summary of an extracted (or demo) menu. Takes the narrow
  * `PreviewMenu` shape for the review list, and an optional canonical
  * `MenuDocument` for the phone-framed first look. The first look is the
  * payoff of the capture flow: the owner sees their menu the way a guest
- * will, while every flagged line stays visible in the full draft beside it.
+ * will, while every flagged line stays fixable in the Check-this queue
+ * beside it (price edits + confirms persist to the draft via callbacks).
  *
  * The preview is a draft, never a publication — the phone frame's caption
  * and the copy both say so.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { MenuPreview } from "@/components/menu-editor/menu-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
@@ -26,6 +27,8 @@ export interface PreviewItem {
   available: boolean | null;
   dietaryLabels: string[];
   reviewNotes: string[];
+  /** Owner-confirmed intentionally unpriced — a null price stops flagging. */
+  unpricedAccepted?: boolean;
 }
 
 export interface PreviewCategory {
@@ -39,6 +42,14 @@ export interface PreviewMenu {
   categories: PreviewCategory[];
 }
 
+/** How the owner resolved one flagged item on the result screen. */
+export type ReviewResolution = "looks-good" | "leave-unpriced";
+
+export interface ReviewItemLocation {
+  categoryIndex: number;
+  itemIndex: number;
+}
+
 interface ExtractionResultProps {
   data: PreviewMenu;
   source: "ai" | "demo";
@@ -47,6 +58,16 @@ interface ExtractionResultProps {
   onEdit?: () => void;
   /** Save the draft and open the publish wizard (shown when the draft is safe). */
   onPublish?: () => void;
+  /** Resolve one flagged item in place (clears its notes; persists to the draft). */
+  onResolveItem?: (loc: ReviewItemLocation, resolution: ReviewResolution) => void;
+  /** Fix a flagged item's price in place (null = blank; persists to the draft). */
+  onUpdatePrice?: (loc: ReviewItemLocation, price: number | null) => void;
+  /** Resolve every flagged item at once — the impatient path. Prices stay
+   * as shown; unpriced items ship with honestly null totals. */
+  onResolveAll?: () => void;
+  /** Flagged count when this extraction landed; drives the "N of M checked"
+   * progress. Defaults to the live count (no progress shown). */
+  initialReviewCount?: number | null;
   /**
    * Label for the edit action while it is the primary path (before the draft
    * is saved). Once `onPublish` exists, Continue takes the primary slot and
@@ -65,9 +86,71 @@ function formatPrice(item: PreviewItem, fallbackCurrency: string | null): string
   return `${currency ? `${currency} ` : ""}${item.price.toFixed(2)}`;
 }
 
-/** An exception, not everything: unpriced or carrying an extraction note. */
+/** An exception, not everything: unpriced (unless accepted) or carrying an
+ * extraction note. Mirrors `isItemFlagged` in menu-utils, which owns the
+ * canonical MenuDocument definition — this PreviewMenu twin exists because
+ * the result screen renders before the canonical doc is the source. */
 function isFlagged(item: PreviewItem): boolean {
-  return item.price === null || item.reviewNotes.length > 0;
+  if (item.reviewNotes.length > 0) return true;
+  if (item.price === null && !item.unpricedAccepted) return true;
+  return false;
+}
+
+/** Inline price fix for the Check-this queue: blank = unknown, never 0.
+ * Commits valid entries (empty or a non-negative number); anything else
+ * reverts. Controlled with a sync effect so a parent save refreshes it. */
+function ReviewPriceInput({
+  value,
+  currency,
+  itemName,
+  onCommit,
+}: {
+  value: number | null;
+  currency: string | null;
+  itemName: string;
+  onCommit: (price: number | null) => void;
+}) {
+  // Uncontrolled + keyed by the committed value: a parent save remounts the
+  // field with the fresh default, so no effect-sync is needed.
+  const fallback = value === null ? "" : String(value);
+  function commit(event: React.FocusEvent<HTMLInputElement>) {
+    const trimmed = event.target.value.trim();
+    if (trimmed === "") {
+      if (value !== null) onCommit(null);
+      else event.target.value = "";
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      event.target.value = fallback;
+      return;
+    }
+    if (parsed !== value) onCommit(parsed);
+  }
+  return (
+    <label className="flex shrink-0 items-center gap-1.5">
+      {currency && <span className="text-xs text-stone-500">{currency}</span>}
+      <input
+        key={fallback}
+        type="number"
+        min="0"
+        step="0.01"
+        inputMode="decimal"
+        aria-label={`Price for ${itemName} — blank if unknown`}
+        placeholder="Blank if unknown"
+        defaultValue={fallback}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") (event.target as HTMLInputElement).blur();
+          if (event.key === "Escape") {
+            (event.target as HTMLInputElement).value = fallback;
+            (event.target as HTMLInputElement).blur();
+          }
+        }}
+        className="w-28 rounded-lg border border-amber-300 bg-white px-2 py-1 text-sm font-semibold text-stone-900 tabular-nums placeholder:font-normal placeholder:text-stone-400 focus:border-amber-700 focus:outline-none"
+      />
+    </label>
+  );
 }
 
 export function ExtractionResult({
@@ -76,6 +159,10 @@ export function ExtractionResult({
   onStartOver,
   onEdit,
   onPublish,
+  onResolveItem,
+  onResolveAll,
+  onUpdatePrice,
+  initialReviewCount = null,
   editLabel = "Edit menu",
   savedNotice = null,
   previewDoc = null,
@@ -86,9 +173,32 @@ export function ExtractionResult({
   // visible work. Both derive from the same flags the editor uses.
   const [showAllReady, setShowAllReady] = useState(false);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
-  const flaggedCategories = data.categories
-    .map((category) => ({ name: category.name, items: category.items.filter(isFlagged) }))
-    .filter((category) => category.items.length > 0);
+  // Index paths survive filtering: resolving item (2, 5) must hit the same
+  // item in the draft the publish wizard will save.
+  const flaggedGroups = data.categories
+    .map((category, categoryIndex) => ({
+      name: category.name,
+      categoryIndex,
+      entries: category.items
+        .map((item, itemIndex) => ({ item, itemIndex }))
+        .filter(({ item }) => isFlagged(item)),
+    }))
+    .filter((group) => group.entries.length > 0);
+  const peak = Math.max(initialReviewCount ?? reviewCount, reviewCount);
+  const checkedCount = peak - reviewCount;
+  // The Continue button is two beats of one road: while flags remain it
+  // lands in the Check-this queue below (the price-review step); once the
+  // queue is clear it becomes the link step. The copy always names the
+  // screen the tap actually opens.
+  const checkThisRef = useRef<HTMLDivElement | null>(null);
+  function handleContinue() {
+    if (reviewCount > 0) {
+      setOnlyFlagged(true);
+      checkThisRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    onPublish?.();
+  }
   const readyItems = data.categories.flatMap((category) =>
     category.items.filter((item) => !isFlagged(item))
   );
@@ -99,8 +209,14 @@ export function ExtractionResult({
   // competing equal. The old amber publish card is gone on purpose — two
   // identical CTAs were the confusion.
 
-  /** One category card with full detail rows (badges + notes). */
-  function renderCategoryCard(categoryName: string, items: PreviewItem[]) {
+  /** One category card with full detail rows (badges + notes + resolve actions).
+   * `locator` maps a rendered row back to its index path in `data`, so a
+   * confirm hits the same item in the draft the wizard will save. */
+  function renderCategoryCard(
+    categoryName: string,
+    items: PreviewItem[],
+    locator?: (itemIndex: number) => ReviewItemLocation | null
+  ) {
     return (
       <div
         key={categoryName}
@@ -110,10 +226,15 @@ export function ExtractionResult({
           {categoryName}
         </h3>
         <ul className="divide-y divide-stone-100">
-          {items.map((item) => {
+          {items.map((item, rowIndex) => {
             const needsReview = isFlagged(item);
+            const loc = locator?.(rowIndex) ?? null;
+            const canResolve = needsReview && loc !== null && onResolveItem !== undefined;
+            // The Check-this queue is the price-review step: flagged rows get
+            // a fix-it-here price field. The whole-list views stay read-only.
+            const canEditPrice = needsReview && loc !== null && onUpdatePrice !== undefined;
             return (
-              <li key={`${categoryName}-${item.name}`} className="px-5 py-3">
+              <li key={`${categoryName}-${item.name}-${rowIndex}`} className="px-5 py-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="flex items-center gap-2 font-medium text-stone-900">
                     <span>{item.name}</span>
@@ -123,15 +244,24 @@ export function ExtractionResult({
                       </span>
                     )}
                   </p>
-                  <p
-                    className={
-                      item.price === null
-                        ? "shrink-0 text-sm font-semibold text-amber-800"
-                        : "shrink-0 text-sm font-semibold text-stone-900"
-                    }
-                  >
-                    {formatPrice(item, data.currency)}
-                  </p>
+                  {canEditPrice ? (
+                    <ReviewPriceInput
+                      value={item.price}
+                      currency={item.currency ?? data.currency}
+                      itemName={item.name}
+                      onCommit={(price) => onUpdatePrice?.(loc, price)}
+                    />
+                  ) : (
+                    <p
+                      className={
+                        item.price === null
+                          ? "shrink-0 text-sm font-semibold text-amber-800"
+                          : "shrink-0 text-sm font-semibold text-stone-900"
+                      }
+                    >
+                      {formatPrice(item, data.currency)}
+                    </p>
+                  )}
                 </div>
                 {item.description && (
                   <p className="mt-0.5 text-sm text-stone-600">{item.description}</p>
@@ -171,6 +301,28 @@ export function ExtractionResult({
                       <li key={note}>{note}</li>
                     ))}
                   </ul>
+                )}
+                {canResolve && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {item.price !== null ? (
+                      <button
+                        type="button"
+                        onClick={() => onResolveItem?.(loc, "looks-good")}
+                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                      >
+                        ✓ Looks good
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onResolveItem?.(loc, "leave-unpriced")}
+                        title="Keeps the price blank — totals stay honestly blank for this item."
+                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                      >
+                        ✓ Leave unpriced
+                      </button>
+                    )}
+                  </div>
                 )}
               </li>
             );
@@ -236,10 +388,33 @@ export function ExtractionResult({
             )}
           </section>
         )}
-        <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
-          ⚠ Check this ({reviewCount})
-        </h3>
-        {flaggedCategories.map((category) => renderCategoryCard(category.name, category.items))}
+        <div ref={checkThisRef} className="flex flex-wrap items-center justify-between gap-2 scroll-mt-4">
+          <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
+            ⚠ Check this ({reviewCount})
+          </h3>
+          <div className="flex items-center gap-3">
+            {checkedCount > 0 && (
+              <span className="text-xs font-medium text-green-800">
+                ✓ {checkedCount} of {peak} checked
+              </span>
+            )}
+            {onResolveAll && (
+              <button
+                type="button"
+                onClick={onResolveAll}
+                title="Confirms every flagged item as shown — prices stay as they are, unpriced items keep honestly blank totals."
+                className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 transition-colors hover:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Accept all as shown
+              </button>
+            )}
+          </div>
+        </div>
+        {flaggedGroups.map((group) =>
+          renderCategoryCard(group.name, group.entries.map(({ item }) => item), (rowIndex) => ({
+            categoryIndex: group.categoryIndex,
+            itemIndex: group.entries[rowIndex].itemIndex,
+          })))}
       </div>
     );
 
@@ -284,10 +459,12 @@ export function ExtractionResult({
           {onPublish && (
             <button
               type="button"
-              onClick={onPublish}
+              onClick={handleContinue}
               className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              Continue → check prices &amp; get your link
+              {reviewCount > 0
+                ? `Continue → check prices (${reviewCount})`
+                : "Get your link →"}
             </button>
           )}
           {onEdit && (

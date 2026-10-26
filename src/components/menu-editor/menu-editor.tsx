@@ -7,6 +7,7 @@ import {
   addItem,
   deleteCategory,
   deleteItem,
+  isItemFlagged,
   moveCategory,
   moveItem,
   moveItemToCategory,
@@ -163,7 +164,7 @@ export function MenuEditor({
   onPreviewOpen,
 }: MenuEditorProps) {
   const reviewCount = doc.categories.reduce(
-    (sum, c) => sum + c.items.filter((i) => i.price === null || i.reviewNotes.length > 0).length,
+    (sum, c) => sum + c.items.filter(isItemFlagged).length,
     0
   );
   // Provenance, so a surprising line can be traced to the model that read it.

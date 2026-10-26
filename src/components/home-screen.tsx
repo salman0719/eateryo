@@ -23,7 +23,12 @@ import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
 import { Dropzone } from "@/components/upload/dropzone";
 import { ExtractionProgress } from "@/components/upload/extraction-progress";
-import { ExtractionResult, PreviewMenu } from "@/components/upload/extraction-result";
+import {
+  ExtractionResult,
+  PreviewMenu,
+  type ReviewItemLocation,
+  type ReviewResolution,
+} from "@/components/upload/extraction-result";
 import { ImagePreview, type PageImage } from "@/components/upload/image-preview";
 import { extractedMenuToDocument } from "@/features/menu/convert";
 import {
@@ -33,7 +38,14 @@ import {
   parseImportedMenu,
   serializeMenu,
 } from "@/features/menu/import-export";
-import { createMenuDocument, suggestRestaurantName } from "@/features/menu/menu-utils";
+import {
+  acceptItemUnpriced,
+  confirmItemReviewed,
+  createMenuDocument,
+  isItemFlagged,
+  suggestRestaurantName,
+  updateItem,
+} from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
@@ -284,6 +296,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   } | null>(null);
   /** Draft persisted automatically after a successful AI extraction. */
   const [draftSave, setDraftSave] = useState<"idle" | "saving" | "saved" | "unavailable">("idle");
+  /** Flagged count when the current extraction landed; drives the "N of M
+   * checked" progress on the result screen. Reset with the capture. */
+  const [initialReviewCount, setInitialReviewCount] = useState<number | null>(null);
   const draftDocRef = useRef<MenuDocument | null>(null);
   /** Guards autosave state against a newer extraction or a reset. */
   const draftTokenRef = useRef(0);
@@ -424,7 +439,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     };
   }, [accountKey, signedIn]);
 
-  const result: PreviewMenu | null = extracted?.menu ?? demoDoc;
+  // Display derives from the canonical docs (which carry confirmations),
+  // falling back to the raw extraction only for the empty state.
+  const result: PreviewMenu | null = resultDoc ?? demoDoc ?? extracted?.menu ?? null;
 
   useEffect(() => {
     return () => {
@@ -1477,6 +1494,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setExtracted(null);
     setResultDoc(null);
     setDemoDoc(null);
+    setInitialReviewCount(null);
     setExtractProgress(null);
     setPhase(next.length > 0 ? "ready" : "upload");
   }
@@ -1580,6 +1598,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           : null;
       setResultDoc(previewDoc);
       setExtracted(extraction);
+      setInitialReviewCount(
+        previewDoc == null
+          ? 0
+          : previewDoc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
+      );
       setSource("ai");
       setPhase("done");
       void autoSaveDraft(extraction, files[0] ?? null, previewDoc);
@@ -1606,6 +1629,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     const doc = createSampleMenuDocument();
     setDemoDoc(doc);
     setResultDoc(doc);
+    setInitialReviewCount(
+      doc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
+    );
     setSource("demo");
     setPhase("done");
     scrollToResult();
@@ -1713,6 +1739,89 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       )
     );
     scrollToResult();
+  }
+
+  /** Point every result-screen confirmation at the same canonical doc. */
+  function patchResultDoc(next: MenuDocument) {
+    setResultDoc(next);
+    if (source === "demo") setDemoDoc(next);
+    draftDocRef.current = next;
+  }
+
+  /** Persist a confirmation to IndexedDB (demo stays in memory until saved). */
+  async function persistResultDoc(next: MenuDocument) {
+    if (storageDownRef.current || source === "demo") return;
+    // Invalidate an in-flight autosave so its stale completion cannot
+    // overwrite the confirmation it raced.
+    draftTokenRef.current += 1;
+    setDraftSave("saving");
+    try {
+      const saved = await saveMenu(next);
+      draftDocRef.current = saved;
+      setResultDoc(saved);
+      setDraftSave("saved");
+      await refreshLibrary();
+    } catch {
+      setDraftSave("unavailable");
+    }
+  }
+
+  /** "Looks good" clears the AI notes; "leave unpriced" also accepts the
+   * null price (e.g. market price). Prices are never invented. */
+  function handleResolveResultItem(loc: ReviewItemLocation, resolution: ReviewResolution) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item) return;
+    const next =
+      resolution === "leave-unpriced"
+        ? acceptItemUnpriced(doc, category.id, item.id)
+        : confirmItemReviewed(doc, category.id, item.id);
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Fix a flagged price in the Check-this queue. Blank stays blank;
+   * entering a number resolves Check price; clearing back to blank
+   * re-flags unless the item was accepted as intentionally unpriced. */
+  function handleUpdateResultPrice(loc: ReviewItemLocation, price: number | null) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item) return;
+    // Filling in a missing price replaces the AI's uncertainty about it:
+    // the owner's number clears the notes in the same tap. Editing an
+    // existing price leaves notes alone — they may concern something else,
+    // and "Looks good" confirms those explicitly.
+    const next = updateItem(
+      doc,
+      category.id,
+      item.id,
+      item.price === null && price !== null ? { price, reviewNotes: [] } : { price }
+    );
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** The impatient path: confirm every flagged item as shown. Null prices
+   * stay null (totals stay honestly blank) — nothing is invented. */
+  function handleResolveAllResultItems() {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    let next = doc;
+    for (const category of doc.categories) {
+      for (const item of category.items) {
+        if (!isItemFlagged(item)) continue;
+        next =
+          item.price === null
+            ? acceptItemUnpriced(next, category.id, item.id)
+            : confirmItemReviewed(next, category.id, item.id);
+      }
+    }
+    patchResultDoc(next);
+    void persistResultDoc(next);
   }
 
   async function handleEditResult() {
@@ -2357,6 +2466,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   source={source}
                   onStartOver={clearCapture}
                   onEdit={() => void handleEditResult()}
+                  onResolveItem={handleResolveResultItem}
+                  onResolveAll={handleResolveAllResultItems}
+                  onUpdatePrice={handleUpdateResultPrice}
+                  initialReviewCount={initialReviewCount}
                   onPublish={
                     source === "demo" || draftSave === "saved"
                       ? () => void handleStartPublish()
