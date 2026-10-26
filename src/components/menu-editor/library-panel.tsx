@@ -6,6 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuSummary } from "@/features/menu/storage";
 import type { RestaurantOption } from "@/features/tenancy/client";
 
+import { suggestSecondMenuNames } from "@/features/menu/menu-utils";
+
 import { CommitInput } from "./fields";
 
 /** A library row: the browser summary plus whether the account holds it. */
@@ -30,7 +32,8 @@ interface LibraryPanelProps {
   onMoveToAccount?: (menuId: string, restaurantId: string) => Promise<string | null>;
   unavailable: boolean;
   onOpen: (id: string) => void;
-  onNew: () => void;
+  /** Optional service name from the second-menu chips (Lunch, Dinner…). */
+  onNew: (suggestedTitle?: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
 }
@@ -61,6 +64,11 @@ export function LibraryPanel({
   const [movingId, setMovingId] = useState<string | null>(null);
   const [moveError, setMoveError] = useState<{ id: string; message: string } | null>(null);
   const moveAvailable = onMoveToAccount != null && ownedRestaurants.length > 0;
+
+  // Q2 companion: the second menu gets a contextual ask, not a bare
+  // duplicate — chips name it for its service, the button keeps numbering.
+  const secondMenuSuggestions =
+    menus.length > 0 && !loading ? suggestSecondMenuNames(menus.map((menu) => menu.title)) : [];
 
   function startMove(id: string) {
     setMoveError(null);
@@ -99,13 +107,34 @@ export function LibraryPanel({
         <h2 className="text-xl font-bold text-stone-900">My menus</h2>
         <button
           type="button"
-          onClick={onNew}
+          onClick={() => onNew()}
           disabled={unavailable}
           className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           + New menu
         </button>
       </div>
+
+      {secondMenuSuggestions.length > 0 && (
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
+          <p className="text-sm text-stone-700">
+            Adding another? <span className="font-medium">Is it for a different time or service?</span>
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {secondMenuSuggestions.map((name) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => onNew(name)}
+                disabled={unavailable}
+                className="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {unavailable && (
         <p

@@ -44,6 +44,7 @@ import {
   acceptItemUnpriced,
   confirmItemReviewed,
   createMenuDocument,
+  defaultNewMenuTitle,
   isItemFlagged,
   suggestRestaurantName,
   updateItem,
@@ -1080,11 +1081,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     navigateTo({ screen: "editor", menuId: id, mode: "edit" });
   }
 
-  async function handleNewMenu() {
+  async function handleNewMenu(suggestedTitle?: string) {
     setLibraryError(null);
+    // Q2: never gate on a name — blank menus arrive titled ("Main menu"
+    // first, honest numbering after) and rename inline in the editor.
+    const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
+    const title = suggestedTitle?.trim() ? suggestedTitle.trim() : fallback;
     const doc = storageDownRef.current
-      ? createMenuDocument({ title: "Untitled menu" })
-      : await createMenu("Untitled menu").catch((error: unknown) => {
+      ? createMenuDocument({ title })
+      : await createMenu(title).catch((error: unknown) => {
           setLibraryError(
             error instanceof StorageError ? error.message : "Could not create a menu."
           );
@@ -2164,7 +2169,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               onMoveToAccount={handleMoveMenuToAccount}
               unavailable={storageDown}
               onOpen={(id) => void handleOpenMenu(id)}
-              onNew={() => void handleNewMenu()}
+              onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
               onRename={(id, title) => void handleRenameMenu(id, title)}
               onDelete={(id) => void handleDeleteMenu(id)}
             />
