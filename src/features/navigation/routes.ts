@@ -48,20 +48,25 @@ export function menuIdFromPathname(pathname: string): string | null {
 }
 
 /**
- * What to say when a menu URL resolves nowhere — not in this browser, not
- * on the account. Publish links only ever point at the draft they were
- * created from, so a dead one almost always means the sign-in link was
+ * Why a publish link resolves nowhere: it only ever points at the draft it
+ * was created from, so a dead one almost always means the sign-in link was
  * opened in a different browser than the one holding the draft (drafts
- * never leave their device until they are published). The message names
- * that directly instead of a generic "deleted or moved".
+ * never leave their device until they are published). Shared by the library
+ * banner and the missing-draft card so the two never drift apart.
+ */
+export const MISSING_PUBLISH_DRAFT_MESSAGE =
+  "That link opened in a browser without your draft. Drafts stay on the device " +
+  "they were made on until they are published — open the sign-in link in the " +
+  "original browser, then continue to your link there.";
+
+/**
+ * What to say when a menu URL resolves nowhere — not in this browser, not
+ * on the account. Publish links get the wrong-browser explanation above;
+ * everything else keeps the generic "deleted or moved".
  */
 export function unresolvableMenuMessage(route: AppRoute): string {
   if (route.screen === "editor" && route.mode === "publish") {
-    return (
-      "That link opened in a browser without your draft. Drafts stay on the device " +
-      "they were made on until they are published — open the sign-in link in the " +
-      "original browser, then continue to your link there."
-    );
+    return MISSING_PUBLISH_DRAFT_MESSAGE;
   }
   return "That menu could not be opened. It may have been deleted or moved.";
 }
