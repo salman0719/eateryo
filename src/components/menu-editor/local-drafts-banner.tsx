@@ -55,7 +55,7 @@ export function LocalDraftsOffer({
           </p>
           <p className="mt-1 max-w-xl text-xs leading-5 text-amber-900">
             Add {count === 1 ? "it" : "them"} to your account so other devices and your public link
-            can use {count === 1 ? "it" : "them"}. This browser keeps its copies.
+            can use {count === 1 ? "it" : "them"}. This browser keeps a synced copy for offline use.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -125,8 +125,8 @@ export function LocalDraftsNotice({
           </p>
           <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-900">
             {nothingImported
-              ? `“${notice.restaurantName}” already holds them. This browser keeps a copy too.`
-              : `They live under “${notice.restaurantName}” and work on your other devices. This browser keeps a copy.`}
+              ? `“${notice.restaurantName}” already holds them. This browser keeps a synced copy for offline use too.`
+              : `They're now on your account under “${notice.restaurantName}” and work on your other devices. This browser keeps a synced copy for offline use.`}
           </p>
           {notice.failed > 0 && (
             <p className="mt-1 text-xs font-medium leading-5 text-amber-900">

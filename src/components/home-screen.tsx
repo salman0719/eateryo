@@ -251,13 +251,22 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     return () => window.removeEventListener("popstate", syncFromLocation);
   }, [pathname]);
 
-  // The assistant needs an account in every mode: a signed-out visitor who
-  // lands on /assistant (typed URL, old bookmark) goes back to capture
-  // instead of meeting an assistant-branded sign-in prompt. Runs every
-  // render by design; the guard goes quiet once the screen moves on.
+  // Signed out is capture-only (plus the library working set and the editor
+  // for anonymous drafts): orders/tables/settings/assistant need an account,
+  // so a signed-out visitor who lands on one (typed URL, old bookmark)
+  // goes back to capture. Runs every render by design; the guard goes
+  // quiet once the screen moves on.
   useEffect(() => {
-    if (!sessionPending && !signedIn && routeRef.current.screen === "assistant") {
-      navigateTo({ screen: "capture" }, true);
+    if (!sessionPending && !signedIn) {
+      const guarded = routeRef.current.screen;
+      if (
+        guarded === "assistant" ||
+        guarded === "orders" ||
+        guarded === "tables" ||
+        guarded === "settings"
+      ) {
+        navigateTo({ screen: "capture" }, true);
+      }
     }
   });
 
@@ -470,6 +479,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         let imageBlob: Blob | null = null;
         try {
           doc = await getMenu(menuId);
+          if (!signedInRef.current) {
+            // Sign-out is a privacy boundary: a stamped row belongs to its
+            // owner and never opens for nobody signed out (direct URL included).
+            const origin = await getDraftOrigin(menuId).catch(() => undefined);
+            if (origin) {
+              setLibraryError("That menu belongs to an account — sign in to view it.");
+              openedRouteMenuRef.current = null;
+              navigateToRef.current?.({ screen: "library" }, true);
+              return;
+            }
+          }
           try {
             imageBlob = (await getImage(menuId))?.blob ?? null;
           } catch {
@@ -1839,8 +1859,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           screen === "editor" ? "max-w-6xl" : "max-w-3xl"
         }`}
       >
-        {/* Desktop pill row. Phones use the bottom tab bar below. */}
-        {screen !== "editor" && (
+        {/* Desktop pill row. Phones use the bottom tab bar below. Signed out
+            with no drafts the row hides entirely — capture needs no tabs.
+            While the session or library is still loading the row stays
+            hidden: showing a provisional My menus tab that vanishes on a
+            fresh profile reads as a flicker. Draft owners get both tabs in
+            one appearance after the load settles. */}
+        {screen !== "editor" &&
+          !sessionPending &&
+          (signedIn || (!libraryLoading && visibleMenus.length > 0)) && (
           <nav
             data-print-hide
             aria-label="Sections"
@@ -1850,17 +1877,31 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             {(
               [
                 { id: "capture", label: "Capture" },
-                { id: "library", label: `My menus${visibleMenus.length ? ` (${visibleMenus.length})` : ""}` },
-                { id: "orders", label: "Orders" },
-                // R0: tabs are always rendered so the app never changes shape
-                // signed out. Tables/Settings render their own signed-out
-                // explanation; the assistant is never offered signed out
-                // (its kill switch, A4, only gates signed-in accounts).
-                ...(signedIn && featureFlags.assistant
-                  ? [{ id: "assistant" as const, label: "Assistant" }]
+                // My menus signed out is the anonymous working set: only
+                // worth a tab when there are drafts to continue (the outer
+                // gate already waited for the library to settle).
+                ...(signedIn || visibleMenus.length > 0
+                  ? [
+                      {
+                        id: "library" as const,
+                        label: `My menus${visibleMenus.length ? ` (${visibleMenus.length})` : ""}`,
+                      },
+                    ]
                   : []),
-                { id: "tables" as const, label: "Tables" },
-                { id: "settings" as const, label: "Settings" },
+                // Orders/Tables/Settings need an account — signed out is
+                // capture-only (plus the working set above). The assistant
+                // is never offered signed out (its kill switch, A4, only
+                // gates signed-in accounts).
+                ...(signedIn
+                  ? [
+                      { id: "orders" as const, label: "Orders" },
+                      ...(featureFlags.assistant
+                        ? [{ id: "assistant" as const, label: "Assistant" }]
+                        : []),
+                      { id: "tables" as const, label: "Tables" },
+                      { id: "settings" as const, label: "Settings" },
+                    ]
+                  : []),
               ] as const
             ).map((tab) => (
               <button
@@ -2316,21 +2357,28 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       </main>
       <SiteFooter />
       {/*
-        R0 phone nav: bottom tab bar (Capture · My menus · Orders · More).
-        Orders stays pinned so the R0.3 order monitor has a persistent home
-        for its badge; Tables/Assistant/Settings live in the More sheet and
-        each render their own signed-out explanation. Desktop keeps pills.
-        Sits after the footer so it is the last thing on the page and sticks
-        to the viewport bottom instead of floating above the footer links.
+        Phone nav: signed in, the tab bar pins Capture · My menus · Orders ·
+        More (Orders keeps its home for the R0.3 monitor badge; the rest
+        lives in the More sheet). Signed out, the shell is capture-only:
+        Capture plus My menus only when anonymous drafts exist to continue —
+        no Orders, no More. Sits after the footer so it is the last thing on
+        the page and sticks to the viewport bottom instead of floating above
+        the footer links.
       */}
+      {!sessionPending && (signedIn || (!libraryLoading && visibleMenus.length > 0)) ? (
       <nav
         data-print-hide
         aria-label="Sections"
         className="sticky bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur-sm sm:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="grid grid-cols-4 px-2 pt-1">
-          {phoneTabs().map((tab) => (
+        <div
+          className={`grid px-2 pt-1 ${signedIn ? "grid-cols-4" : "grid-cols-2"}`}
+        >
+          {(signedIn
+            ? phoneTabs()
+            : phoneTabs().filter((tab) => tab.id === "capture" || tab.id === "library")
+          ).map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -2350,6 +2398,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               {tab.label}
             </button>
           ))}
+          {signedIn && (
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
@@ -2373,9 +2422,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             </span>
             More
           </button>
+          )}
         </div>
       </nav>
-      {moreOpen && (
+      ) : null}
+      {signedIn && moreOpen && (
         <div className="sm:hidden">
           <div
             aria-hidden="true"
