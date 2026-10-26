@@ -1401,6 +1401,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         const server = await fetchServerMenu(menuId);
         if (docRef.current?.id === menuId) serverBaseRef.current = server.updatedAt;
+        // The wizard is how onboarding menus reach the account. Stamp the
+        // agreed revision so this row stays the account's — signed out, it
+        // must never resurface as an anonymous draft.
+        const publishActor = accountKeyRef.current;
+        if (publishActor) {
+          await refreshDraftSync(
+            menuId,
+            publishActor,
+            server.updatedAt,
+            menuContentHash(server.doc)
+          );
+          setOriginList(await listDraftOrigins());
+        }
       } catch {
         // The next editor open reconciles the baseline; publishing already
         // succeeded, so this must not surface as a failure.
