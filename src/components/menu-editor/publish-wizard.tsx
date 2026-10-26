@@ -19,11 +19,14 @@ import { slugCandidates } from "@/features/publishing/slug";
 import { publishMenuWithSetup } from "@/features/publishing/setup-client";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
 import {
+  clearWizardLinkSent,
   clearWizardState,
   defaultWizardState,
+  loadWizardLinkSent,
   loadWizardState,
   publishWizardPath,
   resolveWizardRestaurant,
+  saveWizardLinkSent,
   saveWizardState,
   type PublishWizardState,
 } from "@/features/publishing/wizard-state";
@@ -125,6 +128,8 @@ export function PublishWizard({
 }: PublishWizardProps) {
   const fallback = useMemo(() => defaultWizardState(doc), [doc]);
   const [form, setForm] = useState<PublishWizardState>(() => loadWizardState(doc.id, fallback));
+  // A link requested earlier restores its panel after reloads and returns.
+  const initialLinkSent = useMemo(() => loadWizardLinkSent(doc.id), [doc.id]);
   const publicationKey = `${accountKey ?? "anonymous"}:${doc.id}`;
   /** Which account+menu the publication state belongs to. */
   const [checkedFor, setCheckedFor] = useState<string | null>(null);
@@ -141,6 +146,13 @@ export function PublishWizard({
   useEffect(() => {
     saveWizardState(doc.id, form);
   }, [doc.id, form]);
+
+  // A signed-in owner has no pending link: forget the stored request so a
+  // later sign-out never resurrects a dead "check your email" panel.
+  // Storage only, no state — nothing here can loop or flash.
+  useEffect(() => {
+    if (signedIn) clearWizardLinkSent(doc.id);
+  }, [signedIn, doc.id]);
 
   // A reload after publishing (or opening a menu that is already live) must
   // show the link rather than a fresh publish form. `checkedFor` tracks the
@@ -429,7 +441,12 @@ export function PublishWizard({
                 The draft stays exactly as you left it. Use the same browser you uploaded from when
                 you open the emailed link.
               </div>
-              <MagicLinkForm callbackURL={publishWizardPath(doc.id)} />
+              <MagicLinkForm
+                callbackURL={publishWizardPath(doc.id)}
+                initialSent={initialLinkSent}
+                onSent={(sent) => saveWizardLinkSent(doc.id, sent)}
+                onSentCleared={() => clearWizardLinkSent(doc.id)}
+              />
               <p className="text-xs leading-5 text-stone-500">
                 No password, no card — sign-in is just how the link becomes yours.
               </p>
