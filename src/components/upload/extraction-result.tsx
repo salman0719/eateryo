@@ -154,7 +154,7 @@ export function ExtractionResult({
                       ))}
                       {needsReview && (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-                          Needs review
+                          {item.price === null ? "Check price" : "Couldn't read"}
                         </span>
                       )}
                     </div>
@@ -182,7 +182,7 @@ export function ExtractionResult({
             <h2 className="text-xl font-bold text-stone-900">{data.title ?? "Untitled menu"}</h2>
             {source === "ai" ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
-                AI draft — review required
+                {reviewCount > 0 ? `AI draft — ${reviewCount} to check` : "AI draft"}
               </span>
             ) : (
               <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
@@ -194,7 +194,9 @@ export function ExtractionResult({
             {data.categories.length} {data.categories.length === 1 ? "category" : "categories"} ·{" "}
             {itemCount} {itemCount === 1 ? "item" : "items"}
             {reviewCount > 0 && (
-              <span className="font-medium text-amber-800"> · {reviewCount} need review</span>
+              <span className="font-medium text-amber-800">
+                {" "}· {reviewCount} to check
+              </span>
             )}
           </p>
           {source === "ai" && (
@@ -270,7 +272,7 @@ export function ExtractionResult({
               </h3>
               {reviewCount > 0 && (
                 <span className="text-xs text-amber-800">
-                  {reviewCount} {reviewCount === 1 ? "needs" : "need"} a check
+                  {reviewCount} to check
                 </span>
               )}
             </div>

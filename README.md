@@ -156,7 +156,7 @@ address, promotion dates):
 3. **Review** — the draft opens in the editor: fix names, prices,
    descriptions, categories, variants/options, dietary labels, and
    availability; add, duplicate, delete, reorder, and move items. Uncertain
-   fields carry a visible "needs review" note.
+   fields carry a visible action pill ("Check price" / "Couldn't read").
 4. **Save** — edits autosave to IndexedDB (debounced; "Saving… / Saved
    locally" status). Nothing is claimed saved before the transaction succeeds.
 5. **Export** — download the menu as JSON (round-trips through Import JSON)
