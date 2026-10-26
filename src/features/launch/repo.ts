@@ -60,7 +60,7 @@ export async function getLaunchSnapshot(
     }
     for (const category of parsed.data.categories) {
       for (const item of category.items) {
-        if (item.price === null) unpricedItems += 1;
+        if (item.price === null && !item.unpricedAccepted) unpricedItems += 1;
         if (item.reviewNotes.length > 0) reviewNotes += 1;
       }
     }

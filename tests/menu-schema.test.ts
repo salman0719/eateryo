@@ -52,6 +52,7 @@ describe("menuDocumentSchema", () => {
     const item = parsed.categories[0].items[0];
     expect(item.price).toBeNull();
     expect(item.available).toBeNull();
+    expect(item.unpricedAccepted).toBe(false);
     expect(item.dietaryLabels).toEqual([]);
     expect(item.reviewNotes).toEqual([]);
   });

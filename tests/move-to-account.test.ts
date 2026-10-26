@@ -121,6 +121,7 @@ describe("moveLocalMenusToAccount", () => {
                 },
               ],
               reviewNotes: ["Confirm salmon price with the kitchen"],
+              unpricedAccepted: false,
             },
             {
               id: "item-2",
@@ -134,6 +135,7 @@ describe("moveLocalMenusToAccount", () => {
               variants: [],
               options: [],
               reviewNotes: ["Price not on the board — ask before printing"],
+              unpricedAccepted: false,
             },
           ],
         },

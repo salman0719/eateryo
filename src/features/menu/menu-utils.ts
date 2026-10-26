@@ -96,7 +96,30 @@ function buildItem(
     variants: input.variants ? clone(input.variants) : [],
     options: input.options ? clone(input.options) : [],
     reviewNotes: input.reviewNotes ? [...input.reviewNotes] : [],
+    unpricedAccepted: input.unpricedAccepted ?? false,
   };
+}
+
+/** An exception, not everything: unpriced (unless explicitly accepted) or
+ * carrying an extraction note. Single canonical definition — the result
+ * list, editor rows, badges, and launch derivation must all agree. */
+export function isItemFlagged(item: Pick<MenuItem, "price" | "reviewNotes" | "unpricedAccepted">): boolean {
+  if (item.reviewNotes.length > 0) return true;
+  if (item.price === null && !item.unpricedAccepted) return true;
+  return false;
+}
+
+/** Owner reviewed the AI notes and the data is right — drop the notes.
+ * Never invents a price; a null price stays flagged unless accepted. */
+export function confirmItemReviewed(doc: MenuDocument, categoryId: string, itemId: string): MenuDocument {
+  return updateItem(doc, categoryId, itemId, { reviewNotes: [] });
+}
+
+/** Owner confirms this item is intentionally unpriced (e.g. market price).
+ * Clears the notes and stops the null price from flagging. Prices stay
+ * null — totals stay honestly null downstream. */
+export function acceptItemUnpriced(doc: MenuDocument, categoryId: string, itemId: string): MenuDocument {
+  return updateItem(doc, categoryId, itemId, { reviewNotes: [], unpricedAccepted: true });
 }
 
 // --- Categories -----------------------------------------------------------

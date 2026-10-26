@@ -9,6 +9,8 @@
  * - Missing prices, descriptions, dietary labels, or ingredients are
  *   `null`/empty — never invented.
  * - Uncertainty is recorded in `reviewNotes`, never silently resolved.
+ * - A null price stops flagging only via explicit owner acceptance
+ *   (`unpricedAccepted`, e.g. "market price") — never by inventing a number.
  * - Stable app-generated IDs (`generateId()` in `./menu-utils`), never
  *   names, identify categories and items.
  *
@@ -52,6 +54,10 @@ export const menuItemSchema = z.object({
   variants: z.array(menuVariantSchema).default([]),
   options: z.array(menuOptionSchema).default([]),
   reviewNotes: z.array(z.string().min(1)).default([]),
+  /** Owner-confirmed intentionally unpriced (e.g. "market price").
+   * Set only by an explicit "leave unpriced" action — never by the AI —
+   * so a null price stops flagging without inventing a number. */
+  unpricedAccepted: z.boolean().default(false),
 });
 
 export const menuCategorySchema = z.object({

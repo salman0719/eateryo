@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  acceptItemUnpriced,
   addCategory,
   addItem,
+  confirmItemReviewed,
   createMenuDocument,
   deleteCategory,
   deleteItem,
   duplicateItem,
+  isItemFlagged,
   moveCategory,
   moveItem,
   moveItemToCategory,
@@ -150,6 +153,28 @@ describe("menu-utils", () => {
     expect(mocha.currency).toBe("USD");
     // Original document untouched by any helper.
     expect(doc.categories[0].items).toHaveLength(2);
+  });
+
+  it("flags unpriced and noted items, and clears on explicit review", () => {
+    const { doc, drinksId } = setupTwoCategoryMenu();
+    const pricedId = doc.categories[0].items[0].id;
+    // A clean priced item is never flagged.
+    expect(isItemFlagged(doc.categories[0].items[0])).toBe(false);
+    // An AI note flags even a priced item; confirming clears it.
+    const noted = updateItem(doc, drinksId, pricedId, { reviewNotes: ["faint print"] });
+    expect(isItemFlagged(noted.categories[0].items[0])).toBe(true);
+    const confirmed = confirmItemReviewed(noted, drinksId, pricedId);
+    expect(confirmed.categories[0].items[0].reviewNotes).toEqual([]);
+    expect(isItemFlagged(confirmed.categories[0].items[0])).toBe(false);
+    // A null price flags; confirming alone cannot clear it — only an
+    // explicit accept (market price) or entering a price does.
+    const unpriced = updateItem(doc, drinksId, pricedId, { price: null });
+    expect(isItemFlagged(unpriced.categories[0].items[0])).toBe(true);
+    const stillFlagged = confirmItemReviewed(unpriced, drinksId, pricedId);
+    expect(isItemFlagged(stillFlagged.categories[0].items[0])).toBe(true);
+    const accepted = acceptItemUnpriced(unpriced, drinksId, pricedId);
+    expect(accepted.categories[0].items[0].price).toBeNull();
+    expect(isItemFlagged(accepted.categories[0].items[0])).toBe(false);
   });
 
   it("throws on unknown ids", () => {

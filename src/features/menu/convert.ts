@@ -44,6 +44,7 @@ export function extractedMenuToDocument(
           choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
         })),
         reviewNotes: [...item.reviewNotes],
+        unpricedAccepted: false,
       })),
     })),
     source: {
