@@ -93,6 +93,7 @@ import {
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
+  unresolvableMenuMessage,
   type AppRoute,
   type AppScreen,
   type EditorMode,
@@ -532,7 +533,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         if (!cancelled) await openDocRef.current?.(doc, imageBlob, false);
       } catch {
         if (cancelled) return;
-        setLibraryError("That menu could not be opened. It may have been deleted or moved.");
+        setLibraryError(unresolvableMenuMessage(route));
         openedRouteMenuRef.current = null;
         navigateToRef.current?.({ screen: "library" }, true);
       }
