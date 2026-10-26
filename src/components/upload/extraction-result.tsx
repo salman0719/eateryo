@@ -11,6 +11,8 @@
  * and the copy both say so.
  */
 
+import { useState } from "react";
+
 import { MenuPreview } from "@/components/menu-editor/menu-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -63,6 +65,11 @@ function formatPrice(item: PreviewItem, fallbackCurrency: string | null): string
   return `${currency ? `${currency} ` : ""}${item.price.toFixed(2)}`;
 }
 
+/** An exception, not everything: unpriced or carrying an extraction note. */
+function isFlagged(item: PreviewItem): boolean {
+  return item.price === null || item.reviewNotes.length > 0;
+}
+
 export function ExtractionResult({
   data,
   source,
@@ -74,16 +81,108 @@ export function ExtractionResult({
   previewDoc = null,
 }: ExtractionResultProps) {
   const itemCount = data.categories.reduce((sum, c) => sum + c.items.length, 0);
-  const reviewCount = data.categories.reduce(
-    (sum, c) => sum + c.items.filter((i) => i.price === null || i.reviewNotes.length > 0).length,
-    0
+  const reviewCount = data.categories.reduce((sum, c) => sum + c.items.filter(isFlagged).length, 0);
+  // Q6 calm review: Ready items are the quiet majority, Check-this the
+  // visible work. Both derive from the same flags the editor uses.
+  const [showAllReady, setShowAllReady] = useState(false);
+  const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const flaggedCategories = data.categories
+    .map((category) => ({ name: category.name, items: category.items.filter(isFlagged) }))
+    .filter((category) => category.items.length > 0);
+  const readyItems = data.categories.flatMap((category) =>
+    category.items.filter((item) => !isFlagged(item))
   );
+  const visibleReady = showAllReady ? readyItems : readyItems.slice(0, 5);
 
   // Q7: exactly one primary road. Continue takes the primary slot as soon as
   // the draft is safe; the editor stays as a quiet secondary, never a
   // competing equal. The old amber publish card is gone on purpose — two
   // identical CTAs were the confusion.
 
+  /** One category card with full detail rows (badges + notes). */
+  function renderCategoryCard(categoryName: string, items: PreviewItem[]) {
+    return (
+      <div
+        key={categoryName}
+        className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+      >
+        <h3 className="border-b border-stone-100 bg-stone-50 px-5 py-3 text-sm font-bold tracking-wide text-stone-800 uppercase">
+          {categoryName}
+        </h3>
+        <ul className="divide-y divide-stone-100">
+          {items.map((item) => {
+            const needsReview = isFlagged(item);
+            return (
+              <li key={`${categoryName}-${item.name}`} className="px-5 py-3">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="flex items-center gap-2 font-medium text-stone-900">
+                    <span>{item.name}</span>
+                    {item.available === false && (
+                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
+                        Unavailable
+                      </span>
+                    )}
+                  </p>
+                  <p
+                    className={
+                      item.price === null
+                        ? "shrink-0 text-sm font-semibold text-amber-800"
+                        : "shrink-0 text-sm font-semibold text-stone-900"
+                    }
+                  >
+                    {formatPrice(item, data.currency)}
+                  </p>
+                </div>
+                {item.description && (
+                  <p className="mt-0.5 text-sm text-stone-600">{item.description}</p>
+                )}
+                {item.variants.length > 0 && (
+                  <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
+                    {item.variants.map((variant, index) => (
+                      <li key={`${variant.name}-${index}`} className="tabular-nums">
+                        {variant.name}
+                        <span className="ml-1.5 font-medium text-stone-800">
+                          {variant.price === null
+                            ? "—"
+                            : `${item.currency ?? data.currency ?? ""}${item.currency || data.currency ? " " : ""}${variant.price.toFixed(2)}`}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {item.dietaryLabels.map((label) => (
+                    <span
+                      key={label}
+                      className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
+                    >
+                      {label}
+                    </span>
+                  ))}
+                  {needsReview && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                      {item.price === null ? "Check price" : "Couldn't read"}
+                    </span>
+                  )}
+                </div>
+                {item.reviewNotes.length > 0 && (
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-800">
+                    {item.reviewNotes.map((note) => (
+                      <li key={note}>{note}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
+  // Q6 calm review: Ready is the quiet majority (names + prices, no badges),
+  // Check-this the visible work. With nothing flagged the list renders whole,
+  // exactly as before.
   const draftDetails =
     data.categories.length === 0 ? (
       <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
@@ -92,85 +191,55 @@ export function ExtractionResult({
           The image may not show a menu, or the text was unreadable. Try a clearer photo.
         </p>
       </div>
+    ) : reviewCount === 0 ? (
+      <div className="flex flex-col gap-3">
+        {data.categories.map((category) => renderCategoryCard(category.name, category.items))}
+      </div>
     ) : (
       <div className="flex flex-col gap-3">
-        {data.categories.map((category) => (
-          <div
-            key={category.name}
-            className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
-          >
-            <h3 className="border-b border-stone-100 bg-stone-50 px-5 py-3 text-sm font-bold tracking-wide text-stone-800 uppercase">
-              {category.name}
+        {!onlyFlagged && (
+          <section aria-label="Ready items" className="rounded-2xl border border-stone-200 bg-white p-5">
+            <h3 className="text-sm font-semibold text-stone-900">
+              ✓ Ready ({readyItems.length})
             </h3>
-            <ul className="divide-y divide-stone-100">
-              {category.items.map((item) => {
-                const needsReview = item.price === null || item.reviewNotes.length > 0;
-                return (
-                  <li key={`${category.name}-${item.name}`} className="px-5 py-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <p className="flex items-center gap-2 font-medium text-stone-900">
-                        <span>{item.name}</span>
-                        {item.available === false && (
-                          <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
-                            Unavailable
-                          </span>
-                        )}
-                      </p>
-                      <p
-                        className={
-                          item.price === null
-                            ? "shrink-0 text-sm font-semibold text-amber-800"
-                            : "shrink-0 text-sm font-semibold text-stone-900"
-                        }
-                      >
+            {readyItems.length === 0 ? (
+              <p className="mt-1 text-sm text-stone-600">
+                Every item needs a look — start below.
+              </p>
+            ) : (
+              <>
+                <ul className="mt-2 divide-y divide-stone-100">
+                  {visibleReady.map((item) => (
+                    <li
+                      key={`ready-${item.name}`}
+                      className="flex items-baseline justify-between gap-3 py-1.5"
+                    >
+                      <span className="min-w-0 truncate text-sm text-stone-800">{item.name}</span>
+                      <span className="shrink-0 text-sm font-medium text-stone-800 tabular-nums">
                         {formatPrice(item, data.currency)}
-                      </p>
-                    </div>
-                    {item.description && (
-                      <p className="mt-0.5 text-sm text-stone-600">{item.description}</p>
-                    )}
-                    {item.variants.length > 0 && (
-                      <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
-                        {item.variants.map((variant, index) => (
-                          <li key={`${variant.name}-${index}`} className="tabular-nums">
-                            {variant.name}
-                            <span className="ml-1.5 font-medium text-stone-800">
-                              {variant.price === null
-                                ? "—"
-                                : `${item.currency ?? data.currency ?? ""}${item.currency || data.currency ? " " : ""}${variant.price.toFixed(2)}`}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {item.dietaryLabels.map((label) => (
-                        <span
-                          key={label}
-                          className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
-                        >
-                          {label}
-                        </span>
-                      ))}
-                      {needsReview && (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-                          {item.price === null ? "Check price" : "Couldn't read"}
-                        </span>
-                      )}
-                    </div>
-                    {item.reviewNotes.length > 0 && (
-                      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-800">
-                        {item.reviewNotes.map((note) => (
-                          <li key={note}>{note}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {readyItems.length > visibleReady.length ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllReady(true)}
+                    className="mt-2 text-xs font-medium text-stone-500 underline underline-offset-2 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  >
+                    …and {readyItems.length - visibleReady.length} more — no action needed
+                  </button>
+                ) : (
+                  <p className="mt-2 text-xs text-stone-500">No badges, no action needed.</p>
+                )}
+              </>
+            )}
+          </section>
+        )}
+        <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
+          ⚠ Check this ({reviewCount})
+        </h3>
+        {flaggedCategories.map((category) => renderCategoryCard(category.name, category.items))}
       </div>
     );
 
@@ -268,13 +337,23 @@ export function ExtractionResult({
 
             <div className="flex items-baseline justify-between gap-3">
               <h3 className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">
-                Full draft
+                {onlyFlagged ? "Items to check" : "Full draft"}
               </h3>
-              {reviewCount > 0 && (
-                <span className="text-xs text-amber-800">
-                  {reviewCount} to check
-                </span>
-              )}
+              <div className="flex items-baseline gap-3">
+                {reviewCount > 0 && (
+                  <span className="text-xs text-amber-800">{reviewCount} to check</span>
+                )}
+                {reviewCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setOnlyFlagged((value) => !value)}
+                    aria-pressed={onlyFlagged}
+                    className="text-xs font-medium text-stone-500 underline underline-offset-2 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  >
+                    {onlyFlagged ? "Show everything" : "Show only items to check"}
+                  </button>
+                )}
+              </div>
             </div>
 
             {draftDetails}
