@@ -106,9 +106,10 @@ interface PublishWizardProps {
  * restaurant only when the owner has none, attaches the menu and publishes
  * the snapshot.
  *
- * The success screen is the reward the old flow never had: the live URL, a
- * QR code, the menu inside a phone frame, and the two optional next steps
- * (tables, hours) without a trip to a marketing page.
+ * The success screen sells the right payoff: the live URL kept honest as a
+ * view-only page (door, website, Google profile — never for tables), with
+ * the primary road leading to table cards that order, printed from the
+ * Tables tab.
  */
 export function PublishWizard({
   doc,
@@ -252,14 +253,15 @@ export function PublishWizard({
               {submitResult?.created.menu ? "First link created" : "Your link is live"}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-              Your menu is on the internet
+              Your menu is live — now the tables
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
               {submitResult?.created.restaurant
                 ? `We created “${submitResult.restaurant.name}” for you — rename it in Settings whenever you like. `
                 : ""}
-              Anyone can open this link, no account needed. Share it, or print the QR code for your
-              tables.
+              The link below is a view-only page — good for the door, your website, or your
+              Google profile. Table cards are separate: one printed card per table, each
+              ordering for its table.
             </p>
           </div>
           <button
@@ -275,7 +277,7 @@ export function PublishWizard({
           <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="min-w-0">
               <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">
-                Your link
+                Your menu link · view-only page
               </p>
               <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
                 <code className="min-w-0 max-w-full truncate rounded-lg bg-stone-100 px-2.5 py-1.5 text-sm text-stone-900">
@@ -308,14 +310,17 @@ export function PublishWizard({
             <div className="flex items-center gap-3 rounded-xl border border-stone-200 p-3">
               <QrCode value={publicUrl} alt={`QR code for ${publicUrl}`} size={112} />
               <p className="text-xs leading-5 text-stone-600">
-                Print this at the door or on the tables. It works on any phone — no app needed.
+                For the door, your website, or your Google profile — it opens the menu page,
+                nothing more. <span className="font-medium">Not for tables:</span> table cards print
+                from the Tables tab.
               </p>
             </div>
 
             <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <h2 className="text-sm font-semibold text-stone-900">Make it work for service</h2>
+              <h2 className="text-sm font-semibold text-stone-900">Next: take orders at the tables</h2>
               <p className="mt-1 text-xs leading-5 text-stone-600">
-                These two steps are optional, and neither one changes your live link.
+                One QR per table — each card orders for its table across every open menu. They
+                print from the Tables tab, and nothing here changes your live link.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -350,7 +355,7 @@ export function PublishWizard({
           </section>
 
           <aside className="flex flex-col gap-2">
-            <PhoneFrame label="What customers see on their phone">
+            <PhoneFrame label="Menu page · view-only">
               <MenuPreview
                 doc={doc}
                 themeId={liveTheme}
@@ -358,6 +363,9 @@ export function PublishWizard({
                 eyebrow="Menu · live"
               />
             </PhoneFrame>
+            <p className="text-center text-xs text-stone-500">
+              What a table card opens adds the table — same menu, ordering for its table.
+            </p>
           </aside>
         </div>
       </div>
