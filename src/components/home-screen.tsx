@@ -1856,6 +1856,18 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     void persistResultDoc(next);
   }
 
+  /** Q2: the result title is an editable field, never a naming gate.
+   * Commits persist to the draft like price fixes; blank is ignored. */
+  function handleRenameResultTitle(title: string) {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc || doc.title === trimmed) return;
+    const next = { ...doc, title: trimmed };
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   async function handleEditResult() {
     try {
       await saveResultAndOpen();
@@ -2508,6 +2520,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   onResolveItem={handleResolveResultItem}
                   onResolveAll={handleResolveAllResultItems}
                   onUpdatePrice={handleUpdateResultPrice}
+                  onRenameTitle={handleRenameResultTitle}
                   initialReviewCount={initialReviewCount}
                   onPublish={
                     source === "demo" || draftSave === "saved"

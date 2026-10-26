@@ -15,6 +15,7 @@
 import { useRef, useState } from "react";
 
 import { Attention, didClearAll } from "@/components/ui/attention";
+import { CommitInput } from "@/components/menu-editor/fields";
 import { MenuPreview } from "@/components/menu-editor/menu-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -75,6 +76,8 @@ interface ExtractionResultProps {
    * the edit action becomes a quiet "Fine-tune in the editor" secondary.
    */
   editLabel?: string;
+  /** Rename the draft title inline (persists to the draft). Absent = static title. */
+  onRenameTitle?: (title: string) => void;
   /** Shown when the draft already exists in local storage. */
   savedNotice?: string | null;
   /** Canonical document for the phone preview; null hides the first look. */
@@ -163,6 +166,7 @@ export function ExtractionResult({
   onResolveItem,
   onResolveAll,
   onUpdatePrice,
+  onRenameTitle,
   initialReviewCount = null,
   editLabel = "Edit menu",
   savedNotice = null,
@@ -443,7 +447,24 @@ export function ExtractionResult({
       >
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-bold text-stone-900">{data.title ?? "Untitled menu"}</h2>
+            {onRenameTitle ? (
+              <div className="min-w-52 flex-1">
+                <CommitInput
+                  label="Menu title"
+                  value={data.title ?? ""}
+                  placeholder="e.g. Main menu"
+                  onCommit={(title) => {
+                    if (title.trim()) onRenameTitle(title.trim());
+                  }}
+                  inputClassName="text-xl font-bold"
+                />
+                <p className="mt-0.5 text-xs text-stone-500">
+                  Guests see this at the top — fix it if the photo missed it.
+                </p>
+              </div>
+            ) : (
+              <h2 className="text-xl font-bold text-stone-900">{data.title ?? "Untitled menu"}</h2>
+            )}
             {source === "ai" ? (
               <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
                 {reviewCount > 0 ? `AI draft — ${reviewCount} to check` : "AI draft"}
