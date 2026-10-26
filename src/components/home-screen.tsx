@@ -13,6 +13,7 @@ import {
   LocalDraftsOffer,
   type LocalDraftClaimNotice,
 } from "@/components/menu-editor/local-drafts-banner";
+import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
 import { MoveToAccountPanel } from "@/components/menu-editor/move-to-account-panel";
 import { AssistantPanel } from "@/components/assistant/assistant-panel";
 import { RestaurantSettings } from "@/components/settings/restaurant-settings";
@@ -211,6 +212,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // Which editor surface the URL asks for (edit, reorder, preview);
   // an item deep link is always the edit workspace.
   const editorMode: EditorMode = route.screen === "editor" ? route.mode : "edit";
+  /** A publish URL whose draft resolves nowhere: hold the URL with an
+   * explainer card instead of bouncing to the library. Cleared on any
+   * navigation; re-set if the same dead URL is opened again. */
+  const [missingPublishMenuId, setMissingPublishMenuId] = useState<string | null>(null);
   const routeRef = useRef<AppRoute>(route);
   const navigationReadyRef = useRef(false);
   const openedRouteMenuRef = useRef<string | null>(null);
@@ -238,6 +243,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
     routeRef.current = next;
     setRoute(next);
+    setMissingPublishMenuId(null);
     if (typeof window !== "undefined") navigationReadyRef.current = true;
   }
 
@@ -533,8 +539,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         if (!cancelled) await openDocRef.current?.(doc, imageBlob, false);
       } catch {
         if (cancelled) return;
-        setLibraryError(unresolvableMenuMessage(route));
         openedRouteMenuRef.current = null;
+        // A dead publish link holds its URL with an explainer card — the
+        // draft is in another browser, and the library can't show that.
+        if (route.screen === "editor" && route.mode === "publish") {
+          setMissingPublishMenuId(menuId);
+          return;
+        }
+        setLibraryError(unresolvableMenuMessage(route));
         navigateToRef.current?.({ screen: "library" }, true);
       }
     })();
@@ -2517,7 +2529,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             )}
           </>
         )}
-        {screen === "editor" && !activeDoc && (
+        {screen === "editor" && !activeDoc && missingPublishMenuId && (
+          <MissingDraftCard
+            onOpenLibrary={() => navigateTo({ screen: "library" })}
+            onStartFresh={() => navigateTo({ screen: "capture" })}
+          />
+        )}
+        {screen === "editor" && !activeDoc && !missingPublishMenuId && (
           <div role="status" aria-busy="true" className="flex flex-col gap-4">
             <span className="sr-only">Opening menu…</span>
             <div className="flex items-center gap-3">
