@@ -197,6 +197,10 @@ export function ExtractionResult({
   // from the extraction-time count: only a had-work → none transition fires,
   // so a clean extraction (0 → 0) never yanks the scroll.
   const allClear = didClearAll(initialReviewCount ?? reviewCount, reviewCount);
+  // The link step pulses whenever there is nothing left to check — after the
+  // last resolve and on a clean extraction alike. The scroll above fires only
+  // on the transition, so a clean draft never yanks the page.
+  const linkReady = reviewCount === 0;
   function handleContinue() {
     if (reviewCount > 0) {
       setOnlyFlagged(true);
@@ -468,7 +472,7 @@ export function ExtractionResult({
         </div>
         <div className="flex flex-wrap gap-2">
           {onPublish && (
-            <Attention active={allClear} scroll={false} inline className="inline-flex rounded-full">
+            <Attention active={linkReady} scroll={false} inline className="inline-flex rounded-full">
               <button
                 type="button"
                 onClick={handleContinue}
