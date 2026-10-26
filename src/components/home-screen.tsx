@@ -652,8 +652,36 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }
         const localIds = new Set((await listMenus()).map((menu) => menu.id));
         let cachedAny = false;
+        let originsChanged = false;
         for (const summary of serverMenus) {
-          if (localIds.has(summary.id)) continue;
+          if (localIds.has(summary.id)) {
+            // Backfill: this row is provably the account's (same id on the
+            // server) but was never marked — signed out, it would resurface
+            // as an anonymous draft. The agreed revision comes from the
+            // server, so a later return heals instead of conflicting.
+            // Staff rows and someone else's cache are never touched.
+            if (staffMenusRef.current.has(summary.id)) continue;
+            const backfillActor = accountKeyRef.current;
+            if (!backfillActor) continue;
+            try {
+              const origin = await getDraftOrigin(summary.id).catch(() => undefined);
+              if (origin) continue;
+              if (!signedInRef.current) continue;
+              const full = await fetchServerMenu(summary.id);
+              if (!signedInRef.current) continue;
+              await refreshDraftSync(
+                summary.id,
+                backfillActor,
+                full.updatedAt,
+                menuContentHash(full.doc)
+              );
+              originsChanged = true;
+            } catch {
+              // One unreadable row never blocks the rest; the next sign-in
+              // retries it.
+            }
+            continue;
+          }
           try {
             const full = await fetchServerMenu(summary.id);
             await cacheMenu(full.doc);
@@ -667,6 +695,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           }
         }
         if (cachedAny) setMenus(await listMenus());
+        if (originsChanged) setOriginList(await listDraftOrigins());
       } catch {
         // Signed out mid-flight, offline, or the server DB is unavailable:
         // the local library stands alone.
