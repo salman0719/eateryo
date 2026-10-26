@@ -45,7 +45,11 @@ interface ExtractionResultProps {
   onEdit?: () => void;
   /** Save the draft and open the publish wizard (shown when the draft is safe). */
   onPublish?: () => void;
-  /** Label for the primary action; defaults to "Edit menu". */
+  /**
+   * Label for the edit action while it is the primary path (before the draft
+   * is saved). Once `onPublish` exists, Continue takes the primary slot and
+   * the edit action becomes a quiet "Fine-tune in the editor" secondary.
+   */
   editLabel?: string;
   /** Shown when the draft already exists in local storage. */
   savedNotice?: string | null;
@@ -75,24 +79,10 @@ export function ExtractionResult({
     0
   );
 
-  const publishCard = onPublish ? (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
-      <div>
-        <p className="text-sm font-semibold text-amber-900">Ready to share it?</p>
-        <p className="text-xs leading-5 text-amber-800">
-          Your draft is saved. Get a public link in one short form — sign-in happens inside the
-          flow, and the draft stays here.
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onPublish}
-        className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-      >
-        Get your public link
-      </button>
-    </div>
-  ) : null;
+  // Q7: exactly one primary road. Continue takes the primary slot as soon as
+  // the draft is safe; the editor stays as a quiet secondary, never a
+  // competing equal. The old amber publish card is gone on purpose — two
+  // identical CTAs were the confusion.
 
   const draftDetails =
     data.categories.length === 0 ? (
@@ -219,14 +209,27 @@ export function ExtractionResult({
             </p>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {onPublish && (
+            <button
+              type="button"
+              onClick={onPublish}
+              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              Continue → check prices &amp; get your link
+            </button>
+          )}
           {onEdit && (
             <button
               type="button"
               onClick={onEdit}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className={
+                onPublish
+                  ? "rounded-full px-4 py-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  : "rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              }
             >
-              {editLabel}
+              {onPublish ? "Fine-tune in the editor" : editLabel}
             </button>
           )}
           <button
@@ -261,8 +264,6 @@ export function ExtractionResult({
               </p>
             </div>
 
-            {publishCard}
-
             <div className="flex items-baseline justify-between gap-3">
               <h3 className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">
                 Full draft
@@ -278,10 +279,7 @@ export function ExtractionResult({
           </div>
         </div>
       ) : (
-        <>
-          {publishCard}
-          {draftDetails}
-        </>
+        draftDetails
       )}
     </section>
   );
