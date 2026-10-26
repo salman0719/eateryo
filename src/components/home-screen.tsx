@@ -1241,6 +1241,33 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           (id) => getMenu(id)
         );
       }
+      // The claim may have run while a draft was open (signing in inside
+      // the publish wizard). The editor still holds a null baseline for
+      // that row, so the next save would stay local and fork the revision
+      // just created. Reconcile the open row to the agreed revision instead.
+      const openId = docRef.current?.id ?? null;
+      const openClaimed =
+        openId !== null &&
+        (report.imported.includes(openId) || report.skipped.includes(openId));
+      if (openClaimed && openId !== null && accountKey) {
+        try {
+          const server = await fetchServerMenu(openId);
+          if (docRef.current?.id === openId) {
+            serverBaseRef.current = server.updatedAt;
+            await refreshDraftSync(
+              openId,
+              accountKey,
+              server.updatedAt,
+              menuContentHash(server.doc)
+            );
+            setOriginList(await listDraftOrigins());
+            setSaveState(savedState("Saved to your account."));
+          }
+        } catch {
+          // The row is imported and stamped; the next open reconciles the
+          // baseline. Never fail the claim over it.
+        }
+      }
       setClaimNotice({
         imported: report.imported.length,
         failed: report.failed.length,
@@ -1978,10 +2005,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const storedClaimStatus = accountKey ? loadLocalDraftClaim(accountKey) : "unseen";
   const claimStatus =
     claimAnswer?.accountKey === accountKey ? claimAnswer.status : storedClaimStatus;
+  // The editor suppresses the *offer* (importing the open menu would fork
+  // the revision the editor is holding), but never the empty-account
+  // auto-import: signing in inside the publish wizard is the onboarding
+  // path, and leaving it ungated strands the draft as anonymous — the next
+  // sign-out resurrects the resume banner for a menu the account owns.
   const localDraftsDecision =
     signedIn &&
     !sessionPending &&
-    screen !== "editor" &&
     serverMenusFor === accountKey &&
     restaurantCountFor === accountKey
       ? decideLocalDraftClaim({
@@ -1994,7 +2025,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       : "none";
 
   useEffect(() => {
-    if (!signedIn || !accountKey || screen === "editor") return;
+    if (!signedIn || !accountKey) return;
     if (serverMenusFor !== accountKey || restaurantCountFor !== accountKey) return;
     if (claimEvaluatedRef.current === accountKey) return;
     claimEvaluatedRef.current = accountKey;
@@ -2099,7 +2130,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           </nav>
         )}
 
-        {signedIn && claimNotice && (
+        {signedIn && claimNotice && screen !== "editor" && (
           <LocalDraftsNotice
             notice={claimNotice}
             onOpenLibrary={() => navigateTo({ screen: "library" })}
@@ -2108,6 +2139,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         )}
         {!claimNotice &&
           localDraftsDecision === "offer" &&
+          screen !== "editor" &&
           ownedRestaurantsForAccount.length > 0 && (
             <LocalDraftsOffer
               count={localOnlyCount}
