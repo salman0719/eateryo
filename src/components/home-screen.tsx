@@ -1402,6 +1402,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         void runLocalDraftClaim(result.restaurant.id, result.restaurant.name);
       }
     }
+    // The published menu may be the capture draft: once it has a link,
+    // Capture goes back to a fresh upload instead of showing the old draft
+    // as if it were still being worked on. Other menus leave capture alone.
+    if (menuId === draftDocRef.current?.id || menuId === demoDoc?.id) {
+      clearCapture();
+    }
   }
 
   async function handleDeleteMenu(id: string) {
