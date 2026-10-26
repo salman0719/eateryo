@@ -57,11 +57,11 @@ body {
 }
 
 /* Reusable "look here" pulse for the Attention primitive
-   (src/components/ui/attention.tsx): a warm amber ring that keeps breathing
-   while its step is the next action, plus a slight lift so the wrapped
-   button itself visibly moves. The shadow follows the wrapped element's own
-   border-radius, so the same class works on cards and pill buttons. It stops
-   when the step is done (the component unmounts or `active` flips false). */
+   (src/components/ui/attention.tsx): a warm amber ring that breathes five
+   times (~8s), then rests on the steady button, plus a slight lift so the
+   wrapped button itself visibly moves. The shadow follows the wrapped
+   element's own border-radius, so the same class works on cards and pill
+   buttons. Re-activating the step replays it (the class is reapplied). */
 @keyframes eateryo-attention-pulse {
   0%,
   100% {
@@ -75,7 +75,7 @@ body {
 }
 
 .attention-pulse {
-  animation: eateryo-attention-pulse 1.6s ease-in-out infinite;
+  animation: eateryo-attention-pulse 1.6s ease-in-out 5;
 }
 
 @media (prefers-reduced-motion: reduce) {
