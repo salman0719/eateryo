@@ -60,7 +60,7 @@ describe("extractedMenuToDocument", () => {
 
   it("falls back to a default title for empty extractions", () => {
     const doc = extractedMenuToDocument({ title: null, currency: null, categories: [] });
-    expect(doc.title).toBe("Untitled menu");
+    expect(doc.title).toBe("Main menu");
     expect(doc.categories).toEqual([]);
     expect(() => menuDocumentSchema.parse(doc)).not.toThrow();
   });
