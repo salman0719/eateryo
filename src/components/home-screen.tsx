@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { Attention } from "@/components/ui/attention";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { LibraryPanel } from "@/components/menu-editor/library-panel";
@@ -2435,13 +2436,20 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               </div>
             )}
 
-            {phase === "extracting" && extractProgress && (
-              <ExtractionProgress
-                pageCount={extractProgress.pageCount}
-                preparedPages={extractProgress.preparedPages}
-                requestStartedAt={extractProgress.requestStartedAt}
-              />
-            )}
+            <Attention
+              active={phase === "extracting"}
+              pulse={false}
+              scrollBlock="start"
+              className="scroll-mt-4"
+            >
+              {phase === "extracting" && extractProgress && (
+                <ExtractionProgress
+                  pageCount={extractProgress.pageCount}
+                  preparedPages={extractProgress.preparedPages}
+                  requestStartedAt={extractProgress.requestStartedAt}
+                />
+              )}
+            </Attention>
 
             {extractError && phase !== "extracting" && (
               <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
