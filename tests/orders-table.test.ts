@@ -157,12 +157,14 @@ describe("multi-menu table orders", () => {
     await setMenuAvailabilityForUser(db, ownerA, "menu-bar", [
       { days: [0], start: "11:00", end: "15:00" },
     ]);
-    // Monday noon UTC is not Sunday: the bar is closed.
+    // Pinned to Monday noon UTC, not the real clock: Sunday-only means the
+    // bar is closed, whatever day this runs on.
     await expect(
       placeTableOrder(db, {
         restaurantSlug: "cafe-a",
         tableLabel: "3",
         note: null,
+        now: new Date("2026-10-19T12:00:00.000Z"),
         lines: [
           { menuSlug: "lunch", menuItemId: "item-soup", quantity: 1 },
           { menuSlug: "bar", menuItemId: "item-beer", quantity: 1 },

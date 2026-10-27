@@ -390,10 +390,9 @@ it live.
       arrives.
 - [x] **Neon project** — created; migration applied and sign-in verified
       against it locally (2026-10-18). Env vars land in Vercel at deploy.
-- [ ] **Resend sending domain** — account + API key are live and sending
-      (`.env.local` now uses `notifications@send.eateryo.com`); confirm the
-      domain shows Verified in Resend and the same sender is set in Vercel
-      before relying on it beyond throwaway testing.
+- [x] **Resend sending domain** — verified; `.env.local` sends from
+      `notifications@send.eateryo.com`. Keep the same sender in Vercel env
+      vars at deploy.
 - [ ] **Sentry project** — Step 11 ships structured logs + email alerts;
       the Sentry DSN is still needed for a third-party error dashboard.
 - [ ] **Contact address** — `CONTACT_EMAIL` for `/privacy` and `/terms`.

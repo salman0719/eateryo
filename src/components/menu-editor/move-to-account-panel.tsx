@@ -32,16 +32,19 @@ import {
 interface MoveToAccountPanelProps {
   /** How many browser-only menus the add would consider (button label). */
   menuCount: number;
+  /** Ids to move; when set, hidden rows from another session are skipped. */
+  menuIds?: string[];
   /** Name guessed from the local menu titles, to prefill the create field. */
   suggestedName?: string | null;
-  /** Called after a run that imported at least one menu (refresh the library). */
-  onMoved?: () => void;
+  /** Called after a run that imported at least one menu (stamp + refresh). */
+  onMoved?: (report: MoveReport) => void;
   /** The owned restaurants, mirrored up for the per-row add action. */
   onOwnedChange?: (owned: RestaurantOption[]) => void;
 }
 
 export function MoveToAccountPanel({
   menuCount,
+  menuIds,
   suggestedName,
   onMoved,
   onOwnedChange,
@@ -164,9 +167,9 @@ export function MoveToAccountPanel({
     setError(null);
     setReport(null);
     try {
-      const result = await moveLocalMenusToAccount(selectedId);
+      const result = await moveLocalMenusToAccount(selectedId, menuIds);
       setReport(result);
-      if (result.imported.length > 0) onMoved?.();
+      if (result.imported.length > 0) onMoved?.(result);
     } catch (moveError) {
       // moveLocalMenusToAccount reports per-menu failures itself; a throw
       // here means even reading the browser library failed.

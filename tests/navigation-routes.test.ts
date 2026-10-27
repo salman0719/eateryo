@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { appRouteHref, menuIdFromPathname, parseAppRoute } from "../src/features/navigation/routes";
+import {
+  appRouteHref,
+  menuIdFromPathname,
+  parseAppRoute,
+  unresolvableMenuMessage,
+} from "../src/features/navigation/routes";
 
 describe("application routes", () => {
   it("defaults the root and unknown paths to capture", () => {
@@ -56,6 +61,16 @@ describe("application routes", () => {
   it("rejects malformed menu path encoding", () => {
     expect(menuIdFromPathname("/menus/%E0%A4%A")).toBeNull();
     expect(parseAppRoute("/menus/%E0%A4%A")).toEqual({ screen: "library" });
+  });
+
+  it("explains a dead publish link as a wrong-browser miss, not a deletion", () => {
+    const message = unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "publish" });
+    expect(message).toContain("without your draft");
+    expect(message).toContain("original browser");
+    expect(
+      unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })
+    ).toContain("deleted or moved");
+    expect(unresolvableMenuMessage({ screen: "library" })).toContain("deleted or moved");
   });
 
   it("round-trips every supported route and URL-encodes menu ids", () => {

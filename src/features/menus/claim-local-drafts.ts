@@ -1,11 +1,13 @@
 /**
  * Claiming the drafts that exist only in this browser (R1).
  *
- * After sign-in, the account is the destination: a brand-new account (no
- * menus, no restaurants) gets its browser drafts imported in one go, while
- * an established account is *offered* the same import. Both paths use the
- * same one-way move helper, so the local copies are never deleted and a
- * re-run only reports what was already there.
+ * Sign-in is the one moment that claims. An account with no menus adopts
+ * every browser draft in one go; an account that already holds menus is
+ * *offered* the same import. Both paths use the same one-way move helper,
+ * which marks each row with the account — so a claimed row never renders
+ * signed out again. A shared device deliberately swallows: whoever signs in
+ * first owns what was in the browser, and that is the documented trade
+ * for having no forks, no queues, no per-device scoping matrix.
  *
  * The decision is pure so it can be tested without a browser; only the
  * per-account "done / not now" memory touches localStorage, and it fails
@@ -27,27 +29,25 @@ export interface LocalDraftClaimInputs {
   ownedRestaurantCount: number;
   /** This account's remembered answer, if any. */
   status: LocalDraftClaimStatus;
-  /**
-   * True when this browser was last used by this account (or by none yet).
-   * Another account's cached menus must never be swept into a new one.
-   */
-  accountSeenInBrowser: boolean;
 }
 
 /**
- * Brand-new accounts import automatically — there is no existing account
- * content to surprise anyone with. Established accounts get a one-click
- * offer instead. Staff-only accounts are left alone: they own no restaurant
- * to import into, so the manual panel is the honest place to explain that.
+ * No menus on the account means every browser draft is adopted at sign-in —
+ * restaurants do not matter, because the auto-import creates one when
+ * needed. An account that already holds menus gets a one-click offer
+ * instead. Staff-only accounts with menus are left alone: they own no
+ * restaurant to import into, so the manual panel is the honest place to
+ * explain that.
  */
 export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraftClaimAction {
   if (inputs.localCount <= 0) return "none";
   if (inputs.status !== "unseen") return "none";
-  if (!inputs.accountSeenInBrowser) return "none";
-  if (inputs.accountMenuCount === 0 && inputs.restaurantCount === 0) return "auto-import";
+  if (inputs.accountMenuCount === 0) return "auto-import";
   if (inputs.ownedRestaurantCount === 0) return "none";
   return "offer";
 }
+
+
 
 const STORAGE_PREFIX = "eateryo:local-draft-claim:";
 const BROWSER_ACCOUNT_KEY = "eateryo:browser-account";

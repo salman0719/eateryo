@@ -7,6 +7,7 @@ import {
   addItem,
   deleteCategory,
   deleteItem,
+  isItemFlagged,
   moveCategory,
   moveItem,
   moveItemToCategory,
@@ -163,7 +164,7 @@ export function MenuEditor({
   onPreviewOpen,
 }: MenuEditorProps) {
   const reviewCount = doc.categories.reduce(
-    (sum, c) => sum + c.items.filter((i) => i.price === null || i.reviewNotes.length > 0).length,
+    (sum, c) => sum + c.items.filter(isItemFlagged).length,
     0
   );
   // Provenance, so a surprising line can be traced to the model that read it.
@@ -621,7 +622,7 @@ export function MenuEditor({
                                 title={item.reviewNotes.join("\n")}
                                 className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600"
                               >
-                                needs review
+                                {item.price === null ? "check price" : "couldn't read"}
                               </span>
                             )}
                             <span className="shrink-0 text-xs text-stone-500">
@@ -823,7 +824,7 @@ export function MenuEditor({
           )}
           {reviewCount > 0 && (
             <p className="mt-2 text-xs font-medium text-amber-800">
-              {reviewCount} {reviewCount === 1 ? "item needs" : "items need"} review.
+              {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
             </p>
           )}
         </div>

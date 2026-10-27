@@ -88,6 +88,12 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
+  reusable height-reveal animation: measures the rendered content and
+  animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then
+  releases to `height: auto`; `observeResize` is the opt-in for animating later
+  content/reflow height changes and reduced motion shows content instantly.
+  Dev showcase at `/dev/height-reveal`; tests in `tests/height-reveal.test.ts`
 - `tests/` — schema, utils, import-export, route tests
 - `src/lib/db/`, `drizzle/` — Drizzle schema + lazy Neon client; generated
   migrations (do not hand-edit `drizzle/`)

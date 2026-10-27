@@ -23,7 +23,9 @@ export function extractedMenuToDocument(
   return {
     schemaVersion: SCHEMA_VERSION,
     id: generateId(),
-    title: extracted.title?.trim() ? extracted.title.trim() : "Untitled menu",
+    // Q2: a photo that missed the name still arrives titled — the owner
+    // renames inline on the result screen, never through a naming gate.
+    title: extracted.title?.trim() ? extracted.title.trim() : "Main menu",
     currency: extracted.currency ?? null,
     categories: extracted.categories.map((category, categoryIndex) => ({
       id: generateId(),
@@ -44,6 +46,7 @@ export function extractedMenuToDocument(
           choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
         })),
         reviewNotes: [...item.reviewNotes],
+        unpricedAccepted: false,
       })),
     })),
     source: {

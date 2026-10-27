@@ -2,13 +2,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   defaultWizardState,
+  linkExpiryCopy,
+  loadWizardLinkSent,
   loadWizardState,
   parseWizardState,
   publishWizardPath,
   resolveWizardRestaurant,
+  saveWizardLinkSent,
   saveWizardState,
+  wizardLinkStorageKey,
   wizardStorageKey,
+  clearWizardLinkSent,
   clearWizardState,
+  WIZARD_LINK_TTL_MS,
   type PublishWizardState,
 } from "@/features/publishing/wizard-state";
 
@@ -143,5 +149,48 @@ describe("form persistence", () => {
     storage.setItem(wizardStorageKey("menu-1"), "{not json");
     expect(loadWizardState("menu-1", FALLBACK)).toEqual(FALLBACK);
     expect(parseWizardState("nope", FALLBACK)).toEqual(FALLBACK);
+  });
+});
+
+describe("pending link", () => {
+  it("saves, restores and clears the sent link per menu", () => {
+    const storage = fakeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    const sent = { email: "owner@cafe.com", sentAt: Date.now() };
+
+    saveWizardLinkSent("menu-1", sent);
+    expect(storage.getItem(wizardLinkStorageKey("menu-1"))).toContain("owner@cafe.com");
+    expect(loadWizardLinkSent("menu-1")).toEqual(sent);
+    expect(loadWizardLinkSent("menu-2")).toBeNull();
+
+    clearWizardLinkSent("menu-1");
+    expect(loadWizardLinkSent("menu-1")).toBeNull();
+  });
+
+  it("rejects damaged or ancient link records", () => {
+    const storage = fakeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+    storage.setItem(wizardLinkStorageKey("menu-1"), "{not json");
+    expect(loadWizardLinkSent("menu-1")).toBeNull();
+    storage.setItem(
+      wizardLinkStorageKey("menu-1"),
+      JSON.stringify({ email: "", sentAt: Date.now() })
+    );
+    expect(loadWizardLinkSent("menu-1")).toBeNull();
+    storage.setItem(
+      wizardLinkStorageKey("menu-1"),
+      JSON.stringify({ email: "owner@cafe.com", sentAt: Date.now() - 11 * 60 * 1000 })
+    );
+    expect(loadWizardLinkSent("menu-1")).toBeNull();
+  });
+
+  it("names the live countdown and the expiry", () => {
+    const sentAt = 1_000_000;
+    expect(linkExpiryCopy(sentAt, sentAt).expired).toBe(false);
+    expect(linkExpiryCopy(sentAt, sentAt + 4 * 60 * 1000).text).toContain("min");
+    expect(linkExpiryCopy(sentAt, sentAt + 4 * 60 * 1000 + 30 * 1000).expired).toBe(false);
+    const expired = linkExpiryCopy(sentAt, sentAt + WIZARD_LINK_TTL_MS);
+    expect(expired.expired).toBe(true);
+    expect(linkExpiryCopy(sentAt, sentAt + 60 * 60 * 1000).expired).toBe(true);
   });
 });

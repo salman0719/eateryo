@@ -2,6 +2,7 @@
 
 import {
   duplicateItem,
+  isItemFlagged,
   moveItem,
   moveItemToCategory,
   updateItem,
@@ -47,7 +48,7 @@ export function ItemEditor({
 }: ItemEditorProps) {
   const category = doc.categories.find((c) => c.id === categoryId);
   const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
-  const needsReview = item.price === null || item.reviewNotes.length > 0;
+  const needsReview = isItemFlagged(item);
 
   function patch(patch: Parameters<typeof updateItem>[3]) {
     onChange(updateItem(doc, categoryId, item.id, patch));
@@ -73,7 +74,11 @@ export function ItemEditor({
           label="Price"
           value={item.price}
           placeholder="Blank if unknown"
-          onCommit={(price) => patch({ price })}
+          onCommit={(price) =>
+            patch(
+              item.price === null && price !== null ? { price, reviewNotes: [] } : { price }
+            )
+          }
         />
         <CommitInput
           label="Currency"
@@ -317,6 +322,28 @@ export function ItemEditor({
           ))}
         </ul>
       )}
+      {needsReview && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {item.price !== null ? (
+            <button
+              type="button"
+              onClick={() => patch({ reviewNotes: [] })}
+              className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+            >
+              ✓ Looks good
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => patch({ reviewNotes: [], unpricedAccepted: true })}
+              title="Keeps the price blank — totals stay honestly blank for this item."
+              className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+            >
+              ✓ Leave unpriced
+            </button>
+          )}
+        </div>
+      )}
 
       {/* One control group per row on phones (sm:contents dissolves the rows
           back into today's single wrapping row, so desktop is unchanged). */}
@@ -379,7 +406,7 @@ export function ItemEditor({
           </label>
           {needsReview && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-              Needs review
+              {item.price === null ? "Check price" : "Couldn't read"}
             </span>
           )}
           {duplicate && (
