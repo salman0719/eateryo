@@ -4,6 +4,7 @@ import {
   appRouteHref,
   menuIdFromPathname,
   parseAppRoute,
+  signOutLandingRoute,
   unresolvableMenuMessage,
 } from "../src/features/navigation/routes";
 
@@ -71,6 +72,14 @@ describe("application routes", () => {
       unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })
     ).toContain("deleted or moved");
     expect(unresolvableMenuMessage({ screen: "library" })).toContain("deleted or moved");
+  });
+
+  it("lands on Capture only when a live session actually ends", () => {
+    expect(signOutLandingRoute({ wasSignedIn: false, signedIn: false })).toBeNull();
+    expect(signOutLandingRoute({ wasSignedIn: true, signedIn: true })).toBeNull();
+    expect(signOutLandingRoute({ wasSignedIn: true, signedIn: false })).toEqual({
+      screen: "capture",
+    });
   });
 
   it("round-trips every supported route and URL-encodes menu ids", () => {

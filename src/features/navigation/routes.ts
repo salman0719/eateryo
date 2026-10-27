@@ -71,6 +71,21 @@ export function unresolvableMenuMessage(route: AppRoute): string {
   return "That menu could not be opened. It may have been deleted or moved.";
 }
 
+/**
+ * Where the shell lands when a real session ends. Sign-out is a privacy
+ * boundary: an open editor or capture result can hold an account menu, so
+ * the shell dismisses those surfaces and returns to Capture. Local menus
+ * are never deleted — anonymous drafts remain in My menus — and an initial
+ * signed-out load (never signed in) must not redirect. Returning null means
+ * no boundary action is due.
+ */
+export function signOutLandingRoute(input: {
+  wasSignedIn: boolean;
+  signedIn: boolean;
+}): AppRoute | null {
+  return input.wasSignedIn && !input.signedIn ? { screen: "capture" } : null;
+}
+
 /** Read an application screen from a URL, defaulting unknown URLs to capture. */
 export function parseAppRoute(input: string | URL): AppRoute {
   const url = input instanceof URL ? input : new URL(input, "https://eateryo.invalid");

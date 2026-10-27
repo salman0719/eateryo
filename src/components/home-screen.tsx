@@ -96,6 +96,7 @@ import {
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
+  signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
   type AppScreen,
@@ -227,6 +228,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     ((doc: MenuDocument, image: Blob | null, updateRoute?: boolean) => Promise<void>) | null
   >(null);
   const activeDocIdRef = useRef<string | null>(null);
+  /** Previous session state, so only a real sign-out (not a first load) clears. */
+  const wasSignedInRef = useRef(false);
 
   function navigateTo(next: AppRoute, replace = false, flushCurrent = true) {
     const previousMenuId = routeMenuId(routeRef.current);
@@ -563,7 +566,45 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }, [route, sessionPending, signedIn]);
 
   useEffect(() => {
+    const wasSignedIn = wasSignedInRef.current;
+    wasSignedInRef.current = signedIn;
+
     if (!signedIn) {
+      // Sign-out is a privacy boundary. An open editor or a result on
+      // Capture can hold an account menu, so a real session end dismisses
+      // both and lands on Capture. Nothing is deleted: anonymous drafts
+      // remain in My menus, and the landed screen is the signed-out home.
+      const landing = signOutLandingRoute({ wasSignedIn, signedIn });
+      if (landing) {
+        const openDoc = docRef.current;
+        if (openDoc) {
+          // Release the open document before saving it. Pending account
+          // work (sync, publication, the route opener) checks docRef and
+          // bails once it is null, so nothing can reopen the editor. The
+          // direct save still keeps the latest local edits.
+          docRef.current = null;
+          lastSavedRef.current = null;
+          serverBaseRef.current = null;
+          conflictRef.current = null;
+          if (saveTimer.current) {
+            clearTimeout(saveTimer.current);
+            saveTimer.current = null;
+          }
+          if (!storageDownRef.current) {
+            void saveMenu(openDoc).catch(() => undefined);
+          }
+        }
+        setActiveDoc(null);
+        setEditorImage(null);
+        setConflict(null);
+        setConflictError(null);
+        setPublication(null);
+        setPublicationMenuId(null);
+        setPublicationLoaded(false);
+        setPublishError(null);
+        if (resultDoc !== null || pages.length > 0) applySelection([]);
+        navigateTo(landing, true, false);
+      }
       replaceServerIds(new Set());
       replaceStaffMenus(new Set());
       // State is compared with accountKey when read, so a stale value from
