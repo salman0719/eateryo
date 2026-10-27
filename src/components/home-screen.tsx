@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Attention } from "@/components/ui/attention";
+import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { LibraryPanel } from "@/components/menu-editor/library-panel";
@@ -2219,36 +2220,38 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             const resumable = localOnly.find((menu) => !menu.corrupt);
             if (!resumable) return null;
             return (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-amber-950">
-                    📍 Continue getting your link →
-                  </p>
-                  <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
-                    {localOnlyCount === 1
-                      ? `“${resumable.title}” is saved in this browser, not published yet.`
-                      : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
-                  </p>
+              <HeightReveal>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-amber-950">
+                      📍 Continue getting your link →
+                    </p>
+                    <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
+                      {localOnlyCount === 1
+                        ? `“${resumable.title}” is saved in this browser, not published yet.`
+                        : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
+                      }
+                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    >
+                      Continue →
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setResumeDismissed(true)}
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
-                    }
-                    className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                  >
-                    Continue →
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setResumeDismissed(true)}
-                    className="rounded-full px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
+              </HeightReveal>
             );
           })()}
 
