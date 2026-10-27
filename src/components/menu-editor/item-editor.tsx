@@ -2,6 +2,7 @@
 
 import {
   duplicateItem,
+  hasAnyPrice,
   isItemFlagged,
   moveItem,
   moveItemToCategory,
@@ -73,10 +74,10 @@ export function ItemEditor({
         <CommitNumber
           label="Price"
           value={item.price}
-          placeholder="Blank if unknown"
+          placeholder={item.variants.length > 0 ? "Blank — priced per size" : "Blank if unknown"}
           onCommit={(price) =>
             patch(
-              item.price === null && price !== null ? { price, reviewNotes: [] } : { price }
+              !hasAnyPrice(item) && price !== null ? { price, reviewNotes: [] } : { price }
             )
           }
         />
@@ -324,7 +325,7 @@ export function ItemEditor({
       )}
       {needsReview && (
         <div className="mt-2 flex flex-wrap gap-2">
-          {item.price !== null ? (
+          {hasAnyPrice(item) ? (
             <button
               type="button"
               onClick={() => patch({ reviewNotes: [] })}
@@ -406,7 +407,7 @@ export function ItemEditor({
           </label>
           {needsReview && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-              {item.price === null ? "Check price" : "Couldn't read"}
+              {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
             </span>
           )}
           {duplicate && (

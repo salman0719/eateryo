@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { addCategory, addItem, createMenuDocument } from "@/features/menu/menu-utils";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
@@ -107,6 +108,26 @@ describe("launch snapshot", () => {
   it("reports an empty account as empty", async () => {
     await expect(getLaunchSnapshot(db, ownerId)).resolves.toEqual(emptySnapshot);
   });
+
+  it("counts a size-priced item as priced, not as a review item", async () => {
+    let doc = createMenuDocument({ title: "Pizzeria", currency: "€" });
+    doc = addCategory(doc, { name: "Traditional Pizzas" });
+    doc = addItem(doc, doc.categories[0].id, {
+      name: "Margherita",
+      variants: [
+        { name: "S", price: 9 },
+        { name: "M", price: 11 },
+        { name: "L", price: 15 },
+      ],
+    });
+    await createMenuForUser(db, ownerId, restaurantId, doc);
+
+    await expect(getLaunchSnapshot(db, ownerId)).resolves.toMatchObject({
+      menuCount: 1,
+      unpricedItems: 0,
+      reviewNotes: 0,
+    });
+  }, 30_000);
 
   it("counts menus, review flags, the live slug, and orders — for the right tenant only", async () => {
     const doc = menuDocumentSchema.parse({

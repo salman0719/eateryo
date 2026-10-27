@@ -9,6 +9,7 @@
 
 import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 
+import { hasAnyPrice } from "@/features/menu/menu-utils";
 import { menuDocumentSchema } from "@/features/menu/schema";
 import { publicationPath } from "@/features/publishing/schema";
 import { ensureRestaurantSlug } from "@/features/tables/repo";
@@ -60,7 +61,7 @@ export async function getLaunchSnapshot(
     }
     for (const category of parsed.data.categories) {
       for (const item of category.items) {
-        if (item.price === null && !item.unpricedAccepted) unpricedItems += 1;
+        if (!hasAnyPrice(item) && !item.unpricedAccepted) unpricedItems += 1;
         if (item.reviewNotes.length > 0) reviewNotes += 1;
       }
     }

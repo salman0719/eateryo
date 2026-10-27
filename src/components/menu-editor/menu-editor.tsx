@@ -7,6 +7,7 @@ import {
   addItem,
   deleteCategory,
   deleteItem,
+  hasAnyPrice,
   isItemFlagged,
   moveCategory,
   moveItem,
@@ -622,7 +623,7 @@ export function MenuEditor({
                                 title={item.reviewNotes.join("\n")}
                                 className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600"
                               >
-                                {item.price === null ? "check price" : "couldn't read"}
+                                {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
                             )}
                             <span className="shrink-0 text-xs text-stone-500">

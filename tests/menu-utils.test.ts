@@ -9,6 +9,7 @@ import {
   deleteCategory,
   deleteItem,
   duplicateItem,
+  hasAnyPrice,
   isItemFlagged,
   moveCategory,
   moveItem,
@@ -178,6 +179,31 @@ describe("menu-utils", () => {
     const accepted = acceptItemUnpriced(unpriced, drinksId, pricedId);
     expect(accepted.categories[0].items[0].price).toBeNull();
     expect(isItemFlagged(accepted.categories[0].items[0])).toBe(false);
+  });
+
+  it("treats an item priced per size as priced, not unpriced", () => {
+    const { doc, drinksId } = setupTwoCategoryMenu();
+    const itemId = doc.categories[0].items[0].id;
+    // Small/Medium/Large: the root price is null by design, the variants
+    // carry the prices — nothing for the owner to check.
+    const sized = updateItem(doc, drinksId, itemId, {
+      price: null,
+      variants: [
+        { name: "Small", price: 9 },
+        { name: "Medium", price: 11 },
+        { name: "Large", price: null },
+      ],
+    });
+    expect(hasAnyPrice(sized.categories[0].items[0])).toBe(true);
+    expect(isItemFlagged(sized.categories[0].items[0])).toBe(false);
+
+    // Variants with no prices anywhere are still genuinely unpriced.
+    const unpriced = updateItem(doc, drinksId, itemId, {
+      price: null,
+      variants: [{ name: "Small", price: null }],
+    });
+    expect(hasAnyPrice(unpriced.categories[0].items[0])).toBe(false);
+    expect(isItemFlagged(unpriced.categories[0].items[0])).toBe(true);
   });
 
   it("throws on unknown ids", () => {

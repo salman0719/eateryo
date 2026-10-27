@@ -9,8 +9,10 @@
  * - Missing prices, descriptions, dietary labels, or ingredients are
  *   `null`/empty — never invented.
  * - Uncertainty is recorded in `reviewNotes`, never silently resolved.
- * - A null price stops flagging only via explicit owner acceptance
- *   (`unpricedAccepted`, e.g. "market price") — never by inventing a number.
+ * - A null price stops flagging when the item's size variants carry the
+ *   prices (per-size pricing has a null root `price` by design) or via
+ *   explicit owner acceptance (`unpricedAccepted`, e.g. "market price") —
+ *   never by inventing a number.
  * - Stable app-generated IDs (`generateId()` in `./menu-utils`), never
  *   names, identify categories and items.
  *

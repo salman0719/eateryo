@@ -46,6 +46,7 @@ import {
   confirmItemReviewed,
   createMenuDocument,
   defaultNewMenuTitle,
+  hasAnyPrice,
   isItemFlagged,
   suggestRestaurantName,
   updateItem,
@@ -1931,7 +1932,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       doc,
       category.id,
       item.id,
-      item.price === null && price !== null ? { price, reviewNotes: [] } : { price }
+      !hasAnyPrice(item) && price !== null ? { price, reviewNotes: [] } : { price }
     );
     patchResultDoc(next);
     void persistResultDoc(next);
@@ -1947,9 +1948,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       for (const item of category.items) {
         if (!isItemFlagged(item)) continue;
         next =
-          item.price === null
-            ? acceptItemUnpriced(next, category.id, item.id)
-            : confirmItemReviewed(next, category.id, item.id);
+          hasAnyPrice(item)
+            ? confirmItemReviewed(next, category.id, item.id)
+            : acceptItemUnpriced(next, category.id, item.id);
       }
     }
     patchResultDoc(next);

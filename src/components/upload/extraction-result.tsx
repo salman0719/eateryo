@@ -18,6 +18,7 @@ import { Attention, didClearAll } from "@/components/ui/attention";
 import { CommitInput } from "@/components/menu-editor/fields";
 import { MenuPreview } from "@/components/menu-editor/menu-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
+import { hasAnyPrice } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
 
 export interface PreviewItem {
@@ -91,12 +92,13 @@ function formatPrice(item: PreviewItem, fallbackCurrency: string | null): string
 }
 
 /** An exception, not everything: unpriced (unless accepted) or carrying an
- * extraction note. Mirrors `isItemFlagged` in menu-utils, which owns the
- * canonical MenuDocument definition — this PreviewMenu twin exists because
- * the result screen renders before the canonical doc is the source. */
+ * extraction note. Uses the canonical `hasAnyPrice` rule from menu-utils, so a
+ * size-priced item (null root price, priced variants) counts as priced —
+ * this PreviewMenu twin exists only because the result screen renders before
+ * the canonical doc is the source. */
 function isFlagged(item: PreviewItem): boolean {
   if (item.reviewNotes.length > 0) return true;
-  if (item.price === null && !item.unpricedAccepted) return true;
+  if (!hasAnyPrice(item) && !item.unpricedAccepted) return true;
   return false;
 }
 
@@ -247,8 +249,11 @@ export function ExtractionResult({
             const loc = locator?.(rowIndex) ?? null;
             const canResolve = needsReview && loc !== null && onResolveItem !== undefined;
             // The Check-this queue is the price-review step: flagged rows get
-            // a fix-it-here price field. The whole-list views stay read-only.
-            const canEditPrice = needsReview && loc !== null && onUpdatePrice !== undefined;
+            // a fix-it-here price field. The whole-list views stay read-only,
+            // and a size-priced item keeps its prices in its variants — its
+            // root price stays blank, so it never gets a root-price field.
+            const canEditPrice =
+              needsReview && loc !== null && onUpdatePrice !== undefined && !hasAnyPrice(item);
             return (
               <li key={`${categoryName}-${item.name}-${rowIndex}`} className="px-5 py-3">
                 <div className="flex items-baseline justify-between gap-3">
@@ -307,7 +312,7 @@ export function ExtractionResult({
                   ))}
                   {needsReview && (
                     <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-                      {item.price === null ? "Check price" : "Couldn't read"}
+                      {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                     </span>
                   )}
                 </div>
@@ -320,7 +325,7 @@ export function ExtractionResult({
                 )}
                 {canResolve && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {item.price !== null ? (
+                    {hasAnyPrice(item) ? (
                       <button
                         type="button"
                         onClick={() => onResolveItem?.(loc, "looks-good")}

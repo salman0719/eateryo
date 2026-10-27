@@ -100,12 +100,23 @@ function buildItem(
   };
 }
 
+/** True when the item carries at least one honest price: its own, or one of
+ * its size/tier variants. An item priced per size has a null root `price` by
+ * design (see the extraction prompt), so the variants are its prices — that
+ * is pricing, not a missing price. */
+export function hasAnyPrice(item: Pick<MenuItem, "price" | "variants">): boolean {
+  if (item.price !== null) return true;
+  return item.variants.some((variant) => variant.price !== null);
+}
+
 /** An exception, not everything: unpriced (unless explicitly accepted) or
  * carrying an extraction note. Single canonical definition — the result
  * list, editor rows, badges, and launch derivation must all agree. */
-export function isItemFlagged(item: Pick<MenuItem, "price" | "reviewNotes" | "unpricedAccepted">): boolean {
+export function isItemFlagged(
+  item: Pick<MenuItem, "price" | "variants" | "reviewNotes" | "unpricedAccepted">
+): boolean {
   if (item.reviewNotes.length > 0) return true;
-  if (item.price === null && !item.unpricedAccepted) return true;
+  if (!hasAnyPrice(item) && !item.unpricedAccepted) return true;
   return false;
 }
 

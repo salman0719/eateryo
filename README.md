@@ -157,7 +157,9 @@ address, promotion dates):
    descriptions, categories, variants/options, dietary labels, and
    availability; add, duplicate, delete, reorder, and move items. Uncertain    fields carry a visible action pill ("Check price" / "Couldn't read") with
     an inline confirm ("Looks good" clears the note, "Leave unpriced" accepts
-    a blank price such as market price — totals stay honestly blank).
+    a blank price such as market price — totals stay honestly blank). An item
+    priced per size (Small/Medium/Large) counts as priced: its variants carry
+    the prices, so a blank item price is not a missing price.
 4. **Save** — edits autosave to IndexedDB (debounced; "Saving… / Saved
    locally" status). Nothing is claimed saved before the transaction succeeds.
 5. **Export** — download the menu as JSON (round-trips through Import JSON)
