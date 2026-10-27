@@ -125,6 +125,7 @@ import {
   dismissLocalDraftClaim,
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
+  type LocalDraftClaimAction,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 
@@ -395,8 +396,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [claimBusy, setClaimBusy] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimNotice, setClaimNotice] = useState<LocalDraftClaimNotice | null>(null);
-  /** Session-dismissed "Continue getting your link" resume banner (Q7). */
-  const [resumeDismissed, setResumeDismissed] = useState(false);
+  /**
+   * Session state of the "Continue getting your link" resume banner (Q7).
+   * `null` means *not confirmed yet*: the banner's inputs are read
+   * asynchronously (IndexedDB, the session, the account's server
+   * inventory), so nothing may show on the optimistic first frame. An
+   * effect below confirms it to `false` once those inputs settle; `true`
+   * is only ever written by Dismiss.
+   */
+  const [resumeDismissed, setResumeDismissed] = useState<boolean | null>(null);
   /**
    * The first settled non-editor look at this account decides whether the
    * automatic import runs. Later local menus (a demo saved mid-session) are
@@ -2010,11 +2018,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // auto-import: signing in inside the publish wizard is the onboarding
   // path, and leaving it ungated strands the draft as anonymous — the next
   // sign-out resurrects the resume banner for a menu the account owns.
-  const localDraftsDecision =
-    signedIn &&
-    !sessionPending &&
-    serverMenusFor === accountKey &&
-    restaurantCountFor === accountKey
+  // "pending" is a real third value, not a stand-in for "none": while the
+  // session or the account's inventory is still loading the decision is
+  // *unknown*. The resume banner used to read that unknown as a settled
+  // "none", pass its `!== "offer"` check, and render in the load gap — the
+  // flicker. Signed out and settled, the decision really is "none".
+  const claimDecisionPending =
+    sessionPending ||
+    (signedIn && (serverMenusFor !== accountKey || restaurantCountFor !== accountKey));
+  const localDraftsDecision: LocalDraftClaimAction | "pending" = claimDecisionPending
+    ? "pending"
+    : signedIn
       ? decideLocalDraftClaim({
           localCount: localOnlyCount,
           accountMenuCount: serverIds.size,
@@ -2023,6 +2037,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           status: claimStatus,
         })
       : "none";
+
+  // The resume banner may only render once everything it reads has
+  // settled: the session (who is this?), the IndexedDB library (what is
+  // saved in this browser?) and — signed in — the account's server menu
+  // and restaurant lists (are these drafts really unpublished?). Before
+  // that it renders nothing at all; a late answer can only remove it,
+  // never move it.
+  const resumeReady = !libraryLoading && !claimDecisionPending;
+
+  // Confirm the dismissal only after the inputs settle, so the banner's
+  // very first render is already a confirmed decision, not an assumption.
+  // Deferred exactly like the auto-import below: while unconfirmed the
+  // banner renders nothing, so waiting a tick for the confirmation costs
+  // nothing visually and keeps state out of the effect body.
+  useEffect(() => {
+    if (!resumeReady || resumeDismissed !== null) return;
+    void Promise.resolve().then(() => setResumeDismissed(false));
+  }, [resumeReady, resumeDismissed]);
 
   useEffect(() => {
     if (!signedIn || !accountKey) return;
@@ -2169,16 +2201,20 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
         {/* Q7 resume banner: the way back for anyone who wandered off (or
             returns from the magic-link email) with a saved-but-unpublished
-            draft. Browser-only rows are by definition unpublished, so no
-            server read is needed. Hidden in the editor (it has its own
-            publish entry), while the result is on screen (it IS the continue
-            path), and while the claim surfaces speak. */}
+            draft. Whether a draft is unpublished is *server* knowledge, so
+            this renders only after `resumeReady` (session, library and —
+            signed in — account inventory all settled) and only with a
+            confirmed `resumeDismissed === false`: until then it is
+            invisible, never provisional. Hidden in the editor (it has its
+            own publish entry), while the result is on screen (it IS the
+            continue path), and while the claim surfaces speak. */}
         {(screen === "capture" || screen === "library") &&
           result === null &&
+          resumeReady &&
+          resumeDismissed === false &&
           localOnlyCount > 0 &&
-          !resumeDismissed &&
           !claimNotice &&
-          localDraftsDecision !== "offer" &&
+          localDraftsDecision === "none" &&
           (() => {
             const resumable = localOnly.find((menu) => !menu.corrupt);
             if (!resumable) return null;
