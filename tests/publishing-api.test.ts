@@ -120,7 +120,7 @@ describe("POST /api/menus/[menuId]/publication", () => {
     expect(body.publication).toMatchObject({
       restaurantSlug: "cafe-api",
       slug: "cafe-api-menu",
-      urlPath: "/r/cafe-api/m/cafe-api-menu",
+      urlPath: "/r/cafe-api",
       isLive: true,
       theme: "bistro",
       layout: "columns",
@@ -211,7 +211,7 @@ describe("PATCH /api/menus/[menuId]/publication", () => {
     const res = await patchPublication(jsonRequest("PATCH", { slug: "chez-api" }), menuParams(menuId));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.publication.urlPath).toBe("/r/cafe-api/m/chez-api");
+    expect(body.publication.urlPath).toBe("/r/cafe-api");
     expect(await getPublishedMenuByPath(holder.db!, "cafe-api", "cafe-api-menu")).toBeNull();
     expect(await getPublishedMenuByPath(holder.db!, "cafe-api", "chez-api")).not.toBeNull();
   });

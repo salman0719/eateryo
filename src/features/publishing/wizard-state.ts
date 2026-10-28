@@ -8,6 +8,11 @@
  *
  * The helpers are pure except for the three storage functions, which fail
  * silently when storage is unavailable (private mode, quota, SSR).
+ *
+ * There is no link-name field: onboarding never asks the owner to name a
+ * menu or pick its address. The menu is "Main Menu", its direct address is
+ * derived from that title, and a café with one live menu answers at its own
+ * `/r/<café>` link. Addresses are editable afterwards in the editor.
  */
 
 import { suggestRestaurantName } from "@/features/menu/menu-utils";
@@ -22,14 +27,11 @@ import {
 } from "@/features/menu/preview-themes";
 import type { RestaurantOption } from "@/features/tenancy/client";
 
-import { slugifyMenuTitle } from "./slug";
-
 export interface PublishWizardState {
   /** Only used to create a restaurant when the owner has none. */
   restaurantName: string;
   /** The owner's choice when they have more than one restaurant. */
   restaurantId: string;
-  slug: string;
   theme: PreviewThemeId;
   layout: PreviewLayoutId;
 }
@@ -50,7 +52,6 @@ export function defaultWizardState(doc: Pick<MenuDocument, "title">): PublishWiz
   return {
     restaurantName: suggestRestaurantName([doc.title]) ?? "",
     restaurantId: "",
-    slug: slugifyMenuTitle(doc.title),
     theme: DEFAULT_PREVIEW_THEME_ID,
     layout: DEFAULT_PREVIEW_LAYOUT_ID,
   };
@@ -71,7 +72,6 @@ export function parseWizardState(value: unknown, fallback: PublishWizardState): 
       typeof value.restaurantName === "string" ? value.restaurantName : fallback.restaurantName,
     restaurantId:
       typeof value.restaurantId === "string" ? value.restaurantId : fallback.restaurantId,
-    slug: typeof value.slug === "string" ? value.slug : fallback.slug,
     theme: isPreviewThemeId(value.theme) ? value.theme : fallback.theme,
     layout: isPreviewLayoutId(value.layout) ? value.layout : fallback.layout,
   };

@@ -322,7 +322,7 @@ export function PublishPanel({
           )}
 
           <label className="block text-xs font-semibold text-stone-600">
-            Your link name
+            Direct menu link
             <span className="mt-1 flex items-center gap-2">
               <span className="text-xs font-normal text-stone-400">
                 {origin}/r/{status.restaurantSlug}/m/
@@ -351,8 +351,9 @@ export function PublishPanel({
             </span>
             {slugError && <span className="mt-1 block text-xs text-red-700">{slugError}</span>}
             <span className="mt-1 block text-xs font-normal text-stone-500">
-              Lowercase letters, numbers, and single hyphens. Changing it after printing QR codes
-              breaks those codes.
+              Share the café link above: a café with one live menu answers there. This direct link
+              points at this menu and keeps working when you add more. Lowercase letters, numbers,
+              and single hyphens; changing it after printing QR codes breaks those codes.
             </span>
           </label>
 

@@ -457,7 +457,7 @@ export function ExtractionResult({
                 <CommitInput
                   label="Menu title"
                   value={data.title ?? ""}
-                  placeholder="e.g. Main menu"
+                  placeholder="e.g. Main Menu"
                   onCommit={(title) => {
                     if (title.trim()) onRenameTitle(title.trim());
                   }}

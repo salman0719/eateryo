@@ -478,7 +478,7 @@ backlog below Phase 2 revenue work.
 | Billing provider     | **Stripe — parked.** Billing is the last thing built, riding with the parked B2B step.                                          |
 | Charge anything now  | **No.** Free launch promotion: no checkout or payment links anywhere; pricing revisited after measurement, early users in mind. |
 | Pilot price          | Deferred by design: suggest pricing only after real cost-per-extraction and effort are measured.                                |
-| Public URL shape     | **`/r/<restaurant>/m/<menu>`** on the current domain (decided 2026-10-22: menu slugs are scoped to their café, so two restaurants can both publish `lunch`). Custom domains stay out of scope. |
+| Public URL shape     | **`/r/<restaurant>`** for a café with one live menu (that menu is the primary one by derivation, never by a picker); **`/r/<restaurant>/m/<menu>`** always works as the targeted link (decided 2026-10-22: menu slugs are scoped to their café, so two restaurants can both publish `lunch`). Several live menus make the root a menu index. Custom domains stay out of scope. |
 | Local vs server mode | **Keep both** — signed-out = local prototype, signed-in = server.                                                               |
 | Error tracking       | **Approved:** Sentry (free tier) plus cookie-free view counts only.                                                             |
 

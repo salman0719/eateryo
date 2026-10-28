@@ -97,11 +97,35 @@ export const publishedMenuViewSchema = z.object({
 
 /**
  * Public page path for a published menu — one place that defines the URL
- * shape: `/r/<restaurant>/<menu>`, i.e. scoped to the café that publishes it.
- * Menu slugs are only unique inside one restaurant, so the restaurant's own
- * `/r/<slug>` address is part of every public link (and of every table card,
- * which already encodes that address).
+ * shape: `/r/<restaurant>/m/<menu>`, i.e. scoped to the café that publishes
+ * it. Menu slugs are only unique inside one restaurant, so the restaurant's
+ * own `/r/<slug>` address is part of every public link (and of every table
+ * card, which already encodes that address).
+ *
+ * This is the *targeted* link: it keeps working for every live menu, whether
+ * or not the restaurant has just one.
  */
 export function publicationPath(restaurantSlug: string, slug: string): string {
   return `/r/${restaurantSlug}/m/${slug}`;
+}
+
+/** The restaurant's own public address: the primary-menu page. */
+export function restaurantPath(restaurantSlug: string): string {
+  return `/r/${restaurantSlug}`;
+}
+
+/**
+ * The address to share for a menu: a restaurant with exactly one live menu
+ * has that menu as its primary one, so the café's own `/r/<restaurant>`
+ * address serves it. Once a second menu is live there is no single primary
+ * menu to point at, so every menu uses its targeted path instead.
+ *
+ * No picker and no owner choice: "primary" is derived, never selected.
+ */
+export function canonicalPublicationPath(
+  restaurantSlug: string,
+  slug: string,
+  liveMenuCount: number
+): string {
+  return liveMenuCount === 1 ? restaurantPath(restaurantSlug) : publicationPath(restaurantSlug, slug);
 }

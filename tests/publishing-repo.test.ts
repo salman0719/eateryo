@@ -5,6 +5,7 @@ import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import {
   changeMenuSlugForUser,
   getPublishedMenuByPath,
+  getPublishedMenusForRestaurant,
   getPublicationStatus,
   publishMenuForUser,
   PublicationRepoError,
@@ -63,7 +64,8 @@ describe("publishing repo", () => {
     expect(status.isLive).toBe(true);
     expect(status.restaurantSlug).toBe("cafe-a");
     expect(status.slug).toBe("cafe-a-menu");
-    expect(status.urlPath).toBe("/r/cafe-a/m/cafe-a-menu");
+    // The only live menu of this café: its shareable address is the café's own.
+    expect(status.urlPath).toBe("/r/cafe-a");
     expect(status.theme).toBe("bistro");
     expect(status.layout).toBe("columns");
     expect(status.viewCount).toBe(0);
@@ -82,6 +84,41 @@ describe("publishing repo", () => {
     // The address is scoped: the same menu slug under another restaurant is
     // a different page.
     expect(await getPublishedMenuByPath(db, "cafe-b", "cafe-a-menu")).toBeNull();
+  });
+
+  it("serves the café address while one menu is live, then falls back to targeted links", async () => {
+    await publish();
+    const single = await getPublishedMenusForRestaurant(db, "cafe-a");
+    expect(single).toMatchObject({ restaurantName: "Café A", restaurantSlug: "cafe-a" });
+    expect(single!.menus.map((menu) => menu.slug)).toEqual(["cafe-a-menu"]);
+
+    const secondId = "menu-pub-second";
+    await createMenuForUser(db, ownerA, restaurantA, sampleDoc(secondId, "Lunch"));
+    const second = await publishMenuForUser(db, ownerA, secondId, {
+      theme: "classic",
+      layout: "list",
+    });
+    // Two live menus: neither is "the" primary, so both share their own link.
+    expect(second.urlPath).toBe("/r/cafe-a/m/lunch");
+    expect((await getPublicationStatus(db, ownerA, menuId))!.urlPath).toBe(
+      "/r/cafe-a/m/cafe-a-menu"
+    );
+    const both = await getPublishedMenusForRestaurant(db, "cafe-a");
+    expect(both!.menus.map((menu) => menu.slug).sort()).toEqual(["cafe-a-menu", "lunch"]);
+
+    // Unpublishing one leaves a single live menu again: the café address
+    // serves it without any owner action.
+    await unpublishMenuForUser(db, ownerA, secondId);
+    expect((await getPublicationStatus(db, ownerA, menuId))!.urlPath).toBe("/r/cafe-a");
+  });
+
+  it("reads a café's public index without exposing unpublished menus", async () => {
+    // No café has claimed this address, and nothing is live: no page.
+    expect(await getPublishedMenusForRestaurant(db, "unknown-cafe")).toBeNull();
+    await publish();
+    await unpublishMenuForUser(db, ownerA, menuId);
+    // The café exists now, but a reserved slug is not a live menu.
+    expect(await getPublishedMenusForRestaurant(db, "cafe-a")).toMatchObject({ menus: [] });
   });
 
   it("keeps the public page frozen while the menu keeps being edited", async () => {
@@ -137,7 +174,8 @@ describe("publishing repo", () => {
     });
     // No "-2" suffix: the same title at another café is a different address.
     expect(other.slug).toBe("cafe-a-menu");
-    expect(other.urlPath).toBe("/r/cafe-b/m/cafe-a-menu");
+    // Café B publishes one menu, so its own address serves it.
+    expect(other.urlPath).toBe("/r/cafe-b");
 
     // Both pages resolve, each under its own café, and neither can be read
     // through the other's address.
@@ -173,7 +211,10 @@ describe("publishing repo", () => {
     await publish();
     const changed = await changeMenuSlugForUser(db, ownerA, menuId, "chez-a");
     expect(changed.slug).toBe("chez-a");
-    expect(changed.urlPath).toBe("/r/cafe-a/m/chez-a");
+    // Still the only live menu, so the café address is unchanged…
+    expect(changed.urlPath).toBe("/r/cafe-a");
+    // …and the renamed direct link resolves.
+    expect(await getPublishedMenuByPath(db, "cafe-a", "chez-a")).not.toBeNull();
     expect(changed.isLive).toBe(true);
     expect(await getPublishedMenuByPath(db, "cafe-a", "cafe-a-menu")).toBeNull();
     expect(await getPublishedMenuByPath(db, "cafe-a", "chez-a")).not.toBeNull();

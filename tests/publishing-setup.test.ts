@@ -96,7 +96,8 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
       theme: "bistro",
       layout: "columns",
     });
-    expect(body.publication.urlPath).toMatch(/^\/r\/sunny-side-cafe\/m\//);
+    // One live menu means the café's own address is the link to share.
+    expect(body.publication.urlPath).toBe("/r/sunny-side-cafe");
 
     expect(await listRestaurantsForUser(holder.db!, ownerId)).toHaveLength(1);
     expect(await listMenusForUser(holder.db!, ownerId)).toHaveLength(1);

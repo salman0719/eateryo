@@ -14,8 +14,7 @@ import {
 } from "@/features/menu/preview-themes";
 import { SyncError } from "@/features/menus/sync";
 import { fetchPublication } from "@/features/publishing/client";
-import { menuSlugSchema, type PublicationStatus } from "@/features/publishing/schema";
-import { slugCandidates } from "@/features/publishing/slug";
+import { publicationPath, type PublicationStatus } from "@/features/publishing/schema";
 import { publishMenuWithSetup } from "@/features/publishing/setup-client";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
 import {
@@ -137,8 +136,6 @@ export function PublishWizard({
   const [submitResult, setSubmitResult] = useState<PublishSetupResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** A taken link suggests alternatives instead of only complaining. */
-  const [slugTaken, setSlugTaken] = useState(false);
   const [showHours, setShowHours] = useState(false);
   const [copied, setCopied] = useState(false);
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
@@ -181,14 +178,6 @@ export function PublishWizard({
 
   const menuItems = itemCount(doc);
   const choice = resolveWizardRestaurant(form, ownedRestaurants);
-  const slugParsed = menuSlugSchema.safeParse(form.slug);
-  const slugError =
-    form.slug.length === 0
-      ? null
-      : slugParsed.success
-        ? null
-        : (slugParsed.error.issues[0]?.message ??
-          "Use lowercase letters, numbers and single hyphens.");
   const checking = signedIn && checkedFor !== publicationKey;
   const canSubmit =
     signedIn &&
@@ -196,27 +185,19 @@ export function PublishWizard({
     !restaurantsLoading &&
     !checking &&
     !busy &&
-    slugParsed.success &&
     (choice.kind === "existing" || choice.kind === "create");
 
   const publicUrl = published ? `${origin}${published.urlPath}` : "";
   const liveTheme = published?.theme ?? form.theme;
   const liveLayout = published?.layout ?? form.layout;
 
-  const suggestedSlugs = slugTaken
-    ? slugCandidates(form.slug, 6)
-        .filter((candidate) => candidate !== form.slug)
-        .slice(0, 3)
-    : [];
-
   function update(patch: Partial<PublishWizardState>) {
     setForm((current) => ({ ...current, ...patch }));
     setError(null);
-    setSlugTaken(false);
   }
 
   async function handlePublish() {
-    if (!canSubmit || !slugParsed.success) return;
+    if (!canSubmit) return;
     setBusy(true);
     setError(null);
     try {
@@ -224,7 +205,6 @@ export function PublishWizard({
         doc,
         theme: form.theme,
         layout: form.layout,
-        slug: slugParsed.data,
         ...(choice.kind === "existing"
           ? { restaurantId: choice.id }
           : choice.kind === "create"
@@ -236,7 +216,6 @@ export function PublishWizard({
       clearWizardState(doc.id);
       onPublished(result);
     } catch (publishError) {
-      setSlugTaken(publishError instanceof SyncError && publishError.code === "slug_taken");
       setError(errorCopy(publishError));
     } finally {
       setBusy(false);
@@ -316,6 +295,13 @@ export function PublishWizard({
                   ? "1 view so far"
                   : `${published.viewCount} views so far`}{" "}
                 · updates stay private until you publish changes from the editor.
+              </p>
+              <p className="mt-1 text-xs leading-5 text-stone-500">
+                Direct link to this menu:{" "}
+                <code className="rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-800">
+                  {publicationPath(published.restaurantSlug, published.slug)}
+                </code>{" "}
+                — it keeps working if you add more menus later.
               </p>
             </div>
 
@@ -500,40 +486,15 @@ export function PublishWizard({
                 )}
               </div>
 
-              <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
-                Your link name
-                <span className="flex items-center gap-1 rounded-lg border border-stone-300 px-3 py-2 focus-within:border-amber-600">
-                  <span className="shrink-0 text-xs font-normal text-stone-400">/m/</span>
-                  <input
-                    type="text"
-                    value={form.slug}
-                    onChange={(event) => update({ slug: event.target.value })}
-                    spellCheck={false}
-                    className="min-w-0 flex-1 text-sm text-stone-900 focus:outline-none"
-                  />
-                </span>
-                <span
-                  className={`text-xs font-normal ${slugError ? "text-red-700" : "text-stone-500"}`}
-                >
-                  {slugError ??
-                    "Lowercase letters, numbers and single hyphens. The café part of the link comes from its name."}
-                </span>
-                {suggestedSlugs.length > 0 && (
-                  <span className="flex flex-wrap items-center gap-1.5 text-xs font-normal text-stone-600">
-                    Try
-                    {suggestedSlugs.map((candidate) => (
-                      <button
-                        key={candidate}
-                        type="button"
-                        onClick={() => update({ slug: candidate })}
-                        className="rounded-full border border-stone-300 bg-white px-2 py-0.5 font-medium text-amber-800 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                      >
-                        {candidate}
-                      </button>
-                    ))}
-                  </span>
-                )}
-              </label>
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs leading-5 text-stone-600">
+                <p className="font-medium text-stone-800">Your address</p>
+                <p className="mt-0.5">
+                  Your menu is called “{doc.title.trim() || "Main Menu"}”. It goes live at your
+                  café’s own link — the café part comes from its name, so there is nothing to pick
+                  here. A direct link to this menu always works too, and you can rename either
+                  address after publishing.
+                </p>
+              </div>
 
               <div>
                 <p className="text-xs font-medium text-stone-600">Style</p>

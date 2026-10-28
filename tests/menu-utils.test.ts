@@ -237,26 +237,29 @@ describe("suggestRestaurantName", () => {
     expect(suggestRestaurantName([])).toBeNull();
     expect(suggestRestaurantName(["", "   "])).toBeNull();
     expect(suggestRestaurantName(["Menu"])).toBeNull();
+    // The onboarding default names the menu, not a place.
+    expect(suggestRestaurantName(["Main Menu"])).toBeNull();
+    expect(suggestRestaurantName(["Food"])).toBeNull();
   });
 });
 
 describe("menu naming (Q2)", () => {
-  it("defaults the first menu to Main menu, then numbers honestly", () => {
-    expect(defaultNewMenuTitle([])).toBe("Main menu");
-    expect(defaultNewMenuTitle(["Lunch"])).toBe("Main menu");
-    expect(defaultNewMenuTitle(["Main menu"])).toBe("Menu 2");
-    expect(defaultNewMenuTitle(["main MENU", "Menu 2"])).toBe("Menu 3");
+  it("names the first menu Main Menu, then numbers honestly", () => {
+    expect(defaultNewMenuTitle([])).toBe("Main Menu");
+    expect(defaultNewMenuTitle(["Lunch"])).toBe("Main Menu");
+    expect(defaultNewMenuTitle(["Main Menu"])).toBe("Menu 2");
+    expect(defaultNewMenuTitle(["main menu", "Menu 2"])).toBe("Menu 3");
   });
 
   it("suggests unused service names for the second menu", () => {
-    expect(suggestSecondMenuNames(["Main menu"])).toEqual(["Lunch", "Dinner", "Happy Hour", "Drinks"]);
-    expect(suggestSecondMenuNames(["Main menu", "Lunch", "Dinner"])).toEqual([
+    expect(suggestSecondMenuNames(["Main Menu"])).toEqual(["Lunch", "Dinner", "Happy Hour", "Drinks"]);
+    expect(suggestSecondMenuNames(["Main Menu", "Lunch", "Dinner"])).toEqual([
       "Happy Hour",
       "Drinks",
       "Breakfast",
       "Brunch",
     ]);
-    expect(suggestSecondMenuNames(["Main menu", "lunch"])).not.toContain("Lunch");
+    expect(suggestSecondMenuNames(["Main Menu", "lunch"])).not.toContain("Lunch");
   });
 
   it("spots placeholder titles the photo missed", () => {

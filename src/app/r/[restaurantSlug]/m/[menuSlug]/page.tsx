@@ -2,27 +2,25 @@ import { Suspense, cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { MenuPreview } from "@/components/menu-editor/menu-preview";
-import { ViewCounter } from "@/components/menu-editor/view-counter";
+import {
+  describePublishedMenu,
+  PublishedMenuView,
+} from "@/components/menu/published-menu";
 import { getPublishedMenuByPath } from "@/features/publishing/repo";
 import { isSlug } from "@/features/publishing/slug";
 import { getDb } from "@/lib/db";
 
 /**
- * Public menu page (Step 9, `/r/<restaurant>/m/<menu>`).
+ * Targeted public menu page (Step 9, `/r/<restaurant>/m/<menu>`).
  *
  * The address is scoped to the café that publishes it: menu slugs are only
  * unique inside one restaurant, so two cafés can both publish `lunch`
- * under their own `/r/` address.
+ * under their own `/r/` address. This link always works for a live menu,
+ * including the one a single-menu café also serves at `/r/<restaurant>`.
  *
- * Renders the stored revision snapshot — never the live menu document — so an
- * owner's later edits cannot change what a diner sees until "Publish changes"
- * is pressed. Only live publications exist here: unpublished or unknown
- * addresses get a 404, and the café's slug stays reserved either way.
- *
- * No account, no cookie, and no client data is required: a stranger's phone
- * sees exactly the themed menu. Review notes and AI review badges never
- * render (MenuPreview is the diner surface), and missing prices stay honest.
+ * Only live publications exist here: unpublished or unknown addresses get a
+ * 404, and the café's slug stays reserved either way. Rendering shared with
+ * the primary-menu page lives in `PublishedMenuView`.
  */
 
 /** De-duplicates the slug lookup between metadata and the page render. */
@@ -32,18 +30,6 @@ const loadPublishedMenu = cache(
     return getPublishedMenuByPath(getDb(), restaurantSlug, slug);
   }
 );
-
-function itemCount(doc: { categories: { items: unknown[] }[] }): number {
-  return doc.categories.reduce((sum, category) => sum + category.items.length, 0);
-}
-
-function describe(doc: { categories: { items: unknown[] }[] }, restaurant: string): string {
-  const items = itemCount(doc);
-  if (items === 0) return `The menu for ${restaurant}.`;
-  return `${items} ${items === 1 ? "item" : "items"} across ${doc.categories.length} ${
-    doc.categories.length === 1 ? "category" : "categories"
-  } — ${restaurant}.`;
-}
 
 export async function generateMetadata({
   params,
@@ -59,7 +45,7 @@ export async function generateMetadata({
     };
   }
   const title = page.doc.title.trim() || "Menu";
-  const description = describe(page.doc, page.restaurantName);
+  const description = describePublishedMenu(page.doc, page.restaurantName);
   return {
     title: `${title} · Eateryo`,
     description,
@@ -112,30 +98,5 @@ async function PublishedMenu({
   const page = await loadPublishedMenu(restaurantSlug, menuSlug);
   if (!page) notFound();
 
-  const title = page.doc.title.trim() || "Untitled menu";
-
-  return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:py-12">
-        <p className="mb-3 text-center text-[11px] font-semibold tracking-[0.25em] text-stone-400 uppercase">
-          {page.restaurantName}
-        </p>
-        <MenuPreview doc={page.doc} themeId={page.theme} layout={page.layout} eyebrow="Menu" />
-        <ViewCounter restaurantSlug={page.restaurantSlug} slug={page.slug} />
-        <footer className="mt-8 border-t border-stone-200 pt-4 text-center text-xs text-stone-500">
-          <p>
-            {title} · menu updated{" "}
-            <time dateTime={page.publishedAt}>
-              {new Date(page.publishedAt).toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </time>
-          </p>
-          <p className="mt-1">Published with Eateryo</p>
-        </footer>
-      </main>
-    </div>
-  );
+  return <PublishedMenuView page={page} />;
 }

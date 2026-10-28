@@ -127,13 +127,18 @@ errors, or add lint/type suppressions just to make checks pass.
   generation and collision candidates), `repo.ts` (snapshot revisions,
   publish/unpublish, slug changes, scoped public read path, view counter),
   `client.ts` (typed browser client). Menu slugs are unique per restaurant
-  (`published_menu_restaurant_slug_unique`), never globally: the canonical
+  (`published_menu_restaurant_slug_unique`), never globally: the targeted
   address is `/r/<restaurant>/m/<menu>` and two cafés may both hold `lunch`.
-  Routes: `src/app/api/menus/[menuId]/publication/`,
-  `src/app/api/r/[restaurantSlug]/m/[menuSlug]/view/`, public page
+  A café with exactly one live menu serves it at its own
+  `/r/<restaurant>` address (the primary menu is derived, never selected);
+  several live menus make that root a menu index. Routes:
+  `src/app/api/menus/[menuId]/publication/`,
+  `src/app/api/r/[restaurantSlug]/m/[menuSlug]/view/`, public pages
+  `src/app/r/[restaurantSlug]/page.tsx` and
   `src/app/r/[restaurantSlug]/m/[menuSlug]/page.tsx` (partial prerender;
-  snapshot only). Editor UI `src/components/menu-editor/publish-panel.tsx`,
-  view beacon `view-counter.tsx`. Tests: `tests/publishing-slug.test.ts`,
+  snapshot only, sharing `src/components/menu/published-menu.tsx`). Editor UI
+  `src/components/menu-editor/publish-panel.tsx`, view beacon
+  `view-counter.tsx`. Tests: `tests/publishing-slug.test.ts`,
   `tests/publishing-repo.test.ts`, `tests/publishing-api.test.ts`.
   Invariant: the public page renders `menu_revision`, never `menu.doc`, so
   edits stay private until "Publish changes".

@@ -247,8 +247,10 @@ Two modes exist side by side. **Signed out**, the local-first prototype still
 works exactly as before: menus and table orders live in this browser's
 IndexedDB, nothing leaves the device except extraction, and the QR page says
 honestly that the menu lives on the owner's device. **Signed in**, menus sync
-to Postgres, publishing gives a real public page at `/r/<restaurant>/m/<menu>`, and table
-orders reach every staff device through the live board.
+to Postgres, publishing gives a real public page — `/r/<restaurant>` for a
+café with one live menu, and `/r/<restaurant>/m/<menu>` as the targeted link
+to any menu — and table orders reach every staff device through the live
+board.
 
 The free launch (Steps 7–11) is built and locally verified. The B2B extraction
 API and usage billing are parked by decision (Steps 12–13): nothing in the

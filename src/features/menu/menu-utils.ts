@@ -336,6 +336,9 @@ export function suggestRestaurantName(titles: string[]): string | null {
   return best.display.slice(0, 120).trim() || null;
 }
 
+/** Leftovers that name a role, not a place: never suggest these as a café. */
+const GENERIC_NAME_WORDS = new Set(["main", "the", "our", "this", "food", "drinks"]);
+
 /** The restaurant-name part of one title, or null when it has none. */
 function restaurantNameCandidate(title: string): string | null {
   let candidate = title.trim();
@@ -349,11 +352,15 @@ function restaurantNameCandidate(title: string): string | null {
   }
   candidate = candidate.replace(/(\s+|^)menu$/i, "").trim();
   if (!candidate) candidate = title.trim().replace(/(\s+|^)menu$/i, "").trim();
+  if (GENERIC_NAME_WORDS.has(candidate.toLowerCase())) return null;
   return candidate || null;
 }
 
-/** First menu default: never gate on a name. The owner renames inline. */
-export const DEFAULT_FIRST_MENU_TITLE = "Main menu";
+/** First menu name: the main menu is never a choice. Its address follows
+ * from the title (`/m/main-menu`), and a restaurant with only this menu
+ * serves it at its own `/r/<restaurant>` address. The owner can still
+ * rename it in the editor. */
+export const DEFAULT_FIRST_MENU_TITLE = "Main Menu";
 
 /** Service-name chips offered when a second menu is created. */
 export const SECOND_MENU_SUGGESTIONS = [
@@ -372,7 +379,7 @@ export function isPlaceholderMenuTitle(title: string): boolean {
 }
 
 /**
- * Default title for a blank new menu: "Main menu" while it is free, then
+ * Default title for a blank new menu: "Main Menu" while it is free, then
  * "Menu 2", "Menu 3", … — honest numbering, never an invented service.
  * Comparison is case-insensitive over trimmed titles.
  */

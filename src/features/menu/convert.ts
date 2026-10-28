@@ -25,7 +25,7 @@ export function extractedMenuToDocument(
     id: generateId(),
     // Q2: a photo that missed the name still arrives titled — the owner
     // renames inline on the result screen, never through a naming gate.
-    title: extracted.title?.trim() ? extracted.title.trim() : "Main menu",
+    title: extracted.title?.trim() ? extracted.title.trim() : "Main Menu",
     currency: extracted.currency ?? null,
     categories: extracted.categories.map((category, categoryIndex) => ({
       id: generateId(),

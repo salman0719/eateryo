@@ -11,7 +11,7 @@ import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 
 import { hasAnyPrice } from "@/features/menu/menu-utils";
 import { menuDocumentSchema } from "@/features/menu/schema";
-import { publicationPath } from "@/features/publishing/schema";
+import { canonicalPublicationPath } from "@/features/publishing/schema";
 import { ensureRestaurantSlug } from "@/features/tables/repo";
 import type { TenancyDb } from "@/features/tenancy/repo";
 import { menu, order, publishedMenu, restaurant, restaurantMembership } from "@/lib/db/schema";
@@ -75,7 +75,12 @@ export async function getLaunchSnapshot(
   if (live) {
     const restaurantSlug =
       live.restaurantSlug ?? (await ensureRestaurantSlug(db, live.restaurantId)).slug;
-    livePath = publicationPath(restaurantSlug, live.slug);
+    // A café with one live menu answers at its own address; the checklist
+    // points at whatever a visitor would actually share.
+    const liveMenuCount = publications.filter(
+      (row) => row.restaurantId === live.restaurantId
+    ).length;
+    livePath = canonicalPublicationPath(restaurantSlug, live.slug, liveMenuCount);
   }
 
   return {

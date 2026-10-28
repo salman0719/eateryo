@@ -1151,7 +1151,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   async function handleNewMenu(suggestedTitle?: string) {
     setLibraryError(null);
-    // Q2: never gate on a name — blank menus arrive titled ("Main menu"
+    // Q2: never gate on a name — blank menus arrive titled ("Main Menu"
     // first, honest numbering after) and rename inline in the editor.
     const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
     const title = suggestedTitle?.trim() ? suggestedTitle.trim() : fallback;

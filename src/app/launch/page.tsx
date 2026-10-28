@@ -18,7 +18,7 @@ const WHAT_YOU_GET = [
   },
   {
     title: "Your own public link",
-    body: "Publish to a link like /r/your-cafe/m/lunch. It opens on any phone with no login, shows your menu with your chosen theme, and only changes when you press Publish.",
+    body: "Publish to a link like /r/your-cafe — a café with one menu answers right there, and /r/your-cafe/m/lunch always points at a specific menu. It opens on any phone with no login, shows your menu with your chosen theme, and only changes when you press Publish.",
   },
   {
     title: "QR codes for every table",
