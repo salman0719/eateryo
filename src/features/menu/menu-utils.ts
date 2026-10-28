@@ -339,6 +339,75 @@ export function suggestRestaurantName(titles: string[]): string | null {
 /** Leftovers that name a role, not a place: never suggest these as a café. */
 const GENERIC_NAME_WORDS = new Set(["main", "the", "our", "this", "food", "drinks"]);
 
+/**
+ * Names that say *which* menu this is (a meal or a service), not which place
+ * it belongs to. Exact, case-insensitive matches only: guessing that
+ * "Lunchbox Café" is a service would be worse than asking.
+ */
+const SERVICE_MENU_NAMES = new Set([
+  "breakfast",
+  "brunch",
+  "lunch",
+  "dinner",
+  "supper",
+  "drink",
+  "drinks",
+  "beverage",
+  "beverages",
+  "cocktail",
+  "cocktails",
+  "wine",
+  "wines",
+  "beer",
+  "beers",
+  "dessert",
+  "desserts",
+  "sweet",
+  "sweets",
+  "starter",
+  "starters",
+  "appetizer",
+  "appetizers",
+  "entree",
+  "entrees",
+  "main",
+  "mains",
+  "side",
+  "sides",
+  "kid",
+  "kids",
+  "special",
+  "specials",
+  "happy hour",
+  "coffee",
+  "tea",
+  "takeaway",
+  "takeout",
+  "delivery",
+  "all day",
+]);
+
+/** The trailing "place — service" part of a title (the whole title with none). */
+function titleTail(title: string): string {
+  const parts = title.split(/\s*[—–·|:]\s*|\s+-\s+/);
+  return (parts[parts.length - 1] ?? title).trim();
+}
+
+/**
+ * The meal/service a menu title names ("Lunch Menu" → "Lunch",
+ * "My Café — Dinner" → "Dinner"), or null when the title does not clearly
+ * say — a café name, a placeholder, or nothing at all.
+ */
+export function serviceMenuName(title: string | null | undefined): string | null {
+  const raw = title?.trim();
+  if (!raw) return null;
+  const tail = titleTail(raw)
+    .replace(/(\s+|^)(menus?|card|list|sheet)$/i, "")
+    .trim();
+  if (!tail) return null;
+  return SERVICE_MENU_NAMES.has(tail.toLowerCase()) ? tail : null;
+}
+
 /** The restaurant-name part of one title, or null when it has none. */
 function restaurantNameCandidate(title: string): string | null {
   let candidate = title.trim();
@@ -353,6 +422,9 @@ function restaurantNameCandidate(title: string): string | null {
   candidate = candidate.replace(/(\s+|^)menu$/i, "").trim();
   if (!candidate) candidate = title.trim().replace(/(\s+|^)menu$/i, "").trim();
   if (GENERIC_NAME_WORDS.has(candidate.toLowerCase())) return null;
+  // "Lunch Menu" names a menu, not a place: never offer it as a café name.
+  // Checked after the split, so "My Café — Lunch" still yields "My Café".
+  if (serviceMenuName(candidate)) return null;
   return candidate || null;
 }
 
@@ -376,6 +448,17 @@ export const SECOND_MENU_SUGGESTIONS = [
 export function isPlaceholderMenuTitle(title: string): boolean {
   const normalized = title.trim().toLowerCase();
   return normalized === "" || normalized === "untitled" || normalized === "untitled menu" || normalized === "menu";
+}
+
+/**
+ * The title a first menu is saved with, so onboarding never asks for one: a
+ * title that clearly names a service ("Lunch Menu", "Café — Dinner") keeps
+ * that name — and its address follows (`/m/lunch`) — while a café name, a
+ * placeholder, or nothing at all becomes the main menu (`/m/main-menu`).
+ * The owner can rename it later; nothing here is invented.
+ */
+export function resolveFirstMenuTitle(title: string | null | undefined): string {
+  return serviceMenuName(title) ?? DEFAULT_FIRST_MENU_TITLE;
 }
 
 /**

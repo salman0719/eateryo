@@ -131,7 +131,11 @@ errors, or add lint/type suppressions just to make checks pass.
   address is `/r/<restaurant>/m/<menu>` and two cafés may both hold `lunch`.
   A café with exactly one live menu serves it at its own
   `/r/<restaurant>` address (the primary menu is derived, never selected);
-  several live menus make that root a menu index. Routes:
+  several live menus make that root a menu index, and each menu page links
+  back to it. Onboarding names the first menu itself
+  (`resolveFirstMenuTitle`: "Main Menu", or the service the photo clearly
+  names) and never asks for a name or link; the photo's own title is kept in
+  `source.originalTitle` for the café-name suggestion only. Routes:
   `src/app/api/menus/[menuId]/publication/`,
   `src/app/api/r/[restaurantSlug]/m/[menuSlug]/view/`, public pages
   `src/app/r/[restaurantSlug]/page.tsx` and

@@ -75,6 +75,13 @@ export const menuSourceSchema = z.object({
   /** e.g. "gemini" for live extraction, "demo" for sample data. */
   provider: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
+  /**
+   * The title exactly as read from the photo, kept when onboarding names the
+   * menu itself ("Main Menu"): it is the only place the café's name can be
+   * found, and it is what the first-run café-name suggestion reads. Never
+   * rendered as the menu's title.
+   */
+  originalTitle: z.string().min(1).optional(),
 });
 
 export const menuDocumentSchema = z.object({

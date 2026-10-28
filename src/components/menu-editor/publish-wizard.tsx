@@ -137,6 +137,8 @@ export function PublishWizard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHours, setShowHours] = useState(false);
+  /** The café name is confirmed by default; "Change" reveals the field. */
+  const [nameEditing, setNameEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
 
@@ -178,6 +180,9 @@ export function PublishWizard({
 
   const menuItems = itemCount(doc);
   const choice = resolveWizardRestaurant(form, ownedRestaurants);
+  /** A café we can name confidently: the field stays hidden until asked. */
+  const confirmedName = choice.kind === "create" ? choice.name : "";
+  const nameFieldVisible = nameEditing || confirmedName === "";
   const checking = signedIn && checkedFor !== publicationKey;
   const canSubmit =
     signedIn &&
@@ -447,20 +452,34 @@ export function PublishWizard({
                     <Skeleton className="h-9 w-full" />
                   </div>
                 ) : ownedRestaurants.length === 0 ? (
-                  <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-stone-600">
-                    Name your restaurant
-                    <input
-                      type="text"
-                      value={form.restaurantName}
-                      onChange={(event) => update({ restaurantName: event.target.value })}
-                      placeholder="e.g. Sunny Side Café"
-                      className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    />
-                    <span className="text-xs font-normal text-stone-500">
-                      Suggested from your menu title — change it if you like. You can rename it
-                      later in Settings.
-                    </span>
-                  </label>
+                  nameFieldVisible ? (
+                    <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-stone-600">
+                      Name your restaurant
+                      <input
+                        type="text"
+                        value={form.restaurantName}
+                        onChange={(event) => update({ restaurantName: event.target.value })}
+                        placeholder="e.g. Sunny Side Café"
+                        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      />
+                      <span className="text-xs font-normal text-stone-500">
+                        You can rename it later in Settings.
+                      </span>
+                    </label>
+                  ) : (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-stone-50 px-3 py-2">
+                      <p className="text-sm text-stone-800">
+                        Publishing under <span className="font-medium">{confirmedName}</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setNameEditing(true)}
+                        className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  )
                 ) : ownedRestaurants.length === 1 && ownedRestaurants[0] ? (
                   <p className="mt-1 rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-800">
                     Publishing under <span className="font-medium">{ownedRestaurants[0].name}</span>
@@ -484,16 +503,6 @@ export function PublishWizard({
                     </select>
                   </label>
                 )}
-              </div>
-
-              <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs leading-5 text-stone-600">
-                <p className="font-medium text-stone-800">Your address</p>
-                <p className="mt-0.5">
-                  Your menu is called “{doc.title.trim() || "Main Menu"}”. It goes live at your
-                  café’s own link — the café part comes from its name, so there is nothing to pick
-                  here. A direct link to this menu always works too, and you can rename either
-                  address after publishing.
-                </p>
               </div>
 
               <div>

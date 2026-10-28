@@ -110,6 +110,7 @@ async function RestaurantContent({
           ...primary,
           restaurantName: index.restaurantName,
           restaurantSlug: index.restaurantSlug,
+          liveMenuCount: index.menus.length,
         }}
       />
     );

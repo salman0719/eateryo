@@ -91,6 +91,9 @@ export interface PublishedMenuPage {
   layout: PreviewLayoutId;
   publishedAt: string;
   viewCount: number;
+  /** Live menus at this restaurant: more than one means the café root is a
+   * menu index, and this page can offer a way back to it. */
+  liveMenuCount: number;
 }
 
 interface MenuWithRole {
@@ -494,6 +497,7 @@ export async function getPublishedMenuByPath(
     layout: row.layout,
     publishedAt: row.publishedAt.toISOString(),
     viewCount: row.viewCount,
+    liveMenuCount: await countLiveMenus(db, row.restaurantId),
   };
 }
 

@@ -250,7 +250,9 @@ honestly that the menu lives on the owner's device. **Signed in**, menus sync
 to Postgres, publishing gives a real public page — `/r/<restaurant>` for a
 café with one live menu, and `/r/<restaurant>/m/<menu>` as the targeted link
 to any menu — and table orders reach every staff device through the live
-board.
+board. The first menu is named for the owner: **Main Menu** unless the photo
+clearly names a service ("Lunch Menu" → *Lunch*), and the café's name is
+confirmed rather than typed. Onboarding never asks for a menu name or link.
 
 The free launch (Steps 7–11) is built and locally verified. The B2B extraction
 API and usage billing are parked by decision (Steps 12–13): nothing in the

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { MenuPreview } from "@/components/menu-editor/menu-preview";
 import { ViewCounter } from "@/components/menu-editor/view-counter";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -33,12 +35,31 @@ export function describePublishedMenu(
   } — ${restaurant}.`;
 }
 
-export function PublishedMenuView({ page }: { page: PublishedMenuPage }) {
+/**
+ * `menusHref` is set only when this café publishes several menus: the page
+ * it points at lists them, so a visitor who picked the wrong one can go back
+ * instead of guessing at addresses.
+ */
+export function PublishedMenuView({
+  page,
+  menusHref,
+}: {
+  page: PublishedMenuPage;
+  menusHref?: string;
+}) {
   const title = page.doc.title.trim() || "Untitled menu";
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:py-12">
+        {menusHref && (
+          <Link
+            href={menusHref}
+            className="mb-4 inline-flex items-center gap-1 rounded-full border border-stone-200 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          >
+            <span aria-hidden="true">←</span> All menus
+          </Link>
+        )}
         <p className="mb-3 text-center text-[11px] font-semibold tracking-[0.25em] text-stone-400 uppercase">
           {page.restaurantName}
         </p>

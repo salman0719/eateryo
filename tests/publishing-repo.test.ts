@@ -112,6 +112,24 @@ describe("publishing repo", () => {
     expect((await getPublicationStatus(db, ownerA, menuId))!.urlPath).toBe("/r/cafe-a");
   });
 
+  it("counts the café's live menus so a menu page can offer a way back", async () => {
+    await publish();
+    expect((await getPublishedMenuByPath(db, "cafe-a", "cafe-a-menu"))!.liveMenuCount).toBe(1);
+
+    const secondId = "menu-pub-back";
+    await createMenuForUser(db, ownerA, restaurantA, sampleDoc(secondId, "Lunch"));
+    await publishMenuForUser(db, ownerA, secondId, { theme: "classic", layout: "list" });
+
+    // Two live menus: both targeted pages now belong to a list, not a root.
+    expect((await getPublishedMenuByPath(db, "cafe-a", "cafe-a-menu"))!.liveMenuCount).toBe(2);
+    expect((await getPublishedMenuByPath(db, "cafe-a", "lunch"))!.liveMenuCount).toBe(2);
+
+    // Back to one: the café address serves that menu again, so the back link
+    // has nowhere to go.
+    await unpublishMenuForUser(db, ownerA, secondId);
+    expect((await getPublishedMenuByPath(db, "cafe-a", "cafe-a-menu"))!.liveMenuCount).toBe(1);
+  });
+
   it("reads a café's public index without exposing unpublished menus", async () => {
     // No café has claimed this address, and nothing is live: no page.
     expect(await getPublishedMenusForRestaurant(db, "unknown-cafe")).toBeNull();

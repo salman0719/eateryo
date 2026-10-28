@@ -7,6 +7,7 @@ import {
   PublishedMenuView,
 } from "@/components/menu/published-menu";
 import { getPublishedMenuByPath } from "@/features/publishing/repo";
+import { restaurantPath } from "@/features/publishing/schema";
 import { isSlug } from "@/features/publishing/slug";
 import { getDb } from "@/lib/db";
 
@@ -20,7 +21,8 @@ import { getDb } from "@/lib/db";
  *
  * Only live publications exist here: unpublished or unknown addresses get a
  * 404, and the café's slug stays reserved either way. Rendering shared with
- * the primary-menu page lives in `PublishedMenuView`.
+ * the primary-menu page lives in `PublishedMenuView`. A café with several
+ * live menus also offers a link back to its list here (`liveMenuCount`).
  */
 
 /** De-duplicates the slug lookup between metadata and the page render. */
@@ -98,5 +100,13 @@ async function PublishedMenu({
   const page = await loadPublishedMenu(restaurantSlug, menuSlug);
   if (!page) notFound();
 
-  return <PublishedMenuView page={page} />;
+  // Several live menus make the café's own address the menu list, so this
+  // page offers a way back to it. With one live menu the root is this same
+  // menu, and a "back" would only reload it.
+  return (
+    <PublishedMenuView
+      page={page}
+      menusHref={page.liveMenuCount > 1 ? restaurantPath(page.restaurantSlug) : undefined}
+    />
+  );
 }

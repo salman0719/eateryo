@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
   defaultWizardState,
   linkExpiryCopy,
@@ -60,6 +61,26 @@ describe("wizard prefill", () => {
 
   it("leaves the name empty rather than inventing one", () => {
     expect(defaultWizardState({ title: "Menu" }).restaurantName).toBe("");
+    // A service name is the menu's name, not a café: ask instead.
+    expect(defaultWizardState({ title: "Lunch" }).restaurantName).toBe("");
+  });
+
+  it("reads the café from the title the photo carried, not the menu name", () => {
+    // The extraction renames the menu ("Main Menu"), but the café the photo
+    // showed is still what onboarding offers to publish under.
+    const state = defaultWizardState({
+      title: "Main Menu",
+      source: { originalTitle: "Pizza Tabrabane" },
+    });
+    expect(state.restaurantName).toBe("Pizza Tabrabane");
+  });
+
+  it("walks the demo through the same onboarding as a real photo", () => {
+    // Demo data is a fixture, not a special case: the sample photo's header is
+    // the café, so the menu is the main one and the café is suggested.
+    const demo = createSampleMenuDocument();
+    expect(demo.title).toBe("Main Menu");
+    expect(defaultWizardState(demo).restaurantName).toBe("Sunny Side Café");
   });
 
   it("keeps the wizard path stable and encoded", () => {

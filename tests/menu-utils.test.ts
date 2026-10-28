@@ -18,6 +18,8 @@ import {
   defaultNewMenuTitle,
   isPlaceholderMenuTitle,
   renameCategory,
+  resolveFirstMenuTitle,
+  serviceMenuName,
   setItemAvailability,
   suggestRestaurantName,
   suggestSecondMenuNames,
@@ -229,8 +231,8 @@ describe("suggestRestaurantName", () => {
 
   it("keeps the most common candidate and its first-seen casing", () => {
     expect(
-      suggestRestaurantName(["Lunch Menu", "Brunch Menu", "lunch - Dinner Menu", "Lunch — Drinks"])
-    ).toBe("Lunch");
+      suggestRestaurantName(["my café — Lunch", "My Café — Dinner", "My Café · Drinks"])
+    ).toBe("my café");
   });
 
   it("invents nothing when the titles say nothing", () => {
@@ -240,6 +242,16 @@ describe("suggestRestaurantName", () => {
     // The onboarding default names the menu, not a place.
     expect(suggestRestaurantName(["Main Menu"])).toBeNull();
     expect(suggestRestaurantName(["Food"])).toBeNull();
+  });
+
+  it("never offers a menu service as the café's name", () => {
+    // "Lunch Menu" names which menu this is; the café is still unknown, so
+    // onboarding must ask rather than publish under "Lunch".
+    expect(suggestRestaurantName(["Lunch Menu"])).toBeNull();
+    expect(suggestRestaurantName(["Dinner", "Dinner Menu"])).toBeNull();
+    expect(suggestRestaurantName(["Happy Hour"])).toBeNull();
+    // A real place name that merely contains a service word is kept.
+    expect(suggestRestaurantName(["Lunchbox Café"])).toBe("Lunchbox Café");
   });
 });
 
@@ -260,6 +272,28 @@ describe("menu naming (Q2)", () => {
       "Brunch",
     ]);
     expect(suggestSecondMenuNames(["Main Menu", "lunch"])).not.toContain("Lunch");
+  });
+
+  it("keeps a service name the photo is clear about, else Main Menu", () => {
+    expect(resolveFirstMenuTitle("Lunch Menu")).toBe("Lunch");
+    expect(resolveFirstMenuTitle("Sunny Side Café — Dinner")).toBe("Dinner");
+    expect(resolveFirstMenuTitle("My Café · Drinks List")).toBe("Drinks");
+    expect(resolveFirstMenuTitle("Happy Hour Menu")).toBe("Happy Hour");
+    expect(resolveFirstMenuTitle("breakfast")).toBe("breakfast");
+    // A place, a placeholder, or nothing: the first menu is the main menu.
+    expect(resolveFirstMenuTitle("Pizza Tabrabane")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle("Sunny Side Café Menu")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle("Menu")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle("   ")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle(null)).toBe("Main Menu");
+  });
+
+  it("only trusts an exact service word", () => {
+    expect(serviceMenuName("Dinner at Sunny's")).toBeNull();
+    expect(serviceMenuName("The Lunch Room")).toBeNull();
+    expect(serviceMenuName("Lunch Menu")).toBe("Lunch");
+    expect(serviceMenuName("Café — Wine")).toBe("Wine");
+    expect(serviceMenuName("  ")).toBeNull();
   });
 
   it("spots placeholder titles the photo missed", () => {

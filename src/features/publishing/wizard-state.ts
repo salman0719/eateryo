@@ -10,9 +10,10 @@
  * silently when storage is unavailable (private mode, quota, SSR).
  *
  * There is no link-name field: onboarding never asks the owner to name a
- * menu or pick its address. The menu is "Main Menu", its direct address is
- * derived from that title, and a café with one live menu answers at its own
- * `/r/<café>` link. Addresses are editable afterwards in the editor.
+ * menu or pick its address. A first menu is "Main Menu" (or the service the
+ * photo clearly names, e.g. "Lunch"), its direct address is derived from
+ * that title, and a café with one live menu answers at its own `/r/<café>`
+ * link. Addresses are editable afterwards in the editor.
  */
 
 import { suggestRestaurantName } from "@/features/menu/menu-utils";
@@ -47,10 +48,16 @@ export function wizardStorageKey(menuId: string): string {
   return `${STORAGE_PREFIX}${menuId}`;
 }
 
-/** Prefill the short form from the draft, with nothing invented. */
-export function defaultWizardState(doc: Pick<MenuDocument, "title">): PublishWizardState {
+/** Prefill the short form from the draft, with nothing invented.
+ *
+ * The café name comes from the title the photo carried, not from the menu's
+ * own (now normalised) title: a photo of "Sunny Side Café" becomes the main
+ * menu, and "Sunny Side Café" is still the café to publish under. */
+export function defaultWizardState(
+  doc: Pick<MenuDocument, "title" | "source">
+): PublishWizardState {
   return {
-    restaurantName: suggestRestaurantName([doc.title]) ?? "",
+    restaurantName: suggestRestaurantName([doc.source?.originalTitle ?? doc.title]) ?? "",
     restaurantId: "",
     theme: DEFAULT_PREVIEW_THEME_ID,
     layout: DEFAULT_PREVIEW_LAYOUT_ID,
