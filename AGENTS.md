@@ -88,6 +88,13 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
+  the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
+  shared by capture and the publish wizard. Signing in is a gate inside
+  Publish, never a stop, so the tracker's length is fixed for everyone; the
+  wizard continues it only when the flow came through review
+  (`rememberPublishJourney`), so a plain library deep link gets a heading
+  instead of a tracker with a false "3 done".
 - `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
   reusable height-reveal animation: measures the rendered content and
   animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then

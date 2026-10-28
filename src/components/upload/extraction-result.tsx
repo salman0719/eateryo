@@ -199,7 +199,7 @@ export function ExtractionResult({
   // screen the tap actually opens.
   const checkThisRef = useRef<HTMLDivElement | null>(null);
   // When the last flag clears, take the owner back to the Continue box at
-  // the top and pulse the freshly-unlocked "Get your link" button. Derived
+  // the top and pulse the freshly-unlocked "Publish" button. Derived
   // from the extraction-time count: only a had-work → none transition fires,
   // so a clean extraction (0 → 0) never yanks the scroll.
   const allClear = didClearAll(initialReviewCount ?? reviewCount, reviewCount);
@@ -511,7 +511,7 @@ export function ExtractionResult({
               >
                 {reviewCount > 0
                   ? `Continue → check prices (${reviewCount})`
-                  : "Get your link →"}
+                  : "Publish →"}
               </button>
             </Attention>
           )}
@@ -555,7 +555,7 @@ export function ExtractionResult({
                 This is your menu on a phone
               </h3>
               <p className="mt-1 text-sm leading-6 text-stone-600">
-                Nothing is public yet. Check anything marked, then get your link when it looks
+                Nothing is public yet. Check anything marked, then publish it when it looks
                 right.
               </p>
             </div>

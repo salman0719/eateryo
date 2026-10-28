@@ -3,8 +3,8 @@ export type AppScreen =
 
 /**
  * The surface shown for an open menu: the edit workspace, the compact
- * reorder list, the customer preview, or the get-your-link publish wizard
- * (R1). Table QR cards moved to the Tables tab (R0), so there is no `qr`
+ * reorder list, the customer preview, or the publish wizard (R1). Table QR
+ * cards moved to the Tables tab (R0), so there is no `qr`
  * mode. Each mode has its own deep-linkable URL.
  */
 export type EditorMode = "edit" | "reorder" | "preview" | "publish";

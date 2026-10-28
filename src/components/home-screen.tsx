@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Attention } from "@/components/ui/attention";
 import { HeightReveal } from "@/components/ui/height-reveal";
+import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { LibraryPanel } from "@/components/menu-editor/library-panel";
@@ -83,6 +84,7 @@ import { usePathname } from "next/navigation";
 
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
+import { rememberPublishJourney } from "@/features/publishing/wizard-state";
 import type { PreviewLayoutId, PreviewThemeId } from "@/features/menu/preview-themes";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -133,8 +135,6 @@ import {
 } from "@/features/menus/claim-local-drafts";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
-
-const STEPS = ["Upload image", "Extract menu", "Review draft"] as const;
 
 /** Save status stays one word; `detail` says where the save went. */
 function savedState(detail: string): SaveState {
@@ -1977,10 +1977,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
   }
 
-  /** From the extraction result: save the draft, then open the publish wizard. */
+  /** From the extraction result: save the draft, then open the publish wizard.
+   * The marker lets that screen continue the four-stop journey; a menu opened
+   * straight from the library gets a plain heading instead of a false "3 done". */
   async function handleStartPublish() {
     try {
       const saved = await saveResultAndOpen(false);
+      rememberPublishJourney(saved.id);
       navigateTo({ screen: "editor", menuId: saved.id, mode: "publish" });
     } catch (error) {
       showOpenError(error);
@@ -2266,7 +2269,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-amber-950">
-                      📍 Continue getting your link →
+                      📍 Finish publishing your menu →
                     </p>
                     <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
                       {localOnlyCount === 1
@@ -2498,33 +2501,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 Upload a photo or scan of a menu, extract it into categories and items with AI, then
                 review and correct the draft. AI output is never guaranteed — you stay in charge.
               </p>
+              {!signedIn && !sessionPending && (
+                <p className="mt-1.5 max-w-xl text-xs leading-5 text-stone-500">
+                  You can upload and review first. Publishing needs an account — we’ll email you a
+                  sign-in link, and your draft stays in this browser.
+                </p>
+              )}
             </div>
 
-            <ol aria-label="Progress" className="flex items-center gap-2">
-              {STEPS.map((label, index) => (
-                <li key={label} className="flex flex-1 items-center gap-2 last:flex-none">
-                  <span
-                    aria-current={index === activeStep ? "step" : undefined}
-                    className={[
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                      index <= activeStep
-                        ? "bg-amber-700 text-white"
-                        : "bg-stone-200 text-stone-500",
-                    ].join(" ")}
-                  >
-                    {index + 1}
-                  </span>
-                  <span
-                    className={`text-xs font-medium sm:text-sm ${index <= activeStep ? "text-stone-900" : "text-stone-400"}`}
-                  >
-                    {label}
-                  </span>
-                  {index < STEPS.length - 1 && (
-                    <span aria-hidden="true" className="h-px flex-1 bg-stone-200" />
-                  )}
-                </li>
-              ))}
-            </ol>
+            <JourneySteps current={activeStep} />
 
             {phase === "upload" && pages.length === 0 && (
               <div className="flex flex-col gap-3">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -13,6 +14,7 @@ import {
   type PreviewLayoutId,
 } from "@/features/menu/preview-themes";
 import { SyncError } from "@/features/menus/sync";
+import { PUBLISH_STEP_INDEX } from "@/features/onboarding/journey";
 import { fetchPublication } from "@/features/publishing/client";
 import { publicationPath, type PublicationStatus } from "@/features/publishing/schema";
 import { publishMenuWithSetup } from "@/features/publishing/setup-client";
@@ -21,6 +23,8 @@ import {
   clearWizardLinkSent,
   clearWizardState,
   defaultWizardState,
+  forgetPublishJourney,
+  hasPublishJourney,
   loadWizardLinkSent,
   loadWizardState,
   publishWizardPath,
@@ -100,10 +104,15 @@ interface PublishWizardProps {
 }
 
 /**
- * "Get your public link" — the R1 publish wizard.
+ * The publish stop — the fourth step of onboarding, and the R1 publish wizard.
  *
- * The draft is already saved in IndexedDB, so signing in is a step inside the
- * flow, not a way out of it: the emailed link returns to this exact URL and
+ * Reached from the review screen, it continues the one four-stop journey
+ * (Upload · Extract · Review · Publish) rather than starting a second one; a
+ * menu opened straight from My menus has no journey marker, so it gets a
+ * plain heading instead of a tracker it did not just walk.
+ *
+ * The draft is already saved in IndexedDB, so signing in is a gate inside this
+ * stop, not a way out of it: the emailed link returns to this exact URL and
  * the short form is restored from localStorage. One submit then creates the
  * restaurant only when the owner has none, attaches the menu and publishes
  * the snapshot.
@@ -127,6 +136,8 @@ export function PublishWizard({
 }: PublishWizardProps) {
   const fallback = useMemo(() => defaultWizardState(doc), [doc]);
   const [form, setForm] = useState<PublishWizardState>(() => loadWizardState(doc.id, fallback));
+  /** Opened from the review screen, so the four-stop journey continues here. */
+  const [continuesJourney] = useState(() => hasPublishJourney(doc.id));
   // A link requested earlier restores its panel after reloads and returns.
   const initialLinkSent = useMemo(() => loadWizardLinkSent(doc.id), [doc.id]);
   const publicationKey = `${accountKey ?? "anonymous"}:${doc.id}`;
@@ -219,6 +230,7 @@ export function PublishWizard({
       setPublished(result.publication);
       setSubmitResult(result);
       clearWizardState(doc.id);
+      forgetPublishJourney(doc.id);
       onPublished(result);
     } catch (publishError) {
       setError(errorCopy(publishError));
@@ -380,15 +392,15 @@ export function PublishWizard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
-            Get your public link
+            Publish your menu
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-            {signedIn ? "One short form, then your link" : "Sign in to get your link"}
+            {signedIn ? "One short form, then it’s live" : "Sign in to publish your menu"}
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
             {signedIn
               ? "We will create your café only if you don’t have one yet, attach this draft, and publish it. Nothing else is required."
-              : "Your draft is saved in this browser, so it will be waiting when you come back. The emailed link returns you to this same screen."}
+              : "Publishing needs an account — it’s the only thing we ask for. Your draft is saved in this browser, so it will be waiting when you come back; the emailed link returns you to this same screen."}
           </p>
         </div>
         <button
@@ -400,32 +412,10 @@ export function PublishWizard({
         </button>
       </div>
 
+      {continuesJourney && <JourneySteps current={PUBLISH_STEP_INDEX} />}
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full bg-stone-900 px-2.5 py-0.5 font-semibold text-white">
-              1 · Draft
-            </span>
-            <span aria-hidden="true" className="text-stone-300">
-              →
-            </span>
-            <span
-              className={
-                signedIn
-                  ? "rounded-full bg-amber-100 px-2.5 py-0.5 font-semibold text-amber-900"
-                  : "rounded-full bg-stone-100 px-2.5 py-0.5 font-medium text-stone-500"
-              }
-            >
-              2 · Sign in
-            </span>
-            <span aria-hidden="true" className="text-stone-300">
-              →
-            </span>
-            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 font-medium text-stone-500">
-              3 · Live link
-            </span>
-          </div>
-
           {!signedIn ? (
             <>
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
@@ -439,7 +429,7 @@ export function PublishWizard({
                 onSentCleared={() => clearWizardLinkSent(doc.id)}
               />
               <p className="text-xs leading-5 text-stone-500">
-                No password, no card — sign-in is just how the link becomes yours.
+                No password, no card — signing in is just how the menu becomes yours.
               </p>
             </>
           ) : (
