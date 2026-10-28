@@ -125,6 +125,51 @@ export function clearWizardState(menuId: string): void {
   }
 }
 
+/**
+ * Whether publish was opened from the review screen.
+ *
+ * The publish screen continues the same four-stop journey only when the
+ * flow came through upload, extraction and review. A menu opened straight
+ * from My menus has no marker, so it gets a plain heading rather than a
+ * tracker claiming three stops are done. The marker lives in localStorage
+ * because the magic-link return reloads the page.
+ */
+const JOURNEY_STORAGE_PREFIX = "eateryo:publish-journey:";
+
+export function publishJourneyStorageKey(menuId: string): string {
+  return `${JOURNEY_STORAGE_PREFIX}${menuId}`;
+}
+
+export function rememberPublishJourney(menuId: string): void {
+  const storage = browserStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(publishJourneyStorageKey(menuId), "1");
+  } catch {
+    // The publish screen just shows a plain heading; nothing else changes.
+  }
+}
+
+export function hasPublishJourney(menuId: string): boolean {
+  const storage = browserStorage();
+  if (!storage) return false;
+  try {
+    return storage.getItem(publishJourneyStorageKey(menuId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function forgetPublishJourney(menuId: string): void {
+  const storage = browserStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(publishJourneyStorageKey(menuId));
+  } catch {
+    // Nothing to do: the marker only hides chrome.
+  }
+}
+
 /** How long an emailed link stays valid (mirrors the server's 5 minutes). */
 export const WIZARD_LINK_TTL_MS = 5 * 60 * 1000;
 /** A sent panel older than this is ancient history, not a pending link. */

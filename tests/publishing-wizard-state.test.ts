@@ -15,6 +15,10 @@ import {
   wizardStorageKey,
   clearWizardLinkSent,
   clearWizardState,
+  forgetPublishJourney,
+  hasPublishJourney,
+  publishJourneyStorageKey,
+  rememberPublishJourney,
   WIZARD_LINK_TTL_MS,
   type PublishWizardState,
 } from "@/features/publishing/wizard-state";
@@ -210,5 +214,27 @@ describe("pending link", () => {
     const expired = linkExpiryCopy(sentAt, sentAt + WIZARD_LINK_TTL_MS);
     expect(expired.expired).toBe(true);
     expect(linkExpiryCopy(sentAt, sentAt + 60 * 60 * 1000).expired).toBe(true);
+  });
+});
+
+describe("journey marker", () => {
+  it("remembers that publish was opened from review, per menu", () => {
+    const storage = fakeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
+    expect(hasPublishJourney("menu-1")).toBe(false);
+    rememberPublishJourney("menu-1");
+    expect(storage.getItem(publishJourneyStorageKey("menu-1"))).not.toBeNull();
+    expect(hasPublishJourney("menu-1")).toBe(true);
+    expect(hasPublishJourney("menu-2")).toBe(false);
+
+    forgetPublishJourney("menu-1");
+    expect(hasPublishJourney("menu-1")).toBe(false);
+  });
+
+  it("is simply absent without storage (server render, private mode)", () => {
+    expect(hasPublishJourney("menu-1")).toBe(false);
+    rememberPublishJourney("menu-1");
+    expect(hasPublishJourney("menu-1")).toBe(false);
   });
 });
