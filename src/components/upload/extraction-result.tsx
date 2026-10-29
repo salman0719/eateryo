@@ -4,19 +4,19 @@
  * Review summary of an extracted (or demo) menu. Takes the narrow
  * `PreviewMenu` shape for the review list, and an optional canonical
  * `MenuDocument` for the phone-framed first look. The first look is the
- * payoff of the capture flow: the owner sees their menu the way a guest
- * will, while every flagged line stays fixable in the Check-this queue
+ * payoff of the capture flow: the owner sees the order page their diners
+ * will use, while every flagged line stays fixable in the Check-this queue
  * beside it (price edits + confirms persist to the draft via callbacks).
  *
- * The preview is a draft, never a publication — the phone frame's caption
- * and the copy both say so.
+ * The preview is a draft, never a publication, and ordering is off — the
+ * phone frame's caption and the copy both say so.
  */
 
 import { useRef, useState } from "react";
 
 import { Attention, didClearAll } from "@/components/ui/attention";
 import { CommitInput } from "@/components/menu-editor/fields";
-import { MenuPreview } from "@/components/menu-editor/menu-preview";
+import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import { hasAnyPrice } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -541,8 +541,8 @@ export function ExtractionResult({
       {previewDoc ? (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
           <aside className="flex flex-col gap-2 lg:sticky lg:top-4">
-            <PhoneFrame label="Your draft as a guest would see it">
-              <MenuPreview doc={previewDoc} eyebrow="Preview · not published" />
+            <PhoneFrame label="What a table card opens">
+              <OrderPagePreview doc={previewDoc} />
             </PhoneFrame>
           </aside>
 
@@ -552,11 +552,11 @@ export function ExtractionResult({
                 First look
               </p>
               <h3 className="mt-1 text-lg font-bold text-stone-900">
-                This is your menu on a phone
+                This is what diners will order from
               </h3>
               <p className="mt-1 text-sm leading-6 text-stone-600">
-                Nothing is public yet. Check anything marked, then publish it when it looks
-                right.
+                Nothing is live yet, and ordering is off in this preview. Check anything marked,
+                then publish it when it looks right.
               </p>
             </div>
 

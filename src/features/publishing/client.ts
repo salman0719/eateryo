@@ -1,6 +1,6 @@
 /**
  * Typed browser client for the publication API
- * (`/api/menus/[menuId]/publication`) and the public view beacon.
+ * (`/api/menus/[menuId]/publication`).
  * Client-safe: HTTP only, no Drizzle and no server repo imports.
  *
  * Shares the `SyncError` taxonomy with the menu/restaurant clients, so the
@@ -113,46 +113,20 @@ export async function fetchPublication(menuId: string): Promise<PublicationStatu
   );
 }
 
-/** Publish the current document (or publish changes) with a theme + layout. */
+/** Publish the current document (or publish changes) for table ordering. */
 export async function publishMenu(
   menuId: string,
-  input: { theme: string; layout: string; slug?: string }
+  input: { slug?: string } = {}
 ): Promise<PublicationStatus> {
   return requestJson(publicationUrl(menuId), jsonInit("POST", input), (payload) =>
     publicationEnvelope.parse(payload).publication
   );
 }
 
-/** Rename the public address. */
-export async function setPublicationSlug(
-  menuId: string,
-  slug: string
-): Promise<PublicationStatus> {
-  return requestJson(publicationUrl(menuId), jsonInit("PATCH", { slug }), (payload) =>
-    publicationEnvelope.parse(payload).publication
-  );
-}
-
-/** Stop serving the page; the slug stays reserved. */
+/** Take the menu out of table ordering; the slug stays reserved. */
 export async function unpublishMenu(menuId: string): Promise<PublicationStatus> {
   return requestJson(publicationUrl(menuId), { method: "DELETE" }, (payload) =>
     publicationEnvelope.parse(payload).publication
   );
 }
 
-/**
- * Count one view of a published page. Deliberately silent: a missed count is
- * not worth surfacing to a diner, and the fetch must never block rendering.
- * The beacon address mirrors the page's own path, so the pair
- * (restaurant, menu) is always spelled out.
- */
-export async function recordMenuView(restaurantSlug: string, slug: string): Promise<void> {
-  try {
-    await fetch(
-      `/api/r/${encodeURIComponent(restaurantSlug)}/m/${encodeURIComponent(slug)}/view`,
-      { method: "POST" }
-    );
-  } catch {
-    // Ignored — see above.
-  }
-}

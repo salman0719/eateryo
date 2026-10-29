@@ -195,8 +195,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   }
 }
 
-/* Printing the customer preview should produce a clean paper menu: chrome
-   hidden, every theme flattened to black on white, sections kept whole. */
+/* Printing table cards: chrome hidden, cards kept whole. */
 @media print {
   [data-print-hide] {
     display: none !important;
@@ -204,21 +203,6 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
 
   body {
     background: white;
-  }
-
-  [data-menu-preview] {
-    background: white !important;
-  }
-
-  [data-menu-preview] * {
-    background-color: transparent !important;
-    color: #1c1917 !important;
-    border-color: #d6d3d1 !important;
-    box-shadow: none !important;
-  }
-
-  [data-menu-preview] section {
-    break-inside: avoid;
   }
 
   /* Table QR cards: two per row, never split across pages. */

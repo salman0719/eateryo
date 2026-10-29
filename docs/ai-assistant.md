@@ -17,7 +17,7 @@ results. Product scope and the A0 measurements live in the R&D folder
 | Menu proposals | With one of the caller's menus selected, the model may return one allowlisted tool call: `add_item`, `update_item`, `set_item_availability`, `add_category`, `rename_category`, `move_item`. |
 | Review | The server re-validates the operations, dry-runs them on a clone and returns a diff. The owner can edit a proposed price, approve or discard. |
 | Approval | `POST /api/assistant/apply` writes the draft with `expectedUpdatedAt`; a concurrent edit is a `409 stale_menu`, never an overwrite. |
-| Publishing | Untouched. The public page still renders the last published revision until **Publish changes**. |
+| Publishing | Untouched. Table ordering still serves the last published revision until **Publish changes**. |
 | Spend | The launch page adds an "Assistant this month" line when the ledger has calls: messages/cap, neurons and paid-equivalent cost. |
 
 Not in scope: deletions, promotions/discounts/campaigns, opening-hours or
@@ -142,8 +142,8 @@ clarifying question, never a guessed price.
 6. **The tool is an allowlist.** Zod validates every operation; unknown ops
    are rejected rather than treated as no-ops; at most 12 operations per
    proposal; ids must exist in the target document.
-7. **Published data is untouched.** Applying changes writes `menu.doc`; the
-   public page renders `menu_revision` until the owner publishes.
+7. **Published data is untouched.** Applying changes writes `menu.doc`;
+   table ordering reads `menu_revision` until the owner publishes.
 8. **No secrets or provider bodies leak.** Errors are mapped to fixed copy;
    the ledger keeps only an error code; logs redact credentials and stack
    traces.

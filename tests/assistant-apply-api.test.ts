@@ -302,8 +302,6 @@ describe("POST /api/assistant/apply", () => {
       menuId: menu.id,
       restaurantId,
       doc: menu.doc,
-      theme: "classic",
-      layout: "list",
       sourceUpdatedAt: new Date(menu.updatedAt),
     });
 

@@ -39,8 +39,8 @@ resurrect purged orders.
 4. Verify, in this order:
    - `/launch` loads the checklist and shows the expected menu count.
    - The editor opens a menu and its categories/items match what you expect.
-   - `/r/<restaurant>` serves the published menu (one live menu), and
-     `/r/<restaurant>/m/<menu>` serves it too.
+   - A table card's address (`/r/<restaurant>/t/<table>`) lists the live
+     menu(s) for that restaurant, and its order page loads.
    - The Orders tab lists the order you used as the reference point.
    - An extraction still succeeds (the cap and usage ledger are readable).
 5. Restore your local `DATABASE_URL`, stop the dev server, and delete the

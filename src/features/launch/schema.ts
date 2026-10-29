@@ -12,8 +12,6 @@ import { usageSummarySchema } from "@/features/usage/schema";
 export const launchSnapshotSchema = z.object({
   menuCount: z.number().int().nonnegative(),
   publishedCount: z.number().int().nonnegative(),
-  /** Path of the most recently published menu, when one is live. */
-  livePath: z.string().min(1).nullable(),
   orderCount: z.number().int().nonnegative(),
   /** Items with no price — the review step's first signal. */
   unpricedItems: z.number().int().nonnegative(),

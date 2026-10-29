@@ -92,7 +92,7 @@ beforeEach(async () => {
     currency: "USD",
   });
   await createMenuForUser(holder.db, ownerId, restaurantId, publishedDoc);
-  await publishMenuForUser(holder.db, ownerId, menuId, { theme: "classic", layout: "list" });
+  await publishMenuForUser(holder.db, ownerId, menuId);
   holder.userId = null; // diners are anonymous
   hook.calls = [];
   hook.failNext = false;

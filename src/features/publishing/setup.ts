@@ -12,8 +12,8 @@ import type { PublishSetupInput, PublishSetupResult } from "./setup-schema";
 /**
  * One-submit publish setup for the R1 wizard.
  *
- * The wizard's promise is "draft in this browser → live link", and the only
- * server invariant it changes is this: when the caller owns no restaurant at
+ * The wizard's promise is "draft in this browser → orderable at your
+ * tables", and the only server invariant it changes is this: when the caller owns no restaurant at
  * all, the restaurant is created from the name they confirmed in the wizard
  * instead of being a separate manual step. When they do own one (or several)
  * the existing restaurant is used — this function never adds a second one
@@ -166,8 +166,6 @@ export async function publishMenuWithSetupForUser(
   }
 
   const publication = await publishMenuForUser(db, userId, menuId, {
-    theme: input.theme,
-    layout: input.layout,
     ...(input.slug ? { slug: input.slug } : {}),
   });
 

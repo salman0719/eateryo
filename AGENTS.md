@@ -15,7 +15,7 @@ demands it; all user-facing copy uses Eateryo.
 
 Phase 1 (the local-first P0/P1 prototype) is complete and deployed.
 Phase 2 — accounts, a server DB, cross-device table ordering, one-click
-public menu publishing, and a usage-billed B2B extraction API — is scoped
+publishing for table ordering, and a usage-billed B2B extraction API — is scoped
 in `PHASE-2.md`. Work follows `ROADMAP.md` step by step: auth, billing, a
 remote DB, and public publishing are allowed **only when a roadmap step
 schedules them**, and nothing outside `PHASE-2.md`'s scope.
@@ -118,6 +118,15 @@ errors, or add lint/type suppressions just to make checks pass.
   `src/app/api/restaurants/[restaurantId]/audit/` — team audit trail:
   snapshot actor/target names, member-scoped reads (404 across tenants),
   best-effort writes; UI in `src/components/settings/team-activity.tsx`
+- `src/components/order/order-cart.tsx` + `order-sheet.tsx` — one cart, two
+  homes, chosen by `useWideLayout` at Tailwind's `lg`: a one-column phone gets
+  the bottom sheet that "View order" raises (`order-sheet.tsx`, pinned to the
+  frame in a `PhoneFrame`, viewport-fixed with the page scroll locked on a real
+  diner page), and a wide page gets the sticky right-hand column
+  (`OrderCartPanel`) beside the menu. `OrderCartLines` is the only line/note
+  markup, so the two cannot drift. Only one is mounted at a time, which is why
+  the kitchen note id stays unique. The owner preview is always phone-shaped
+  inside its frame, so it always uses the sheet, never the column.
 - `src/features/menus/` — Step 8 server menus: `repo.ts` (tenancy-scoped,
   conditional-UPDATE `updatedAt` conflict detection), `sync.ts` (typed
   browser client with `SyncError` codes), `move-to-account.ts` (one-way
@@ -130,29 +139,32 @@ errors, or add lint/type suppressions just to make checks pass.
   `tests/menus-sync.test.ts`, `tests/move-to-account.test.ts` — Step 8
   (PGlite + stubbed fetch; conflict, tenancy, import fidelity)
 - `src/features/publishing/` — Step 9 publish: `schema.ts` (slug rules +
-  publication status + `publicationPath`), `slug.ts` (deterministic slug
-  generation and collision candidates), `repo.ts` (snapshot revisions,
-  publish/unpublish, slug changes, scoped public read path, view counter),
-  `client.ts` (typed browser client). Menu slugs are unique per restaurant
-  (`published_menu_restaurant_slug_unique`), never globally: the targeted
-  address is `/r/<restaurant>/m/<menu>` and two cafés may both hold `lunch`.
-  A café with exactly one live menu serves it at its own
-  `/r/<restaurant>` address (the primary menu is derived, never selected);
-  several live menus make that root a menu index, and each menu page links
-  back to it. Onboarding names the first menu itself
+  publication status), `slug.ts` (deterministic slug generation and collision
+  candidates), `repo.ts` (snapshot revisions, publish/unpublish, the diner
+  read path ordering uses, plus `getLiveMenuDoc` for the owner's "what
+  changed" comparison), `client.ts` (typed browser client), `changes.ts` (the
+  pure live-vs-draft diff behind the publish panel's "Since you last
+  published" counts and list — matched by id, never by name). Publishing
+  means "make this menu orderable at the tables": it snapshots the menu and
+  marks it live. There is no public menu page, no menu URL, no menu QR code
+  and no view count — a menu is reached only through a table card at
+  `/r/<restaurant>/t/<table>`, and its own order address is
+  `/r/<restaurant>/m/<menu>/order?table=<label>`. Menu slugs are unique per
+  restaurant (`published_menu_restaurant_slug_unique`), never globally, so
+  two cafés may both hold `lunch`. Onboarding names the first menu itself
   (`resolveFirstMenuTitle`: "Main Menu", or the service the photo clearly
   names) and never asks for a name or link; the photo's own title is kept in
   `source.originalTitle` for the café-name suggestion only. Routes:
-  `src/app/api/menus/[menuId]/publication/`,
-  `src/app/api/r/[restaurantSlug]/m/[menuSlug]/view/`, public pages
-  `src/app/r/[restaurantSlug]/page.tsx` and
-  `src/app/r/[restaurantSlug]/m/[menuSlug]/page.tsx` (partial prerender;
-  snapshot only, sharing `src/components/menu/published-menu.tsx`). Editor UI
-  `src/components/menu-editor/publish-panel.tsx`, view beacon
-  `view-counter.tsx`. Tests: `tests/publishing-slug.test.ts`,
-  `tests/publishing-repo.test.ts`, `tests/publishing-api.test.ts`.
-  Invariant: the public page renders `menu_revision`, never `menu.doc`, so
-  edits stay private until "Publish changes".
+  `src/app/api/menus/[menuId]/publication/` (and its `/live` read, the
+  snapshot diners see now). Editor UI
+  `src/components/menu-editor/publish-panel.tsx`; the owner-facing preview is
+  a read-only rendering of the diner order page
+  (`src/components/order/order-page-preview.tsx`, ordering off), shared by
+  the editor, publish wizard and onboarding result. Tests:
+  `tests/publishing-slug.test.ts`, `tests/publishing-repo.test.ts`,
+  `tests/publishing-api.test.ts`, `tests/menu-changes.test.ts`. Invariant: table ordering renders
+  `menu_revision`, never `menu.doc`, so edits stay private until "Publish
+  changes".
 - `src/features/orders/` — Step 10 table orders: `schema.ts` (canonical
   order schema, the status transitions, totals), `repo.ts` (server-only:
   snapshot-priced placement, membership-scoped board + cursor, conditional
@@ -162,8 +174,9 @@ errors, or add lint/type suppressions just to make checks pass.
   `src/app/api/orders/[orderId]/` (PATCH). Diner page
   `src/app/r/[restaurantSlug]/m/[menuSlug]/order/page.tsx` (snapshot only,
   noindex) with
-  `src/components/order/` (`order-menu.tsx` shared UI, `server-table-order.tsx`,
-  `table-order.tsx` for local mode); staff board
+  `src/components/order/` (`order-menu.tsx` shared UI, `order-sheet.tsx` the
+  shared cart sheet, `server-table-order.tsx`, `table-order.tsx` for local
+  mode, `table-order-tabs.tsx` for the multi-menu landing); staff board
   `src/components/orders/server-orders-board.tsx` (5 s polling with backoff
   and a visible reconnect state) behind the session switch in
   `orders-board.tsx`. Tests: `tests/orders-repo.test.ts`,

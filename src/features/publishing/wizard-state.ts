@@ -3,29 +3,20 @@
  *
  * The draft itself already survives a round trip through the magic-link email
  * because it lives in IndexedDB. This module covers the rest of the form:
- * restaurant name, chosen restaurant, link and style are kept in
- * localStorage so signing in never makes the owner fill the form again.
+ * restaurant name and chosen restaurant are kept in localStorage so signing
+ * in never makes the owner fill the form again.
  *
  * The helpers are pure except for the three storage functions, which fail
  * silently when storage is unavailable (private mode, quota, SSR).
  *
  * There is no link-name field: onboarding never asks the owner to name a
  * menu or pick its address. A first menu is "Main Menu" (or the service the
- * photo clearly names, e.g. "Lunch"), its direct address is derived from
- * that title, and a café with one live menu answers at its own `/r/<café>`
- * link. Addresses are editable afterwards in the editor.
+ * photo clearly names, e.g. "Lunch"); its address segment is derived from
+ * that title because a menu's own order page uses it.
  */
 
 import { suggestRestaurantName } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
-import {
-  DEFAULT_PREVIEW_LAYOUT_ID,
-  DEFAULT_PREVIEW_THEME_ID,
-  isPreviewLayoutId,
-  isPreviewThemeId,
-  type PreviewLayoutId,
-  type PreviewThemeId,
-} from "@/features/menu/preview-themes";
 import type { RestaurantOption } from "@/features/tenancy/client";
 
 export interface PublishWizardState {
@@ -33,8 +24,6 @@ export interface PublishWizardState {
   restaurantName: string;
   /** The owner's choice when they have more than one restaurant. */
   restaurantId: string;
-  theme: PreviewThemeId;
-  layout: PreviewLayoutId;
 }
 
 const STORAGE_PREFIX = "eateryo:publish-wizard:";
@@ -59,8 +48,6 @@ export function defaultWizardState(
   return {
     restaurantName: suggestRestaurantName([doc.source?.originalTitle ?? doc.title]) ?? "",
     restaurantId: "",
-    theme: DEFAULT_PREVIEW_THEME_ID,
-    layout: DEFAULT_PREVIEW_LAYOUT_ID,
   };
 }
 
@@ -79,8 +66,6 @@ export function parseWizardState(value: unknown, fallback: PublishWizardState): 
       typeof value.restaurantName === "string" ? value.restaurantName : fallback.restaurantName,
     restaurantId:
       typeof value.restaurantId === "string" ? value.restaurantId : fallback.restaurantId,
-    theme: isPreviewThemeId(value.theme) ? value.theme : fallback.theme,
-    layout: isPreviewLayoutId(value.layout) ? value.layout : fallback.layout,
   };
 }
 

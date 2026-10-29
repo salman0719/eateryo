@@ -11,10 +11,8 @@ import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 
 import { hasAnyPrice } from "@/features/menu/menu-utils";
 import { menuDocumentSchema } from "@/features/menu/schema";
-import { canonicalPublicationPath } from "@/features/publishing/schema";
-import { ensureRestaurantSlug } from "@/features/tables/repo";
 import type { TenancyDb } from "@/features/tenancy/repo";
-import { menu, order, publishedMenu, restaurant, restaurantMembership } from "@/lib/db/schema";
+import { menu, order, publishedMenu, restaurantMembership } from "@/lib/db/schema";
 
 import type { LaunchSnapshot } from "./schema";
 
@@ -31,8 +29,6 @@ export async function getLaunchSnapshot(
   const publications = await db
     .select({
       restaurantId: publishedMenu.restaurantId,
-      restaurantSlug: restaurant.slug,
-      slug: publishedMenu.slug,
       publishedAt: publishedMenu.publishedAt,
     })
     .from(publishedMenu)
@@ -40,7 +36,6 @@ export async function getLaunchSnapshot(
       restaurantMembership,
       eq(restaurantMembership.restaurantId, publishedMenu.restaurantId)
     )
-    .innerJoin(restaurant, eq(restaurant.id, publishedMenu.restaurantId))
     .where(and(eq(restaurantMembership.userId, userId), isNotNull(publishedMenu.publishedAt)))
     .orderBy(desc(publishedMenu.publishedAt));
 
@@ -67,26 +62,9 @@ export async function getLaunchSnapshot(
     }
   }
 
-  // The most recently published live menu, addressed the way a visitor opens
-  // it. A café that published before claiming its `/r/` address claims it
-  // here — the checklist link has to point somewhere real.
-  const live = publications[0] ?? null;
-  let livePath: string | null = null;
-  if (live) {
-    const restaurantSlug =
-      live.restaurantSlug ?? (await ensureRestaurantSlug(db, live.restaurantId)).slug;
-    // A café with one live menu answers at its own address; the checklist
-    // points at whatever a visitor would actually share.
-    const liveMenuCount = publications.filter(
-      (row) => row.restaurantId === live.restaurantId
-    ).length;
-    livePath = canonicalPublicationPath(restaurantSlug, live.slug, liveMenuCount);
-  }
-
   return {
     menuCount: menus.length,
     publishedCount: publications.length,
-    livePath,
     orderCount: Number(orders[0]?.value ?? 0),
     unpricedItems,
     reviewNotes,

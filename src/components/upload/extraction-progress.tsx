@@ -39,7 +39,7 @@ const NEXT_STEPS = [
   },
   {
     title: "Your link, when ready",
-    body: "After you review it, one short form gives you a public link. Table QR codes are one step after that.",
+    body: "After you review it, one short form makes the menu orderable at your tables. Table QR codes are one step after that.",
   },
 ] as const;
 

@@ -454,24 +454,19 @@ deployed app after the next deploy.
   localStorage. The chip row sticks to the top of the viewport while
   editing long categories (`src/components/menu-editor/menu-editor.tsx`).
 
-## Customer preview — parked ideas
+## Customer preview — retired
 
-Delivered first: a **Preview menu** toggle in the editor renders the live
-document as a clean customer-facing view — availability, variants, options
-and dietary labels, no review chrome, unset prices shown as an em dash, and
-a "not published" label so it never reads as a hosted page
-(`src/components/menu-editor/menu-preview.tsx`,
-`src/features/menu/preview-utils.ts`, `tests/menu-preview.test.ts`).
-Ideas to revisit after that foundation:
+The static customer preview is gone: four themes, two layouts, the print/PDF
+stylesheet, and the published menu pages they served were removed. A themed
+generic menu never matched a café's own design, so owners read it as a promise
+about how their menu would look instead of a check of what was extracted —
+and it competed with the real job of reviewing prices.
 
-- **Menu themes** — a few branded styles (café, bistro, takeaway) so owners
-  see the menu matching their look.
-- **Phone/QR mockup framing** — render the preview inside a phone frame to
-  show the customer's mobile view (QR code generation stays out of scope).
-- **Print stylesheet / PDF export** — print the preview for the counter,
-  alongside the existing JSON/CSV exports.
-- **Side-by-side editing** — form + live preview in parallel now that the
-  editor canvas is wide (`max-w-6xl`).
+The owner-facing preview now renders the real diner order page
+(`src/components/order/order-page-preview.tsx`) from the draft, with ordering
+off: the editor, publish wizard and onboarding result all show what a table
+card opens, and nothing in it can reach the kitchen. Publishing is for table
+ordering only; see `AGENTS.md` for the route and file map.
 
 ## local/ sandbox convention (untracked)
 

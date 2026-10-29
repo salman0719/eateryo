@@ -48,19 +48,17 @@ afterEach(() => {
 const FALLBACK: PublishWizardState = {
   restaurantName: "Fallback Café",
   restaurantId: "",
-  theme: "classic",
-  layout: "list",
 };
 
 describe("wizard prefill", () => {
   it("suggests a café name and no link-name choice", () => {
     const state = defaultWizardState({ title: "Sunny Side Café — Lunch Menu" });
     expect(state.restaurantName).toBe("Sunny Side Café");
-    expect(state.theme).toBe("classic");
-    expect(state.layout).toBe("list");
-    // Onboarding never asks for an address: the server derives the menu's
-    // direct link and the café's own link serves a single menu.
+    // Onboarding never asks for an address or a style: the server derives
+    // the menu's order address, and publishing has no theme or layout.
     expect(state).not.toHaveProperty("slug");
+    expect(state).not.toHaveProperty("theme");
+    expect(state).not.toHaveProperty("layout");
   });
 
   it("leaves the name empty rather than inventing one", () => {
@@ -134,8 +132,6 @@ describe("form persistence", () => {
     const state: PublishWizardState = {
       restaurantName: "Retry Café",
       restaurantId: "r-1",
-      theme: "bistro",
-      layout: "columns",
     };
 
     saveWizardState("menu-1", state);
@@ -153,6 +149,8 @@ describe("form persistence", () => {
       wizardStorageKey("menu-1"),
       JSON.stringify({
         restaurantName: "Saved Café",
+        // Leftovers from the retired style picker are simply not part of
+        // the form anymore.
         theme: "neon",
         layout: "columns",
       })
@@ -161,7 +159,6 @@ describe("form persistence", () => {
     expect(loadWizardState("menu-1", FALLBACK)).toEqual({
       ...FALLBACK,
       restaurantName: "Saved Café",
-      layout: "columns",
     });
   });
 

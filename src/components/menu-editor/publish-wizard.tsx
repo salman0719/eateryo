@@ -3,20 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import type { MenuDocument } from "@/features/menu/schema";
-import {
-  PREVIEW_LAYOUT_IDS,
-  PREVIEW_THEMES,
-  PREVIEW_THEME_IDS,
-  type PreviewLayoutId,
-} from "@/features/menu/preview-themes";
 import { SyncError } from "@/features/menus/sync";
 import { PUBLISH_STEP_INDEX } from "@/features/onboarding/journey";
 import { fetchPublication } from "@/features/publishing/client";
-import { publicationPath, type PublicationStatus } from "@/features/publishing/schema";
+import type { PublicationStatus } from "@/features/publishing/schema";
 import { publishMenuWithSetup } from "@/features/publishing/setup-client";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
 import {
@@ -36,17 +31,6 @@ import {
 import type { RestaurantOption } from "@/features/tenancy/client";
 
 import { AvailabilityPanel } from "./availability-panel";
-import { MenuPreview } from "./menu-preview";
-import { QrCode } from "./qr-code";
-
-const LAYOUTS: { id: PreviewLayoutId; label: string }[] = [
-  { id: "list", label: "List" },
-  { id: "columns", label: "Two columns" },
-];
-
-function itemCount(doc: MenuDocument): number {
-  return doc.categories.reduce((sum, category) => sum + category.items.length, 0);
-}
 
 function errorCopy(error: unknown): string {
   if (error instanceof SyncError) {
@@ -60,7 +44,7 @@ function errorCopy(error: unknown): string {
       case "invalid":
         return error.message;
       case "slug_taken":
-        return "That link name is already used by another menu at this café. Pick a different one.";
+        return "That address is already used by another menu at this café. Try publishing again.";
       default:
         return "Could not reach the server. Your draft is safe in this browser — try again.";
     }
@@ -71,7 +55,7 @@ function errorCopy(error: unknown): string {
 function WizardSkeleton() {
   return (
     <div role="status" aria-busy="true" className="flex flex-col gap-4">
-      <span className="sr-only">Preparing your public link…</span>
+      <span className="sr-only">Preparing your tables…</span>
       <Skeleton className="h-8 w-64" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -117,10 +101,9 @@ interface PublishWizardProps {
  * restaurant only when the owner has none, attaches the menu and publishes
  * the snapshot.
  *
- * The success screen sells the right payoff: the live URL kept honest as a
- * view-only page (door, website, Google profile — never for tables), with
- * the primary road leading to table cards that order, printed from the
- * Tables tab.
+ * The success screen sells the right payoff: the menu is orderable at the
+ * tables, reached through printed table cards. There is no menu page and no
+ * link, so none is offered.
  */
 export function PublishWizard({
   doc,
@@ -150,8 +133,6 @@ export function PublishWizard({
   const [showHours, setShowHours] = useState(false);
   /** The café name is confirmed by default; "Change" reveals the field. */
   const [nameEditing, setNameEditing] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [origin] = useState(() => (typeof window === "undefined" ? "" : window.location.origin));
 
   useEffect(() => {
     saveWizardState(doc.id, form);
@@ -165,9 +146,9 @@ export function PublishWizard({
   }, [signedIn, doc.id]);
 
   // A reload after publishing (or opening a menu that is already live) must
-  // show the link rather than a fresh publish form. `checkedFor` tracks the
-  // answer per account+menu, so a stale success never renders while another
-  // account's publication is still being read.
+  // show the success screen rather than a fresh publish form. `checkedFor`
+  // tracks the answer per account+menu, so a stale success never renders
+  // while another account's publication is still being read.
   useEffect(() => {
     if (!signedIn || !accountKey) return;
     let cancelled = false;
@@ -189,7 +170,6 @@ export function PublishWizard({
     };
   }, [accountKey, doc.id, publicationKey, signedIn]);
 
-  const menuItems = itemCount(doc);
   const choice = resolveWizardRestaurant(form, ownedRestaurants);
   /** A café we can name confidently: the field stays hidden until asked. */
   const confirmedName = choice.kind === "create" ? choice.name : "";
@@ -203,10 +183,6 @@ export function PublishWizard({
     !busy &&
     (choice.kind === "existing" || choice.kind === "create");
 
-  const publicUrl = published ? `${origin}${published.urlPath}` : "";
-  const liveTheme = published?.theme ?? form.theme;
-  const liveLayout = published?.layout ?? form.layout;
-
   function update(patch: Partial<PublishWizardState>) {
     setForm((current) => ({ ...current, ...patch }));
     setError(null);
@@ -219,8 +195,6 @@ export function PublishWizard({
     try {
       const result = await publishMenuWithSetup(doc.id, {
         doc,
-        theme: form.theme,
-        layout: form.layout,
         ...(choice.kind === "existing"
           ? { restaurantId: choice.id }
           : choice.kind === "create"
@@ -239,37 +213,30 @@ export function PublishWizard({
     }
   }
 
-  async function copyLink() {
-    if (!publicUrl) return;
-    try {
-      await navigator.clipboard.writeText(publicUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  }
-
   if (sessionPending || (signedIn && checking)) return <WizardSkeleton />;
 
   if (signedIn && published?.isLive) {
+    const restaurantName =
+      submitResult?.restaurant.name ??
+      ownedRestaurants.find((restaurant) => restaurant.id === published.restaurantId)?.name ??
+      null;
+
     return (
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
-              {submitResult?.created.menu ? "First link created" : "Your link is live"}
+              {submitResult?.created.menu ? "First menu published" : "Published for ordering"}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-              Your menu is live — now the tables
+              Your menu is live for your tables
             </h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
               {submitResult?.created.restaurant
                 ? `We created “${submitResult.restaurant.name}” for you — rename it in Settings whenever you like. `
                 : ""}
-              The link below is a view-only page — good for the door, your website, or your
-              Google profile. Table cards are separate: one printed card per table, each
-              ordering for its table.
+              Diners scan a table card and order from this menu; orders land on your board. There
+              is no public menu page, so there is no link to share.
             </p>
           </div>
           <button
@@ -283,59 +250,11 @@ export function PublishWizard({
 
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">
-                Your menu link · view-only page
-              </p>
-              <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
-                <code className="min-w-0 max-w-full truncate rounded-lg bg-stone-100 px-2.5 py-1.5 text-sm text-stone-900">
-                  {publicUrl || published.urlPath}
-                </code>
-                <button
-                  type="button"
-                  onClick={() => void copyLink()}
-                  className="rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                >
-                  {copied ? "Copied" : "Copy link"}
-                </button>
-                <a
-                  href={published.urlPath}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                >
-                  Open page
-                </a>
-              </div>
-              <p className="mt-2 text-xs leading-5 text-stone-500">
-                {published.viewCount === 1
-                  ? "1 view so far"
-                  : `${published.viewCount} views so far`}{" "}
-                · updates stay private until you publish changes from the editor.
-              </p>
-              <p className="mt-1 text-xs leading-5 text-stone-500">
-                Direct link to this menu:{" "}
-                <code className="rounded bg-stone-100 px-1 py-0.5 text-[11px] text-stone-800">
-                  {publicationPath(published.restaurantSlug, published.slug)}
-                </code>{" "}
-                — it keeps working if you add more menus later.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 rounded-xl border border-stone-200 p-3">
-              <QrCode value={publicUrl} alt={`QR code for ${publicUrl}`} size={112} />
-              <p className="text-xs leading-5 text-stone-600">
-                For the door, your website, or your Google profile — it opens the menu page,
-                nothing more. <span className="font-medium">Not for tables:</span> table cards print
-                from the Tables tab.
-              </p>
-            </div>
-
             <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <h2 className="text-sm font-semibold text-stone-900">Next: take orders at the tables</h2>
+              <h2 className="text-sm font-semibold text-stone-900">Next: print a table card</h2>
               <p className="mt-1 text-xs leading-5 text-stone-600">
                 One QR per table — each card orders for its table across every open menu. They
-                print from the Tables tab, and nothing here changes your live link.
+                print from the Tables tab.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -367,19 +286,19 @@ export function PublishWizard({
                 </div>
               )}
             </div>
+
+            <p className="text-xs leading-5 text-stone-500">
+              Edits made in the editor stay off your tables until you press “Publish changes” —
+              diners always see the last published version.
+            </p>
           </section>
 
           <aside className="flex flex-col gap-2">
-            <PhoneFrame label="Menu page · view-only">
-              <MenuPreview
-                doc={doc}
-                themeId={liveTheme}
-                layout={liveLayout}
-                eyebrow="Menu · live"
-              />
+            <PhoneFrame label="Diner page at a table">
+              <OrderPagePreview doc={doc} restaurantName={restaurantName} />
             </PhoneFrame>
             <p className="text-center text-xs text-stone-500">
-              What a table card opens adds the table — same menu, ordering for its table.
+              Ordering is off in this preview; a real table card turns it on.
             </p>
           </aside>
         </div>
@@ -395,11 +314,11 @@ export function PublishWizard({
             Publish your menu
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
-            {signedIn ? "One short form, then it’s live" : "Sign in to publish your menu"}
+            {signedIn ? "One short form, then you can take orders" : "Sign in to publish your menu"}
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
             {signedIn
-              ? "We will create your café only if you don’t have one yet, attach this draft, and publish it. Nothing else is required."
+              ? "We will create your café only if you don’t have one yet, attach this draft, and make it orderable at your tables. Nothing else is required."
               : "Publishing needs an account — it’s the only thing we ask for. Your draft is saved in this browser, so it will be waiting when you come back; the emailed link returns you to this same screen."}
           </p>
         </div>
@@ -495,50 +414,6 @@ export function PublishWizard({
                 )}
               </div>
 
-              <div>
-                <p className="text-xs font-medium text-stone-600">Style</p>
-                <div role="group" aria-label="Menu theme" className="mt-1 flex flex-wrap gap-1.5">
-                  {PREVIEW_THEME_IDS.map((themeId) => (
-                    <button
-                      key={themeId}
-                      type="button"
-                      aria-pressed={form.theme === themeId}
-                      onClick={() => update({ theme: themeId })}
-                      className={
-                        form.theme === themeId
-                          ? "rounded-full bg-amber-800 px-3 py-1 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                          : "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                      }
-                    >
-                      {PREVIEW_THEMES[themeId].name}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  role="group"
-                  aria-label="Menu layout"
-                  className="mt-1.5 flex flex-wrap gap-1.5"
-                >
-                  {LAYOUTS.filter((layout) => PREVIEW_LAYOUT_IDS.includes(layout.id)).map(
-                    (layout) => (
-                      <button
-                        key={layout.id}
-                        type="button"
-                        aria-pressed={form.layout === layout.id}
-                        onClick={() => update({ layout: layout.id })}
-                        className={
-                          form.layout === layout.id
-                            ? "rounded-full bg-stone-900 px-3 py-1 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                            : "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                        }
-                      >
-                        {layout.label}
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-
               {choice.kind === "choose" && (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
                   Choose which café this menu belongs to above.
@@ -577,17 +452,14 @@ export function PublishWizard({
         </section>
 
         <aside className="flex flex-col gap-2">
-          <PhoneFrame label="Preview — the live page uses this theme">
-            <MenuPreview
+          <PhoneFrame label="What a table card opens">
+            <OrderPagePreview
               doc={doc}
-              themeId={form.theme}
-              layout={form.layout}
-              eyebrow="Preview · not published"
+              restaurantName={choice.kind === "existing" || choice.kind === "create" ? choice.name : null}
             />
           </PhoneFrame>
           <p className="text-center text-xs text-stone-500">
-            {doc.categories.length} {doc.categories.length === 1 ? "category" : "categories"} ·{" "}
-            {menuItems} {menuItems === 1 ? "item" : "items"}
+            Ordering is off in this preview; a real table card turns it on.
           </p>
         </aside>
       </div>

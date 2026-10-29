@@ -34,11 +34,12 @@ function cardsPrintedOnThisDevice(): boolean {
   }
 }
 
-function stepHref(step: LaunchStep, status: LaunchStatus): string {
+function stepHref(step: LaunchStep): string {
   // Table cards belong to the restaurant, not to a menu: the Tables tab is
   // the only place that can print them for every open menu at once.
   if (step.id === "cards") return "/tables";
-  if (step.id === "order" && status.livePath) return status.livePath;
+  // Orders start at a table card, which is printed from the same tab.
+  if (step.id === "order") return "/tables";
   return "/";
 }
 
@@ -48,14 +49,12 @@ function stepActionLabel(step: LaunchStep): string {
       return "Upload a menu";
     case "review":
       return "Open the editor";
-    case "theme":
-      return "Preview themes";
     case "cards":
       return "Open Tables";
     case "publish":
       return "Publish";
     case "order":
-      return "Open the public menu";
+      return "Open Tables";
   }
 }
 
@@ -137,7 +136,7 @@ export function LaunchChecklist() {
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
         <h2 className="text-base font-semibold text-amber-950">Sign in to start the checklist</h2>
         <p className="mt-1 text-sm text-amber-900">
-          Your menus, public link, and table orders need an account so a phone at the table can
+          Your menus, publishing, and table orders need an account so a phone at the table can
           reach the same menu your laptop published. It is still free, and there is no card step.
         </p>
         <Link
@@ -230,7 +229,7 @@ export function LaunchChecklist() {
                 {!step.done || step.manual ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <Link
-                      href={stepHref(step, status)}
+                      href={stepHref(step)}
                       className="text-xs font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
                     >
                       {stepActionLabel(step)}

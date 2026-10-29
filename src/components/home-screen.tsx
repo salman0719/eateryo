@@ -77,7 +77,6 @@ import {
 import {
   fetchPublication,
   publishMenu,
-  setPublicationSlug,
   unpublishMenu,
 } from "@/features/publishing/client";
 import { usePathname } from "next/navigation";
@@ -85,7 +84,6 @@ import { usePathname } from "next/navigation";
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
 import { rememberPublishJourney } from "@/features/publishing/wizard-state";
-import type { PreviewLayoutId, PreviewThemeId } from "@/features/menu/preview-themes";
 import { authClient } from "@/lib/auth-client";
 import {
   ExtractClientError,
@@ -1398,7 +1396,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (error instanceof SyncError && error.code === "not_found") {
         setPublication(null);
       } else {
-        setPublishError("Could not check the public link. Try again in a moment.");
+        setPublishError("Could not check the menu’s status. Try again in a moment.");
       }
     } finally {
       if (docRef.current?.id === menuId) setPublicationLoaded(true);
@@ -1431,7 +1429,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * Publish (or publish changes): flush the pending save first so the
    * snapshot is of what the owner just saw, never of a stale draft.
    */
-  async function handlePublish(theme: PreviewThemeId, layout: PreviewLayoutId) {
+  async function handlePublish() {
     const doc = docRef.current;
     if (!doc) return;
     setPublishError(null);
@@ -1442,7 +1440,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         setPublishError("Add this menu to your account first, then publish it.");
         return;
       }
-      const status = await publishMenu(doc.id, { theme, layout });
+      const status = await publishMenu(doc.id);
       setPublication(status);
       setPublicationLoaded(true);
     } catch (error) {
@@ -1459,20 +1457,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setPublishBusy(true);
     try {
       setPublication(await unpublishMenu(doc.id));
-    } catch (error) {
-      setPublishError(publishErrorMessage(error));
-    } finally {
-      setPublishBusy(false);
-    }
-  }
-
-  async function handleChangeSlug(slug: string) {
-    const doc = docRef.current;
-    if (!doc) return;
-    setPublishError(null);
-    setPublishBusy(true);
-    try {
-      setPublication(await setPublicationSlug(doc.id, slug));
     } catch (error) {
       setPublishError(publishErrorMessage(error));
     } finally {
@@ -2463,6 +2447,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 syncMode={signedIn ? "account" : "local"}
                 canManage={!activeMenuIsStaff}
                 onServer={serverIds.has(activeDoc.id)}
+                restaurantName={
+                  ownedRestaurantsForAccount.find(
+                    (restaurant) => restaurant.id === activePublication?.restaurantId
+                  )?.name ?? null
+                }
                 onStartPublish={() =>
                   navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "publish" })
                 }
@@ -2479,9 +2468,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   busy: publishBusy,
                   error: publishError,
                   inAccount: serverIds.has(activeDoc.id),
-                  onPublish: (theme, layout) => void handlePublish(theme, layout),
+                  onPublish: () => void handlePublish(),
                   onUnpublish: () => void handleUnpublish(),
-                  onChangeSlug: (slug) => void handleChangeSlug(slug),
                 }}
                 onPreviewOpen={() => {
                   if (docRef.current) void refreshPublication(docRef.current.id);

@@ -371,6 +371,11 @@ phase-3 candidates once someone is paying.
 
 ## 6. I3 — One-click publish + the free promotion
 
+> **Superseded (2026-10-28):** the public menu page, the page QR, the view
+> count and the theme/layout choice described below were retired. Publishing
+> now makes a menu orderable at the café's tables; the only diner entry is a
+> table card (`/r/<restaurant>/t/<table>`). See `ROADMAP.md`.
+
 **Outcome:** an owner clicks **Publish** and gets
 `https://<app>/m/<their-cafe>` that works on any phone with no login — **free,
 while the promotion lasts**. This is the first user-facing feature of Phase 2.

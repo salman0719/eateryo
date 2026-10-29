@@ -74,15 +74,16 @@ Target: under ten minutes from photo to first order.
    result.
 3. **Review**: open every item flagged, fill in prices the AI left empty, and
    remove anything that is not on the menu.
-4. **Theme**: open Preview, pick a theme and layout.
-5. **Table QR**: open Table QR, print one card per table, and tick the step in
-   `/launch`.
-6. **Publish**: press Publish, copy the public link, open it on a phone that
-   has never seen the app.
-7. **First order**: scan a table card, order one item, confirm it lands on the
-   board. Run `docs/two-device-test.md` if this is the first café.
+4. **Preview and publish**: open Preview to check the diner page, then press
+   Publish. There is no public menu link to share — publishing makes the menu
+   orderable at the tables.
+5. **Table QR**: open the Tables tab, print one card per table, and tick the
+   step in `/launch`.
+6. **First order**: scan a table card on a phone that has never seen the app,
+   order one item, confirm it lands on the board. Run
+   `docs/two-device-test.md` if this is the first café.
 
-Then check `/launch`: five verifiable steps should read done. Check Settings →
+Then check `/launch`: four verifiable steps should read done. Check Settings →
 Usage for one or two extractions against the cap.
 
 Nothing in this flow asks for a card. If any screen does, that is a bug and the

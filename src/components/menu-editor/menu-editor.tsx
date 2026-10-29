@@ -37,22 +37,12 @@ import {
   type DeleteUndo,
 } from "@/features/menu/undo";
 
-import {
-  DEFAULT_PREVIEW_LAYOUT_ID,
-  DEFAULT_PREVIEW_THEME_ID,
-  PREVIEW_THEMES,
-  PREVIEW_THEME_IDS,
-  isPreviewLayoutId,
-  isPreviewThemeId,
-  type PreviewLayoutId,
-  type PreviewThemeId,
-} from "@/features/menu/preview-themes";
-
+import { OrderPagePreview } from "@/components/order/order-page-preview";
+import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
 import { ItemEditor } from "./item-editor";
-import { MenuPreview } from "./menu-preview";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
@@ -102,6 +92,8 @@ interface MenuEditorProps {
    * sync to the server copy or stay in this browser.
    */
   onServer?: boolean;
+  /** The café's name, shown on the diner preview when the account knows it. */
+  restaurantName?: string | null;
   /** Open the publish wizard for a browser-only menu (R1). */
   onStartPublish?: () => void;
   /**
@@ -109,7 +101,7 @@ interface MenuEditorProps {
    * in this context, in which case the preview simply omits the panel.
    */
   publishing?: PublishingControls;
-  /** Fired when the customer preview opens; the page refreshes publish state. */
+  /** Fired when the diner preview opens; the page refreshes publish state. */
   onPreviewOpen?: () => void;
 }
 
@@ -126,23 +118,6 @@ const tinyButton =
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
 
-/**
- * The preview's eyebrow must never claim the draft is what visitors see:
- * "Live page preview" only when the live snapshot matches both the document
- * and the selected style.
- */
-function previewEyebrow(
-  status: PublishingControls["status"],
-  themeId: PreviewThemeId,
-  layout: PreviewLayoutId
-): string {
-  if (!status?.isLive) return "Preview · not published";
-  const styleDiffers = status.theme !== themeId || status.layout !== layout;
-  return status.hasUnpublishedChanges || styleDiffers
-    ? "Draft preview · public page is older"
-    : "Live page preview";
-}
-
 export function MenuEditor({
   doc,
   selectedItemId = null,
@@ -153,6 +128,7 @@ export function MenuEditor({
   syncMode,
   canManage = true,
   onServer = false,
+  restaurantName = null,
   onStartPublish,
   imageUrl,
   onExportJson,
@@ -273,58 +249,20 @@ export function MenuEditor({
     onChange(next);
   }
 
-  // View mode swaps the editing surface for the customer preview, the
-  // printable table QR cards, or the compact reorder list, while the header
-  // (back, save state) stays put. "edit" is the workspace; "preview" is a
-  // read-only presentation; "reorder" arranges without the editing boxes.
-  // The mode itself lives in the URL (via onModeChange), so each surface
-  // has its own link and back/forward moves between them.
+  // View mode swaps the editing surface for the diner's order page or the
+  // compact reorder list, while the header (back, save state) stays put.
+  // "edit" is the workspace; "preview" is the read-only order page a table
+  // card opens; "reorder" arranges without the editing boxes. The mode lives
+  // in the URL (via onModeChange), so each surface has its own link and
+  // back/forward moves between them.
   function changeMode(next: EditorMode) {
     if (next === "preview") onPreviewOpen?.();
     onModeChange(next);
   }
 
-  // Preview style is a tiny UI preference (like the category layout above), so
-  // it lives in localStorage rather than the menu document.
-  const PREVIEW_THEME_STORAGE_KEY = "menu-preview-theme";
-  const [previewThemeId, setPreviewThemeId] = useState<PreviewThemeId>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREVIEW_THEME_ID;
-    try {
-      const stored = window.localStorage.getItem(PREVIEW_THEME_STORAGE_KEY);
-      return isPreviewThemeId(stored) ? stored : DEFAULT_PREVIEW_THEME_ID;
-    } catch {
-      return DEFAULT_PREVIEW_THEME_ID;
-    }
-  });
-
-  function changePreviewTheme(id: PreviewThemeId) {
-    setPreviewThemeId(id);
-    try {
-      window.localStorage.setItem(PREVIEW_THEME_STORAGE_KEY, id);
-    } catch {
-      /* storage unavailable — the session choice still applies */
-    }
-  }
-
-  const PREVIEW_LAYOUT_STORAGE_KEY = "menu-preview-layout";
-  const [previewLayout, setPreviewLayout] = useState<PreviewLayoutId>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREVIEW_LAYOUT_ID;
-    try {
-      const stored = window.localStorage.getItem(PREVIEW_LAYOUT_STORAGE_KEY);
-      return isPreviewLayoutId(stored) ? stored : DEFAULT_PREVIEW_LAYOUT_ID;
-    } catch {
-      return DEFAULT_PREVIEW_LAYOUT_ID;
-    }
-  });
-
-  function changePreviewLayout(id: PreviewLayoutId) {
-    setPreviewLayout(id);
-    try {
-      window.localStorage.setItem(PREVIEW_LAYOUT_STORAGE_KEY, id);
-    } catch {
-      /* storage unavailable — the session choice still applies */
-    }
-  }
+  /** The draft is ahead of what table ordering serves right now. */
+  const needsPublish =
+    publishing?.status?.isLive === true && publishing.status.hasUnpublishedChanges;
 
   // Bulk reassignment: selection is tracked by item id and pruned against
   // the live document, so deleted or filtered-out items never linger.
@@ -448,7 +386,7 @@ export function MenuEditor({
         <>
           {mode !== "preview" && (
             <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-              Preview menu
+              Preview order page
             </button>
           )}
         </>
@@ -458,7 +396,7 @@ export function MenuEditor({
             ↕ Reorder
           </button>
           <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-            Preview menu
+            Preview order page
           </button>
         </>
       ) : (
@@ -473,70 +411,33 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div
-          data-print-hide
-          className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white p-3"
-        >
-          <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Style</p>
-          <div role="group" aria-label="Preview style" className="flex flex-wrap gap-1.5">
-            {PREVIEW_THEME_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={previewThemeId === id}
-                onClick={() => changePreviewTheme(id)}
-                className={
-                  previewThemeId === id
-                    ? "rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    : "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                }
-              >
-                {PREVIEW_THEMES[id].name}
-              </button>
-            ))}
-          </div>
-          <span className="mx-1 hidden h-5 w-px bg-stone-200 sm:block" aria-hidden="true" />
-          <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Layout</p>
-          <div role="group" aria-label="Preview layout" className="flex flex-wrap gap-1.5">
-            {[
-              { id: "list" as const, label: "List" },
-              { id: "columns" as const, label: "Two columns" },
-            ].map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={previewLayout === option.id}
-                onClick={() => changePreviewLayout(option.id)}
-                className={
-                  previewLayout === option.id
-                    ? "rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    : "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                }
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <span className="flex-1" />
-          <button type="button" onClick={() => window.print()} className={smallButton}>
-            Print / save PDF
-          </button>
+        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+          <p className="text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
+            The diner’s view
+          </p>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            This is the page a table card opens. Ordering is off in this preview, so nothing here
+            reaches the kitchen.
+          </p>
         </div>
         {publishing && canManage && (
           <PublishPanel
             signedIn={syncMode === "account"}
-            themeId={previewThemeId}
-            layout={previewLayout}
             controls={publishing}
             onStartWizard={onStartPublish}
           />
         )}
-        <MenuPreview
-          doc={doc}
-          themeId={previewThemeId}
-          layout={previewLayout}
-          eyebrow={previewEyebrow(publishing?.status ?? null, previewThemeId, previewLayout)}
-        />
+        <PhoneFrame
+          label="Diner ordering page"
+          heightClass="h-[min(78vh,860px)]"
+          widthClass="max-w-[420px]"
+        >
+          <OrderPagePreview
+            doc={doc}
+            restaurantName={restaurantName}
+            draftAheadOfLive={needsPublish}
+          />
+        </PhoneFrame>
       </div>
     );
   }
@@ -698,9 +599,6 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      {/* The public link panel now lives in Preview only, so the edit screen
-          stays compact and food items show sooner. Kept below (commented out)
-          in case it needs to come back. */}
       <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
         {onStartPublish && !onServer ? (
           <>
@@ -710,7 +608,7 @@ export function MenuEditor({
               onClick={onStartPublish}
               className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              get your public link
+              set up table ordering
             </button>{" "}
             — we create your café if you don&apos;t have one yet. Or{" "}
             <button
@@ -718,7 +616,7 @@ export function MenuEditor({
               onClick={() => changeMode("preview")}
               className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              preview it first
+              preview the order page
             </button>
             .
           </>
@@ -732,21 +630,10 @@ export function MenuEditor({
             >
               go to Preview
             </button>{" "}
-            to publish it and get your public link.
+            to publish it for your tables.
           </>
         )}
       </p>
-      {/*
-      {publishing && canManage && (
-        <PublishPanel
-          signedIn={syncMode === "account"}
-          themeId={previewThemeId}
-          layout={previewLayout}
-          controls={publishing}
-          onOpenPreview={() => changeMode("preview")}
-        />
-      )}
-      */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">

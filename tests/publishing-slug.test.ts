@@ -4,7 +4,7 @@ import { SLUG_MAX_LENGTH } from "@/features/publishing/schema";
 import { isSlug, slugCandidates, slugifyMenuTitle } from "@/features/publishing/slug";
 
 /**
- * Step 9 — public link generation. The slug is the only part of a published
+ * Step 9 — address generation. The slug is the only part of a published
  * menu people read out loud and type, so these tests pin the rules: readable,
  * lowercase, ASCII, hyphenated, never empty, and never longer than the cap.
  */

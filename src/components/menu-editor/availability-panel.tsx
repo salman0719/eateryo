@@ -120,7 +120,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
         <h2 className="text-sm font-bold text-stone-900">Opening times</h2>
         <p className="mt-1 text-xs leading-5 text-stone-600">
           Opening hours are set once this menu is on your account, because that is the version its
-          table page shows. Get your public link first — until then the menu is served all day.
+          table page shows. Publish the menu first — until then it is served all day.
         </p>
       </section>
     );
