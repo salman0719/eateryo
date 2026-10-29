@@ -11,7 +11,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem } from "@/features/menu/schema";
@@ -242,47 +242,81 @@ export function formatOrderTotal(currency: string | null, total: number | null):
 }
 
 /**
- * Mobile cart shortcut: on small screens the "Your order" card sits below
- * the whole menu, so diners would scroll past everything to send. Once
- * something is in the cart this fixed bar shows the count + total and jumps
- * to the cart. Hidden on desktop (the sticky aside covers it) and while the
- * cart is empty (nothing to jump to). The spacer reserves room in the flow
- * so the bar never covers the Send button.
+ * The cart shortcut for a one-column (phone) diner page: once something is in
+ * the order, this bar shows the count and total and opens the order sheet.
+ * A phone has no room for a cart beside the dishes, so "View order" is the
+ * only way in there.
+ *
+ * Callers mount it only on narrow screens (`useWideLayout`); a wide page puts
+ * the order in its own sticky column instead, and the bar would cover content
+ * the panel already shows. The spacer reserves room at the end of the page so
+ * the bar never covers the last dish.
+ *
+ * `contained` is for the owner-facing preview, which renders inside a phone
+ * frame in the editor and wizard and is phone-shaped at every viewport width,
+ * so it always needs the bar. There the viewport-bottom bar would float over
+ * the app instead of the preview, so the bar sticks to the bottom of the
+ * frame's own scroll area and the page does not need the spacer. Its `-mb-6`
+ * cancels `OrderShell`'s bottom padding so the bar reaches the screen edge;
+ * it is only correct inside that shell.
  */
 export function StickyCartBar({
   itemCount,
   total,
   currency,
+  contained = false,
+  onViewOrder,
+  buttonRef,
 }: {
   itemCount: number;
   total: number | null;
   currency: string | null;
+  contained?: boolean;
+  /** Opens the order sheet; every cart lives there. */
+  onViewOrder: () => void;
+  /** Lets the caller return focus here after closing the order sheet. */
+  buttonRef?: RefObject<HTMLButtonElement | null>;
 }) {
   if (itemCount === 0) return null;
-  function scrollToCart() {
-    document.getElementById("your-order")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-  return (
-    <>
-      <div aria-hidden="true" className="h-16 lg:hidden" />
+
+  const inner = (
+    <div className="mx-auto flex w-full items-center gap-3">
+      <p className="min-w-0 flex-1 truncate text-sm text-stone-700">
+        <span className="font-bold text-stone-900">
+          {itemCount} {itemCount === 1 ? "item" : "items"}
+        </span>{" "}
+        · {formatOrderTotal(currency, total)}
+      </p>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onViewOrder}
+        className="shrink-0 rounded-full bg-amber-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:scale-95"
+      >
+        View order
+      </button>
+    </div>
+  );
+
+  if (contained) {
+    return (
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur lg:hidden"
+        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="mx-auto flex w-full max-w-4xl items-center gap-3">
-          <p className="min-w-0 flex-1 truncate text-sm text-stone-700">
-            <span className="font-bold text-stone-900">
-              {itemCount} {itemCount === 1 ? "item" : "items"}
-            </span>{" "}· {formatOrderTotal(currency, total)}
-          </p>
-          <button
-            type="button"
-            onClick={scrollToCart}
-            className="shrink-0 rounded-full bg-amber-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:scale-95"
-          >
-            View order
-          </button>
-        </div>
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div aria-hidden="true" className="h-16" />
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <div className="mx-auto w-full max-w-4xl">{inner}</div>
       </div>
     </>
   );
