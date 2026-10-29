@@ -151,6 +151,42 @@ export async function getPublicationStatus(
   return readStatus(db, menuId);
 }
 
+/**
+ * The document table ordering is serving for this menu right now, with the
+ * same membership scope as the status. The diner path resolves by address
+ * (`getPublishedMenuByPath`); this one exists so the editor can answer "what is
+ * live, compared with my draft?" without knowing the menu's slug. Null when
+ * nothing is serving (never published, or paused with no snapshot).
+ */
+export async function getLiveMenuDoc(
+  db: TenancyDb,
+  userId: string,
+  menuId: string
+): Promise<MenuDocument | null> {
+  const menuRow = await loadMenuWithRole(db, userId, menuId);
+  if (!menuRow) throw new PublicationRepoError("not_found", "That menu does not exist.");
+
+  const rows = await db
+    .select({ doc: menuRevision.doc })
+    .from(publishedMenu)
+    .innerJoin(menuRevision, eq(menuRevision.id, publishedMenu.liveRevisionId))
+    .where(
+      and(
+        eq(publishedMenu.menuId, menuId),
+        isNotNull(publishedMenu.publishedAt),
+        isNotNull(publishedMenu.liveRevisionId)
+      )
+    );
+
+  const doc = rows[0]?.doc;
+  if (doc === undefined) return null;
+  const parsed = menuDocumentSchema.safeParse(doc);
+  if (!parsed.success) {
+    throw new Error(`live menu ${menuId} failed canonical schema validation`);
+  }
+  return parsed.data;
+}
+
 /** True when the slug already belongs to a different menu of this restaurant. */
 async function slugTakenByAnother(
   db: TenancyDb,

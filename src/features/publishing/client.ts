@@ -11,12 +11,17 @@
 
 import { z } from "zod";
 
+import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { SyncError, type SyncErrorCode } from "@/features/menus/sync";
 
 import { publicationStatusSchema, type PublicationStatus } from "./schema";
 
 const publicationEnvelope = z.object({
   publication: publicationStatusSchema,
+});
+
+const liveDocEnvelope = z.object({
+  doc: menuDocumentSchema.nullable(),
 });
 
 const optionalPublicationEnvelope = z.object({
@@ -106,10 +111,24 @@ function publicationUrl(menuId: string): string {
   return `/api/menus/${encodeURIComponent(menuId)}/publication`;
 }
 
+function publicationLiveUrl(menuId: string): string {
+  return `${publicationUrl(menuId)}/live`;
+}
+
 /** The menu's publication state; null when it has never been published. */
 export async function fetchPublication(menuId: string): Promise<PublicationStatus | null> {
   return requestJson(publicationUrl(menuId), undefined, (payload) =>
     optionalPublicationEnvelope.parse(payload).publication
+  );
+}
+
+/**
+ * The snapshot diners see right now; null when nothing is being served. Used
+ * to show the owner what publishing changes would alter.
+ */
+export async function fetchLiveMenuDoc(menuId: string): Promise<MenuDocument | null> {
+  return requestJson(publicationLiveUrl(menuId), undefined, (payload) =>
+    liveDocEnvelope.parse(payload).doc
   );
 }
 

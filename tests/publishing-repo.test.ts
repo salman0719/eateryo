@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import {
+  getLiveMenuDoc,
   getPublishedMenuByPath,
   getPublicationStatus,
   publishMenuForUser,
@@ -96,6 +97,39 @@ describe("publishing repo", () => {
     // History is append-only: two revisions for one menu.
     const revisions = await db.select({ id: menuRevision.id }).from(menuRevision);
     expect(revisions).toHaveLength(2);
+  });
+
+  it("reads the live snapshot for the editor, scoped to members", async () => {
+    // Nothing is serving before the first publish.
+    expect(await getLiveMenuDoc(db, ownerA, menuId)).toBeNull();
+
+    await publish();
+    expect((await getLiveMenuDoc(db, ownerA, menuId))!.title).toBe("Café A — Menu");
+
+    // Editing the draft does not change the snapshot the editor compares to.
+    const current = await getMenuForUser(db, ownerA, menuId);
+    await updateMenuForUser(
+      db,
+      ownerA,
+      menuId,
+      { ...current.doc, title: "Draft title" },
+      current.updatedAt
+    );
+    expect((await getLiveMenuDoc(db, ownerA, menuId))!.title).toBe("Café A — Menu");
+
+    // Staff may read it; another tenant cannot learn that it exists.
+    const staffId = await seedUser(db, "live-staff@cafe.test", "Staff");
+    await db
+      .insert(restaurantMembership)
+      .values({ restaurantId: restaurantA, userId: staffId, role: "staff" });
+    expect((await getLiveMenuDoc(db, staffId, menuId))!.title).toBe("Café A — Menu");
+    await expect(getLiveMenuDoc(db, ownerB, menuId)).rejects.toMatchObject({
+      code: "not_found",
+    });
+
+    // A paused menu serves nothing to compare against.
+    await unpublishMenuForUser(db, ownerA, menuId);
+    expect(await getLiveMenuDoc(db, ownerA, menuId)).toBeNull();
   });
 
   it("suffixes a derived slug on collision inside one restaurant instead of failing", async () => {

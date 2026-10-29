@@ -424,6 +424,7 @@ export function MenuEditor({
           <PublishPanel
             signedIn={syncMode === "account"}
             controls={publishing}
+            draftDoc={doc}
             onStartWizard={onStartPublish}
           />
         )}

@@ -75,6 +75,7 @@ import {
   updateServerMenu,
 } from "@/features/menus/sync";
 import {
+  fetchLiveMenuDoc,
   fetchPublication,
   publishMenu,
   unpublishMenu,
@@ -426,6 +427,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [publicationLoaded, setPublicationLoaded] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  /**
+   * The snapshot diners see now, read only while the draft is ahead of it.
+   * The publish panel diffs it against the draft so the owner sees what
+   * "Publish changes" actually changes.
+   */
+  const [liveDoc, setLiveDoc] = useState<MenuDocument | null>(null);
+  const [liveDocMenuId, setLiveDocMenuId] = useState<string | null>(null);
+  const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle"
+  );
 
   useEffect(() => {
     signedInRef.current = signedIn;
@@ -601,6 +612,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         setPublicationMenuId(null);
         setPublicationLoaded(false);
         setPublishError(null);
+        resetLiveDoc();
         if (resultDoc !== null || pages.length > 0) applySelection([]);
         navigateTo(landing, true, false);
       }
@@ -934,6 +946,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setPublicationMenuId(null);
     setPublicationLoaded(false);
     setPublishError(null);
+    resetLiveDoc();
     void refreshPublication(doc.id);
     docRef.current = doc;
     lastSavedRef.current = JSON.stringify(doc);
@@ -1377,12 +1390,48 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setClaimAnswer({ accountKey, status: "dismissed" });
   }
 
+  function resetLiveDoc() {
+    setLiveDoc(null);
+    setLiveDocMenuId(null);
+    setLiveDocState("idle");
+  }
+
+  /**
+   * Read the live snapshot, but only while the draft is ahead of it: with no
+   * unpublished changes there is nothing to compare, and a paused or
+   * never-published menu has no serving version at all.
+   */
+  async function refreshLiveDoc(menuId: string, status: PublicationStatus | null) {
+    if (!status?.isLive || !status.hasUnpublishedChanges) {
+      resetLiveDoc();
+      return;
+    }
+    setLiveDocMenuId(menuId);
+    setLiveDocState("loading");
+    try {
+      const doc = await fetchLiveMenuDoc(menuId);
+      if (docRef.current?.id !== menuId) return;
+      setLiveDoc(doc);
+      setLiveDocState("ready");
+    } catch (error) {
+      if (docRef.current?.id !== menuId) return;
+      if (error instanceof SyncError && error.code === "not_found") {
+        setLiveDoc(null);
+        setLiveDocState("ready");
+        return;
+      }
+      setLiveDoc(null);
+      setLiveDocState("error");
+    }
+  }
+
   /** Load the open menu's publication state (signed in only). */
   async function refreshPublication(menuId: string) {
     if (!signedInRef.current) {
       setPublication(null);
       setPublicationMenuId(null);
       setPublicationLoaded(false);
+      resetLiveDoc();
       return;
     }
     setPublicationMenuId(menuId);
@@ -1391,6 +1440,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (docRef.current?.id !== menuId) return;
       setPublication(status);
       setPublishError(null);
+      void refreshLiveDoc(menuId, status);
     } catch (error) {
       if (docRef.current?.id !== menuId) return;
       if (error instanceof SyncError && error.code === "not_found") {
@@ -1398,6 +1448,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       } else {
         setPublishError("Could not check the menu’s status. Try again in a moment.");
       }
+      resetLiveDoc();
     } finally {
       if (docRef.current?.id === menuId) setPublicationLoaded(true);
     }
@@ -1443,6 +1494,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       const status = await publishMenu(doc.id);
       setPublication(status);
       setPublicationLoaded(true);
+      // Nothing is unpublished any more, so there is nothing left to compare.
+      void refreshLiveDoc(doc.id, status);
     } catch (error) {
       setPublishError(publishErrorMessage(error));
     } finally {
@@ -1476,6 +1529,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setPublicationMenuId(menuId);
     setPublicationLoaded(true);
     setPublishError(null);
+    resetLiveDoc();
     void (async () => {
       try {
         const server = await fetchServerMenu(menuId);
@@ -1551,6 +1605,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       setPublicationMenuId(null);
       setPublicationLoaded(false);
       setPublishError(null);
+      resetLiveDoc();
       await refreshLibrary();
       if (accountNote) setLibraryError(accountNote);
       navigateTo({ screen: "library" }, false, false);
@@ -2468,6 +2523,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   busy: publishBusy,
                   error: publishError,
                   inAccount: serverIds.has(activeDoc.id),
+                  liveDoc: liveDocMenuId === activeDoc.id ? liveDoc : null,
+                  liveDocState: liveDocMenuId === activeDoc.id ? liveDocState : "idle",
                   onPublish: () => void handlePublish(),
                   onUnpublish: () => void handleUnpublish(),
                 }}

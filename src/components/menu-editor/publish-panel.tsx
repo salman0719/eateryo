@@ -1,7 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuDocument } from "@/features/menu/schema";
+import {
+  MENU_CHANGE_LABEL,
+  MENU_CHANGE_ORDER,
+  summarizeMenuChanges,
+  type MenuChangeSummary,
+} from "@/features/publishing/changes";
 import type { PublicationStatus } from "@/features/publishing/schema";
 
 /**
@@ -26,6 +34,13 @@ export interface PublishingControls {
   error: string | null;
   /** Whether this menu exists in the signed-in account (required to publish). */
   inAccount: boolean;
+  /**
+   * The snapshot diners see right now, read only when the draft is ahead of
+   * it. Null until read — `liveDocState` says whether that is still pending,
+   * impossible, or failed.
+   */
+  liveDoc: MenuDocument | null;
+  liveDocState: "idle" | "loading" | "ready" | "error";
   onPublish: () => void;
   onUnpublish: () => void;
 }
@@ -33,6 +48,8 @@ export interface PublishingControls {
 interface PublishPanelProps {
   signedIn: boolean;
   controls: PublishingControls;
+  /** The draft being edited, diffed against the live snapshot. */
+  draftDoc: MenuDocument;
   /** Opens the R1 publish wizard for a menu that is not in the account yet. */
   onStartWizard?: () => void;
 }
@@ -60,9 +77,90 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export function PublishPanel({ signedIn, controls, onStartWizard }: PublishPanelProps) {
-  const { status, loaded, busy, error, inAccount, onPublish, onUnpublish } = controls;
+/**
+ * What publishing changes would alter, compared with what diners see now.
+ *
+ * A counts line plus an expandable list, not a second menu: the owner's
+ * question is "what am I about to push?", and two phone-sized menus side by
+ * side are unreadable. When the comparison cannot be made, say so quietly —
+ * the amber warning above still tells the truth either way.
+ */
+function ChangeList({
+  summary,
+  state,
+}: {
+  summary: MenuChangeSummary | null;
+  state: PublishingControls["liveDocState"];
+}) {
+  if (state === "loading") {
+    return (
+      <div role="status" aria-busy="true" className="mt-2 flex flex-col gap-2">
+        <span className="sr-only">Comparing your draft with what diners see…</span>
+        <Skeleton className="h-3 w-2/3" />
+        <Skeleton className="h-3 w-1/2" />
+      </div>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <p className="mt-2 text-xs leading-5 text-stone-600">
+        Could not compare this with what diners see right now. The warning above still applies.
+      </p>
+    );
+  }
+
+  if (state !== "ready" || !summary) return null;
+
+  if (summary.rows.length === 0) {
+    return (
+      <p className="mt-2 text-xs leading-5 text-stone-600">
+        Nothing on the menu itself changed — the last save touched details diners do not see.
+      </p>
+    );
+  }
+
+  const counts = MENU_CHANGE_ORDER.filter((kind) => summary.counts[kind] > 0).map(
+    (kind) => `${summary.counts[kind]} ${MENU_CHANGE_LABEL[kind]}`
+  );
+
+  return (
+    <div className="mt-2">
+      <p className="text-xs font-semibold text-stone-700">
+        Since you last published: {counts.join(" · ")}
+      </p>
+      <details className="mt-1">
+        <summary className="cursor-pointer text-xs font-medium text-amber-800 underline hover:text-amber-900">
+          Show details
+        </summary>
+        <ul className="mt-2 max-h-56 divide-y divide-stone-100 overflow-y-auto rounded-xl border border-stone-200">
+          {summary.rows.map((row, index) => (
+            <li
+              key={`${row.kind}:${row.name}:${index}`}
+              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-1.5 text-xs"
+            >
+              <span className="min-w-0 font-medium text-stone-900">{row.name}</span>
+              <span className="text-right text-stone-500">
+                {row.detail
+                  ? `${MENU_CHANGE_LABEL[row.kind]} · ${row.detail}`
+                  : MENU_CHANGE_LABEL[row.kind]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </div>
+  );
+}
+
+export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: PublishPanelProps) {
+  const { status, loaded, busy, error, inAccount, liveDoc, liveDocState, onPublish, onUnpublish } =
+    controls;
   const needsPublish = status?.isLive === true && status.hasUnpublishedChanges;
+  const summary = useMemo(
+    () => (liveDoc ? summarizeMenuChanges(liveDoc, draftDoc) : null),
+    [liveDoc, draftDoc]
+  );
   const publishLabel = !status?.isLive
     ? "Publish for ordering"
     : needsPublish
@@ -184,6 +282,7 @@ export function PublishPanel({ signedIn, controls, onStartWizard }: PublishPanel
                 Draft changes are not on your tables yet — diners still see the last published
                 version until you press “Publish changes”.
               </p>
+              <ChangeList summary={summary} state={liveDocState} />
             </>
           )}
 

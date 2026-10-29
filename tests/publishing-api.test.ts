@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GET as getLiveDoc } from "@/app/api/menus/[menuId]/publication/live/route";
 import {
   DELETE as unpublish,
   GET as getPublication,
@@ -179,6 +180,43 @@ describe("POST /api/menus/[menuId]/publication", () => {
     holder.userId = staffId;
     const res = await publish(jsonRequest("POST", PUBLISH_BODY), menuParams(menuId));
     expect(res.status).toBe(403);
+  });
+});
+
+describe("GET /api/menus/[menuId]/publication/live", () => {
+  it("requires a session and nothing to compare before the first publish", async () => {
+    holder.userId = null;
+    const signedOut = await getLiveDoc(new Request("http://test.local"), menuParams(menuId));
+    expect(signedOut.status).toBe(401);
+
+    holder.userId = ownerId;
+    const never = await getLiveDoc(new Request("http://test.local"), menuParams(menuId));
+    expect(never.status).toBe(200);
+    expect(await never.json()).toEqual({ doc: null });
+  });
+
+  it("returns the frozen snapshot, not the edited draft, and 404s other tenants", async () => {
+    await publish(jsonRequest("POST", PUBLISH_BODY), menuParams(menuId));
+    const current = await getMenuForUser(holder.db!, ownerId, menuId);
+    await updateMenuForUser(
+      holder.db!,
+      ownerId,
+      menuId,
+      { ...current.doc, title: "Edited after publish" },
+      current.updatedAt
+    );
+
+    const res = await getLiveDoc(new Request("http://test.local"), menuParams(menuId));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect((await res.json()).doc.title).toBe("Café API Menu");
+
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const outsider = await seedUser(holder.db!, "live-outsider@cafe.test", "Outsider");
+    await createRestaurant(holder.db!, outsider, "Other Café");
+    holder.userId = outsider;
+    const hidden = await getLiveDoc(new Request("http://test.local"), menuParams(menuId));
+    expect(hidden.status).toBe(404);
   });
 });
 
