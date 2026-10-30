@@ -18,6 +18,8 @@ import type { MenuCategory, MenuItem } from "@/features/menu/schema";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { MenuItemPhoto } from "./menu-item-photo";
+
 /**
  * Loading placeholder for the diner-facing order surfaces: a menu card in
  * the shape the loaded content lands in, so a slow table connection shows
@@ -155,7 +157,8 @@ export function OrderMenuSection({
           return (
             <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+                <MenuItemPhoto item={item} />
+                <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 font-medium text-stone-900">
                     <span>{item.name}</span>
                     {soldOut && (
