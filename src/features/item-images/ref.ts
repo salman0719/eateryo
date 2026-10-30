@@ -6,6 +6,8 @@
 
 import type { MenuItemImage } from "@/features/menu/schema";
 
+import type { ItemImageVariantName } from "./sizes";
+
 /** One copy of a photo, ready to hand to a plain `<img>`. */
 export interface ItemImageCopy {
   url: string;
@@ -35,4 +37,60 @@ export function itemImageCopy(image: MenuItemImage | null | undefined): ItemImag
  */
 export function itemImageKey(image: MenuItemImage | null | undefined): string | null {
   return image?.key ?? null;
+}
+
+/** One copy the browser prepared: what it is and the pixels it holds. */
+export interface PreparedPhotoFile {
+  name: ItemImageVariantName;
+  /** File name sent to the CDN; the upload response is matched by it. */
+  filename: string;
+  width: number;
+  height: number;
+}
+
+/** One uploaded file, as the file host reports it back. */
+export interface UploadedPhotoFile {
+  name: string;
+  key: string;
+  url: string;
+}
+
+/**
+ * Turn prepared copies plus the host's reply into the reference a menu item
+ * stores. Returns null when the reply does not contain the display copy — that
+ * is a broken upload, not a photo, and the caller reports it as a failure.
+ *
+ * Matching is by file name, never by array position: the host is free to
+ * answer in any order, and attaching the thumbnail as the display copy would
+ * leave diners with a permanently blurry dish.
+ */
+export function buildMenuItemImage(
+  prepared: ReadonlyArray<PreparedPhotoFile>,
+  uploaded: ReadonlyArray<UploadedPhotoFile>
+): MenuItemImage | null {
+  const byName = new Map(uploaded.map((file) => [file.name, file]));
+  const displayPrepared = prepared.find((file) => file.name === "display");
+  const display = displayPrepared ? byName.get(displayPrepared.filename) : undefined;
+  if (!displayPrepared || !display) return null;
+
+  const image: MenuItemImage = {
+    url: display.url,
+    key: display.key,
+    width: displayPrepared.width,
+    height: displayPrepared.height,
+    thumb: null,
+  };
+
+  const thumbPrepared = prepared.find((file) => file.name === "thumb");
+  const thumb = thumbPrepared ? byName.get(thumbPrepared.filename) : undefined;
+  if (thumbPrepared && thumb) {
+    image.thumb = {
+      url: thumb.url,
+      key: thumb.key,
+      width: thumbPrepared.width,
+      height: thumbPrepared.height,
+    };
+  }
+
+  return image;
 }
