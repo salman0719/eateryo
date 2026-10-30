@@ -15,9 +15,18 @@
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { itemImageKey } from "@/features/item-images/ref";
 
 export type MenuChangeKind =
-  "title" | "currency" | "category" | "added" | "removed" | "renamed" | "repriced" | "availability";
+  | "title"
+  | "currency"
+  | "category"
+  | "added"
+  | "removed"
+  | "renamed"
+  | "repriced"
+  | "photo"
+  | "availability";
 
 export interface MenuChange {
   kind: MenuChangeKind;
@@ -39,6 +48,7 @@ export const MENU_CHANGE_ORDER: MenuChangeKind[] = [
   "removed",
   "renamed",
   "repriced",
+  "photo",
   "availability",
   "category",
   "title",
@@ -50,6 +60,7 @@ export const MENU_CHANGE_LABEL: Record<MenuChangeKind, string> = {
   removed: "removed",
   renamed: "renamed",
   repriced: "repriced",
+  photo: "photo",
   availability: "status",
   category: "section",
   title: "title",
@@ -101,6 +112,7 @@ function emptyCounts(): Record<MenuChangeKind, number> {
     removed: 0,
     renamed: 0,
     repriced: 0,
+    photo: 0,
     availability: 0,
   };
 }
@@ -158,6 +170,17 @@ export function summarizeMenuChanges(before: MenuDocument, after: MenuDocument):
       if (sameCurrency) {
         const detail = priceDetail(previous, item, currency);
         if (detail) rows.push({ kind: "repriced", name: item.name, detail });
+      }
+      // A different stored file is a different picture: matching by key (not
+      // URL) keeps a replaced photo from hiding behind an unchanged address.
+      const photoBefore = itemImageKey(previous.image);
+      const photoAfter = itemImageKey(item.image);
+      if (photoBefore !== photoAfter) {
+        rows.push({
+          kind: "photo",
+          name: item.name,
+          detail: photoAfter === null ? "removed" : photoBefore === null ? "added" : "replaced",
+        });
       }
       const wasSoldOut = previous.available === false;
       const soldOut = item.available === false;

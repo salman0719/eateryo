@@ -8,6 +8,7 @@ import {
   type MenuCategory,
   type MenuDocument,
   type MenuItem,
+  type MenuItemImage,
 } from "@/features/menu/schema";
 import { summarizeMenuChanges } from "@/features/publishing/changes";
 
@@ -86,6 +87,7 @@ describe("summarizeMenuChanges", () => {
       removed: 1,
       renamed: 1,
       repriced: 1,
+      photo: 0,
       availability: 0,
     });
     expect(summary.rows).toEqual([
@@ -164,6 +166,36 @@ describe("summarizeMenuChanges", () => {
       { kind: "category", name: "Café drinks", detail: "was “Drinks”" },
       { kind: "availability", name: "Latte", detail: "now sold out" },
     ]);
+  });
+
+  it("reports a dish photo being added, replaced, or removed", () => {
+    function photo(key: string): MenuItemImage {
+      return {
+        url: `https://abc123.ufs.sh/f/${key}`,
+        key,
+        width: 1024,
+        height: 768,
+        thumb: null,
+      };
+    }
+    const bare = doc([category("c1", "Drinks", [item("i1", "Latte", 4.5)])]);
+    const added = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5, { image: photo("a") })]),
+    ]);
+    const replaced = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5, { image: photo("b") })]),
+    ]);
+
+    expect(summarizeMenuChanges(bare, added).rows).toEqual([
+      { kind: "photo", name: "Latte", detail: "added" },
+    ]);
+    expect(summarizeMenuChanges(added, replaced).rows).toEqual([
+      { kind: "photo", name: "Latte", detail: "replaced" },
+    ]);
+    expect(summarizeMenuChanges(replaced, bare).rows).toEqual([
+      { kind: "photo", name: "Latte", detail: "removed" },
+    ]);
+    expect(summarizeMenuChanges(bare, bare).counts.photo).toBe(0);
   });
 
   it("stops comparing prices when the currency itself changed", () => {
