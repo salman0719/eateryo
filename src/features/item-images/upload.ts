@@ -13,30 +13,9 @@ import { genUploader } from "uploadthing/client";
 import type { OurFileRouter } from "@/app/api/uploadthing/core";
 import type { MenuItemImage } from "@/features/menu/schema";
 
+import { ItemImageError, mapItemImageUploadError } from "./errors";
+import { ItemImagePrepareError, prepareItemImage, type PreparedItemImageVariant } from "./prepare";
 import { buildMenuItemImage } from "./ref";
-import {
-  ItemImagePrepareError,
-  prepareItemImage,
-  type ItemImagePrepareErrorCode,
-  type PreparedItemImageVariant,
-} from "./prepare";
-
-export type ItemImageErrorCode =
-  | ItemImagePrepareErrorCode
-  | "sign_in"
-  | "not_configured"
-  | "unsupported"
-  | "failed";
-
-export class ItemImageError extends Error {
-  readonly code: ItemImageErrorCode;
-
-  constructor(code: ItemImageErrorCode, message: string) {
-    super(message);
-    this.name = "ItemImageError";
-    this.code = code;
-  }
-}
 
 /**
  * An explicit relative URL keeps the client from guessing the origin from
@@ -46,31 +25,6 @@ const { uploadFiles } = genUploader<OurFileRouter>({ url: "/api/uploadthing" });
 
 /** The file router's per-file limit; a prepared copy is far below it. */
 const MAX_UPLOADED_BYTES = 4 * 1024 * 1024;
-
-function mapUploadError(error: unknown): ItemImageError {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { code: unknown }).code)
-      : "";
-  const message = error instanceof Error ? error.message : "";
-
-  if (code === "FORBIDDEN" || code === "UNAUTHORIZED" || /sign in to add dish photos/i.test(message)) {
-    return new ItemImageError("sign_in", "Sign in to add dish photos to your menu.");
-  }
-  if (code === "TOO_LARGE") {
-    return new ItemImageError("too_large", "That photo is too large to upload. Try a smaller one.");
-  }
-  if (code === "BAD_REQUEST") {
-    return new ItemImageError("unsupported", "That file type is not supported. Use a photo (JPEG, PNG, WebP).");
-  }
-  if (/not_configured|not set up|UPLOADTHING_TOKEN/i.test(`${code} ${message}`)) {
-    return new ItemImageError(
-      "not_configured",
-      "Dish photos are not set up on this server yet. Ask the operator to configure photo storage."
-    );
-  }
-  return new ItemImageError("failed", "The photo could not be uploaded. Check your connection and try again.");
-}
 
 /**
  * Prepare and upload one dish photo. `onProgress` reports 0–100 for the
@@ -98,7 +52,8 @@ export async function uploadItemImage(
   }
 
   const files = prepared.map(
-    (variant) => new File([variant.blob], variant.filename, { type: variant.blob.type || "image/webp" })
+    (variant) =>
+      new File([variant.blob], variant.filename, { type: variant.blob.type || "image/webp" })
   );
 
   let uploaded;
@@ -108,7 +63,7 @@ export async function uploadItemImage(
       onUploadProgress: ({ progress }) => options.onProgress?.(Math.round(progress)),
     });
   } catch (error) {
-    throw mapUploadError(error);
+    throw mapItemImageUploadError(error);
   }
 
   const image = buildMenuItemImage(

@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 
 import type { MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { itemImageCopy } from "@/features/item-images/ref";
-import { ItemImageError, uploadItemImage } from "@/features/item-images/upload";
+import { ItemImageError } from "@/features/item-images/errors";
+import { uploadItemImage } from "@/features/item-images/upload";
 import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
 
 /**
