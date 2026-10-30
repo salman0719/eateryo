@@ -8,7 +8,13 @@
  * from the current document.
  */
 
-import { SCHEMA_VERSION, type MenuCategory, type MenuDocument, type MenuItem } from "./schema";
+import {
+  SCHEMA_VERSION,
+  type MenuCategory,
+  type MenuDocument,
+  type MenuItem,
+  type MenuItemImage,
+} from "./schema";
 import type { ItemPatch, NewCategoryInput, NewItemInput } from "./types";
 
 export function generateId(): string {
@@ -293,6 +299,24 @@ export function moveItemsToCategory(
   }
 
   target.items.push(...collected);
+  return finalize(next);
+}
+
+/**
+ * Attach, replace, or (with `null`) remove an item's photo. Removing drops the
+ * reference only — the stored file is kept, because a published revision may
+ * still be serving it to diners (see `menuItemImageSchema`).
+ */
+export function setItemImage(
+  doc: MenuDocument,
+  categoryId: string,
+  itemId: string,
+  image: MenuItemImage | null
+): MenuDocument {
+  const next = clone(doc);
+  const item = findItem(findCategory(next, categoryId), itemId);
+  if (image) item.image = clone(image);
+  else delete item.image;
   return finalize(next);
 }
 
