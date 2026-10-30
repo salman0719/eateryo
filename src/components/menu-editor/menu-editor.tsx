@@ -301,13 +301,16 @@ export function MenuEditor({
   /**
    * Apply a finished photo upload to the *current* document. The upload takes
    * seconds, and an item edit made meanwhile must survive it — so this reads
-   * the latest document instead of the one captured when the upload started.
+   * the latest document instead of the one captured when the upload started,
+   * and finds the dish by id even if it moved to another section meanwhile.
    */
-  function attachItemImage(categoryId: string, itemId: string, image: MenuItemImage | null) {
+  function attachItemImage(itemId: string, image: MenuItemImage | null) {
     const current = docRef.current;
-    const category = current.categories.find((candidate) => candidate.id === categoryId);
-    if (!category?.items.some((candidate) => candidate.id === itemId)) return;
-    onChange(setItemImage(current, categoryId, itemId, image));
+    const category = current.categories.find((candidate) =>
+      candidate.items.some((item) => item.id === itemId)
+    );
+    if (!category) return;
+    onChange(setItemImage(current, category.id, itemId, image));
   }
 
   // Add pages: photograph more of the same menu later and merge the new
@@ -982,9 +985,7 @@ export function MenuEditor({
                         selected={selectedIds.has(item.id)}
                         onToggle={() => toggleSelected(item.id)}
                         canUploadImage={canUploadItemImages}
-                        onAttachImage={(image) =>
-                          attachItemImage(category.id, item.id, image)
-                        }
+                        onAttachImage={(image) => attachItemImage(item.id, image)}
                       />
                     ))}
                   </ul>

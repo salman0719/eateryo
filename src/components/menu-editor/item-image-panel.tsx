@@ -27,6 +27,11 @@ const smallButton =
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 " +
   "disabled:cursor-not-allowed disabled:opacity-40";
 
+/** The label wraps the real file input, so focus lands on the input: ring it there. */
+const fileLabel =
+  `${smallButton} cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 ` +
+  "focus-within:outline-amber-700";
+
 type UploadState =
   | { status: "idle" }
   | { status: "working"; percent: number }
@@ -102,9 +107,7 @@ export function ItemImagePanel({
 
         {canUpload && (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-            <label
-              className={`${smallButton} cursor-pointer ${working ? "pointer-events-none opacity-60" : ""}`}
-            >
+            <label className={`${fileLabel} ${working ? "pointer-events-none opacity-60" : ""}`}>
               {working ? "Uploading…" : copy ? "Replace" : "Add photo"}
               <input
                 ref={inputRef}
