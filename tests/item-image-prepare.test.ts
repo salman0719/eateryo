@@ -66,7 +66,11 @@ describe("buildMenuItemImage", () => {
   it("attaches the display copy and keeps the thumbnail beside it", () => {
     const image = buildMenuItemImage(prepared, [
       { name: "dish-a-thumb.webp", key: "thumb-key", url: "https://abc123.ufs.sh/f/thumb-key" },
-      { name: "dish-a-display.webp", key: "display-key", url: "https://abc123.ufs.sh/f/display-key" },
+      {
+        name: "dish-a-display.webp",
+        key: "display-key",
+        url: "https://abc123.ufs.sh/f/display-key",
+      },
     ]);
 
     expect(image).toEqual({

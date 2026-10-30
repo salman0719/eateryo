@@ -49,20 +49,13 @@ function extensionForMimeType(mimeType: string): string {
   return "img";
 }
 
-async function encodeVariant(
-  bitmap: ImageBitmap,
-  width: number,
-  height: number
-): Promise<Blob> {
+async function encodeVariant(bitmap: ImageBitmap, width: number, height: number): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) {
-    throw new ItemImagePrepareError(
-      "decode_failed",
-      "Your browser could not prepare this photo."
-    );
+    throw new ItemImagePrepareError("decode_failed", "Your browser could not prepare this photo.");
   }
   context.imageSmoothingQuality = "high";
   context.drawImage(bitmap, 0, 0, width, height);
@@ -71,10 +64,7 @@ async function encodeVariant(
     canvas.toBlob(resolve, "image/webp", ENCODE_QUALITY)
   );
   if (!blob) {
-    throw new ItemImagePrepareError(
-      "decode_failed",
-      "Your browser could not prepare this photo."
-    );
+    throw new ItemImagePrepareError("decode_failed", "Your browser could not prepare this photo.");
   }
   // Where a browser cannot encode WebP, toBlob falls back to PNG and says so
   // in the blob's own type. The caller names the file from that type, so the
