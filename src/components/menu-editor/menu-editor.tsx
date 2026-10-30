@@ -14,6 +14,7 @@ import {
   moveItemToCategory,
   moveItemsToCategory,
   renameCategory,
+  setItemImage,
 } from "@/features/menu/menu-utils";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import {
@@ -22,7 +23,7 @@ import {
   loadDismissedDuplicateKeys,
   saveDismissedDuplicateKeys,
 } from "@/features/menu/duplicates";
-import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
+import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import { searchMenu } from "@/features/menu/search";
 import { describeExtractionSource } from "@/features/menu/source-label";
@@ -144,6 +145,9 @@ export function MenuEditor({
     (sum, c) => sum + c.items.filter(isItemFlagged).length,
     0
   );
+  // Photos are uploaded under the signed-in session, so a browser-only menu
+  // (nobody signed in) cannot attach one yet.
+  const canUploadItemImages = canManage && syncMode === "account";
   // Provenance, so a surprising line can be traced to the model that read it.
   const sourceLabel = describeExtractionSource(doc.source);
 
@@ -293,6 +297,18 @@ export function MenuEditor({
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
+
+  /**
+   * Apply a finished photo upload to the *current* document. The upload takes
+   * seconds, and an item edit made meanwhile must survive it — so this reads
+   * the latest document instead of the one captured when the upload started.
+   */
+  function attachItemImage(categoryId: string, itemId: string, image: MenuItemImage | null) {
+    const current = docRef.current;
+    const category = current.categories.find((candidate) => candidate.id === categoryId);
+    if (!category?.items.some((candidate) => candidate.id === itemId)) return;
+    onChange(setItemImage(current, categoryId, itemId, image));
+  }
 
   // Add pages: photograph more of the same menu later and merge the new
   // extraction in. Repeats are flagged by the duplicate review, never
@@ -965,6 +981,10 @@ export function MenuEditor({
                         duplicate={duplicateIds.has(item.id)}
                         selected={selectedIds.has(item.id)}
                         onToggle={() => toggleSelected(item.id)}
+                        canUploadImage={canUploadItemImages}
+                        onAttachImage={(image) =>
+                          attachItemImage(category.id, item.id, image)
+                        }
                       />
                     ))}
                   </ul>

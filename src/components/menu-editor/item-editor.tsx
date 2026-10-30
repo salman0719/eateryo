@@ -8,9 +8,10 @@ import {
   moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
-import type { MenuDocument, MenuItem } from "@/features/menu/schema";
+import type { MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 
 import { CommitInput, CommitNumber } from "./fields";
+import { ItemImagePanel } from "./item-image-panel";
 
 interface ItemEditorProps {
   doc: MenuDocument;
@@ -29,6 +30,10 @@ interface ItemEditorProps {
   /** Bulk reassignment checkbox state (see menu-editor's bulk actions bar). */
   selected: boolean;
   onToggle: () => void;
+  /** Signed in, so the upload endpoint will authorize a photo. */
+  canUploadImage: boolean;
+  /** Attach, replace, or (null) remove this item's photo. */
+  onAttachImage: (image: MenuItemImage | null) => void;
 }
 
 const smallButton =
@@ -46,6 +51,8 @@ export function ItemEditor({
   duplicate,
   selected,
   onToggle,
+  canUploadImage,
+  onAttachImage,
 }: ItemEditorProps) {
   const category = doc.categories.find((c) => c.id === categoryId);
   const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
@@ -117,6 +124,10 @@ export function ItemEditor({
             <option value="no">Unavailable</option>
           </select>
         </label>
+      </div>
+
+      <div className="mt-3">
+        <ItemImagePanel item={item} canUpload={canUploadImage} onAttach={onAttachImage} />
       </div>
 
       <div className="mt-3">
