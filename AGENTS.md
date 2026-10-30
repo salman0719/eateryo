@@ -149,6 +149,13 @@ errors, or add lint/type suppressions just to make checks pass.
   optimizer never touches a dish photo. Stored files are never deleted on
   replace/remove: a published revision may still be serving the old one.
   Tests: `tests/item-images.test.ts`, `tests/item-image-prepare.test.ts`.
+- `scripts/cleanup-dish-photos.mjs`, `scripts/lib/dish-photo-sweep.mjs` — the
+  maintenance sweep that reclaims abandoned dish photos: it deletes only
+  `dish-…` files that no `menu`/`menu_revision` document references and that
+  are older than the retention window (30 days), and lists every file it keeps
+  with the reason. Dry run by default; `--delete --yes` acts, and it refuses a
+  database with no menus. `npm run photos:sweep`; tests in
+  `tests/dish-photo-sweep.test.ts`. Nothing schedules it.
 - `src/features/publishing/` — Step 9 publish: `schema.ts` (slug rules +
   publication status), `slug.ts` (deterministic slug generation and collision
   candidates), `repo.ts` (snapshot revisions, publish/unpublish, the diner

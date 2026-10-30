@@ -41,6 +41,20 @@ cron service, GitHub Action, uptime pinger) at
 with real usage, and a single tenant's restore/export gets larger. Revisit
 before that matters.
 
+### Dish photo storage
+
+Replacing or removing a dish photo never deletes the file: a published
+revision may still be serving it, so storage only grows. The one kind of file
+that is genuinely orphaned is an upload that never made it into a saved menu
+(the save failed, or the tab closed mid-edit).
+
+`npm run photos:sweep` lists those (a dry run) and
+`npm run photos:sweep -- --delete --yes` deletes the ones older than 30 days
+(`--days` changes the window). It reads `DATABASE_URL` and `UPLOADTHING_TOKEN`,
+refuses to run against a database with no menus at all, and leaves every file
+that is not named `dish-…` alone. Nothing schedules it — run it by hand when
+storage looks large, or wire it to an external scheduler once one exists.
+
 ## 2. Prove a production failure is visible
 
 Do this once after the first deploy and after changing alerting.
