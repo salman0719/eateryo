@@ -8,7 +8,7 @@
 export const SITE_NAME = "Eateryo";
 
 /** Shown as "last updated" on both legal pages. */
-export const LEGAL_UPDATED = "18 October 2026";
+export const LEGAL_UPDATED = "30 October 2026";
 
 /**
  * Where privacy and account questions go. Deliberately not defaulted to an

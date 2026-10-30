@@ -138,6 +138,17 @@ errors, or add lint/type suppressions just to make checks pass.
   `tests/menus-repo.test.ts`, `tests/menus-api.test.ts`,
   `tests/menus-sync.test.ts`, `tests/move-to-account.test.ts` — Step 8
   (PGlite + stubbed fetch; conflict, tenancy, import fidelity)
+- `src/features/item-images/` — dish photos on menu items: `sizes.ts` (the
+  pre-sized copies: display ≤1024px, thumb ≤256px), `prepare.ts` (browser
+  decode/resize/encode, so the camera original is never uploaded), `ref.ts`
+  (build/read the stored reference), `upload.ts` (UploadThing browser client),
+  `src/app/api/uploadthing/` (session-gated file router, `UPLOADTHING_TOKEN`
+  server-side only; 503 until it is set). Photos are part of the menu document
+  like any other field, so publishing snapshots them. Rendered with a plain
+  `<img>` straight from the CDN — never `next/image`, so Vercel's image
+  optimizer never touches a dish photo. Stored files are never deleted on
+  replace/remove: a published revision may still be serving the old one.
+  Tests: `tests/item-images.test.ts`, `tests/item-image-prepare.test.ts`.
 - `src/features/publishing/` — Step 9 publish: `schema.ts` (slug rules +
   publication status), `slug.ts` (deterministic slug generation and collision
   candidates), `repo.ts` (snapshot revisions, publish/unpublish, the diner

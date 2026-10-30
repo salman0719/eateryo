@@ -20,6 +20,7 @@ where useful). Secrets stay server-side; none of them may be `NEXT_PUBLIC_`.
 | `DATABASE_URL` | yes | Neon Postgres. |
 | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | yes | Magic-link sessions. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | yes | Sign-in email and ops alerts. |
+| `UPLOADTHING_TOKEN` | optional | Dish photos on menu items. Without it, photo uploads answer 503 and the editor tells the owner photos are not set up; the rest of the app is unaffected. |
 | `OPS_ALERT_EMAIL` | yes | Where failure/volume alerts land. Without it, alerts only reach the logs. |
 | `CONTACT_EMAIL` | yes | Shown on the privacy and terms pages. |
 | `GEMINI_INPUT_USD_PER_MTOK`, `GEMINI_OUTPUT_USD_PER_MTOK` | recommended | Enables cost for Gemini calls in the spend panel. |

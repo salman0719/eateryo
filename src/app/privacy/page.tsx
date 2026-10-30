@@ -58,6 +58,13 @@ export default function PrivacyPage() {
               name, menu text, prices, and the themes you publish.
             </li>
             <li>
+              <strong className="font-medium text-stone-800">Dish photos:</strong> only the photos
+              you choose to attach to a dish. They are stored by our file host, UploadThing, and
+              served from its CDN to the diners looking at your menu. Removing a photo from a dish
+              stops it being shown; the stored file is kept so that diners still being served your
+              last published menu keep seeing the picture that was published.
+            </li>
+            <li>
               <strong className="font-medium text-stone-800">Table orders:</strong> the table label,
               the items and prices at the time of ordering, an optional free-text note from the
               diner, the status, and timestamps.
@@ -82,9 +89,10 @@ export default function PrivacyPage() {
         <Section title="What we never store">
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <strong className="font-medium text-stone-800">Menu photos.</strong> Images are read in
-              memory to extract the menu and are discarded; they are not written to disk or to
-              object storage.
+              <strong className="font-medium text-stone-800">Menu photos you scan.</strong> The
+              pictures you photograph to extract a menu are read in memory and discarded; they are
+              not written to disk or to object storage. (Dish photos you deliberately attach are a
+              different case — those are listed above.)
             </li>
             <li>
               <strong className="font-medium text-stone-800">Diner identities.</strong> No name, no
@@ -114,7 +122,8 @@ export default function PrivacyPage() {
           <p>
             Hosting and request logs: Vercel. Database: Neon. Sign-in email delivery: Resend. Menu
             extraction: Google&apos;s Gemini API, which receives the menu image and prompt for that
-            request. We do not sell data or share it for advertising.
+            request. Dish photo storage and delivery: UploadThing. We do not sell data or share it
+            for advertising.
           </p>
         </Section>
 
