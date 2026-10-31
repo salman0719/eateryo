@@ -89,6 +89,9 @@ describe("summarizeMenuChanges", () => {
       repriced: 1,
       photo: 0,
       availability: 0,
+      description: 0,
+      labels: 0,
+      moved: 0,
     });
     expect(summary.rows).toEqual([
       { kind: "renamed", name: "Oat Latte", detail: "was “Latte”" },
@@ -98,7 +101,7 @@ describe("summarizeMenuChanges", () => {
     ]);
   });
 
-  it("treats a dish moved to another section as a move, not churn", () => {
+  it("reports a dish moved to another section as one move, not churn", () => {
     const before = doc([
       category("c1", "Drinks", [item("i1", "Latte", 4.5)]),
       category("c2", "Food", []),
@@ -107,7 +110,117 @@ describe("summarizeMenuChanges", () => {
       category("c1", "Drinks", []),
       category("c2", "Food", [item("i1", "Latte", 4.5)]),
     ]);
-    expect(summarizeMenuChanges(before, after).rows).toEqual([]);
+    const summary = summarizeMenuChanges(before, after);
+    expect(summary.rows).toEqual([{ kind: "moved", name: "Latte", detail: "moved to Food" }]);
+    expect(summary.counts.moved).toBe(1);
+    expect(summary.counts.removed).toBe(0);
+    expect(summary.counts.added).toBe(0);
+  });
+
+  it("reports description edits without quoting them", () => {
+    const bare = doc([category("c1", "Drinks", [item("i1", "Latte", 4.5)])]);
+    const described = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5, { description: "Oat milk" })]),
+    ]);
+    const reworded = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5, { description: "House oat milk" })]),
+    ]);
+    const blanked = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5, { description: "   " })]),
+    ]);
+
+    expect(summarizeMenuChanges(bare, described).rows).toEqual([
+      { kind: "description", name: "Latte", detail: "added" },
+    ]);
+    expect(summarizeMenuChanges(described, reworded).rows).toEqual([
+      { kind: "description", name: "Latte", detail: "updated" },
+    ]);
+    expect(summarizeMenuChanges(described, blanked).rows).toEqual([
+      { kind: "description", name: "Latte", detail: "removed" },
+    ]);
+    expect(summarizeMenuChanges(bare, bare).counts.description).toBe(0);
+  });
+
+  it("reports dietary label changes on the dish they belong to", () => {
+    const before = doc([category("c1", "Drinks", [item("i1", "Latte", 4.5)])]);
+    const after = doc([
+      category("c1", "Drinks", [
+        item("i1", "Latte", 4.5, { dietaryLabels: ["vegan", "gluten-free"] }),
+      ]),
+    ]);
+
+    const summary = summarizeMenuChanges(before, after);
+    expect(summary.rows).toEqual([
+      { kind: "labels", name: "Latte", detail: "none → vegan, gluten-free" },
+    ]);
+    expect(summary.counts.labels).toBe(1);
+  });
+
+  it("aggregates a reorder into one row per section", () => {
+    const before = doc([
+      category("c1", "Drinks", [
+        item("i1", "Latte", 4.5),
+        item("i2", "Mocha", 5),
+        item("i3", "Tea", 3),
+      ]),
+    ]);
+    const after = doc([
+      category("c1", "Drinks", [
+        item("i3", "Tea", 3),
+        item("i1", "Latte", 4.5),
+        item("i2", "Mocha", 5),
+      ]),
+    ]);
+
+    const summary = summarizeMenuChanges(before, after);
+    expect(summary.rows).toEqual([
+      { kind: "moved", name: "Drinks", detail: "3 dishes reordered" },
+    ]);
+    expect(summary.counts.moved).toBe(1);
+  });
+
+  it("does not read a new dish inserted mid-list as a reorder", () => {
+    const before = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5), item("i2", "Mocha", 5)]),
+    ]);
+    const after = doc([
+      category("c1", "Drinks", [
+        item("i1", "Latte", 4.5),
+        item("i3", "Tea", 3),
+        item("i2", "Mocha", 5),
+      ]),
+    ]);
+
+    expect(summarizeMenuChanges(before, after).rows).toEqual([
+      { kind: "added", name: "Tea", detail: "USD 3.00" },
+    ]);
+  });
+
+  it("reports an empty section appearing or disappearing", () => {
+    const before = doc([category("c1", "Drinks", [item("i1", "Latte", 4.5)])]);
+    const withEmpty = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5)]),
+      category("c2", "Sunset specials", []),
+    ]);
+
+    expect(summarizeMenuChanges(before, withEmpty).rows).toEqual([
+      { kind: "category", name: "Sunset specials", detail: "added" },
+    ]);
+    expect(summarizeMenuChanges(withEmpty, before).rows).toEqual([
+      { kind: "category", name: "Sunset specials", detail: "removed" },
+    ]);
+  });
+
+  it("does not double-count a section that arrived with its dishes", () => {
+    const before = doc([category("c1", "Drinks", [item("i1", "Latte", 4.5)])]);
+    const after = doc([
+      category("c1", "Drinks", [item("i1", "Latte", 4.5)]),
+      category("c2", "Food", [item("i2", "Toast", 6)]),
+    ]);
+
+    expect(summarizeMenuChanges(before, after).rows).toEqual([
+      { kind: "added", name: "Toast", detail: "USD 6.00" },
+    ]);
   });
 
   it("reports size price changes and variant additions", () => {

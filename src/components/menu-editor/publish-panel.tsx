@@ -113,9 +113,13 @@ function ChangeList({
   if (state !== "ready" || !summary) return null;
 
   if (summary.rows.length === 0) {
+    // Only what the comparison can prove: it covers names, prices, photos,
+    // availability, descriptions, labels and ordering — not every stored
+    // detail. Claiming diners "see nothing different" would be a guess.
     return (
       <p className="mt-2 text-xs leading-5 text-stone-600">
-        Nothing on the menu itself changed — the last save touched details diners do not see.
+        Nothing diners would notice changed since the last publish — the save only touched details
+        this summary does not compare, like review notes or import metadata.
       </p>
     );
   }

@@ -11,6 +11,11 @@
  * rename reads as a rename and moving a dish between sections is not reported
  * as a removal plus an addition. Nothing here invents a value: a missing price
  * compares as an em dash.
+ *
+ * Everything the diner page renders is compared — name, price, photo,
+ * availability, description, dietary labels, and the order of both sections
+ * and dishes. A field this module does not look at is *unexamined*, not
+ * unchanged, so the panel never claims more than these rows can prove.
  */
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
@@ -26,7 +31,10 @@ export type MenuChangeKind =
   | "renamed"
   | "repriced"
   | "photo"
-  | "availability";
+  | "availability"
+  | "description"
+  | "labels"
+  | "moved";
 
 export interface MenuChange {
   kind: MenuChangeKind;
@@ -50,6 +58,9 @@ export const MENU_CHANGE_ORDER: MenuChangeKind[] = [
   "repriced",
   "photo",
   "availability",
+  "description",
+  "labels",
+  "moved",
   "category",
   "title",
   "currency",
@@ -62,6 +73,9 @@ export const MENU_CHANGE_LABEL: Record<MenuChangeKind, string> = {
   repriced: "repriced",
   photo: "photo",
   availability: "status",
+  description: "description",
+  labels: "label",
+  moved: "moved",
   category: "section",
   title: "title",
   currency: "currency",
@@ -114,7 +128,32 @@ function emptyCounts(): Record<MenuChangeKind, number> {
     repriced: 0,
     photo: 0,
     availability: 0,
+    description: 0,
+    labels: 0,
+    moved: 0,
   };
+}
+
+/** A blank description is no description, exactly as the diner page reads it. */
+function descriptionOf(item: MenuItem): string {
+  return item.description?.trim() ?? "";
+}
+
+function sameLabels(before: readonly string[], after: readonly string[]): boolean {
+  return before.length === after.length && before.every((label, index) => label === after[index]);
+}
+
+function labelList(labels: readonly string[]): string {
+  return labels.length > 0 ? labels.join(", ") : "none";
+}
+
+function sameOrder(before: readonly string[], after: readonly string[]): boolean {
+  return before.length === after.length && before.every((id, index) => id === after[index]);
+}
+
+/** Items of both lists, in their own order, so an add/remove is not a reorder. */
+function commonIds(after: readonly string[], before: readonly string[]): string[] {
+  return after.filter((id) => before.includes(id));
 }
 
 export function summarizeMenuChanges(before: MenuDocument, after: MenuDocument): MenuChangeSummary {
@@ -135,17 +174,30 @@ export function summarizeMenuChanges(before: MenuDocument, after: MenuDocument):
     });
   }
 
-  // Sections only matter when their label changes: a whole section added or
-  // removed is already counted by the dishes inside it.
+  // Sections matter when their label changes, and when an *empty* one appears
+  // or disappears — that heading is all the diner sees of it, so the dishes
+  // inside cannot stand in for it.
   const beforeCategories = new Map(before.categories.map((category) => [category.id, category]));
+  const afterCategoryIds = new Set(after.categories.map((category) => category.id));
   for (const category of after.categories) {
     const previous = beforeCategories.get(category.id);
-    if (previous && previous.name !== category.name) {
+    if (!previous) {
+      if (category.items.length === 0) {
+        rows.push({ kind: "category", name: category.name, detail: "added" });
+      }
+      continue;
+    }
+    if (previous.name !== category.name) {
       rows.push({
         kind: "category",
         name: category.name,
         detail: `was “${previous.name}”`,
       });
+    }
+  }
+  for (const category of before.categories) {
+    if (!afterCategoryIds.has(category.id) && category.items.length === 0) {
+      rows.push({ kind: "category", name: category.name, detail: "removed" });
     }
   }
 
@@ -154,6 +206,10 @@ export function summarizeMenuChanges(before: MenuDocument, after: MenuDocument):
   );
   const afterItems = new Set(
     after.categories.flatMap((category) => category.items).map((item) => item.id)
+  );
+  /** Which section each dish was in, for "moved to Food" rows. */
+  const beforeSectionOf = new Map(
+    before.categories.flatMap((category) => category.items.map((item) => [item.id, category.id]))
   );
 
   for (const category of after.categories) {
@@ -191,7 +247,77 @@ export function summarizeMenuChanges(before: MenuDocument, after: MenuDocument):
           detail: soldOut ? "now sold out" : "available again",
         });
       }
+      // The description is prose under the dish on the diner page; a
+      // before/after quote would defeat a scannable list, so it says what
+      // happened instead of repeating it.
+      const descriptionBefore = descriptionOf(previous);
+      const descriptionAfter = descriptionOf(item);
+      if (descriptionBefore !== descriptionAfter) {
+        rows.push({
+          kind: "description",
+          name: item.name,
+          detail:
+            descriptionBefore === "" ? "added" : descriptionAfter === "" ? "removed" : "updated",
+        });
+      }
+      if (!sameLabels(previous.dietaryLabels, item.dietaryLabels)) {
+        rows.push({
+          kind: "labels",
+          name: item.name,
+          detail: `${labelList(previous.dietaryLabels)} → ${labelList(item.dietaryLabels)}`,
+        });
+      }
     }
+  }
+
+  // Ordering is diner-visible even when no field differs: sections render in
+  // document order and dishes in array order. Aggregated deliberately — one
+  // row per section, one for a section shuffle, one for cross-section moves —
+  // because twenty reordered dishes must not become twenty rows.
+  const beforeSectionOrder = before.categories.map((category) => category.id);
+  const sectionOrder = commonIds(
+    after.categories.map((category) => category.id),
+    beforeSectionOrder
+  );
+  // The same ids in the order they had before, so only a real shuffle differs.
+  const sectionOrderBefore = commonIds(beforeSectionOrder, sectionOrder);
+  if (sectionOrder.length > 1 && !sameOrder(sectionOrder, sectionOrderBefore)) {
+    rows.push({ kind: "moved", name: "Sections", detail: "reordered" });
+  }
+
+  const movedSections: { name: string; section: string }[] = [];
+  for (const category of after.categories) {
+    const previous = beforeCategories.get(category.id);
+    const previousIds = previous?.items.map((item) => item.id) ?? [];
+    for (const item of category.items) {
+      const wasIn = beforeSectionOf.get(item.id);
+      if (wasIn !== undefined && wasIn !== category.id) {
+        movedSections.push({ name: item.name, section: category.name });
+      }
+    }
+    const ordered = commonIds(
+      category.items.map((item) => item.id),
+      previousIds
+    );
+    if (ordered.length < 2) continue;
+    const orderedBefore = commonIds(previousIds, ordered);
+    if (sameOrder(ordered, orderedBefore)) continue;
+    const outOfPlace = ordered.filter((id, index) => orderedBefore[index] !== id).length;
+    rows.push({
+      kind: "moved",
+      name: category.name,
+      detail: `${outOfPlace} ${outOfPlace === 1 ? "dish" : "dishes"} reordered`,
+    });
+  }
+  if (movedSections.length === 1) {
+    const [moved] = movedSections;
+    rows.push({ kind: "moved", name: moved.name, detail: `moved to ${moved.section}` });
+  } else if (movedSections.length > 1) {
+    rows.push({
+      kind: "moved",
+      name: `${movedSections.length} dishes`,
+      detail: "moved between sections",
+    });
   }
 
   // Removals last: gone dishes are the ones an owner double-checks.
