@@ -54,6 +54,25 @@ export async function getRestaurantForUser(
 }
 
 /**
+ * The restaurant the user owns, or null.
+ *
+ * An account may own at most one restaurant (006). Ownership is granted in
+ * only a few places — creating one, adding a member as owner, promoting a
+ * member, accepting an owner invitation — and each reads this first. Staff
+ * memberships in other cafés are deliberately unaffected: a bookkeeper who
+ * owns their own café can still work at yours.
+ */
+export async function getOwnedRestaurantForUser(
+  db: TenancyDb,
+  userId: string
+): Promise<RestaurantWithRole | null> {
+  const rows = await membershipSelect(db).where(
+    and(eq(restaurantMembership.userId, userId), eq(restaurantMembership.role, "owner"))
+  );
+  return rows[0] ?? null;
+}
+
+/**
  * Create a restaurant with the caller as its owner (single implicit
  * transaction via compensation: if the membership insert fails, the
  * restaurant row is removed again — no ownerless tenants).

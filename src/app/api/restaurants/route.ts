@@ -1,14 +1,21 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createRestaurant, listRestaurantsForUser } from "@/features/tenancy/repo";
+import {
+  createRestaurant,
+  getOwnedRestaurantForUser,
+  listRestaurantsForUser,
+} from "@/features/tenancy/repo";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 
 /**
  * GET  /api/restaurants — the signed-in user's restaurants (with their role).
- * POST /api/restaurants — create one; the caller becomes its owner.
+ * POST /api/restaurants — create one; the caller becomes its owner. An
+ *   account may own at most one restaurant (006), so an owner gets 409
+ *   `restaurant_exists` instead of a second café. Staff memberships in other
+ *   cafés never block creating your own.
  * Anonymous visitors get 401; a missing server DB gets 503 (the local-only
  * mode is unaffected — this endpoint is simply unused when signed out).
  * Error shape matches the extraction route: { error: { code, message } }.
@@ -72,7 +79,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const restaurant = await createRestaurant(getDb(), userId, parsed.data.name);
+    const db = getDb();
+    // The forms only render while the account owns nothing, so this closes
+    // the raw endpoint and any stale-state double submit rather than a
+    // visible path. The check and the insert are separate statements (the
+    // Neon HTTP driver has no interactive transactions); a duplicated
+    // restaurant is a nuisance the owner can delete, never a leak.
+    if (await getOwnedRestaurantForUser(db, userId)) {
+      return errorResponse(
+        "restaurant_exists",
+        "You already have a restaurant on this account.",
+        409
+      );
+    }
+    const restaurant = await createRestaurant(db, userId, parsed.data.name);
     return NextResponse.json({ restaurant }, { status: 201 });
   } catch {
     return errorResponse(

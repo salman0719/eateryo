@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { POST as createRestaurantRoute } from "@/app/api/restaurants/route";
 import {
   DELETE as deleteRestaurant,
   PATCH as renameRestaurant,
@@ -87,6 +88,85 @@ beforeEach(async () => {
   holder.db = await initTestDb();
   holder.userId = null;
 }, 30_000);
+
+describe("POST /api/restaurants", () => {
+  it("returns 401 with the shared error shape when signed out", async () => {
+    const res = await createRestaurantRoute(
+      jsonRequest("/api/restaurants", "POST", { name: "My cafe" })
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      error: { code: "unauthorized", message: expect.any(String) },
+    });
+  });
+
+  it("rejects a blank name with 400", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    holder.userId = await seedUser(holder.db!, "owner@cafe.test", "Owner");
+
+    const res = await createRestaurantRoute(
+      jsonRequest("/api/restaurants", "POST", { name: "   " })
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("invalid_body");
+  });
+
+  it("creates the caller's café and makes them its owner", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const userId = await seedUser(holder.db!, "owner@cafe.test", "Owner");
+    holder.userId = userId;
+
+    const res = await createRestaurantRoute(
+      jsonRequest("/api/restaurants", "POST", { name: "  Sunny Side Café  " })
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json()).restaurant).toMatchObject({
+      name: "Sunny Side Café",
+      role: "owner",
+    });
+    expect(await listRestaurantsForUser(holder.db!, userId)).toHaveLength(1);
+  });
+
+  it("refuses a second restaurant with 409 restaurant_exists", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const userId = await seedUser(holder.db!, "owner@cafe.test", "Owner");
+    await createRestaurant(holder.db!, userId, "My cafe");
+    holder.userId = userId;
+
+    const res = await createRestaurantRoute(
+      jsonRequest("/api/restaurants", "POST", { name: "Second cafe" })
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toEqual({
+      code: "restaurant_exists",
+      message: expect.any(String),
+    });
+    // The refusal leaves the account with exactly the café it had.
+    const list = await listRestaurantsForUser(holder.db!, userId);
+    expect(list.map((item) => item.name)).toEqual(["My cafe"]);
+  });
+
+  it("still lets a staff member of another café create their own", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const owner = await seedUser(holder.db!, "owner@cafe.test", "Owner");
+    const staff = await seedUser(holder.db!, "staff@cafe.test", "Staff");
+    const theirs = await createRestaurant(holder.db!, owner, "Owner's cafe");
+    const { restaurantMembership } = await import("@/lib/db/schema");
+    await holder
+      .db!.insert(restaurantMembership)
+      .values({ restaurantId: theirs.id, userId: staff, role: "staff" });
+    holder.userId = staff;
+
+    const res = await createRestaurantRoute(
+      jsonRequest("/api/restaurants", "POST", { name: "Staff's own cafe" })
+    );
+    expect(res.status).toBe(201);
+    expect(await listRestaurantsForUser(holder.db!, staff)).toHaveLength(2);
+    expect(
+      (await listRestaurantsForUser(holder.db!, staff)).filter((item) => item.role === "owner")
+    ).toHaveLength(1);
+  });
+});
 
 describe("PATCH /api/restaurants/[restaurantId]", () => {
   it("returns 401 with the shared error shape when signed out", async () => {
