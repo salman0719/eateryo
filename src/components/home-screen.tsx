@@ -129,6 +129,7 @@ import {
   dismissLocalDraftClaim,
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
+  resolveAutoClaimTarget,
   type LocalDraftClaimAction,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
@@ -1351,17 +1352,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
-   * A brand-new account (no menus, no restaurants) adopts this browser's
-   * drafts in one go. The café name comes from the menu titles, never a
-   * placeholder the owner cannot recognise.
+   * An account with no menus adopts this browser's drafts in one go. Where
+   * they land is the account's own café when it has one — an empty café is
+   * still *its* café — and only an account that owns none gets one created,
+   * named from the menu titles rather than a placeholder the owner cannot
+   * recognise. Reusing is what stops a retried claim from minting a second
+   * café next to the first.
    */
   async function handleAutoClaim(titles: string[]) {
     if (!accountKey) return;
     setClaimBusy(true);
     setClaimError(null);
     try {
-      const name = suggestRestaurantName(titles) ?? "My restaurant";
-      const created = await createRestaurant(name);
+      const target = resolveAutoClaimTarget(ownedRestaurantsForAccount, titles);
+      if (target.kind === "reuse") {
+        await runLocalDraftClaim(target.restaurantId, target.restaurantName);
+        return;
+      }
+      const created = await createRestaurant(target.name);
       setOwnedRestaurants((current) =>
         current.some((restaurant) => restaurant.id === created.id) ? current : [...current, created]
       );
