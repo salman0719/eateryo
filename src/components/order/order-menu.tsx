@@ -18,6 +18,7 @@ import type { MenuCategory, MenuItem } from "@/features/menu/schema";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { ClampedDescription } from "./clamped-description";
 import { MenuItemPhoto } from "./menu-item-photo";
 
 /**
@@ -167,8 +168,10 @@ export function OrderMenuSection({
                       </span>
                     )}
                   </p>
+                  {/* Clamped to two lines with a "More" control: a long
+                      description must not push Add away from its dish (009). */}
                   {item.description && (
-                    <p className="mt-0.5 text-sm text-stone-600">{item.description}</p>
+                    <ClampedDescription text={item.description} name={item.name} />
                   )}
                   {item.dietaryLabels.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
