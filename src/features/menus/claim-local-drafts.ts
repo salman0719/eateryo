@@ -91,6 +91,75 @@ export function resolveAutoClaimTarget(
   return { kind: "create", name: suggestRestaurantName([...titles]) ?? "My restaurant" };
 }
 
+/**
+ * Whether one account read has settled, and how.
+ *
+ * Three states, not two. A failed read used to look exactly like one still in
+ * flight — both left the marker unset — so the resume banner and the
+ * automatic import silently never ran, and nothing said they had been
+ * skipped (002). `failed` is still *unknown*, never "empty": see
+ * {@link decideLocalDraftClaimSurface}.
+ */
+export type AccountReadState = "loading" | "ready" | "failed";
+
+/** What one read (menus, restaurants) has settled to for the account on screen. */
+export function accountReadState(input: {
+  /** The account being rendered; null while the session is unresolved. */
+  accountKey: string | null;
+  /** The account a settled answer belongs to; null = nothing settled yet. */
+  settledFor: string | null;
+  /** The account whose read failed, until a later read succeeds. */
+  failedFor: string | null;
+}): AccountReadState {
+  if (input.accountKey === null) return "loading";
+  if (input.settledFor === input.accountKey) return "ready";
+  if (input.failedFor === input.accountKey) return "failed";
+  return "loading";
+}
+
+export interface ClaimGate {
+  /** The session or an account read is still in flight. */
+  pending: boolean;
+  /** The reads are in, but at least one failed — the counts are unknown. */
+  incomplete: boolean;
+}
+
+/** Collapse the session and both account reads into the gate they feed. */
+export function deriveClaimGate(input: {
+  sessionPending: boolean;
+  signedIn: boolean;
+  menus: AccountReadState;
+  restaurants: AccountReadState;
+}): ClaimGate {
+  if (input.sessionPending) return { pending: true, incomplete: false };
+  if (!input.signedIn) return { pending: false, incomplete: false };
+  return {
+    pending: input.menus === "loading" || input.restaurants === "loading",
+    incomplete: input.menus === "failed" || input.restaurants === "failed",
+  };
+}
+
+/** The claim surface this frame may show. */
+export type LocalDraftClaimSurface = LocalDraftClaimAction | "pending" | "unavailable";
+
+/**
+ * `unavailable` is a real answer, not a stand-in for "none": the account's
+ * inventory could not be read, so its counts are unknown. Importing on an
+ * unknown would push this browser's drafts at a café we cannot see, so both
+ * server paths wait for a read that actually settled. The local-only resume
+ * banner is unaffected — it asserts browser truth, and the caller decides
+ * that separately.
+ */
+export function decideLocalDraftClaimSurface(input: {
+  gate: ClaimGate;
+  signedIn: boolean;
+  claim: LocalDraftClaimInputs;
+}): LocalDraftClaimSurface {
+  if (input.gate.pending) return "pending";
+  if (input.gate.incomplete) return "unavailable";
+  return input.signedIn ? decideLocalDraftClaim(input.claim) : "none";
+}
+
 const STORAGE_PREFIX = "eateryo:local-draft-claim:";
 const BROWSER_ACCOUNT_KEY = "eateryo:browser-account";
 

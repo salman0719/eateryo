@@ -125,12 +125,13 @@ import {
   type DraftOrigin,
 } from "@/features/menus/draft-origins";
 import {
-  decideLocalDraftClaim,
+  accountReadState,
+  decideLocalDraftClaimSurface,
+  deriveClaimGate,
   dismissLocalDraftClaim,
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
   resolveAutoClaimTarget,
-  type LocalDraftClaimAction,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 
@@ -389,8 +390,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [restaurantCount, setRestaurantCount] = useState(0);
   /** Which account the restaurant count belongs to; null until it settles. */
   const [restaurantCountFor, setRestaurantCountFor] = useState<string | null>(null);
+  /**
+   * Which account's restaurant read *failed* — a third state, because an
+   * error and an in-flight request must not look the same (002). Cleared by
+   * the next successful read.
+   */
+  const [restaurantReadFailedFor, setRestaurantReadFailedFor] = useState<string | null>(null);
   /** Which account the server menu ids belong to; null until a merge settles. */
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
+  /** Which account's server menu read failed (same third state, menus). */
+  const [serverMenusReadFailedFor, setServerMenusReadFailedFor] = useState<string | null>(null);
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   /** The answer just given here; the stored per-account value is the fallback. */
@@ -457,6 +466,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         setOwnedRestaurantsFor(accountKey);
         setRestaurantCount(list.length);
         setRestaurantCountFor(accountKey);
+        setRestaurantReadFailedFor(null);
       } catch {
         // Best-effort: the move panel shows its own load error, the wizard
         // explains a failed create, and the server still refuses a move the
@@ -465,6 +475,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         if (!cancelled) {
           setOwnedRestaurants([]);
           setOwnedRestaurantsFor(accountKey);
+          // Unknown, not zero: `restaurantCountFor` stays for the old account
+          // and this marker settles the claim gate as *failed* instead.
+          setRestaurantReadFailedFor(accountKey);
         }
       }
     })();
@@ -694,7 +707,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
-        if (signedInRef.current) setServerMenusFor(accountKey);
+        if (signedInRef.current) {
+          setServerMenusFor(accountKey);
+          setServerMenusReadFailedFor(null);
+        }
         try {
           replaceStaffMenus(staffMenuIds(serverMenus, await fetchRestaurants()));
         } catch {
@@ -748,7 +764,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         if (originsChanged) setOriginList(await listDraftOrigins());
       } catch {
         // Signed out mid-flight, offline, or the server DB is unavailable:
-        // the local library stands alone.
+        // the local library stands alone. Remember that the read failed so
+        // the claim gate can settle as unknown instead of waiting forever.
+        if (signedInRef.current && accountKeyRef.current) {
+          setServerMenusReadFailedFor(accountKeyRef.current);
+        }
       }
     })();
     mergeRef.current = run;
@@ -2111,33 +2131,55 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // auto-import: signing in inside the publish wizard is the onboarding
   // path, and leaving it ungated strands the draft as anonymous — the next
   // sign-out resurrects the resume banner for a menu the account owns.
-  // "pending" is a real third value, not a stand-in for "none": while the
-  // session or the account's inventory is still loading the decision is
-  // *unknown*. The resume banner used to read that unknown as a settled
-  // "none", pass its `!== "offer"` check, and render in the load gap — the
-  // flicker. Signed out and settled, the decision really is "none".
-  const claimDecisionPending =
-    sessionPending ||
-    (signedIn && (serverMenusFor !== accountKey || restaurantCountFor !== accountKey));
-  const localDraftsDecision: LocalDraftClaimAction | "pending" = claimDecisionPending
-    ? "pending"
-    : signedIn
-      ? decideLocalDraftClaim({
-          localCount: localOnlyCount,
-          accountMenuCount: serverIds.size,
-          restaurantCount,
-          ownedRestaurantCount: ownedRestaurantsForAccount.length,
-          status: claimStatus,
-        })
-      : "none";
+  //
+  // "pending" and "unavailable" are real answers, not stand-ins for "none".
+  // While the session or the account's inventory is still loading the
+  // decision is *unknown* (the resume banner once read that unknown as a
+  // settled "none", passed its `!== "offer"` check and rendered in the load
+  // gap — the flicker). A read that *failed* is unknown too, and must never
+  // be read as an empty account: that would push this browser's drafts at a
+  // server that did not answer. Signed out and settled, the decision really
+  // is "none".
+  const claimGate = deriveClaimGate({
+    sessionPending,
+    signedIn,
+    menus: accountReadState({
+      accountKey,
+      settledFor: serverMenusFor,
+      failedFor: serverMenusReadFailedFor,
+    }),
+    restaurants: accountReadState({
+      accountKey,
+      settledFor: restaurantCountFor,
+      failedFor: restaurantReadFailedFor,
+    }),
+  });
+  const localDraftsDecision = decideLocalDraftClaimSurface({
+    gate: claimGate,
+    signedIn,
+    claim: {
+      localCount: localOnlyCount,
+      accountMenuCount: serverIds.size,
+      restaurantCount,
+      ownedRestaurantCount: ownedRestaurantsForAccount.length,
+      status: claimStatus,
+    },
+  });
+  // The resume banner asserts only local truth ("this is saved in this
+  // browser"), so a failed account read does not silence it — it is the one
+  // surface that still works offline. Neither claim surface renders while
+  // the gate says the account is unknown.
+  const claimSurfaceQuiet =
+    localDraftsDecision === "none" || localDraftsDecision === "unavailable";
 
   // The resume banner may only render once everything it reads has
   // settled: the session (who is this?), the IndexedDB library (what is
   // saved in this browser?) and — signed in — the account's server menu
   // and restaurant lists (are these drafts really unpublished?). Before
   // that it renders nothing at all; a late answer can only remove it,
-  // never move it.
-  const resumeReady = !libraryLoading && !claimDecisionPending;
+  // never move it. A failed read settles the gate (as `incomplete`), so the
+  // banner appears instead of waiting forever.
+  const resumeReady = !libraryLoading && !claimGate.pending;
 
   // Confirm the dismissal only after the inputs settle, so the banner's
   // very first render is already a confirmed decision, not an assumption.
@@ -2151,7 +2193,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   useEffect(() => {
     if (!signedIn || !accountKey) return;
-    if (serverMenusFor !== accountKey || restaurantCountFor !== accountKey) return;
+    // Unknown is not "empty": no server work while a read is in flight, and
+    // none after one failed. The evaluation stays unmarked, so a later
+    // successful read in this session can still run it.
+    if (claimGate.pending || claimGate.incomplete) return;
     if (claimEvaluatedRef.current === accountKey) return;
     claimEvaluatedRef.current = accountKey;
     if (localDraftsDecision !== "auto-import") return;
@@ -2162,11 +2207,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     accountKey,
+    claimGate.incomplete,
+    claimGate.pending,
     claimStatus,
     localDraftsDecision,
-    restaurantCountFor,
     screen,
-    serverMenusFor,
     signedIn,
   ]);
 
@@ -2292,6 +2337,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           </div>
         )}
 
+        {/* A failed account read is no longer silent: the gate settles, the
+            server paths stay off, and this says so once. */}
+        {signedIn && claimGate.incomplete && screen !== "editor" && (
+          <p className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-stone-600">
+            We couldn&apos;t check your account just now, so nothing was imported from this
+            browser. Reload when you&apos;re back online and it will try again.
+          </p>
+        )}
+
         {/* Q7 resume banner: the way back for anyone who wandered off (or
             returns from the magic-link email) with a saved-but-unpublished
             draft. Whether a draft is unpublished is *server* knowledge, so
@@ -2307,7 +2361,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           resumeDismissed === false &&
           localOnlyCount > 0 &&
           !claimNotice &&
-          localDraftsDecision === "none" &&
+          claimSurfaceQuiet &&
           (() => {
             const resumable = localOnly.find((menu) => !menu.corrupt);
             if (!resumable) return null;

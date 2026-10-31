@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  accountReadState,
   decideLocalDraftClaim,
+  decideLocalDraftClaimSurface,
+  deriveClaimGate,
   dismissLocalDraftClaim,
   loadBrowserAccount,
   loadLocalDraftClaim,
@@ -182,5 +185,141 @@ describe("per-account memory", () => {
     expect(loadLocalDraftClaim("user-a")).toBe("unseen");
     expect(() => markLocalDraftsClaimed("user-a")).not.toThrow();
     expect(() => dismissLocalDraftClaim("user-a")).not.toThrow();
+  });
+});
+
+/**
+ * 002: an account read that *failed* must not look like one still in flight.
+ * The gate settles either way, but a failure may never be read as "the
+ * account holds nothing" — that would push a browser's drafts at a server
+ * that did not answer.
+ */
+describe("claim gate", () => {
+  const accountKey = "user-a";
+
+  function claimInputs(overrides: Partial<Parameters<typeof decideLocalDraftClaim>[0]> = {}) {
+    return {
+      localCount: 2,
+      accountMenuCount: 0,
+      restaurantCount: 0,
+      ownedRestaurantCount: 0,
+      status: "unseen" as const,
+      ...overrides,
+    };
+  }
+
+  it("reads a marker for another account as still loading", () => {
+    expect(
+      accountReadState({ accountKey, settledFor: null, failedFor: null })
+    ).toBe("loading");
+    expect(
+      accountReadState({ accountKey, settledFor: "user-b", failedFor: null })
+    ).toBe("loading");
+    expect(accountReadState({ accountKey, settledFor: accountKey, failedFor: null })).toBe(
+      "ready"
+    );
+    expect(accountReadState({ accountKey, settledFor: null, failedFor: accountKey })).toBe(
+      "failed"
+    );
+    // A later success outranks the old failure.
+    expect(accountReadState({ accountKey, settledFor: accountKey, failedFor: accountKey })).toBe(
+      "ready"
+    );
+  });
+
+  it("stays pending while any read is in flight", () => {
+    expect(
+      deriveClaimGate({
+        sessionPending: true,
+        signedIn: false,
+        menus: "ready",
+        restaurants: "ready",
+      })
+    ).toEqual({ pending: true, incomplete: false });
+    expect(
+      deriveClaimGate({
+        sessionPending: false,
+        signedIn: true,
+        menus: "ready",
+        restaurants: "loading",
+      })
+    ).toEqual({ pending: true, incomplete: false });
+  });
+
+  it("settles as incomplete when a read failed, and as open when both are in", () => {
+    expect(
+      deriveClaimGate({
+        sessionPending: false,
+        signedIn: true,
+        menus: "failed",
+        restaurants: "ready",
+      })
+    ).toEqual({ pending: false, incomplete: true });
+    expect(
+      deriveClaimGate({
+        sessionPending: false,
+        signedIn: true,
+        menus: "ready",
+        restaurants: "ready",
+      })
+    ).toEqual({ pending: false, incomplete: false });
+    // Signed out settles immediately, and a remembered failure is not news.
+    expect(
+      deriveClaimGate({
+        sessionPending: false,
+        signedIn: false,
+        menus: "failed",
+        restaurants: "failed",
+      })
+    ).toEqual({ pending: false, incomplete: false });
+  });
+
+  it("never auto-imports on an unknown account", () => {
+    const claim = claimInputs();
+    // Same inputs that would auto-import on a settled, empty account…
+    expect(
+      decideLocalDraftClaimSurface({
+        gate: { pending: false, incomplete: false },
+        signedIn: true,
+        claim,
+      })
+    ).toBe("auto-import");
+    // …are "unavailable" while a read is missing, never "auto-import".
+    expect(
+      decideLocalDraftClaimSurface({
+        gate: { pending: false, incomplete: true },
+        signedIn: true,
+        claim,
+      })
+    ).toBe("unavailable");
+    expect(
+      decideLocalDraftClaimSurface({
+        gate: { pending: true, incomplete: false },
+        signedIn: true,
+        claim,
+      })
+    ).toBe("pending");
+  });
+
+  it("keeps the ordinary decisions and the signed-out case", () => {
+    const gate = deriveClaimGate({
+      sessionPending: false,
+      signedIn: true,
+      menus: "ready",
+      restaurants: "ready",
+    });
+    expect(
+      decideLocalDraftClaimSurface({
+        gate,
+        signedIn: true,
+        claim: claimInputs({ accountMenuCount: 3, ownedRestaurantCount: 1 }),
+      })
+    ).toBe("offer");
+    expect(
+      decideLocalDraftClaimSurface({ gate, signedIn: true, claim: claimInputs({ localCount: 0 }) })
+    ).toBe("none");
+    expect(
+      decideLocalDraftClaimSurface({ gate, signedIn: false, claim: claimInputs() })
+    ).toBe("none");
   });
 });
