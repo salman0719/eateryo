@@ -14,6 +14,8 @@
  * quiet when storage is unavailable.
  */
 
+import { suggestRestaurantName } from "@/features/menu/menu-utils";
+
 export type LocalDraftClaimStatus = "unseen" | "dismissed" | "done";
 
 export type LocalDraftClaimAction = "auto-import" | "offer" | "none";
@@ -33,11 +35,12 @@ export interface LocalDraftClaimInputs {
 
 /**
  * No menus on the account means every browser draft is adopted at sign-in —
- * restaurants do not matter, because the auto-import creates one when
- * needed. An account that already holds menus gets a one-click offer
- * instead. Staff-only accounts with menus are left alone: they own no
- * restaurant to import into, so the manual panel is the honest place to
- * explain that.
+ * restaurant ownership does not change *whether* to adopt, because
+ * {@link resolveAutoClaimTarget} reuses a café the account already owns and
+ * mints one only when it owns none. An account that already holds menus gets
+ * a one-click offer instead. Staff-only accounts with menus are left alone:
+ * they own no restaurant to import into, so the manual panel is the honest
+ * place to explain that.
  */
 export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraftClaimAction {
   if (inputs.localCount <= 0) return "none";
@@ -47,7 +50,46 @@ export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraft
   return "offer";
 }
 
+/** The only part of a restaurant the automatic claim reads. */
+export interface AutoClaimRestaurant {
+  id: string;
+  name: string;
+}
 
+/**
+ * Where an automatic claim puts this browser's drafts.
+ *
+ * `reuse` — the account already owns a café (it may simply hold no menus
+ * yet, e.g. a previous claim whose import failed); the drafts belong there.
+ * `create` — the account owns none, so the claim needs a home and names one
+ * from the drafts' titles.
+ */
+export type AutoClaimTarget =
+  | { kind: "reuse"; restaurantId: string; restaurantName: string }
+  | { kind: "create"; name: string };
+
+/**
+ * Pick the café an automatic draft claim targets: the one the account already
+ * owns, otherwise a new one. Never mints a second café behind the owner's
+ * back — the automatic path has no way to ask which café it meant, so an
+ * existing café always wins.
+ *
+ * Pass the restaurants the caller *owns* (the server only lets owners import
+ * menus); a staff-only account owns none and keeps today's behaviour of
+ * getting its own café for its own drafts. Several owned cafés is
+ * unreachable while one café per account holds (006); if that is ever lifted
+ * this becomes an ask-don't-guess question.
+ */
+export function resolveAutoClaimTarget(
+  ownedRestaurants: readonly AutoClaimRestaurant[],
+  titles: readonly string[]
+): AutoClaimTarget {
+  const existing = ownedRestaurants[0];
+  if (existing) {
+    return { kind: "reuse", restaurantId: existing.id, restaurantName: existing.name };
+  }
+  return { kind: "create", name: suggestRestaurantName([...titles]) ?? "My restaurant" };
+}
 
 const STORAGE_PREFIX = "eateryo:local-draft-claim:";
 const BROWSER_ACCOUNT_KEY = "eateryo:browser-account";

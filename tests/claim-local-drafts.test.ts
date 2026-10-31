@@ -8,6 +8,7 @@ import {
   localDraftClaimKey,
   markLocalDraftsClaimed,
   rememberBrowserAccount,
+  resolveAutoClaimTarget,
 } from "@/features/menus/claim-local-drafts";
 
 /**
@@ -67,6 +68,8 @@ describe("decideLocalDraftClaim", () => {
   });
 
   it("auto-imports when the account holds no menus, even with a restaurant", () => {
+    // "Auto-import" says nothing about *creating* a café — where the import
+    // lands is resolveAutoClaimTarget's job (and it reuses an owned one).
     expect(
       decideLocalDraftClaim({ ...NEW_ACCOUNT, restaurantCount: 1, ownedRestaurantCount: 1 })
     ).toBe("auto-import");
@@ -92,6 +95,39 @@ describe("decideLocalDraftClaim", () => {
     // No fork, no queue — the first sign-in adopts the drafts, marked so
     // they never render signed out again.
     expect(decideLocalDraftClaim(NEW_ACCOUNT)).toBe("auto-import");
+  });
+});
+
+describe("resolveAutoClaimTarget", () => {
+  const OWNED = { id: "rest-1", name: "Sunny Side Café" };
+
+  it("reuses the café the account already owns", () => {
+    // The bug: an owned café with no menus yet used to get a second café
+    // minted next to it, without the owner asking.
+    expect(resolveAutoClaimTarget([OWNED], ["Sunny Side Café — Lunch"])).toEqual({
+      kind: "reuse",
+      restaurantId: "rest-1",
+      restaurantName: "Sunny Side Café",
+    });
+  });
+
+  it("creates a café named from the drafts when the account owns none", () => {
+    expect(resolveAutoClaimTarget([], ["My Café — Lunch Menu", "My Café — Dinner Menu"])).toEqual({
+      kind: "create",
+      name: "My Café",
+    });
+  });
+
+  it("falls back to a plain name when the drafts name no place", () => {
+    expect(resolveAutoClaimTarget([], ["Main Menu"])).toEqual({
+      kind: "create",
+      name: "My restaurant",
+    });
+  });
+
+  it("reuses rather than guesses a name, whatever the drafts are called", () => {
+    expect(resolveAutoClaimTarget([OWNED], [])).toMatchObject({ kind: "reuse" });
+    expect(resolveAutoClaimTarget([OWNED], ["Main Menu"])).toMatchObject({ kind: "reuse" });
   });
 });
 
