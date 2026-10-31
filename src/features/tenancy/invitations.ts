@@ -5,7 +5,7 @@ import { and, desc, eq, gt, isNull, sql } from "drizzle-orm";
 import { restaurant, restaurantInvitation, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole } from "@/lib/db/schema";
 import { recordAuditEvent } from "./audit";
-import type { TenancyDb } from "./repo";
+import { ownsAnyRestaurant, type TenancyDb } from "./repo";
 
 /**
  * Email invitations for teammates who have never signed in (server-only).
@@ -30,7 +30,8 @@ export type InvitationErrorCode =
   | "already_member"
   | "expired"
   | "used"
-  | "wrong_account";
+  | "wrong_account"
+  | "restaurant_exists";
 
 export class InvitationError extends Error {
   readonly code: InvitationErrorCode;
@@ -399,6 +400,15 @@ export async function acceptInvitation(
     .limit(1);
 
   if (existing.length === 0) {
+    // An account owns at most one café (006). Refusing at acceptance beats
+    // granting a second one, and it costs nothing recoverable: the link is
+    // left unaccepted, so the owner can send a staff invite in its place.
+    if (row.role === "owner" && (await ownsAnyRestaurant(db, input.userId))) {
+      throw new InvitationError(
+        "restaurant_exists",
+        "You already own a restaurant, so this invitation can only be accepted as staff. Ask the owner for a staff invitation."
+      );
+    }
     await db
       .insert(restaurantMembership)
       .values({ restaurantId: row.restaurantId, userId: input.userId, role: row.role })

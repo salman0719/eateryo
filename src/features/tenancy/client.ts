@@ -115,6 +115,7 @@ function mapErrorCode(code: string, status: number): SyncErrorCode {
       return "invalid";
     case "already_member":
     case "last_owner":
+    case "restaurant_exists":
     case "invitation_expired":
     case "invitation_used":
       return "conflict";

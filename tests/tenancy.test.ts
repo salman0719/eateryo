@@ -212,10 +212,13 @@ describe("member management", () => {
       code: "last_owner",
     });
 
-    // With a second owner, either owner may leave.
-    await addMemberForOwner(db, owner, place.id, "staff@cafe.test", "owner");
+    // With a second owner, either owner may leave. The co-owner is a fresh
+    // account: `staff` already owns "Roles Place" in this suite, and an
+    // account may own only one café (006).
+    const coOwner = await seedUser(db, "co-owner@cafe.test", "Co Owner");
+    await addMemberForOwner(db, owner, place.id, "co-owner@cafe.test", "owner");
     await removeMemberForOwner(db, owner, place.id, owner);
-    const afterLeave = await listMembersForUser(db, staff, place.id);
-    expect(afterLeave.map((m) => m.userId)).toEqual([staff]);
+    const afterLeave = await listMembersForUser(db, coOwner, place.id);
+    expect(afterLeave.map((m) => m.userId)).toEqual([coOwner]);
   });
 });
