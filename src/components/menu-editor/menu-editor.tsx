@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -230,12 +231,16 @@ export function MenuEditor({
   // document still matches the post-delete state — see undo.ts.
   const [undo, setUndo] = useState<DeleteUndo | null>(null);
   const undoLabel = undo && canRestoreDeleteUndo(undo, doc) ? undo.label : null;
+  const { confirm, dialog } = useConfirm();
 
   /** Delete an item, keeping a one-level undo of the document beforehand. */
-  function removeItem(categoryId: string, item: MenuItem) {
-    if (!window.confirm(`Delete “${item.name}”? You can undo this until your next change.`)) {
-      return;
-    }
+  async function removeItem(categoryId: string, item: MenuItem) {
+    const ok = await confirm({
+      message: `Delete “${item.name}”? You can undo this until your next change.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const next = deleteItem(doc, categoryId, item.id);
     setUndo(captureDeleteUndo(doc, next, `deleted “${item.name}”`));
     onChange(next);
@@ -248,14 +253,13 @@ export function MenuEditor({
   }
 
   /** Delete a category (after confirm), keeping undo and the carousel sane. */
-  function handleDeleteCategory(category: MenuCategory, index: number) {
-    if (
-      !window.confirm(
-        `Delete category “${category.name}” and its ${category.items.length} items? You can undo this until your next change.`
-      )
-    ) {
-      return;
-    }
+  async function handleDeleteCategory(category: MenuCategory, index: number) {
+    const ok = await confirm({
+      message: `Delete category “${category.name}” and its ${category.items.length} items? You can undo this until your next change.`,
+      confirmLabel: "Delete category",
+      destructive: true,
+    });
+    if (!ok) return;
     const next = deleteCategory(doc, category.id);
     setUndo(captureDeleteUndo(doc, next, `deleted category “${category.name}”`));
     // Keep the stepper on the category that takes this one's place (or the
@@ -1076,14 +1080,13 @@ export function MenuEditor({
         <span aria-hidden="true" className="hidden flex-1 sm:block" />
         <button
           type="button"
-          onClick={() => {
-            if (
-              window.confirm(
-                `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`
-              )
-            ) {
-              onDeleteMenu();
-            }
+          onClick={async () => {
+            const ok = await confirm({
+              message: `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`,
+              confirmLabel: "Delete menu",
+              destructive: true,
+            });
+            if (ok) onDeleteMenu();
           }}
           className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:self-auto"
         >
@@ -1156,6 +1159,7 @@ export function MenuEditor({
           </p>
         )}
       </div>
+      {dialog}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuSummary } from "@/features/menu/storage";
@@ -65,6 +66,7 @@ export function LibraryPanel({
   onRename,
   onDelete,
 }: LibraryPanelProps) {
+  const { confirm, dialog } = useConfirm();
   /** The row whose restaurant picker is open (one add at a time). */
   const [pickerMenuId, setPickerMenuId] = useState<string | null>(null);
 
@@ -197,8 +199,13 @@ export function LibraryPanel({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      if (window.confirm("Delete this unreadable record?")) onDelete(menu.id);
+                    onClick={async () => {
+                      const ok = await confirm({
+                        message: "Delete this unreadable record?",
+                        confirmLabel: "Delete",
+                        destructive: true,
+                      });
+                      if (ok) onDelete(menu.id);
                     }}
                     className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
                   >
@@ -254,14 +261,13 @@ export function LibraryPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`
-                          )
-                        ) {
-                          onDelete(menu.id);
-                        }
+                      onClick={async () => {
+                        const ok = await confirm({
+                          message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
+                          confirmLabel: "Delete menu",
+                          destructive: true,
+                        });
+                        if (ok) onDelete(menu.id);
                       }}
                       className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
                     >
@@ -318,6 +324,7 @@ export function LibraryPanel({
           ))}
         </ul>
       )}
+      {dialog}
     </div>
   );
 }

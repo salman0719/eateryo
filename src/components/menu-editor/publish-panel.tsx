@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 
+import { useConfirm } from "@/components/ui/confirm-dialog";
+
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuDocument } from "@/features/menu/schema";
 import {
@@ -172,6 +174,7 @@ function ChangeList({
 }
 
 export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: PublishPanelProps) {
+  const { confirm, dialog } = useConfirm();
   const {
     status,
     loaded,
@@ -360,14 +363,14 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           {status.isLive && (
             <button
               type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Unpublish this menu? Table cards stop offering it, though the menu and its address stay reserved."
-                  )
-                ) {
-                  onUnpublish();
-                }
+              onClick={async () => {
+                const ok = await confirm({
+                  message:
+                    "Unpublish this menu? Table cards stop offering it, though the menu and its address stay reserved.",
+                  confirmLabel: "Unpublish",
+                  destructive: false,
+                });
+                if (ok) onUnpublish();
               }}
               disabled={busy}
               className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
@@ -383,6 +386,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           {error}
         </p>
       )}
+      {dialog}
     </div>
   );
 }
