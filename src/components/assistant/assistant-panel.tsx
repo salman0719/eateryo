@@ -94,6 +94,7 @@ export function AssistantPanel({
   proposalsEnabled = false,
 }: AssistantPanelProps) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
