@@ -141,7 +141,11 @@ import {
   menuOpenBlockedMessage,
   type SessionState,
 } from "@/features/session/state";
-import { decideMenuMembership, membershipFlag } from "@/features/menus/membership";
+import {
+  decideMenuMembership,
+  membershipFlag,
+  type MenuMembership,
+} from "@/features/menus/membership";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -452,19 +456,26 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * async code that finishes after an await (003).
    */
   const accountMenusSettledRef = useRef<string | null>(null);
+  /** The same failure marker as a ref: the save status decides after awaits. */
+  const accountMenusReadFailedRef = useRef<string | null>(null);
   /**
    * Where the open menu is saved. `null` while the account read is still
    * pending, so nothing claims "this browser only" on a guess (001, 003).
    */
-  const activeMenuOnServer: boolean | null = activeDoc
-    ? membershipFlag(
-        decideMenuMembership({
-          signedIn,
-          readSettled: serverMenusReadFor === accountKey,
-          onServer: serverIds.has(activeDoc.id),
-        })
-      )
+  const activeMenuMembership: MenuMembership | null = activeDoc
+    ? decideMenuMembership({
+        signedIn,
+        readSettled: serverMenusReadFor === accountKey,
+        readFailed: serverMenusReadFailedFor === accountKey,
+        onServer: serverIds.has(activeDoc.id),
+      })
     : null;
+  const activeMenuOnServer = activeMenuMembership ? membershipFlag(activeMenuMembership) : null;
+  /**
+   * A failed read is not a wait: the editor says the account couldn't be
+   * checked, and does not offer the café-creating flow on a guess (016).
+   */
+  const activeMenuAccountCheckFailed = activeMenuMembership === "unreachable";
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   /** The answer just given here; the stored per-account value is the fallback. */
@@ -518,6 +529,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     sessionStateRef.current = sessionState;
     accountKeyRef.current = accountKey;
   }, [signedIn, sessionState, accountKey]);
+
+  // The save status and the publish gate decide in async code that finishes
+  // after an await, so the failed read travels with the other refs (003, 016).
+  useEffect(() => {
+    accountMenusReadFailedRef.current = serverMenusReadFailedFor;
+  }, [serverMenusReadFailedFor]);
 
   // A failed session read is not a sign-out (015): retry it twice with a
   // backing-off delay, then stop asking and let the UI say what it knows. Only
@@ -797,6 +814,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
+   * Retry the account's menu read after a failure (016). The markers drop
+   * back to "not read yet" first, so the surfaces return to their
+   * placeholders instead of announcing an answer that has not arrived.
+   */
+  function handleRetryAccountCheck() {
+    if (!accountKey) return;
+    setServerMenusReadFailedFor(null);
+    setServerMenusReadFor(null);
+    accountMenusSettledRef.current = null;
+    void mergeAccountMenus();
+  }
+
+  /**
    * Merge the account's menus into the local library (signed in only). A
    * menu that exists only on the server — moved from another device — is
    * downloaded and cached locally once, so the library lists and opens it
@@ -1052,11 +1082,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     const membership = decideMenuMembership({
       signedIn: signedInRef.current,
       readSettled: accountMenusSettledRef.current === accountKeyRef.current,
+      readFailed: accountMenusReadFailedRef.current === accountKeyRef.current,
       onServer: serverIdsRef.current.has(id),
     });
     if (membership === "account") return savedState("Saved to your account.");
     if (membership === "unknown") {
       return { kind: "checking", message: "Checking your account…" };
+    }
+    if (membership === "unreachable") {
+      return savedState("Saved here — your account couldn't be checked.");
     }
     return savedState("Saved in this browser.");
   }
@@ -2729,6 +2763,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 syncMode={signedIn ? "account" : "local"}
                 canManage={!activeMenuIsStaff}
                 onServer={activeMenuOnServer}
+                accountCheckFailed={activeMenuAccountCheckFailed}
+                onRetryAccountCheck={handleRetryAccountCheck}
                 restaurantName={
                   ownedRestaurantsForAccount.find(
                     (restaurant) => restaurant.id === activePublication?.restaurantId
@@ -2750,6 +2786,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   busy: publishBusy,
                   error: publishError,
                   inAccount: activeMenuOnServer,
+                  accountCheckFailed: activeMenuAccountCheckFailed,
+                  onRetryAccountCheck: handleRetryAccountCheck,
                   liveDoc: liveDocMenuId === activeDoc.id ? liveDoc : null,
                   liveDocState: liveDocMenuId === activeDoc.id ? liveDocState : "idle",
                   onPublish: () => void handlePublish(),

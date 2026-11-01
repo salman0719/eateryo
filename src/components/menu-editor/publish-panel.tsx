@@ -41,6 +41,14 @@ export interface PublishingControls {
    */
   inAccount: boolean | null;
   /**
+   * True when the account's menu read failed, so `inAccount: null` means
+   * "couldn't check" rather than "still checking". The café-creating setup
+   * flow stays off in that state — it would mint tenancy on a guess (007).
+   */
+  accountCheckFailed?: boolean;
+  /** Re-runs the account read; the panel returns to its placeholders. */
+  onRetryAccountCheck?: () => void;
+  /**
    * The snapshot diners see right now, read only when the draft is ahead of
    * it. Null until read — `liveDocState` says whether that is still pending,
    * impossible, or failed.
@@ -164,8 +172,19 @@ function ChangeList({
 }
 
 export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: PublishPanelProps) {
-  const { status, loaded, busy, error, inAccount, liveDoc, liveDocState, onPublish, onUnpublish } =
-    controls;
+  const {
+    status,
+    loaded,
+    busy,
+    error,
+    inAccount,
+    accountCheckFailed = false,
+    onRetryAccountCheck,
+    liveDoc,
+    liveDocState,
+    onPublish,
+    onUnpublish,
+  } = controls;
   const needsPublish = status?.isLive === true && status.hasUnpublishedChanges;
   const summary = useMemo(
     () => (liveDoc ? summarizeMenuChanges(liveDoc, draftDoc) : null),
@@ -203,6 +222,30 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           >
             Sign in to publish (free while the promotion lasts)
           </a>
+        )}
+      </div>
+    );
+  }
+
+  if (inAccount === null && accountCheckFailed) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
+          <span className={`${pill} bg-stone-100 text-stone-600`}>Not checked</span>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-stone-600">
+          We couldn&apos;t check your account just now, so we can&apos;t tell whether this menu is
+          already there. Nothing here changed — try again in a moment.
+        </p>
+        {onRetryAccountCheck && (
+          <button
+            type="button"
+            onClick={onRetryAccountCheck}
+            className="mt-3 rounded-full border border-stone-300 px-4 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          >
+            Try again
+          </button>
         )}
       </div>
     );

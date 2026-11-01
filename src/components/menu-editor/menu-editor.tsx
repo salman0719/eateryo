@@ -101,6 +101,14 @@ interface MenuEditorProps {
    * true then, so the copy says it is checking instead (003).
    */
   onServer?: boolean | null;
+  /**
+   * True when the account's menu read failed. `onServer` is `null` then, but
+   * this is an answer, not a wait: the surfaces say the account couldn't be
+   * checked and offer a retry, and the café-creating CTA stays off (016).
+   */
+  accountCheckFailed?: boolean;
+  /** Re-runs the account read behind those surfaces. */
+  onRetryAccountCheck?: () => void;
   /** The café's name, shown on the diner preview when the account knows it. */
   restaurantName?: string | null;
   /** Open the publish wizard for a browser-only menu (R1). */
@@ -138,6 +146,8 @@ export function MenuEditor({
   canManage = true,
   onServer = false,
   restaurantName = null,
+  accountCheckFailed = false,
+  onRetryAccountCheck,
   onStartPublish,
   imageUrl,
   onExportJson,
@@ -633,7 +643,21 @@ export function MenuEditor({
     <div className="flex flex-col gap-4">
       {headerRow}
       <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
-        {onStartPublish && onServer === null ? (
+        {onStartPublish && accountCheckFailed ? (
+          <p>
+            We couldn&apos;t check your account just now, so publishing is paused.{" "}
+            {onRetryAccountCheck && (
+              <button
+                type="button"
+                onClick={onRetryAccountCheck}
+                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+            )}
+            {onRetryAccountCheck ? "." : null}
+          </p>
+        ) : onStartPublish && onServer === null ? (
           <div role="status" aria-busy="true">
             <span className="sr-only">Checking where this menu is saved…</span>
             <Skeleton className="h-3 w-3/4" />
@@ -1101,7 +1125,21 @@ export function MenuEditor({
         </p>
       )}{" "}
       <div className="text-xs leading-5 text-stone-500">
-        {onServer === null ? (
+        {onServer === null && accountCheckFailed ? (
+          <p>
+            This browser has your menu saved. We couldn&apos;t check your account just now, so it
+            may also be there — nothing was lost either way.{" "}
+            {onRetryAccountCheck && (
+              <button
+                type="button"
+                onClick={onRetryAccountCheck}
+                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+            )}
+          </p>
+        ) : onServer === null ? (
           <div role="status" aria-busy="true" className="flex flex-col gap-2">
             <span className="sr-only">
               Checking where this menu is saved. Your edits are saved either way.

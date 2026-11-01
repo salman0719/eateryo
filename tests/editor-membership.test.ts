@@ -11,9 +11,13 @@ import { createSampleMenuDocument } from "@/features/menu/sample-menu";
  * account already held, and the publish panel offered to create a café the
  * owner already had. Both now take three answers: on the account, proved
  * browser-only, and not read yet (`null`), which claims neither.
+ *
+ * 016 — a read that failed is a fourth answer: the same three surfaces say the
+ * account couldn't be checked and offer a retry, never the browser-only claim
+ * and never the café-creating flow.
  */
 
-function renderEditor(onServer: boolean | null): string {
+function renderEditor(onServer: boolean | null, accountCheckFailed = false): string {
   const doc = createSampleMenuDocument();
   return renderToStaticMarkup(
     createElement(MenuEditor, {
@@ -21,7 +25,13 @@ function renderEditor(onServer: boolean | null): string {
       mode: "edit",
       onModeChange: () => {},
       onChange: () => {},
-      saveState: { kind: "saved", message: "Saved", detail: "Saved to your account." },
+      saveState: {
+        kind: "saved",
+        message: "Saved",
+        detail: accountCheckFailed
+          ? "Saved here — your account couldn't be checked."
+          : "Saved to your account.",
+      },
       syncMode: "account",
       imageUrl: null,
       onExportJson: () => {},
@@ -31,6 +41,8 @@ function renderEditor(onServer: boolean | null): string {
       onDeleteMenu: () => {},
       onBack: () => {},
       onServer,
+      accountCheckFailed,
+      onRetryAccountCheck: () => {},
       onStartPublish: () => {},
       publishing: {
         status: null,
@@ -38,6 +50,8 @@ function renderEditor(onServer: boolean | null): string {
         busy: false,
         error: null,
         inAccount: onServer,
+        accountCheckFailed,
+        onRetryAccountCheck: () => {},
         liveDoc: null,
         liveDocState: "idle",
         onPublish: () => {},
@@ -47,7 +61,7 @@ function renderEditor(onServer: boolean | null): string {
   );
 }
 
-function renderPublishPanel(inAccount: boolean | null): string {
+function renderPublishPanel(inAccount: boolean | null, accountCheckFailed = false): string {
   return renderToStaticMarkup(
     createElement(PublishPanel, {
       signedIn: true,
@@ -58,6 +72,8 @@ function renderPublishPanel(inAccount: boolean | null): string {
         busy: false,
         error: null,
         inAccount,
+        accountCheckFailed,
+        onRetryAccountCheck: () => {},
         liveDoc: null,
         liveDocState: "idle",
         onPublish: () => {},
@@ -100,6 +116,25 @@ describe("editor storage copy", () => {
   });
 });
 
+describe("editor copy after a failed account read", () => {
+  it("says the account couldn't be checked instead of claiming the browser", () => {
+    const html = renderEditor(null, true);
+    expect(html).toContain("Saved here");
+    expect(html).toContain("We couldn");
+    expect(html).toContain("may also be there");
+    // An answer is not a wait, so the placeholders are gone.
+    expect(html).not.toContain("Checking where this menu is saved");
+    expect(html).not.toContain("animate-pulse");
+    // Neither false claim: no browser-only sentence, no move offer, and no
+    // café-creating publish flow offered on a guess (007).
+    expect(html).not.toContain("browser only");
+    expect(html).not.toContain("Add it to your account");
+    expect(html).not.toContain("we create your café");
+    // The retry is the only way forward, and it is offered on every surface.
+    expect(html.match(/Try again/g)).toHaveLength(2);
+  });
+});
+
 describe("publish panel membership", () => {
   it("checks instead of offering to create a café while unknown", () => {
     const html = renderPublishPanel(null);
@@ -112,5 +147,14 @@ describe("publish panel membership", () => {
     const html = renderPublishPanel(false);
     expect(html).toContain("still only in this browser");
     expect(html).not.toContain("Checking whether this menu is on your account");
+  });
+
+  it("stops the café-creating setup while the account is unreadable", () => {
+    const html = renderPublishPanel(null, true);
+    expect(html).toContain("Not checked");
+    expect(html).toContain("Try again");
+    expect(html).not.toContain("Set up table ordering");
+    expect(html).not.toContain("Checking whether this menu is on your account");
+    expect(html).not.toContain("animate-pulse");
   });
 });
