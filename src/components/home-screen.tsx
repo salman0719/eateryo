@@ -144,6 +144,11 @@ import {
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
+/** How many automatic retries a failed session read gets before the UI asks. */
+const SESSION_READ_RETRIES = 2;
+/** Delay before each retry, growing linearly (1.5 s, then 3 s). */
+const SESSION_READ_RETRY_MS = 1500;
+
 /** Save status stays one word; `detail` says where the save went. */
 function savedState(detail: string): SaveState {
   return { kind: "saved", message: "Saved", detail };
@@ -363,6 +368,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     data: session,
     error: sessionError,
     isPending: sessionLoading,
+    refetch: refetchSession,
   } = authClient.useSession();
   /**
    * Three answers, not two (015). The session is a request: while it is in
@@ -379,6 +385,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   });
   /** Waiting on the session: guarded surfaces stay inert, skeletons stay up. */
   const sessionPending = sessionState === "unknown";
+  /** A read that failed has not answered; offer a retry, not a verdict. */
+  const sessionCheckFailed = sessionPending && sessionError != null;
   const signedIn = session?.user != null;
   const accountKey = session?.user?.id ?? null;
   /**
@@ -389,6 +397,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const visibleLibraryError =
     signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
+  /** Automatic retries spent on a failed session read (0 = none yet). */
+  const [sessionRetries, setSessionRetries] = useState(0);
   // Server-evaluated release decisions (A4). Both assistant flags default
   // off, so the tab and panel appear only for a released account or a
   // preview link; the loading state below avoids flashing “unavailable” while
@@ -483,6 +493,21 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     sessionStateRef.current = sessionState;
     accountKeyRef.current = accountKey;
   }, [signedIn, sessionState, accountKey]);
+
+  // A failed session read is not a sign-out (015): retry it twice with a
+  // backing-off delay, then stop asking and let the UI say what it knows. Only
+  // the timer writes state, so a failure never cascades a render.
+  useEffect(() => {
+    if (!sessionCheckFailed || sessionRetries >= SESSION_READ_RETRIES) return;
+    const timer = setTimeout(() => {
+      setSessionRetries((attempts) => attempts + 1);
+      void refetchSession?.();
+    }, SESSION_READ_RETRY_MS * (sessionRetries + 1));
+    return () => clearTimeout(timer);
+  }, [sessionCheckFailed, sessionRetries, refetchSession]);
+
+  /** The retries are spent: keep the wait honest instead of guessing. */
+  const sessionCheckGaveUp = sessionCheckFailed && sessionRetries >= SESSION_READ_RETRIES;
 
   // Moving a single menu needs the owned restaurants up front, so each
   // browser-only row can offer its target without opening the move panel.
@@ -2825,7 +2850,38 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             onStartFresh={() => navigateTo({ screen: "capture" })}
           />
         )}
-        {screen === "editor" && !activeDoc && !missingPublishMenuId && (
+        {screen === "editor" && !activeDoc && !missingPublishMenuId && sessionCheckGaveUp && (
+          <section className="rounded-2xl border border-stone-200 bg-white p-6 text-center">
+            <h1 className="font-medium text-stone-900">Checking your session…</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft
+              is still saved in this browser — nothing is lost.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSessionRetries(0);
+                  void refetchSession?.();
+                }}
+                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => navigateTo({ screen: "library" })}
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Back to My menus
+              </button>
+            </div>
+          </section>
+        )}
+        {screen === "editor" &&
+          !activeDoc &&
+          !missingPublishMenuId &&
+          !sessionCheckGaveUp && (
           <div role="status" aria-busy="true" className="flex flex-col gap-4">
             <span className="sr-only">Opening menu…</span>
             <div className="flex items-center gap-3">
