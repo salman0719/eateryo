@@ -15,6 +15,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem } from "@/features/menu/schema";
+import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
@@ -148,6 +149,10 @@ export function OrderMenuSection({
       <ul className="divide-y divide-stone-100">
         {category.items.map((item) => {
           const soldOut = item.available === false;
+          // One chip per diet: an older document (or a CSV import) can hold the
+          // same label twice, which used to mean duplicate keys and two
+          // identical chips on the diner's screen.
+          const dietaryLabels = dedupeDietaryLabels(item.dietaryLabels);
           const variantName = variantChoice[item.id] ?? item.variants[0]?.name ?? null;
           const variant = variantName
             ? item.variants.find((candidate) => candidate.name === variantName)
@@ -173,9 +178,9 @@ export function OrderMenuSection({
                   {item.description && (
                     <ClampedDescription text={item.description} name={item.name} />
                   )}
-                  {item.dietaryLabels.length > 0 && (
+                  {dietaryLabels.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
-                      {item.dietaryLabels.map((label) => (
+                      {dietaryLabels.map((label) => (
                         <span
                           key={label}
                           className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"

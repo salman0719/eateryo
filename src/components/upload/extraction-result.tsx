@@ -18,6 +18,7 @@ import { Attention, didClearAll } from "@/components/ui/attention";
 import { CommitInput } from "@/components/menu-editor/fields";
 import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
+import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
 import { hasAnyPrice } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
 
@@ -302,7 +303,7 @@ export function ExtractionResult({
                   </ul>
                 )}
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {item.dietaryLabels.map((label) => (
+                  {dedupeDietaryLabels(item.dietaryLabels).map((label) => (
                     <span
                       key={label}
                       className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
