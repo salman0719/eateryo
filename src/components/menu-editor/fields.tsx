@@ -108,6 +108,25 @@ interface CommitTagsProps {
 }
 
 /**
+ * The key an instruction names, with the glyph printed on it in a keycap, so
+ * "press Enter" is never ambiguous about which physical key adds the label.
+ * The keycap is decorative: the word beside it already says the key's name.
+ */
+function KeyHint({ glyph, children }: { glyph: string; children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span className="font-semibold text-stone-700">{children}</span>
+      <kbd
+        aria-hidden="true"
+        className="rounded border border-stone-300 bg-white px-1 py-px font-sans text-[10px] leading-none text-stone-500"
+      >
+        {glyph}
+      </kbd>
+    </span>
+  );
+}
+
+/**
  * Tag input for a list of short strings (010). Commits on Enter, on blur and
  * on every add/remove, with the same `flushSync` contract as `CommitInput` so
  * a click in the same tick sees the committed list instead of stale props.
@@ -140,11 +159,21 @@ export function CommitTags({
 
   return (
     <div role="group" aria-label={label}>
-      {/* The keys live on the label row: an instruction the owner sees before
-          typing, without taking a line of its own. */}
-      <span className="mb-1 flex flex-wrap items-baseline gap-x-1.5 text-xs">
-        <span className="font-medium text-stone-600">{label}</span>
-        <span className="text-stone-500">Enter, Tab or comma adds</span>
+      {/* One row, two parts: the label names the field, a hairline divider
+          marks where the instruction starts, and the muted hint keeps the
+          bold key names from reading as more of the field's name. */}
+      <span className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+        <span className="font-medium text-stone-700">{label}</span>
+        <span aria-hidden="true" className="h-3 w-px self-center bg-stone-300" />
+        <span className="inline-flex flex-wrap items-center gap-x-1 text-[11px] text-stone-500">
+          <span>Press</span>
+          <KeyHint glyph="⏎">Enter</KeyHint>
+          <span>,</span>
+          <KeyHint glyph="⇥">Tab</KeyHint>
+          <span>or</span>
+          <KeyHint glyph=",">comma</KeyHint>
+          <span>to add</span>
+        </span>
       </span>
       {tags.length > 0 && (
         <ul className="mb-1.5 flex flex-wrap gap-1.5">
@@ -177,6 +206,11 @@ export function CommitTags({
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={(event) => {
+          // Tabbing from the input into this field's own suggestions is not
+          // leaving the field: committing here would add a half-typed label
+          // first, and the suggestion the person is reaching for second.
+          const next = event.relatedTarget;
+          if (next instanceof Element && next.closest("[data-suggestion-row]")) return;
           if (event.target.value.trim()) commit([...tags, event.target.value]);
         }}
         onKeyDown={(event) => {
@@ -186,9 +220,14 @@ export function CommitTags({
             event.preventDefault();
             if (draft.trim()) commit([...tags, draft]);
           } else if (event.key === "Tab") {
-            // Commit, then let Tab do its job: keyboard users must still be
-            // able to leave the field by tabbing.
-            if (draft.trim()) commit([...tags, draft]);
+            // Tab is advertised as a key that adds, so a draft is added here
+            // and the key stops there instead of jumping to the next control.
+            // With nothing typed, Tab is left alone: Escape (or simply not
+            // typing) still gets anyone out of the field by keyboard.
+            if (draft.trim()) {
+              event.preventDefault();
+              commit([...tags, draft]);
+            }
           } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
             commit(tags.slice(0, -1));
           } else if (event.key === "Escape") {
@@ -198,7 +237,7 @@ export function CommitTags({
         className={baseInput}
       />
       {offered.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <div data-suggestion-row className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] text-stone-500">
             {draft.trim() ? "Matching" : "Already used"}:
           </span>
@@ -206,12 +245,17 @@ export function CommitTags({
             <button
               key={candidate}
               type="button"
-              // mousedown + preventDefault keeps focus in the input, so adding
-              // a suggestion does not fight the blur.
+              // Keep a primary-button press from moving focus: the input's
+              // blur would commit a half-typed label first. A right (or middle)
+              // press is not a request to add anything, and its default has to
+              // stay for the context menu, so it is skipped entirely.
               onMouseDown={(event) => {
+                if (event.button !== 0) return;
                 event.preventDefault();
-                commit([...tags, candidate]);
               }}
+              // The click adds it: for the mouse, and for Enter or Space on the
+              // focused button, which is what a button is expected to do.
+              onClick={() => commit([...tags, candidate])}
               className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-[11px] text-stone-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               + {candidate}
