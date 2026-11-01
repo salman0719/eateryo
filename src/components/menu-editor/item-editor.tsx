@@ -1,5 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
+
+import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import {
   duplicateItem,
   hasAnyPrice,
@@ -10,7 +13,7 @@ import {
 } from "@/features/menu/menu-utils";
 import type { MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 
-import { CommitInput, CommitNumber } from "./fields";
+import { CommitInput, CommitNumber, CommitTags } from "./fields";
 import { ItemImagePanel } from "./item-image-panel";
 
 interface ItemEditorProps {
@@ -57,6 +60,9 @@ export function ItemEditor({
   const category = doc.categories.find((c) => c.id === categoryId);
   const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
   const needsReview = isItemFlagged(item);
+  // Labels this menu already uses, most-used first: the reuse list is a view
+  // over the document in hand, so there is nothing new to store or fetch.
+  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
 
   function patch(patch: Parameters<typeof updateItem>[3]) {
     onChange(updateItem(doc, categoryId, item.id, patch));
@@ -131,19 +137,13 @@ export function ItemEditor({
       </div>
 
       <div className="mt-3">
-        <CommitInput
-          label="Dietary labels (comma-separated, only if shown on the menu)"
-          value={item.dietaryLabels.join(", ")}
-          validate={() => null}
-          placeholder="e.g. vegan, gluten-free"
-          onCommit={(raw) =>
-            patch({
-              dietaryLabels: raw
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
+        <CommitTags
+          label="Dietary labels"
+          value={item.dietaryLabels}
+          suggestions={labelVocabulary}
+          placeholder="Add a label…"
+          hint="Only labels the menu itself shows — never inferred."
+          onCommit={(dietaryLabels) => patch({ dietaryLabels })}
         />
       </div>
 
