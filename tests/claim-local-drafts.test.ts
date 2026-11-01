@@ -12,6 +12,7 @@ import {
   markLocalDraftsClaimed,
   rememberBrowserAccount,
   resolveAutoClaimTarget,
+  resumeBannerReady,
 } from "@/features/menus/claim-local-drafts";
 
 /**
@@ -321,5 +322,55 @@ describe("claim gate", () => {
     expect(
       decideLocalDraftClaimSurface({ gate, signedIn: false, claim: claimInputs() })
     ).toBe("none");
+  });
+});
+
+/**
+ * 017 — the resume banner's copy ("“X” is saved in this browser, not published
+ * yet") is read off the account's id set, which is empty after a failed read
+ * just as it is before one. It speaks only on a list that answered, or with no
+ * account to wait for.
+ */
+describe("resumeBannerReady", () => {
+  const open = { pending: false, incomplete: false };
+  const failed = { pending: false, incomplete: true };
+
+  it("waits for the browser library, whatever else is known", () => {
+    expect(resumeBannerReady({ libraryLoading: true, gate: open, signedIn: true, accountMenusSettled: true })).toBe(false);
+    expect(resumeBannerReady({ libraryLoading: true, gate: open, signedIn: false, accountMenusSettled: false })).toBe(false);
+  });
+
+  it("waits while either account read is still in flight", () => {
+    expect(
+      resumeBannerReady({
+        libraryLoading: false,
+        gate: { pending: true, incomplete: false },
+        signedIn: true,
+        accountMenusSettled: false,
+      })
+    ).toBe(false);
+  });
+
+  it("speaks signed out: the library is the whole truth", () => {
+    expect(
+      resumeBannerReady({ libraryLoading: false, gate: open, signedIn: false, accountMenusSettled: false })
+    ).toBe(true);
+  });
+
+  it("speaks for a signed-in account whose menu list answered", () => {
+    expect(
+      resumeBannerReady({ libraryLoading: false, gate: open, signedIn: true, accountMenusSettled: true })
+    ).toBe(true);
+    // The restaurant read is not part of this banner's claim: it needs the
+    // menu list to tell a draft from an account menu, and nothing more.
+    expect(
+      resumeBannerReady({ libraryLoading: false, gate: failed, signedIn: true, accountMenusSettled: true })
+    ).toBe(true);
+  });
+
+  it("stays quiet when the menu list failed — it cannot tell an account menu from a draft", () => {
+    expect(
+      resumeBannerReady({ libraryLoading: false, gate: failed, signedIn: true, accountMenusSettled: false })
+    ).toBe(false);
   });
 });

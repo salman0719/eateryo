@@ -147,8 +147,9 @@ export type LocalDraftClaimSurface = LocalDraftClaimAction | "pending" | "unavai
  * inventory could not be read, so its counts are unknown. Importing on an
  * unknown would push this browser's drafts at a café we cannot see, so both
  * server paths wait for a read that actually settled. The local-only resume
- * banner is unaffected — it asserts browser truth, and the caller decides
- * that separately.
+ * server paths wait for a read that actually settled. The resume banner has
+ * its own gate ({@link resumeBannerReady}): it names a menu as an unpublished
+ * browser draft, which is only local truth once the account list answered.
  */
 export function decideLocalDraftClaimSurface(input: {
   gate: ClaimGate;
@@ -158,6 +159,35 @@ export function decideLocalDraftClaimSurface(input: {
   if (input.gate.pending) return "pending";
   if (input.gate.incomplete) return "unavailable";
   return input.signedIn ? decideLocalDraftClaim(input.claim) : "none";
+}
+
+/**
+ * Whether the resume banner may render at all.
+ *
+ * It exists for someone who wandered off — or followed the magic link back —
+ * with a draft they never published, and it is the only route back that works
+ * with no account. Its copy is narrower than the claim surfaces', though: it
+ * names one menu as *saved in this browser, not published yet*, which is read
+ * off `serverIds`. That set is empty both before the account list arrives and
+ * after its read fails, so in both states **every** menu would look like an
+ * unclaimed draft — and the banner would offer an account menu, already
+ * published or not, as one (017). The signed-in banner therefore waits for the
+ * menu list to have answered (`ready`); a failed read is a settled answer, but
+ * not one that can tell these menus apart, so the 002 notice explains the
+ * skip instead. Signed out, there is no list to wait for: the library is the
+ * whole truth.
+ */
+export function resumeBannerReady(input: {
+  /** IndexedDB still being read — nothing is known about this browser yet. */
+  libraryLoading: boolean;
+  gate: ClaimGate;
+  signedIn: boolean;
+  /** The account's menu list answered for this account. */
+  accountMenusSettled: boolean;
+}): boolean {
+  if (input.libraryLoading) return false;
+  if (input.gate.pending) return false;
+  return !input.signedIn || input.accountMenusSettled;
 }
 
 const STORAGE_PREFIX = "eateryo:local-draft-claim:";
