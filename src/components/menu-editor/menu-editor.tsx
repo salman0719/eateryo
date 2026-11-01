@@ -635,7 +635,19 @@ export function MenuEditor({
     <div className="flex flex-col gap-4">
       {headerRow}
       <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
-        {onStartPublish && onServer === false ? (
+        {onStartPublish && onServer === null ? (
+          <>
+            Once your menu is set,{" "}
+            <button
+              type="button"
+              onClick={() => changeMode("preview")}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              preview the order page
+            </button>{" "}
+            to see it as diners will.
+          </>
+        ) : onStartPublish && onServer === false ? (
           <>
             Once your menu is set,{" "}
             <button

@@ -75,11 +75,16 @@ describe("editor storage copy", () => {
     expect(html).not.toContain("saved to your account");
     // The café-creating CTA is only for a menu proven to be browser-only.
     expect(html).not.toContain("we create your café");
+    // Same for the helper paragraph above the fields: an unread list is not
+    // "your café already exists" and not "one click publishes it" either.
+    expect(html).not.toContain("to publish it for your tables");
+    expect(html).toContain("to see it as diners will");
   });
 
   it("offers the move once a read proved the menu is browser-only", () => {
     const html = renderEditor(false);
     expect(html).toContain("Add it to your account");
+    expect(html).toContain("we create your café");
     expect(html).not.toContain("Checking where this menu is saved");
   });
 
@@ -87,6 +92,7 @@ describe("editor storage copy", () => {
     const html = renderEditor(true);
     expect(html).toContain("saved to your account");
     expect(html).not.toContain("Add it to your account");
+    expect(html).toContain("to publish it for your tables");
   });
 });
 
