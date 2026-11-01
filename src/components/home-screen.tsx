@@ -2478,7 +2478,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 role="alert"
                 className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
               >
-                {visibleLibraryError}
+                {visibleLibraryError}{" "}
+                {isSessionGateMessage(visibleLibraryError) && (
+                  <a
+                    href="/sign-in"
+                    className="font-semibold text-red-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
+                  >
+                    Sign in
+                  </a>
+                )}
               </p>
             )}
             <LibraryPanel
