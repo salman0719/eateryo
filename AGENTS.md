@@ -143,14 +143,17 @@ errors, or add lint/type suppressions just to make checks pass.
   `tests/menus-sync.test.ts`, `tests/move-to-account.test.ts` — Step 8
   (PGlite + stubbed fetch; conflict, tenancy, import fidelity)
 - `src/features/menus/membership.ts` — the one tri-state answer to "where is
-  this menu saved?" (`account` / `browser` / `unknown`), so the editor and the
-  publish panel never claim "this browser only" before the account's menu list
-  has been read (001, 003); `membershipFlag` maps it to the `boolean | null`
-  the components take. While it is `unknown` the membership surfaces (save
-  status, publish hint, Table ordering card, storage footnote) render
-  placeholders with the wait announced only to screen readers, so no sentence
-  is printed and then retracted. Tests: `tests/menu-membership.test.ts`,
-  `tests/editor-membership.test.ts`.
+  this menu saved?" (`account` / `browser` / `unknown` / `unreachable`), so the
+  editor and the publish panel never claim "this browser only" before the
+  account's menu list has been read (001, 003); `membershipFlag` maps it to the
+  `boolean | null` the components take. While it is `unknown` the membership
+  surfaces (save status, publish hint, Table ordering card, storage footnote)
+  render placeholders with the wait announced only to screen readers, so no
+  sentence is printed and then retracted. `unreachable` is the read that
+  settled by *failing*: those surfaces say the account couldn't be checked and
+  offer **Try again**, the save status never claims browser-only, and the
+  café-creating flow stays off because it would mint tenancy on a guess (016).
+  Tests: `tests/menu-membership.test.ts`, `tests/editor-membership.test.ts`.
 - `src/features/item-images/` — dish photos on menu items: `sizes.ts` (the
   pre-sized copies: display ≤1024px, thumb ≤256px), `prepare.ts` (browser
   decode/resize/encode, so the camera original is never uploaded), `ref.ts`
