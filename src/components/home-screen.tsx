@@ -440,6 +440,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
   /** Which account's server menu read failed (same third state, menus). */
   const [serverMenusReadFailedFor, setServerMenusReadFailedFor] = useState<string | null>(null);
+  /**
+   * Which account's server menu list has *finished* being read, however it
+   * ended. The chip column waits for this (001): before it lands, an empty id
+   * set means "not asked yet", never "this browser only".
+   */
+  const [serverMenusReadFor, setServerMenusReadFor] = useState<string | null>(null);
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   /** The answer just given here; the stored per-account value is the fallback. */
@@ -702,6 +708,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       }
       replaceServerIds(new Set());
       replaceStaffMenus(new Set());
+      // The ids and the read that produced them reset together (001): a stale
+      // "settled" marker over an empty id set would let the next sign-in paint
+      // the same false chip.
+      setServerMenusFor(null);
+      setServerMenusReadFailedFor(null);
+      setServerMenusReadFor(null);
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
@@ -712,7 +724,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // that was never moved to the account stays local-only (serverBaseRef
     // stays null), so this cannot loop.
     void refreshLibrary();
-    void mergeAccountMenus();
+    // Chain onto a merge left over from the previous session instead of
+    // letting the dedupe swallow this one: the chip column waits for a read,
+    // and a skipped start would leave it waiting forever (001).
+    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
     void healStampedDrafts();
     const doc = docRef.current;
     if (doc && serverBaseRef.current === null && !conflictRef.current) {
@@ -838,6 +853,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         // the claim gate can settle as unknown instead of waiting forever.
         if (signedInRef.current && accountKeyRef.current) {
           setServerMenusReadFailedFor(accountKeyRef.current);
+        }
+      } finally {
+        // Settled either way, so the library may stop skeletoning. On a failed
+        // read it then says nothing about membership rather than claiming
+        // "this browser only" (001).
+        if (signedInRef.current && accountKeyRef.current) {
+          setServerMenusReadFor(accountKeyRef.current);
         }
       }
     })();
@@ -2180,6 +2202,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // Library rows carry their account state: menus on the server show as
   // synced; the rest are browser-only until moved (or downloaded).
   const libraryMenus = visibleMenus.map((menu) => ({ ...menu, onServer: serverIds.has(menu.id) }));
+  /**
+   * The chip column may only speak once the account's menu list has been read
+   * (001). Before that an empty id set is "not asked yet", so the rows keep
+   * their skeleton; after a *failed* read they render with no chip at all —
+   * an unknown membership is never reported as "this browser only".
+   */
+  // The gate reads the *settled* marker, not the id set: a read that failed
+  // still ends the wait (rows appear without a chip), while only a read that
+  // answered lets the rows name membership (001).
+  const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
+  const libraryAccountMode = signedIn && serverMenusFor === accountKey;
   const localOnly = libraryMenus.filter((menu) => !menu.onServer);
   const localOnlyCount = localOnly.length;
   // A list cached from another account is never offered as a move target.
@@ -2491,8 +2524,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             )}
             <LibraryPanel
               menus={libraryMenus}
-              loading={libraryLoading}
-              accountMode={signedIn}
+              loading={libraryLoading || libraryAccountPending}
+              accountMode={libraryAccountMode}
               hasHiddenMenus={hasHiddenMenus}
               ownedRestaurants={signedIn ? ownedRestaurantsForAccount : []}
               onMoveToAccount={handleMoveMenuToAccount}
@@ -2505,7 +2538,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             {/* The manual route stays available, quietly: the post-sign-in
                 offer handles the common case, and this is where a partial
                 import is retried. */}
-            {signedIn && localOnlyCount > 0 && (
+            {signedIn && libraryAccountMode && localOnlyCount > 0 && (
               <details className="rounded-2xl border border-stone-200 bg-white">
                 <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-700 marker:text-stone-400">
                   Import from this browser
