@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Attention } from "@/components/ui/attention";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -219,6 +220,7 @@ function MonitorToastStack({ onOpen }: { onOpen: () => void }) {
 export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // The URL is the source of truth for the main screen and selected menu.
   const [route, setRoute] = useState<AppRoute>(initialRoute);
+  const { confirm, dialog } = useConfirm();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
   const selectedItemId = route.screen === "item" ? route.itemId : null;
   /** R0 phone nav: the More sheet (Tables · Assistant · Settings · Get started). */
@@ -1839,11 +1841,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }));
   }
 
-  function confirmDiscard(
+  async function confirmDiscard(
     message = "This will discard the current extracted menu. Continue?"
-  ): boolean {
+  ): Promise<boolean> {
     if (!extracted && !demoDoc) return true;
-    return window.confirm(message);
+    return confirm({ message, confirmLabel: "Discard", destructive: true });
   }
 
   /**
@@ -1871,9 +1873,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /** Start (or restart) a selection from the dropzone — replaces every page. */
-  function selectFiles(incoming: File[]) {
+  async function selectFiles(incoming: File[]) {
     if (incoming.length === 0) return;
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     const check = validateImageBatch(incoming);
     if (!check.valid) {
       setFileError(check.message);
@@ -1889,7 +1891,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * new extraction runs right away over the old pages plus the new ones
    * instead of making the user press Extract a second time.
    */
-  function addPages(incoming: File[]) {
+  async function addPages(incoming: File[]) {
     if (incoming.length === 0) return;
     if (phase === "extracting") {
       setFileError("An extraction is running — add pages once it finishes.");
@@ -1909,7 +1911,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       `A new extraction will run on all ${combined.length} images together: the ` +
       `${pages.length} already selected plus ${incoming.length} new ` +
       `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
-    if (!confirmDiscard(confirmMessage)) return;
+    if (!(await confirmDiscard(confirmMessage))) return;
     applySelection(combined);
     void extractFiles(combined);
   }
@@ -1926,8 +1928,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /** Drop one page; dropping the last one returns to the dropzone. */
-  function removePage(index: number) {
-    if (!confirmDiscard()) return;
+  async function removePage(index: number) {
+    if (!(await confirmDiscard())) return;
     applySelection(pages.filter((_, i) => i !== index).map((page) => page.file));
   }
 
@@ -1994,8 +1996,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     void extractFiles(pages.map((page) => page.file));
   }
 
-  function handleDemo() {
-    if (!confirmDiscard()) return;
+  async function handleDemo() {
+    if (!(await confirmDiscard())) return;
     clearCapture();
     const doc = createSampleMenuDocument();
     setDemoDoc(doc);
@@ -2420,6 +2422,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   return (
     <OrderMonitorProvider userId={session?.user?.id ?? null}>
     <div className="flex min-h-full flex-1 flex-col">
+      {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
       <SiteHeader />
       <main
