@@ -47,7 +47,11 @@ import { ItemEditor } from "./item-editor";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
-  kind: "saved" | "saving" | "error";
+  /**
+   * `checking` is the honest third answer while it is unknown where a save
+   * will land — the account read has not come back yet (003).
+   */
+  kind: "saved" | "saving" | "checking" | "error";
   /** Short status: "Saved", or the failure/conflict sentence. */
   message: string;
   /**
@@ -91,8 +95,11 @@ interface MenuEditorProps {
    * True when this menu lives on the server. Table cards are restaurant-wide
    * and print from the Tables tab; this only decides whether opening hours
    * sync to the server copy or stay in this browser.
+   *
+   * Null when the account's menu list has not answered yet: neither claim is
+   * true then, so the copy says it is checking instead (003).
    */
-  onServer?: boolean;
+  onServer?: boolean | null;
   /** The café's name, shown on the diner preview when the account knows it. */
   restaurantName?: string | null;
   /** Open the publish wizard for a browser-only menu (R1). */
@@ -395,6 +402,14 @@ export function MenuEditor({
             />
             Saving…
           </span>
+        ) : saveState.kind === "checking" ? (
+          <span>
+            <span
+              aria-hidden="true"
+              className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-stone-400 border-t-transparent align-[-2px]"
+            />
+            {saveState.message}
+          </span>
         ) : (
           saveState.message
         )}
@@ -620,7 +635,7 @@ export function MenuEditor({
     <div className="flex flex-col gap-4">
       {headerRow}
       <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
-        {onStartPublish && !onServer ? (
+        {onStartPublish && onServer === false ? (
           <>
             Once your menu is set,{" "}
             <button
@@ -1083,11 +1098,13 @@ export function MenuEditor({
         </p>
       )}{" "}
       <p className="text-xs leading-5 text-stone-500">
-        {onServer
-          ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
-          : syncMode === "account"
-            ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
-            : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
+        {onServer === null
+          ? "Checking where this menu is saved. Your edits are saved either way."
+          : onServer
+            ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
+            : syncMode === "account"
+              ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
+              : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
       </p>
     </div>
   );

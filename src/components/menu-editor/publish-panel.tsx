@@ -33,7 +33,13 @@ export interface PublishingControls {
   busy: boolean;
   error: string | null;
   /** Whether this menu exists in the signed-in account (required to publish). */
-  inAccount: boolean;
+  /**
+   * Whether this menu exists in the signed-in account (required to publish).
+   * Null while the account's menu list has not answered: the panel then says
+   * it is checking rather than offering to create a café the account may
+   * already have (003).
+   */
+  inAccount: boolean | null;
   /**
    * The snapshot diners see right now, read only when the draft is ahead of
    * it. Null until read — `liveDocState` says whether that is still pending,
@@ -198,6 +204,20 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
             Sign in to publish (free while the promotion lasts)
           </a>
         )}
+      </div>
+    );
+  }
+
+  if (inAccount === null) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
+          <span className={`${pill} bg-stone-100 text-stone-600`}>Checking</span>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-stone-600" role="status">
+          Checking whether this menu is on your account. Publishing opens here once that answers.
+        </p>
       </div>
     );
   }
