@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 
+import {
+  dedupeDietaryLabels,
+  sameDietaryLabels,
+  suggestDietaryLabels,
+} from "@/features/menu/dietary-labels";
+
 /**
  * Inputs that commit on blur/Enter and revert on invalid values, so the
  * document only ever holds valid data (helpers throw on empty names, and
@@ -88,6 +94,122 @@ export function CommitInput({
       {multiline ? <textarea rows={2} {...shared} /> : <input type="text" {...shared} />}
       {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
     </label>
+  );
+}
+
+interface CommitTagsProps {
+  label: string;
+  value: readonly string[];
+  onCommit: (next: string[]) => void;
+  /** Ranked candidates; offered as one-click additions under the input. */
+  suggestions?: readonly string[];
+  hint?: string;
+  placeholder?: string;
+}
+
+/**
+ * Tag input for a list of short strings (010). Commits on Enter, on blur and
+ * on every add/remove, with the same `flushSync` contract as `CommitInput` so
+ * a click in the same tick sees the committed list instead of stale props.
+ *
+ * A label is never split on commas: one that contains a comma survives a round
+ * trip intact, which the old comma string could not promise.
+ */
+export function CommitTags({
+  label,
+  value,
+  onCommit,
+  suggestions = [],
+  hint,
+  placeholder,
+}: CommitTagsProps) {
+  const [draft, setDraft] = useState("");
+  // Render the deduped list: a document saved before this was a tag input (a
+  // CSV import can hold `vegan` twice) must not produce duplicate keys.
+  const tags = dedupeDietaryLabels(value);
+  const offered = suggestDietaryLabels(suggestions, { exclude: tags, query: draft, limit: 8 });
+
+  function commit(next: readonly string[]) {
+    flushSync(() => {
+      setDraft("");
+      const cleaned = dedupeDietaryLabels(next);
+      if (sameDietaryLabels(cleaned, tags)) return;
+      onCommit(cleaned);
+    });
+  }
+
+  return (
+    <div role="group" aria-label={label}>
+      <span className="mb-1 block text-xs font-medium text-stone-500">{label}</span>
+      {tags.length > 0 && (
+        <ul className="mb-1.5 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <li key={tag}>
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-green-900">
+                {tag}
+                <button
+                  type="button"
+                  aria-label={`Remove ${tag}`}
+                  // mousedown, not click: the input's blur would otherwise
+                  // commit a draft and leave this handler with stale props.
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    commit(tags.filter((candidate) => candidate !== tag));
+                  }}
+                  className="rounded-full px-1 leading-none text-green-900/70 hover:text-green-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-700"
+                >
+                  ✕
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        type="text"
+        aria-label={label}
+        placeholder={placeholder ?? "Add a label…"}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={(event) => {
+          if (event.target.value.trim()) commit([...tags, event.target.value]);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            if (draft.trim()) commit([...tags, draft]);
+          } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
+            commit(tags.slice(0, -1));
+          } else if (event.key === "Escape") {
+            setDraft("");
+          }
+        }}
+        className={baseInput}
+      />
+      {offered.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-stone-500">
+            {draft.trim() ? "Matching" : "Already used"}:
+          </span>
+          {offered.map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              // mousedown + preventDefault keeps focus in the input, so adding
+              // a suggestion does not fight the blur.
+              onMouseDown={(event) => {
+                event.preventDefault();
+                commit([...tags, candidate]);
+              }}
+              className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-[11px] text-stone-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              + {candidate}
+            </button>
+          ))}
+        </div>
+      )}
+      {hint && <span className="mt-1 block text-[11px] text-stone-500">{hint}</span>}
+    </div>
   );
 }
 
