@@ -10,7 +10,11 @@ import { suggestSecondMenuNames } from "@/features/menu/menu-utils";
 
 import { CommitInput } from "./fields";
 
-/** A library row: the browser summary plus whether the account holds it. */
+/**
+ * A library row: the browser summary plus whether the account holds it. The
+ * second field is only meaningful when `accountMode` is on — before the
+ * account's menu list has been read, it is `false` because nobody asked.
+ */
 export interface LibraryMenu extends MenuSummary {
   onServer: boolean;
 }
@@ -19,7 +23,11 @@ interface LibraryPanelProps {
   menus: LibraryMenu[];
   /** True until the first library read settles — rows skeleton, never the empty state. */
   loading?: boolean;
-  /** Signed in: every row carries an account-status chip. */
+  /**
+   * Signed in *and* the account's menu list has actually been read: only then
+   * may a row name its membership. False covers both "signed out" and "not
+   * answered yet", so nothing claims "this browser only" on a guess.
+   */
   accountMode: boolean;
   /** Signed out with stamped rows hidden: say so instead of "no menus". */
   hasHiddenMenus?: boolean;
@@ -225,7 +233,9 @@ export function LibraryPanel({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {!menu.onServer && moveAvailable && (
+                    {/* Only a read that proved membership may offer the move:
+                        while it is unknown, "not on the account" is a guess. */}
+                    {accountMode && !menu.onServer && moveAvailable && (
                       <button
                         type="button"
                         onClick={() => startMove(menu.id)}
