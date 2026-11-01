@@ -55,4 +55,8 @@ describe("CommitTags", () => {
   it("states the honesty rule under the field", () => {
     expect(render([], [])).toContain("Only labels the menu itself shows");
   });
+
+  it("names the keys that add a label, on the label row itself", () => {
+    expect(render([], [])).toContain("Enter, Tab or comma adds");
+  });
 });

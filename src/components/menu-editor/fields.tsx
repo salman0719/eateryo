@@ -140,7 +140,12 @@ export function CommitTags({
 
   return (
     <div role="group" aria-label={label}>
-      <span className="mb-1 block text-xs font-medium text-stone-500">{label}</span>
+      {/* The keys live on the label row: an instruction the owner sees before
+          typing, without taking a line of its own. */}
+      <span className="mb-1 flex flex-wrap items-baseline gap-x-1.5 text-xs">
+        <span className="font-medium text-stone-600">{label}</span>
+        <span className="text-stone-500">Enter, Tab or comma adds</span>
+      </span>
       {tags.length > 0 && (
         <ul className="mb-1.5 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
@@ -175,8 +180,14 @@ export function CommitTags({
           if (event.target.value.trim()) commit([...tags, event.target.value]);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (event.key === "Enter" || event.key === ",") {
+            // A comma must not land in the field, and Enter must not submit a
+            // surrounding form.
             event.preventDefault();
+            if (draft.trim()) commit([...tags, draft]);
+          } else if (event.key === "Tab") {
+            // Commit, then let Tab do its job: keyboard users must still be
+            // able to leave the field by tabbing.
             if (draft.trim()) commit([...tags, draft]);
           } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
             commit(tags.slice(0, -1));
