@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
   addItem,
   deleteCategory,
   deleteItem,
+  hasAnyPrice,
   isItemFlagged,
   moveCategory,
   moveItem,
   moveItemToCategory,
   moveItemsToCategory,
   renameCategory,
+  setItemImage,
 } from "@/features/menu/menu-utils";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import {
@@ -21,7 +25,7 @@ import {
   loadDismissedDuplicateKeys,
   saveDismissedDuplicateKeys,
 } from "@/features/menu/duplicates";
-import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
+import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import { searchMenu } from "@/features/menu/search";
 import { describeExtractionSource } from "@/features/menu/source-label";
@@ -36,26 +40,20 @@ import {
   type DeleteUndo,
 } from "@/features/menu/undo";
 
-import {
-  DEFAULT_PREVIEW_LAYOUT_ID,
-  DEFAULT_PREVIEW_THEME_ID,
-  PREVIEW_THEMES,
-  PREVIEW_THEME_IDS,
-  isPreviewLayoutId,
-  isPreviewThemeId,
-  type PreviewLayoutId,
-  type PreviewThemeId,
-} from "@/features/menu/preview-themes";
-
+import { OrderPagePreview } from "@/components/order/order-page-preview";
+import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
 import { ItemEditor } from "./item-editor";
-import { MenuPreview } from "./menu-preview";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
-  kind: "saved" | "saving" | "error";
+  /**
+   * `checking` is the honest third answer while it is unknown where a save
+   * will land — the account read has not come back yet (003).
+   */
+  kind: "saved" | "saving" | "checking" | "error";
   /** Short status: "Saved", or the failure/conflict sentence. */
   message: string;
   /**
@@ -99,8 +97,21 @@ interface MenuEditorProps {
    * True when this menu lives on the server. Table cards are restaurant-wide
    * and print from the Tables tab; this only decides whether opening hours
    * sync to the server copy or stay in this browser.
+   *
+   * Null when the account's menu list has not answered yet: neither claim is
+   * true then, so the copy says it is checking instead (003).
    */
-  onServer?: boolean;
+  onServer?: boolean | null;
+  /**
+   * True when the account's menu read failed. `onServer` is `null` then, but
+   * this is an answer, not a wait: the surfaces say the account couldn't be
+   * checked and offer a retry, and the café-creating CTA stays off (016).
+   */
+  accountCheckFailed?: boolean;
+  /** Re-runs the account read behind those surfaces. */
+  onRetryAccountCheck?: () => void;
+  /** The café's name, shown on the diner preview when the account knows it. */
+  restaurantName?: string | null;
   /** Open the publish wizard for a browser-only menu (R1). */
   onStartPublish?: () => void;
   /**
@@ -108,7 +119,7 @@ interface MenuEditorProps {
    * in this context, in which case the preview simply omits the panel.
    */
   publishing?: PublishingControls;
-  /** Fired when the customer preview opens; the page refreshes publish state. */
+  /** Fired when the diner preview opens; the page refreshes publish state. */
   onPreviewOpen?: () => void;
 }
 
@@ -125,23 +136,6 @@ const tinyButton =
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
 
-/**
- * The preview's eyebrow must never claim the draft is what visitors see:
- * "Live page preview" only when the live snapshot matches both the document
- * and the selected style.
- */
-function previewEyebrow(
-  status: PublishingControls["status"],
-  themeId: PreviewThemeId,
-  layout: PreviewLayoutId
-): string {
-  if (!status?.isLive) return "Preview · not published";
-  const styleDiffers = status.theme !== themeId || status.layout !== layout;
-  return status.hasUnpublishedChanges || styleDiffers
-    ? "Draft preview · public page is older"
-    : "Live page preview";
-}
-
 export function MenuEditor({
   doc,
   selectedItemId = null,
@@ -152,6 +146,9 @@ export function MenuEditor({
   syncMode,
   canManage = true,
   onServer = false,
+  restaurantName = null,
+  accountCheckFailed = false,
+  onRetryAccountCheck,
   onStartPublish,
   imageUrl,
   onExportJson,
@@ -167,6 +164,9 @@ export function MenuEditor({
     (sum, c) => sum + c.items.filter(isItemFlagged).length,
     0
   );
+  // Photos are uploaded under the signed-in session, so a browser-only menu
+  // (nobody signed in) cannot attach one yet.
+  const canUploadItemImages = canManage && syncMode === "account";
   // Provenance, so a surprising line can be traced to the model that read it.
   const sourceLabel = describeExtractionSource(doc.source);
 
@@ -231,12 +231,16 @@ export function MenuEditor({
   // document still matches the post-delete state — see undo.ts.
   const [undo, setUndo] = useState<DeleteUndo | null>(null);
   const undoLabel = undo && canRestoreDeleteUndo(undo, doc) ? undo.label : null;
+  const { confirm, dialog } = useConfirm();
 
   /** Delete an item, keeping a one-level undo of the document beforehand. */
-  function removeItem(categoryId: string, item: MenuItem) {
-    if (!window.confirm(`Delete “${item.name}”? You can undo this until your next change.`)) {
-      return;
-    }
+  async function removeItem(categoryId: string, item: MenuItem) {
+    const ok = await confirm({
+      message: `Delete “${item.name}”? You can undo this until your next change.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const next = deleteItem(doc, categoryId, item.id);
     setUndo(captureDeleteUndo(doc, next, `deleted “${item.name}”`));
     onChange(next);
@@ -249,14 +253,13 @@ export function MenuEditor({
   }
 
   /** Delete a category (after confirm), keeping undo and the carousel sane. */
-  function handleDeleteCategory(category: MenuCategory, index: number) {
-    if (
-      !window.confirm(
-        `Delete category “${category.name}” and its ${category.items.length} items? You can undo this until your next change.`
-      )
-    ) {
-      return;
-    }
+  async function handleDeleteCategory(category: MenuCategory, index: number) {
+    const ok = await confirm({
+      message: `Delete category “${category.name}” and its ${category.items.length} items? You can undo this until your next change.`,
+      confirmLabel: "Delete category",
+      destructive: true,
+    });
+    if (!ok) return;
     const next = deleteCategory(doc, category.id);
     setUndo(captureDeleteUndo(doc, next, `deleted category “${category.name}”`));
     // Keep the stepper on the category that takes this one's place (or the
@@ -272,58 +275,20 @@ export function MenuEditor({
     onChange(next);
   }
 
-  // View mode swaps the editing surface for the customer preview, the
-  // printable table QR cards, or the compact reorder list, while the header
-  // (back, save state) stays put. "edit" is the workspace; "preview" is a
-  // read-only presentation; "reorder" arranges without the editing boxes.
-  // The mode itself lives in the URL (via onModeChange), so each surface
-  // has its own link and back/forward moves between them.
+  // View mode swaps the editing surface for the diner's order page or the
+  // compact reorder list, while the header (back, save state) stays put.
+  // "edit" is the workspace; "preview" is the read-only order page a table
+  // card opens; "reorder" arranges without the editing boxes. The mode lives
+  // in the URL (via onModeChange), so each surface has its own link and
+  // back/forward moves between them.
   function changeMode(next: EditorMode) {
     if (next === "preview") onPreviewOpen?.();
     onModeChange(next);
   }
 
-  // Preview style is a tiny UI preference (like the category layout above), so
-  // it lives in localStorage rather than the menu document.
-  const PREVIEW_THEME_STORAGE_KEY = "menu-preview-theme";
-  const [previewThemeId, setPreviewThemeId] = useState<PreviewThemeId>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREVIEW_THEME_ID;
-    try {
-      const stored = window.localStorage.getItem(PREVIEW_THEME_STORAGE_KEY);
-      return isPreviewThemeId(stored) ? stored : DEFAULT_PREVIEW_THEME_ID;
-    } catch {
-      return DEFAULT_PREVIEW_THEME_ID;
-    }
-  });
-
-  function changePreviewTheme(id: PreviewThemeId) {
-    setPreviewThemeId(id);
-    try {
-      window.localStorage.setItem(PREVIEW_THEME_STORAGE_KEY, id);
-    } catch {
-      /* storage unavailable — the session choice still applies */
-    }
-  }
-
-  const PREVIEW_LAYOUT_STORAGE_KEY = "menu-preview-layout";
-  const [previewLayout, setPreviewLayout] = useState<PreviewLayoutId>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREVIEW_LAYOUT_ID;
-    try {
-      const stored = window.localStorage.getItem(PREVIEW_LAYOUT_STORAGE_KEY);
-      return isPreviewLayoutId(stored) ? stored : DEFAULT_PREVIEW_LAYOUT_ID;
-    } catch {
-      return DEFAULT_PREVIEW_LAYOUT_ID;
-    }
-  });
-
-  function changePreviewLayout(id: PreviewLayoutId) {
-    setPreviewLayout(id);
-    try {
-      window.localStorage.setItem(PREVIEW_LAYOUT_STORAGE_KEY, id);
-    } catch {
-      /* storage unavailable — the session choice still applies */
-    }
-  }
+  /** The draft is ahead of what table ordering serves right now. */
+  const needsPublish =
+    publishing?.status?.isLive === true && publishing.status.hasUnpublishedChanges;
 
   // Bulk reassignment: selection is tracked by item id and pruned against
   // the live document, so deleted or filtered-out items never linger.
@@ -354,6 +319,21 @@ export function MenuEditor({
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
+
+  /**
+   * Apply a finished photo upload to the *current* document. The upload takes
+   * seconds, and an item edit made meanwhile must survive it — so this reads
+   * the latest document instead of the one captured when the upload started,
+   * and finds the dish by id even if it moved to another section meanwhile.
+   */
+  function attachItemImage(itemId: string, image: MenuItemImage | null) {
+    const current = docRef.current;
+    const category = current.categories.find((candidate) =>
+      candidate.items.some((item) => item.id === itemId)
+    );
+    if (!category) return;
+    onChange(setItemImage(current, category.id, itemId, image));
+  }
 
   // Add pages: photograph more of the same menu later and merge the new
   // extraction in. Repeats are flagged by the duplicate review, never
@@ -424,7 +404,7 @@ export function MenuEditor({
           ↩ Undo {undoLabel}
         </button>
       )}
-      <p
+      <div
         role="status"
         title={saveState.detail}
         className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
@@ -437,17 +417,22 @@ export function MenuEditor({
             />
             Saving…
           </span>
+        ) : saveState.kind === "checking" ? (
+          <span>
+            <span className="sr-only">{saveState.message}</span>
+            <Skeleton className="inline-block h-3 w-36 align-[-1px]" />
+          </span>
         ) : (
           saveState.message
         )}
         {saveState.detail && <span className="sr-only"> — {saveState.detail}</span>}
-      </p>
+      </div>
       <span className="flex-1" />
       {!canManage ? (
         <>
           {mode !== "preview" && (
             <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-              Preview menu
+              Preview order page
             </button>
           )}
         </>
@@ -457,7 +442,7 @@ export function MenuEditor({
             ↕ Reorder
           </button>
           <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-            Preview menu
+            Preview order page
           </button>
         </>
       ) : (
@@ -472,70 +457,34 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div
-          data-print-hide
-          className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white p-3"
-        >
-          <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Style</p>
-          <div role="group" aria-label="Preview style" className="flex flex-wrap gap-1.5">
-            {PREVIEW_THEME_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={previewThemeId === id}
-                onClick={() => changePreviewTheme(id)}
-                className={
-                  previewThemeId === id
-                    ? "rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    : "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                }
-              >
-                {PREVIEW_THEMES[id].name}
-              </button>
-            ))}
-          </div>
-          <span className="mx-1 hidden h-5 w-px bg-stone-200 sm:block" aria-hidden="true" />
-          <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Layout</p>
-          <div role="group" aria-label="Preview layout" className="flex flex-wrap gap-1.5">
-            {[
-              { id: "list" as const, label: "List" },
-              { id: "columns" as const, label: "Two columns" },
-            ].map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={previewLayout === option.id}
-                onClick={() => changePreviewLayout(option.id)}
-                className={
-                  previewLayout === option.id
-                    ? "rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    : "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                }
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <span className="flex-1" />
-          <button type="button" onClick={() => window.print()} className={smallButton}>
-            Print / save PDF
-          </button>
+        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+          <p className="text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
+            The diner’s view
+          </p>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            This is the page a table card opens. Ordering is off in this preview, so nothing here
+            reaches the kitchen.
+          </p>
         </div>
         {publishing && canManage && (
           <PublishPanel
             signedIn={syncMode === "account"}
-            themeId={previewThemeId}
-            layout={previewLayout}
             controls={publishing}
+            draftDoc={doc}
             onStartWizard={onStartPublish}
           />
         )}
-        <MenuPreview
-          doc={doc}
-          themeId={previewThemeId}
-          layout={previewLayout}
-          eyebrow={previewEyebrow(publishing?.status ?? null, previewThemeId, previewLayout)}
-        />
+        <PhoneFrame
+          label="Diner ordering page"
+          heightClass="h-[min(78vh,860px)]"
+          widthClass="max-w-[420px]"
+        >
+          <OrderPagePreview
+            doc={doc}
+            restaurantName={restaurantName}
+            draftAheadOfLive={needsPublish}
+          />
+        </PhoneFrame>
       </div>
     );
   }
@@ -622,7 +571,7 @@ export function MenuEditor({
                                 title={item.reviewNotes.join("\n")}
                                 className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600"
                               >
-                                {item.price === null ? "check price" : "couldn't read"}
+                                {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
                             )}
                             <span className="shrink-0 text-xs text-stone-500">
@@ -697,19 +646,35 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      {/* The public link panel now lives in Preview only, so the edit screen
-          stays compact and food items show sooner. Kept below (commented out)
-          in case it needs to come back. */}
-      <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
-        {onStartPublish && !onServer ? (
-          <>
+      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
+        {onStartPublish && accountCheckFailed ? (
+          <p>
+            We couldn&apos;t check your account just now, so publishing is paused.{" "}
+            {onRetryAccountCheck && (
+              <button
+                type="button"
+                onClick={onRetryAccountCheck}
+                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+            )}
+            {onRetryAccountCheck ? "." : null}
+          </p>
+        ) : onStartPublish && onServer === null ? (
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Checking where this menu is saved…</span>
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+        ) : onStartPublish && onServer === false ? (
+          <p>
             Once your menu is set,{" "}
             <button
               type="button"
               onClick={onStartPublish}
               className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              get your public link
+              set up table ordering
             </button>{" "}
             — we create your café if you don&apos;t have one yet. Or{" "}
             <button
@@ -717,12 +682,12 @@ export function MenuEditor({
               onClick={() => changeMode("preview")}
               className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              preview it first
+              preview the order page
             </button>
             .
-          </>
+          </p>
         ) : (
-          <>
+          <p>
             Once your menu is set,{" "}
             <button
               type="button"
@@ -731,21 +696,10 @@ export function MenuEditor({
             >
               go to Preview
             </button>{" "}
-            to publish it and get your public link.
-          </>
+            to publish it for your tables.
+          </p>
         )}
-      </p>
-      {/*
-      {publishing && canManage && (
-        <PublishPanel
-          signedIn={syncMode === "account"}
-          themeId={previewThemeId}
-          layout={previewLayout}
-          controls={publishing}
-          onOpenPreview={() => changeMode("preview")}
-        />
-      )}
-      */}
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
@@ -1076,6 +1030,8 @@ export function MenuEditor({
                         duplicate={duplicateIds.has(item.id)}
                         selected={selectedIds.has(item.id)}
                         onToggle={() => toggleSelected(item.id)}
+                        canUploadImage={canUploadItemImages}
+                        onAttachImage={(image) => attachItemImage(item.id, image)}
                       />
                     ))}
                   </ul>
@@ -1124,14 +1080,13 @@ export function MenuEditor({
         <span aria-hidden="true" className="hidden flex-1 sm:block" />
         <button
           type="button"
-          onClick={() => {
-            if (
-              window.confirm(
-                `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`
-              )
-            ) {
-              onDeleteMenu();
-            }
+          onClick={async () => {
+            const ok = await confirm({
+              message: `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`,
+              confirmLabel: "Delete menu",
+              destructive: true,
+            });
+            if (ok) onDeleteMenu();
           }}
           className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:self-auto"
         >
@@ -1172,13 +1127,39 @@ export function MenuEditor({
           {addPages.message}
         </p>
       )}{" "}
-      <p className="text-xs leading-5 text-stone-500">
-        {onServer
-          ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
-          : syncMode === "account"
-            ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
-            : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
-      </p>
+      <div className="text-xs leading-5 text-stone-500">
+        {onServer === null && accountCheckFailed ? (
+          <p>
+            This browser has your menu saved. We couldn&apos;t check your account just now, so it
+            may also be there — nothing was lost either way.{" "}
+            {onRetryAccountCheck && (
+              <button
+                type="button"
+                onClick={onRetryAccountCheck}
+                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+            )}
+          </p>
+        ) : onServer === null ? (
+          <div role="status" aria-busy="true" className="flex flex-col gap-2">
+            <span className="sr-only">
+              Checking where this menu is saved. Your edits are saved either way.
+            </span>
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        ) : (
+          <p>
+            {onServer
+              ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
+              : syncMode === "account"
+                ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
+                : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
+          </p>
+        )}
+      </div>
+      {dialog}
     </div>
   );
 }

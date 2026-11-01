@@ -9,8 +9,10 @@
  * - Missing prices, descriptions, dietary labels, or ingredients are
  *   `null`/empty — never invented.
  * - Uncertainty is recorded in `reviewNotes`, never silently resolved.
- * - A null price stops flagging only via explicit owner acceptance
- *   (`unpricedAccepted`, e.g. "market price") — never by inventing a number.
+ * - A null price stops flagging when the item's size variants carry the
+ *   prices (per-size pricing has a null root `price` by design) or via
+ *   explicit owner acceptance (`unpricedAccepted`, e.g. "market price") —
+ *   never by inventing a number.
  * - Stable app-generated IDs (`generateId()` in `./menu-utils`), never
  *   names, identify categories and items.
  *
@@ -42,6 +44,51 @@ export const menuOptionSchema = z.object({
   choices: z.array(menuOptionChoiceSchema).default([]),
 });
 
+/**
+ * One stored copy of a dish photo, as served from the file host's CDN.
+ *
+ * `url` is absolute and https: the diner's page renders it directly from the
+ * CDN, and a stored document must never be able to point an `<img>` at a
+ * `javascript:`/`data:` address or a plain-http origin.
+ */
+export const storedMenuItemPhotoSchema = z.object({
+  url: z
+    .string()
+    .refine(
+      (value) => {
+        try {
+          return new URL(value).protocol === "https:";
+        } catch {
+          return false;
+        }
+      },
+      "Photo URLs must be absolute https URLs."
+    ),
+  /** UploadThing file key — the handle for this stored object. */
+  key: z.string().min(1),
+  /** Real pixel size of this copy, so the page reserves space while it loads. */
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+/**
+ * A dish photo attached to a menu item (owner-supplied, never invented).
+ *
+ * Two pre-sized copies are uploaded per photo: the display copy (the base
+ * fields) and an optional smaller `thumb` for a menu row. Both are sized in
+ * the browser before upload, so the page renders a plain `<img>` straight
+ * from the CDN — no image optimizer, no per-request resizing. `thumb` is
+ * null when the source was already small enough that a second copy would be
+ * the same picture twice.
+ *
+ * Old files are deliberately never deleted on replace/remove: a published
+ * revision snapshots documents, so the previous photo may still be the one
+ * diners are served until the owner republishes.
+ */
+export const menuItemImageSchema = storedMenuItemPhotoSchema.extend({
+  thumb: storedMenuItemPhotoSchema.nullable().default(null),
+});
+
 export const menuItemSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -58,6 +105,11 @@ export const menuItemSchema = z.object({
    * Set only by an explicit "leave unpriced" action — never by the AI —
    * so a null price stops flagging without inventing a number. */
   unpricedAccepted: z.boolean().default(false),
+  /**
+   * Owner-attached photo. Optional so documents saved before dish photos
+   * existed (and the AI's output, which never has one) stay valid.
+   */
+  image: menuItemImageSchema.optional(),
 });
 
 export const menuCategorySchema = z.object({
@@ -73,6 +125,13 @@ export const menuSourceSchema = z.object({
   /** e.g. "gemini" for live extraction, "demo" for sample data. */
   provider: z.string().min(1).optional(),
   model: z.string().min(1).optional(),
+  /**
+   * The title exactly as read from the photo, kept when onboarding names the
+   * menu itself ("Main Menu"): it is the only place the café's name can be
+   * found, and it is what the first-run café-name suggestion reads. Never
+   * rendered as the menu's title.
+   */
+  originalTitle: z.string().min(1).optional(),
 });
 
 export const menuDocumentSchema = z.object({
@@ -85,6 +144,8 @@ export const menuDocumentSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
+export type StoredMenuItemPhoto = z.infer<typeof storedMenuItemPhotoSchema>;
+export type MenuItemImage = z.infer<typeof menuItemImageSchema>;
 export type MenuVariant = z.infer<typeof menuVariantSchema>;
 export type MenuOptionChoice = z.infer<typeof menuOptionChoiceSchema>;
 export type MenuOption = z.infer<typeof menuOptionSchema>;

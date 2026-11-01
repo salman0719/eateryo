@@ -14,10 +14,9 @@
  * plainly instead of pretending it was sent.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { placeOrder } from "@/features/orders/client";
 import {
   addLine,
@@ -30,7 +29,9 @@ import {
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import { OrderSheet } from "./order-sheet";
 
 interface ServerTableOrderProps {
   /** The café's public slug — the order is resolved inside it. */
@@ -56,6 +57,10 @@ export function ServerTableOrder({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const viewOrderButton = useRef<HTMLButtonElement | null>(null);
+  /** Wide screens keep the order in its own column; phones raise the sheet. */
+  const wide = useWideLayout();
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
@@ -82,6 +87,13 @@ export function ServerTableOrder({
     setError(null);
   }
 
+  /** Quantity changes go through here so emptying the order closes the sheet. */
+  function setQuantity(index: number, quantity: number) {
+    const next = setLineQuantity(lines, index, quantity);
+    setLines(next);
+    if (next.length === 0) setSheetOpen(false);
+  }
+
   async function sendOrder() {
     if (lines.length === 0 || submitting) return;
     setSubmitting(true);
@@ -102,6 +114,7 @@ export function ServerTableOrder({
       setPlaced(order);
       setLines([]);
       setNote("");
+      setSheetOpen(false);
     } catch (submitError: unknown) {
       setError(
         submitError instanceof SyncError
@@ -145,10 +158,47 @@ export function ServerTableOrder({
     );
   }
 
+  /**
+   * What sits under the cart's total. One node for both cart homes: the sheet
+   * on phones and the sticky column on wide screens show the same total, the
+   * same warning about an unpriced line, the same server error, and the same
+   * button.
+   */
+  const orderFooter = (
+    <>
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm font-medium text-stone-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-stone-900">
+          {formatOrderTotal(doc.currency, total)}
+        </p>
+      </div>
+      {lines.length > 0 && total === null && (
+        <p className="mt-1 text-xs text-amber-800">
+          Some items have no price on the menu, so no total is shown. Staff confirm the price.
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={submitting || lines.length === 0}
+        onClick={() => void sendOrder()}
+        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {submitting ? "Sending…" : "Send order to the kitchen"}
+      </button>
+    </>
+  );
+
   return (
     <OrderShell tableLabel={tableLabel}>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
             <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
               {restaurantName} · {formatTableLabel(tableLabel)}
@@ -167,145 +217,74 @@ export function ServerTableOrder({
               category={category}
               currency={doc.currency}
               variantChoice={variantChoice}
-            onVariantChange={(itemId, name) =>
-              setVariantChoice((current) => ({ ...current, [itemId]: name }))
-            }
-            onAdd={addItem}
-            itemCount={(item, variantName) =>
-              lines.find(
-                (line) =>
-                  line.menuItemId === item.id &&
-                  (line.variantName ?? null) === (variantName ?? null)
-              )?.quantity ?? 0
-            }
-          />
+              onVariantChange={(itemId, name) =>
+                setVariantChoice((current) => ({ ...current, [itemId]: name }))
+              }
+              onAdd={addItem}
+              itemCount={(item, variantName) =>
+                lines.find(
+                  (line) =>
+                    line.menuItemId === item.id &&
+                    (line.variantName ?? null) === (variantName ?? null)
+                )?.quantity ?? 0
+              }
+            />
           ))}
         </div>
 
-        <aside
-          id="your-order"
-          className={`${frame} h-fit scroll-mt-4 p-5 lg:sticky lg:top-4`}
-          aria-label="Your order"
-        >
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-bold text-stone-900">Your order</h2>
-            <span className="text-xs font-medium text-stone-500">
-              {itemCount} {itemCount === 1 ? "item" : "items"}
-            </span>
-          </div>
-
-          {lines.length === 0 ? (
-            <p className="mt-3 rounded-xl border border-dashed border-stone-300 p-4 text-center text-sm text-stone-500">
-              Nothing added yet.
-            </p>
-          ) : (
-            <ul className="mt-3 divide-y divide-stone-100">
-              {lines.map((line, index) => (
-                <li key={`${line.menuItemId}-${line.variantName ?? "base"}`} className="py-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-sm font-medium text-stone-900">
-                      {line.name}
-                      {line.variantName && (
-                        <span className="ml-1 text-xs font-normal text-stone-500">
-                          {line.variantName}
-                        </span>
-                      )}
-                    </p>
-                    <p className="shrink-0 text-sm tabular-nums text-stone-800">
-                      {line.unitPrice === null
-                        ? "—"
-                        : formatPreviewPrice(line.unitPrice * line.quantity, doc.currency, null)}
-                    </p>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label={`Decrease ${line.name}`}
-                      onClick={() => setLines((current) => setLineQuantity(current, index, line.quantity - 1))}
-                      className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-sm tabular-nums">{line.quantity}</span>
-                    <button
-                      type="button"
-                      aria-label={`Increase ${line.name}`}
-                      onClick={() => setLines((current) => setLineQuantity(current, index, line.quantity + 1))}
-                      className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
-                    >
-                      +
-                    </button>
-                    <span className="flex-1" />
-                    <button
-                      type="button"
-                      onClick={() => setLines((current) => setLineQuantity(current, index, 0))}
-                      className="text-xs font-medium text-stone-500 underline hover:text-red-800"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <label htmlFor="order-note" className="mt-4 block text-xs font-semibold text-stone-600">
-            Note for the kitchen (optional)
-          </label>
-          <textarea
-            id="order-note"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            rows={2}
-            maxLength={280}
-            placeholder="Allergies, no onions…"
-            className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+        {wide && (
+          <OrderCartPanel
+            lines={lines}
+            currency={doc.currency}
+            subtitle={`${restaurantName} · ${formatTableLabel(tableLabel)}`}
+            onQuantityChange={setQuantity}
+            note={note}
+            onNoteChange={setNote}
+            noteId="order-note"
+            footer={orderFooter}
           />
-
-          {/*
-            Honeypot: visually hidden, unreachable by keyboard, and ignored by
-            real people. Only a script fills it, and the server refuses then.
-          */}
-          <label aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
-            Website
-            <input
-              type="text"
-              tabIndex={-1}
-              autoComplete="off"
-              value={honeypot}
-              onChange={(event) => setHoneypot(event.target.value)}
-            />
-          </label>
-
-          <div className="mt-4 flex items-baseline justify-between border-t border-stone-200 pt-3">
-            <p className="text-sm font-medium text-stone-600">Total</p>
-            <p className="text-lg font-bold tabular-nums text-stone-900">
-              {formatOrderTotal(doc.currency, total)}
-            </p>
-          </div>
-          {total === null && lines.length > 0 && (
-            <p className="mt-1 text-xs text-amber-800">
-              Some items have no price on the menu, so no total is shown. Staff confirm the price.
-            </p>
-          )}
-
-          {error && (
-            <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="button"
-            disabled={lines.length === 0 || submitting}
-            onClick={() => void sendOrder()}
-            className="mt-4 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {submitting ? "Sending…" : "Send order to the kitchen"}
-          </button>
-        </aside>
-        <StickyCartBar itemCount={itemCount} total={total} currency={doc.currency} />
+        )}
       </div>
+
+      {/*
+        Honeypot: visually hidden, unreachable by keyboard, and ignored by
+        real people. Only a script fills it, and the server refuses then.
+      */}
+      <label aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+        Website
+        <input
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+      </label>
+
+      {!wide && (
+        <StickyCartBar
+          itemCount={itemCount}
+          total={total}
+          currency={doc.currency}
+          onViewOrder={() => setSheetOpen(true)}
+          buttonRef={viewOrderButton}
+        />
+      )}
+
+      {!wide && sheetOpen && lines.length > 0 && (
+        <OrderSheet
+          lines={lines}
+          currency={doc.currency}
+          subtitle={`${restaurantName} · ${formatTableLabel(tableLabel)}`}
+          onQuantityChange={setQuantity}
+          note={note}
+          onNoteChange={setNote}
+          noteId="order-note"
+          onClose={() => setSheetOpen(false)}
+          returnFocusTo={viewOrderButton}
+          footer={orderFooter}
+        />
+      )}
     </OrderShell>
   );
 }

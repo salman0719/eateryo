@@ -9,11 +9,10 @@
 
 import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 
+import { hasAnyPrice } from "@/features/menu/menu-utils";
 import { menuDocumentSchema } from "@/features/menu/schema";
-import { publicationPath } from "@/features/publishing/schema";
-import { ensureRestaurantSlug } from "@/features/tables/repo";
 import type { TenancyDb } from "@/features/tenancy/repo";
-import { menu, order, publishedMenu, restaurant, restaurantMembership } from "@/lib/db/schema";
+import { menu, order, publishedMenu, restaurantMembership } from "@/lib/db/schema";
 
 import type { LaunchSnapshot } from "./schema";
 
@@ -30,8 +29,6 @@ export async function getLaunchSnapshot(
   const publications = await db
     .select({
       restaurantId: publishedMenu.restaurantId,
-      restaurantSlug: restaurant.slug,
-      slug: publishedMenu.slug,
       publishedAt: publishedMenu.publishedAt,
     })
     .from(publishedMenu)
@@ -39,7 +36,6 @@ export async function getLaunchSnapshot(
       restaurantMembership,
       eq(restaurantMembership.restaurantId, publishedMenu.restaurantId)
     )
-    .innerJoin(restaurant, eq(restaurant.id, publishedMenu.restaurantId))
     .where(and(eq(restaurantMembership.userId, userId), isNotNull(publishedMenu.publishedAt)))
     .orderBy(desc(publishedMenu.publishedAt));
 
@@ -60,27 +56,15 @@ export async function getLaunchSnapshot(
     }
     for (const category of parsed.data.categories) {
       for (const item of category.items) {
-        if (item.price === null && !item.unpricedAccepted) unpricedItems += 1;
+        if (!hasAnyPrice(item) && !item.unpricedAccepted) unpricedItems += 1;
         if (item.reviewNotes.length > 0) reviewNotes += 1;
       }
     }
   }
 
-  // The most recently published live menu, addressed the way a visitor opens
-  // it. A café that published before claiming its `/r/` address claims it
-  // here — the checklist link has to point somewhere real.
-  const live = publications[0] ?? null;
-  let livePath: string | null = null;
-  if (live) {
-    const restaurantSlug =
-      live.restaurantSlug ?? (await ensureRestaurantSlug(db, live.restaurantId)).slug;
-    livePath = publicationPath(restaurantSlug, live.slug);
-  }
-
   return {
     menuCount: menus.length,
     publishedCount: publications.length,
-    livePath,
     orderCount: Number(orders[0]?.value ?? 0),
     unpricedItems,
     reviewNotes,

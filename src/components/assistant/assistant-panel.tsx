@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ProposalReview } from "@/components/assistant/proposal-review";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AssistantApplyError,
@@ -93,6 +94,7 @@ export function AssistantPanel({
   proposalsEnabled = false,
 }: AssistantPanelProps) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const { confirm, dialog } = useConfirm();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -163,9 +165,10 @@ export function AssistantPanel({
       if (usage !== null && usage.remaining <= 0) return;
       if (
         proposalVisible &&
-        !window.confirm(
-          "Send this? The proposed change on screen has not been saved and will be discarded."
-        )
+        !(await confirm({
+          message: "Send this? The proposed change on screen has not been saved and will be discarded.",
+          confirmLabel: "Send",
+        }))
       ) {
         return;
       }
@@ -218,7 +221,7 @@ export function AssistantPanel({
         inputRef.current?.focus();
       }
     },
-    [sending, signedIn, turns, usage, configured, selectedMenu, proposalBusy, proposalVisible, proposalsEnabled]
+    [sending, signedIn, turns, usage, configured, selectedMenu, proposalBusy, proposalVisible, proposalsEnabled, confirm]
   );
 
   const approve = useCallback(async () => {
@@ -273,9 +276,16 @@ export function AssistantPanel({
     inputRef.current?.focus();
   }
 
-  function chooseMenu(nextId: string) {
+  async function chooseMenu(nextId: string) {
     if (!proposalsEnabled || nextId === selectedMenuId) return;
-    if (proposal && !window.confirm("Discard the proposed change? It has not been saved.")) {
+    if (
+      proposal &&
+      !(await confirm({
+        message: "Discard the proposed change? It has not been saved.",
+        confirmLabel: "Discard",
+        destructive: true,
+      }))
+    ) {
       return;
     }
     setSelectedMenuId(nextId);
@@ -322,6 +332,7 @@ export function AssistantPanel({
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="assistant-heading">
+      {dialog}
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 id="assistant-heading" className="text-xl font-semibold text-stone-900">

@@ -50,7 +50,7 @@ describe("table landing repo", () => {
 
   async function publishOpenMenu(menuId: string, title = "House Menu") {
     await createMenuForUser(db, ownerA, restaurantA, sampleDoc(menuId, title));
-    await publishMenuForUser(db, ownerA, menuId, { theme: "bistro", layout: "list" });
+    await publishMenuForUser(db, ownerA, menuId);
   }
 
   describe("menu availability writes", () => {
@@ -158,8 +158,6 @@ describe("table landing repo", () => {
       expect(landing?.menus[0]).toMatchObject({
         menuSlug: expect.any(String),
         title: "Lunch",
-        theme: "bistro",
-        layout: "list",
       });
     });
 

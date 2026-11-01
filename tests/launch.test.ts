@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { addCategory, addItem, createMenuDocument } from "@/features/menu/menu-utils";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
@@ -8,7 +10,9 @@ import type { LaunchSnapshot } from "@/features/launch/schema";
 import { launchSteps, verifiedProgress } from "@/features/launch/steps";
 import { placeOrderFromSlug } from "@/features/orders/repo";
 import { publishMenuForUser } from "@/features/publishing/repo";
+import { setRestaurantSlugForUser } from "@/features/tables/repo";
 import { createRestaurant } from "@/features/tenancy/repo";
+import { publishedMenu } from "@/lib/db/schema";
 import type { TestDb } from "./helpers/pg-test-db";
 
 const holder: { db: TestDb | null; userId: string | null } = { db: null, userId: null };
@@ -27,7 +31,6 @@ vi.mock("@/lib/db", () => ({
 const emptySnapshot: LaunchSnapshot = {
   menuCount: 0,
   publishedCount: 0,
-  livePath: null,
   orderCount: 0,
   unpricedItems: 0,
   reviewNotes: 0,
@@ -40,14 +43,13 @@ describe("launch steps", () => {
     expect(steps.map((step) => step.id)).toEqual([
       "extract",
       "review",
-      "theme",
       "cards",
       "publish",
       "order",
     ]);
     expect(steps.filter((step) => step.done)).toHaveLength(0);
     expect(steps.find((step) => step.id === "cards")?.manual).toBe(true);
-    expect(verifiedProgress(steps)).toEqual({ done: 0, total: 5 });
+    expect(verifiedProgress(steps)).toEqual({ done: 0, total: 4 });
   });
 
   it("keeps review open while any item is unpriced or noted", () => {
@@ -63,23 +65,21 @@ describe("launch steps", () => {
     expect(steps.find((step) => step.id === "extract")?.done).toBe(true);
   });
 
-  it("reports a live address and the first order once they exist", () => {
+  it("reports a published menu and the first order once they exist", () => {
     const steps = launchSteps({
       ...emptySnapshot,
       menuCount: 2,
       publishedCount: 1,
-      livePath: "/r/cafe-a/m/cafe-a",
       orderCount: 3,
     });
     expect(steps.find((step) => step.id === "publish")).toMatchObject({
       done: true,
-      detail: "Live at /r/cafe-a/m/cafe-a",
+      detail: "Offered at your table cards",
     });
     expect(steps.find((step) => step.id === "order")).toMatchObject({
       done: true,
       detail: "3 orders received",
     });
-    expect(steps.find((step) => step.id === "theme")?.done).toBe(true);
     // Printing is still the owner's word, not our inference.
     expect(steps.find((step) => step.id === "cards")?.done).toBe(false);
   });
@@ -108,21 +108,45 @@ describe("launch snapshot", () => {
     await expect(getLaunchSnapshot(db, ownerId)).resolves.toEqual(emptySnapshot);
   });
 
-  it("counts menus, review flags, the live slug, and orders — for the right tenant only", async () => {
+  it("counts a size-priced item as priced, not as a review item", async () => {
+    let doc = createMenuDocument({ title: "Pizzeria", currency: "€" });
+    doc = addCategory(doc, { name: "Traditional Pizzas" });
+    doc = addItem(doc, doc.categories[0].id, {
+      name: "Margherita",
+      variants: [
+        { name: "S", price: 9 },
+        { name: "M", price: 11 },
+        { name: "L", price: 15 },
+      ],
+    });
+    await createMenuForUser(db, ownerId, restaurantId, doc);
+
+    await expect(getLaunchSnapshot(db, ownerId)).resolves.toMatchObject({
+      menuCount: 1,
+      unpricedItems: 0,
+      reviewNotes: 0,
+    });
+  }, 30_000);
+
+  it("counts menus, review flags, and orders — for the right tenant only", async () => {
     const doc = menuDocumentSchema.parse({
       ...createSampleMenuDocument(),
       id: "menu-launch-a",
       title: "Launch Café Menu",
     });
     await createMenuForUser(db, ownerId, restaurantId, doc);
-    const publication = await publishMenuForUser(db, ownerId, "menu-launch-a", {
-      theme: "classic",
-      layout: "list",
-    });
+    await publishMenuForUser(db, ownerId, "menu-launch-a");
+    await setRestaurantSlugForUser(db, ownerId, restaurantId, "launch-cafe");
+    const publicationRows = await db
+      .select({ slug: publishedMenu.slug })
+      .from(publishedMenu)
+      .where(eq(publishedMenu.menuId, "menu-launch-a"));
+    const menuSlug = publicationRows[0]?.slug;
+    if (!menuSlug) throw new Error("publication row missing");
 
     await placeOrderFromSlug(db, {
-      restaurantSlug: publication.restaurantSlug,
-      slug: publication.slug,
+      restaurantSlug: "launch-cafe",
+      slug: menuSlug,
       tableLabel: "2",
       note: null,
       lines: [
@@ -134,7 +158,6 @@ describe("launch snapshot", () => {
     expect(snapshot).toMatchObject({
       menuCount: 1,
       publishedCount: 1,
-      livePath: publication.urlPath,
       orderCount: 1,
       unpricedItems: 1,
       reviewNotes: 2,

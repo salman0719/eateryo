@@ -9,12 +9,6 @@ import {
 } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
-import {
-  isPreviewLayoutId,
-  isPreviewThemeId,
-  type PreviewLayoutId,
-  type PreviewThemeId,
-} from "@/features/menu/preview-themes";
 import { menuSlugSchema } from "@/features/publishing/schema";
 import { isSlug, slugCandidates, slugifyMenuTitle } from "@/features/publishing/slug";
 import {
@@ -58,8 +52,6 @@ export interface OpenMenuEntry {
   menuSlug: string;
   title: string;
   doc: MenuDocument;
-  theme: PreviewThemeId;
-  layout: PreviewLayoutId;
   publishedAt: string;
   availability: MenuAvailability;
 }
@@ -341,8 +333,6 @@ export async function listOpenMenusForRestaurantSlug(
       menuSlug: publishedMenu.slug,
       title: menu.title,
       doc: menuRevision.doc,
-      theme: menuRevision.theme,
-      layout: menuRevision.layout,
       publishedAt: publishedMenu.publishedAt,
       availability: menu.availability,
       timeZone: restaurant.timeZone,
@@ -368,9 +358,6 @@ export async function listOpenMenusForRestaurantSlug(
     if (!parsedDoc.success) {
       throw new Error(`published menu ${row.menuSlug} failed canonical schema validation`);
     }
-    if (!isPreviewThemeId(row.theme) || !isPreviewLayoutId(row.layout)) {
-      throw new Error(`published menu ${row.menuSlug} has an unknown theme or layout`);
-    }
     const availability = parseAvailability(row.menuId, row.availability);
     // Wall-clock windows only mean something in the restaurant's zone;
     // a restaurant that has never saved hours keeps the UTC fallback.
@@ -385,8 +372,6 @@ export async function listOpenMenusForRestaurantSlug(
       menuSlug: row.menuSlug,
       title: row.title,
       doc: parsedDoc.data,
-      theme: row.theme,
-      layout: row.layout,
       publishedAt: row.publishedAt.toISOString(),
       availability,
     });

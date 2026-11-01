@@ -2,20 +2,15 @@ import { z } from "zod";
 
 import { menuDocumentSchema } from "@/features/menu/schema";
 
-import {
-  menuSlugSchema,
-  previewLayoutIdSchema,
-  previewThemeIdSchema,
-  publicationStatusSchema,
-} from "./schema";
+import { menuSlugSchema, publicationStatusSchema } from "./schema";
 
 /**
  * The publish wizard's server contract (R1).
  *
- * One request is enough to go from a browser-only draft to a live link: the
- * server creates the restaurant only when the owner has none, copies the
- * draft into the account when it is not there yet, and publishes the
- * snapshot. The client never supplies ownership ids that are trusted — they
+ * One request is enough to go from a browser-only draft to a menu that table
+ * cards can order from: the server creates the restaurant only when the
+ * owner has none, copies the draft into the account when it is not there
+ * yet, and publishes the snapshot. The client never supplies ownership ids that are trusted — they
  * are only *requested* targets, checked against the session's memberships.
  *
  * `doc` is optional because an account menu is published from its stored
@@ -30,8 +25,6 @@ export const publishSetupBodySchema = z.object({
   restaurantId: z.string().trim().min(1).optional(),
   /** Used only to create a restaurant when the caller owns none. */
   restaurantName: z.string().trim().min(1).max(120).optional(),
-  theme: previewThemeIdSchema,
-  layout: previewLayoutIdSchema,
   /** Optional first-publish address; omitted means derive it from the title. */
   slug: menuSlugSchema.optional(),
 });

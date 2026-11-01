@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
   defaultWizardState,
   linkExpiryCopy,
@@ -14,6 +15,10 @@ import {
   wizardStorageKey,
   clearWizardLinkSent,
   clearWizardState,
+  forgetPublishJourney,
+  hasPublishJourney,
+  publishJourneyStorageKey,
+  rememberPublishJourney,
   WIZARD_LINK_TTL_MS,
   type PublishWizardState,
 } from "@/features/publishing/wizard-state";
@@ -43,23 +48,41 @@ afterEach(() => {
 const FALLBACK: PublishWizardState = {
   restaurantName: "Fallback Café",
   restaurantId: "",
-  slug: "fallback",
-  theme: "classic",
-  layout: "list",
 };
 
 describe("wizard prefill", () => {
-  it("suggests a café name and derives a link slug from the title", () => {
+  it("suggests a café name and no link-name choice", () => {
     const state = defaultWizardState({ title: "Sunny Side Café — Lunch Menu" });
     expect(state.restaurantName).toBe("Sunny Side Café");
-    expect(state.slug).toBe("sunny-side-cafe-lunch-menu");
-    expect(state.theme).toBe("classic");
-    expect(state.layout).toBe("list");
+    // Onboarding never asks for an address or a style: the server derives
+    // the menu's order address, and publishing has no theme or layout.
+    expect(state).not.toHaveProperty("slug");
+    expect(state).not.toHaveProperty("theme");
+    expect(state).not.toHaveProperty("layout");
   });
 
   it("leaves the name empty rather than inventing one", () => {
     expect(defaultWizardState({ title: "Menu" }).restaurantName).toBe("");
-    expect(defaultWizardState({ title: "Lunch Menu" }).slug).toBe("lunch-menu");
+    // A service name is the menu's name, not a café: ask instead.
+    expect(defaultWizardState({ title: "Lunch" }).restaurantName).toBe("");
+  });
+
+  it("reads the café from the title the photo carried, not the menu name", () => {
+    // The extraction renames the menu ("Main Menu"), but the café the photo
+    // showed is still what onboarding offers to publish under.
+    const state = defaultWizardState({
+      title: "Main Menu",
+      source: { originalTitle: "Pizza Tabrabane" },
+    });
+    expect(state.restaurantName).toBe("Pizza Tabrabane");
+  });
+
+  it("walks the demo through the same onboarding as a real photo", () => {
+    // Demo data is a fixture, not a special case: the sample photo's header is
+    // the café, so the menu is the main one and the café is suggested.
+    const demo = createSampleMenuDocument();
+    expect(demo.title).toBe("Main Menu");
+    expect(defaultWizardState(demo).restaurantName).toBe("Sunny Side Café");
   });
 
   it("keeps the wizard path stable and encoded", () => {
@@ -109,9 +132,6 @@ describe("form persistence", () => {
     const state: PublishWizardState = {
       restaurantName: "Retry Café",
       restaurantId: "r-1",
-      slug: "lunch",
-      theme: "bistro",
-      layout: "columns",
     };
 
     saveWizardState("menu-1", state);
@@ -129,7 +149,8 @@ describe("form persistence", () => {
       wizardStorageKey("menu-1"),
       JSON.stringify({
         restaurantName: "Saved Café",
-        slug: "saved",
+        // Leftovers from the retired style picker are simply not part of
+        // the form anymore.
         theme: "neon",
         layout: "columns",
       })
@@ -138,8 +159,6 @@ describe("form persistence", () => {
     expect(loadWizardState("menu-1", FALLBACK)).toEqual({
       ...FALLBACK,
       restaurantName: "Saved Café",
-      slug: "saved",
-      layout: "columns",
     });
   });
 
@@ -192,5 +211,27 @@ describe("pending link", () => {
     const expired = linkExpiryCopy(sentAt, sentAt + WIZARD_LINK_TTL_MS);
     expect(expired.expired).toBe(true);
     expect(linkExpiryCopy(sentAt, sentAt + 60 * 60 * 1000).expired).toBe(true);
+  });
+});
+
+describe("journey marker", () => {
+  it("remembers that publish was opened from review, per menu", () => {
+    const storage = fakeStorage();
+    vi.stubGlobal("window", { localStorage: storage });
+
+    expect(hasPublishJourney("menu-1")).toBe(false);
+    rememberPublishJourney("menu-1");
+    expect(storage.getItem(publishJourneyStorageKey("menu-1"))).not.toBeNull();
+    expect(hasPublishJourney("menu-1")).toBe(true);
+    expect(hasPublishJourney("menu-2")).toBe(false);
+
+    forgetPublishJourney("menu-1");
+    expect(hasPublishJourney("menu-1")).toBe(false);
+  });
+
+  it("is simply absent without storage (server render, private mode)", () => {
+    expect(hasPublishJourney("menu-1")).toBe(false);
+    rememberPublishJourney("menu-1");
+    expect(hasPublishJourney("menu-1")).toBe(false);
   });
 });

@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Attention } from "@/components/ui/attention";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
+import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { LibraryPanel } from "@/components/menu-editor/library-panel";
@@ -46,6 +48,7 @@ import {
   confirmItemReviewed,
   createMenuDocument,
   defaultNewMenuTitle,
+  hasAnyPrice,
   isItemFlagged,
   suggestRestaurantName,
   updateItem,
@@ -73,16 +76,16 @@ import {
   updateServerMenu,
 } from "@/features/menus/sync";
 import {
+  fetchLiveMenuDoc,
   fetchPublication,
   publishMenu,
-  setPublicationSlug,
   unpublishMenu,
 } from "@/features/publishing/client";
 import { usePathname } from "next/navigation";
 
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
-import type { PreviewLayoutId, PreviewThemeId } from "@/features/menu/preview-themes";
+import { rememberPublishJourney } from "@/features/publishing/wizard-state";
 import { authClient } from "@/lib/auth-client";
 import {
   ExtractClientError,
@@ -96,6 +99,7 @@ import {
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
+  signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
   type AppScreen,
@@ -122,17 +126,35 @@ import {
   type DraftOrigin,
 } from "@/features/menus/draft-origins";
 import {
-  decideLocalDraftClaim,
+  accountReadState,
+  decideLocalDraftClaimSurface,
+  deriveClaimGate,
   dismissLocalDraftClaim,
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
-  type LocalDraftClaimAction,
+  resolveAutoClaimTarget,
+  resumeBannerReady,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
+import {
+  decideMenuOpen,
+  decideSessionState,
+  isSessionGateMessage,
+  menuOpenBlockedMessage,
+  type SessionState,
+} from "@/features/session/state";
+import {
+  decideMenuMembership,
+  membershipFlag,
+  type MenuMembership,
+} from "@/features/menus/membership";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
-const STEPS = ["Upload image", "Extract menu", "Review draft"] as const;
+/** How many automatic retries a failed session read gets before the UI asks. */
+const SESSION_READ_RETRIES = 2;
+/** Delay before each retry, growing linearly (1.5 s, then 3 s). */
+const SESSION_READ_RETRY_MS = 1500;
 
 /** Save status stays one word; `detail` says where the save went. */
 function savedState(detail: string): SaveState {
@@ -198,6 +220,7 @@ function MonitorToastStack({ onOpen }: { onOpen: () => void }) {
 export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // The URL is the source of truth for the main screen and selected menu.
   const [route, setRoute] = useState<AppRoute>(initialRoute);
+  const { confirm, dialog } = useConfirm();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
   const selectedItemId = route.screen === "item" ? route.itemId : null;
   /** R0 phone nav: the More sheet (Tables · Assistant · Settings · Get started). */
@@ -227,6 +250,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     ((doc: MenuDocument, image: Blob | null, updateRoute?: boolean) => Promise<void>) | null
   >(null);
   const activeDocIdRef = useRef<string | null>(null);
+  /** Previous session state, so only a real sign-out (not a first load) clears. */
+  const wasSignedInRef = useRef(false);
 
   function navigateTo(next: AppRoute, replace = false, flushCurrent = true) {
     const previousMenuId = routeMenuId(routeRef.current);
@@ -275,9 +300,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // for anonymous drafts): orders/tables/settings/assistant need an account,
   // so a signed-out visitor who lands on one (typed URL, old bookmark)
   // goes back to capture. Runs every render by design; the guard goes
-  // quiet once the screen moves on.
+  // quiet once the screen moves on, and stays inert while the session read is
+  // unanswered (015): unknown is not signed out.
   useEffect(() => {
-    if (!sessionPending && !signedIn) {
+    if (sessionState === "signed-out") {
       const guarded = routeRef.current.screen;
       if (
         guarded === "assistant" ||
@@ -348,14 +374,39 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // the whole local-first flow above keeps working untouched.
   const {
     data: session,
+    error: sessionError,
     isPending: sessionLoading,
-    isRefetching: sessionRefetching,
+    refetch: refetchSession,
   } = authClient.useSession();
-  // A background refetch (e.g. returning to the tab) must not flash skeletons
-  // or unmount in-progress forms: only the first load counts as pending.
-  const sessionPending = sessionLoading && !sessionRefetching;
+  /**
+   * Three answers, not two (015). The session is a request: while it is in
+   * flight — the first read of every page load — or after it failed, nothing
+   * is known, and nothing may be refused or hidden on a guess. `isRefetching`
+   * cannot express that (the first read sets it too), so the decision reads
+   * `pending` and `error` instead. A background refetch keeps `data`, so it
+   * still cannot flash skeletons or unmount in-progress forms.
+   */
+  const sessionState: SessionState = decideSessionState({
+    hasUser: session?.user != null,
+    pending: sessionLoading,
+    error: sessionError ?? null,
+  });
+  /** Waiting on the session: guarded surfaces stay inert, skeletons stay up. */
+  const sessionPending = sessionState === "unknown";
+  /** A read that failed has not answered; offer a retry, not a verdict. */
+  const sessionCheckFailed = sessionPending && sessionError != null;
   const signedIn = session?.user != null;
   const accountKey = session?.user?.id ?? null;
+  /**
+   * The ownership wall's sentence is only true while nobody is known, so it is
+   * derived away the moment a session settles signed in — never cleared by an
+   * effect that could render it for a frame first (015). Derived, not deleted:
+   * the stored message is what a later genuine sign-out has to say.
+   */
+  const visibleLibraryError =
+    signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
+  /** Automatic retries spent on a failed session read (0 = none yet). */
+  const [sessionRetries, setSessionRetries] = useState(0);
   // Server-evaluated release decisions (A4). Both assistant flags default
   // off, so the tab and panel appear only for a released account or a
   // preview link; the loading state below avoids flashing “unavailable” while
@@ -364,6 +415,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     session?.user?.id ?? null
   );
   const signedInRef = useRef(false);
+  /** Session state at decision time (a closure may outlive the render). */
+  const sessionStateRef = useRef<SessionState>("unknown");
   /** Current account id for async work (closures may outlive the render). */
   const accountKeyRef = useRef<string | null>(null);
   /** The server updatedAt the open menu was last synced at; null = don't push. */
@@ -385,8 +438,47 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [restaurantCount, setRestaurantCount] = useState(0);
   /** Which account the restaurant count belongs to; null until it settles. */
   const [restaurantCountFor, setRestaurantCountFor] = useState<string | null>(null);
+  /**
+   * Which account's restaurant read *failed* — a third state, because an
+   * error and an in-flight request must not look the same (002). Cleared by
+   * the next successful read.
+   */
+  const [restaurantReadFailedFor, setRestaurantReadFailedFor] = useState<string | null>(null);
   /** Which account the server menu ids belong to; null until a merge settles. */
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
+  /** Which account's server menu read failed (same third state, menus). */
+  const [serverMenusReadFailedFor, setServerMenusReadFailedFor] = useState<string | null>(null);
+  /**
+   * Which account's server menu list has *finished* being read, however it
+   * ended. The chip column waits for this (001): before it lands, an empty id
+   * set means "not asked yet", never "this browser only".
+   */
+  const [serverMenusReadFor, setServerMenusReadFor] = useState<string | null>(null);
+  /**
+   * The same marker as a ref: the save status and the publish gate decide in
+   * async code that finishes after an await (003).
+   */
+  const accountMenusSettledRef = useRef<string | null>(null);
+  /** The same failure marker as a ref: the save status decides after awaits. */
+  const accountMenusReadFailedRef = useRef<string | null>(null);
+  /**
+   * Where the open menu is saved. `null` while the account read is still
+   * pending, so nothing claims "this browser only" on a guess (001, 003).
+   */
+  const activeMenuMembership: MenuMembership | null = activeDoc
+    ? decideMenuMembership({
+        signedIn,
+        readSettled: serverMenusReadFor === accountKey,
+        readFailed: serverMenusReadFailedFor === accountKey,
+        onServer: serverIds.has(activeDoc.id),
+      })
+    : null;
+  const activeMenuOnServer = activeMenuMembership ? membershipFlag(activeMenuMembership) : null;
+  /**
+   * A failed read is not a wait: the editor says the account couldn't be
+   * checked, and does not offer the café-creating flow on a guess (016).
+   */
+  const activeMenuAccountCheckFailed = activeMenuMembership === "unreachable";
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   /** The answer just given here; the stored per-account value is the fallback. */
@@ -424,11 +516,43 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const [publicationLoaded, setPublicationLoaded] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  /**
+   * The snapshot diners see now, read only while the draft is ahead of it.
+   * The publish panel diffs it against the draft so the owner sees what
+   * "Publish changes" actually changes.
+   */
+  const [liveDoc, setLiveDoc] = useState<MenuDocument | null>(null);
+  const [liveDocMenuId, setLiveDocMenuId] = useState<string | null>(null);
+  const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle"
+  );
 
   useEffect(() => {
     signedInRef.current = signedIn;
+    sessionStateRef.current = sessionState;
     accountKeyRef.current = accountKey;
-  }, [signedIn, accountKey]);
+  }, [signedIn, sessionState, accountKey]);
+
+  // The save status and the publish gate decide in async code that finishes
+  // after an await, so the failed read travels with the other refs (003, 016).
+  useEffect(() => {
+    accountMenusReadFailedRef.current = serverMenusReadFailedFor;
+  }, [serverMenusReadFailedFor]);
+
+  // A failed session read is not a sign-out (015): retry it twice with a
+  // backing-off delay, then stop asking and let the UI say what it knows. Only
+  // the timer writes state, so a failure never cascades a render.
+  useEffect(() => {
+    if (!sessionCheckFailed || sessionRetries >= SESSION_READ_RETRIES) return;
+    const timer = setTimeout(() => {
+      setSessionRetries((attempts) => attempts + 1);
+      void refetchSession?.();
+    }, SESSION_READ_RETRY_MS * (sessionRetries + 1));
+    return () => clearTimeout(timer);
+  }, [sessionCheckFailed, sessionRetries, refetchSession]);
+
+  /** The retries are spent: keep the wait honest instead of guessing. */
+  const sessionCheckGaveUp = sessionCheckFailed && sessionRetries >= SESSION_READ_RETRIES;
 
   // Moving a single menu needs the owned restaurants up front, so each
   // browser-only row can offer its target without opening the move panel.
@@ -443,6 +567,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         setOwnedRestaurantsFor(accountKey);
         setRestaurantCount(list.length);
         setRestaurantCountFor(accountKey);
+        setRestaurantReadFailedFor(null);
       } catch {
         // Best-effort: the move panel shows its own load error, the wizard
         // explains a failed create, and the server still refuses a move the
@@ -451,6 +576,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         if (!cancelled) {
           setOwnedRestaurants([]);
           setOwnedRestaurantsFor(accountKey);
+          // Unknown, not zero: `restaurantCountFor` stays for the old account
+          // and this marker settles the claim gate as *failed* instead.
+          setRestaurantReadFailedFor(accountKey);
         }
       }
     })();
@@ -482,7 +610,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   editorImageUrlRef.current = editorImageUrl;
 
   useEffect(() => {
-    if (!navigationReadyRef.current || !routeMenuId(route) || sessionPending) return;
+    if (!navigationReadyRef.current || !routeMenuId(route) || sessionState === "unknown") return;
     const menuId = routeMenuId(route);
     if (!menuId) return;
     if (activeDocIdRef.current === menuId) {
@@ -518,16 +646,30 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         let imageBlob: Blob | null = null;
         try {
           doc = await getMenu(menuId);
-          if (!signedInRef.current) {
-            // Sign-out is a privacy boundary: a stamped row belongs to its
-            // owner and never opens for nobody signed out (direct URL included).
-            const origin = await getDraftOrigin(menuId).catch(() => undefined);
-            if (origin) {
-              setLibraryError("That menu belongs to an account — sign in to view it.");
-              openedRouteMenuRef.current = null;
-              navigateToRef.current?.({ screen: "library" }, true);
-              return;
-            }
+          // The device stamp is a privacy boundary, not an accusation (015): a
+          // row stamped to this account is the account's own copy, an unstamped
+          // row is the shared anonymous working set, and only a row stamped to
+          // somebody else stays shut. An unanswered session decides nothing
+          // here — the effect re-runs when the read settles.
+          const origin = await getDraftOrigin(menuId).catch(() => undefined);
+          const access = decideMenuOpen({
+            session: sessionStateRef.current,
+            stampAccountId: origin?.accountId,
+            accountKey: accountKeyRef.current,
+          });
+          if (access.state === "wait") {
+            if (cancelled) return;
+            openedRouteMenuRef.current = null;
+            return;
+          }
+          if (access.state === "blocked") {
+            // A torn-down run must never navigate: this was the one branch in
+            // the effect without the cancellation guard (015).
+            if (cancelled) return;
+            setLibraryError(menuOpenBlockedMessage(access.reason));
+            openedRouteMenuRef.current = null;
+            navigateToRef.current?.({ screen: "library" }, true);
+            return;
           }
           try {
             imageBlob = (await getImage(menuId))?.blob ?? null;
@@ -560,12 +702,58 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       cancelled = true;
       if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
     };
-  }, [route, sessionPending, signedIn]);
+  }, [route, sessionState, signedIn]);
 
   useEffect(() => {
+    const wasSignedIn = wasSignedInRef.current;
+    wasSignedInRef.current = signedIn;
+
     if (!signedIn) {
+      // Sign-out is a privacy boundary. An open editor or a result on
+      // Capture can hold an account menu, so a real session end dismisses
+      // both and lands on Capture. Nothing is deleted: anonymous drafts
+      // remain in My menus, and the landed screen is the signed-out home.
+      const landing = signOutLandingRoute({ wasSignedIn, signedIn });
+      if (landing) {
+        const openDoc = docRef.current;
+        if (openDoc) {
+          // Release the open document before saving it. Pending account
+          // work (sync, publication, the route opener) checks docRef and
+          // bails once it is null, so nothing can reopen the editor. The
+          // direct save still keeps the latest local edits.
+          docRef.current = null;
+          lastSavedRef.current = null;
+          serverBaseRef.current = null;
+          conflictRef.current = null;
+          if (saveTimer.current) {
+            clearTimeout(saveTimer.current);
+            saveTimer.current = null;
+          }
+          if (!storageDownRef.current) {
+            void saveMenu(openDoc).catch(() => undefined);
+          }
+        }
+        setActiveDoc(null);
+        setEditorImage(null);
+        setConflict(null);
+        setConflictError(null);
+        setPublication(null);
+        setPublicationMenuId(null);
+        setPublicationLoaded(false);
+        setPublishError(null);
+        resetLiveDoc();
+        if (resultDoc !== null || pages.length > 0) applySelection([]);
+        navigateTo(landing, true, false);
+      }
       replaceServerIds(new Set());
       replaceStaffMenus(new Set());
+      // The ids and the read that produced them reset together (001): a stale
+      // "settled" marker over an empty id set would let the next sign-in paint
+      // the same false chip.
+      setServerMenusFor(null);
+      setServerMenusReadFailedFor(null);
+      setServerMenusReadFor(null);
+      accountMenusSettledRef.current = null;
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
@@ -576,7 +764,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // that was never moved to the account stays local-only (serverBaseRef
     // stays null), so this cannot loop.
     void refreshLibrary();
-    void mergeAccountMenus();
+    // Chain onto a merge left over from the previous session instead of
+    // letting the dedupe swallow this one: the chip column waits for a read,
+    // and a skipped start would leave it waiting forever (001).
+    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
     void healStampedDrafts();
     const doc = docRef.current;
     if (doc && serverBaseRef.current === null && !conflictRef.current) {
@@ -626,6 +817,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
+   * Retry the account's menu read after a failure (016). The markers drop
+   * back to "not read yet" first, so the surfaces return to their
+   * placeholders instead of announcing an answer that has not arrived.
+   */
+  function handleRetryAccountCheck() {
+    if (!accountKey) return;
+    setServerMenusReadFailedFor(null);
+    setServerMenusReadFor(null);
+    accountMenusSettledRef.current = null;
+    void mergeAccountMenus();
+  }
+
+  /**
    * Merge the account's menus into the local library (signed in only). A
    * menu that exists only on the server — moved from another device — is
    * downloaded and cached locally once, so the library lists and opens it
@@ -641,7 +845,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
-        if (signedInRef.current) setServerMenusFor(accountKey);
+        if (signedInRef.current) {
+          setServerMenusFor(accountKey);
+          setServerMenusReadFailedFor(null);
+        }
         try {
           replaceStaffMenus(staffMenuIds(serverMenus, await fetchRestaurants()));
         } catch {
@@ -695,7 +902,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         if (originsChanged) setOriginList(await listDraftOrigins());
       } catch {
         // Signed out mid-flight, offline, or the server DB is unavailable:
-        // the local library stands alone.
+        // the local library stands alone. Remember that the read failed so
+        // the claim gate can settle as unknown instead of waiting forever.
+        if (signedInRef.current && accountKeyRef.current) {
+          setServerMenusReadFailedFor(accountKeyRef.current);
+        }
+      } finally {
+        // Settled either way, so the library may stop skeletoning. On a failed
+        // read it then says nothing about membership rather than claiming
+        // "this browser only" (001).
+        if (signedInRef.current && accountKeyRef.current) {
+          setServerMenusReadFor(accountKeyRef.current);
+          accountMenusSettledRef.current = accountKeyRef.current;
+        }
       }
     })();
     mergeRef.current = run;
@@ -763,9 +982,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     if (!doc || storageDownRef.current) return;
     const json = JSON.stringify(doc);
     if (json === lastSavedRef.current) {
-      setSaveState(
-        savedState(serverBaseRef.current ? "Saved to your account." : "Saved in this browser.")
-      );
+      setSaveState(storageSaveState(doc.id));
       return;
     }
     try {
@@ -858,6 +1075,29 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
   }
 
+  /**
+   * Where this document's saves go, as far as the client can honestly say.
+   * Before the account's list settles the answer is "checking", not "in this
+   * browser": the latter is false for every account menu (003).
+   */
+  function storageSaveState(id: string): SaveState {
+    if (serverBaseRef.current) return savedState("Saved to your account.");
+    const membership = decideMenuMembership({
+      signedIn: signedInRef.current,
+      readSettled: accountMenusSettledRef.current === accountKeyRef.current,
+      readFailed: accountMenusReadFailedRef.current === accountKeyRef.current,
+      onServer: serverIdsRef.current.has(id),
+    });
+    if (membership === "account") return savedState("Saved to your account.");
+    if (membership === "unknown") {
+      return { kind: "checking", message: "Checking your account…" };
+    }
+    if (membership === "unreachable") {
+      return savedState("Saved here — your account couldn't be checked.");
+    }
+    return savedState("Saved in this browser.");
+  }
+
   async function flushSave() {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
@@ -894,6 +1134,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setPublicationMenuId(null);
     setPublicationLoaded(false);
     setPublishError(null);
+    resetLiveDoc();
     void refreshPublication(doc.id);
     docRef.current = doc;
     lastSavedRef.current = JSON.stringify(doc);
@@ -901,7 +1142,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setSaveState(
       storageDownRef.current
         ? { kind: "error", message: "Storage unavailable — edits are kept in memory only." }
-        : savedState("Saved in this browser.")
+        : storageSaveState(doc.id)
     );
     setImportError(null);
     setEditorImage(imageBlob ? URL.createObjectURL(imageBlob) : null);
@@ -1109,7 +1350,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   async function handleNewMenu(suggestedTitle?: string) {
     setLibraryError(null);
-    // Q2: never gate on a name — blank menus arrive titled ("Main menu"
+    // Q2: never gate on a name — blank menus arrive titled ("Main Menu"
     // first, honest numbering after) and rename inline in the editor.
     const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
     const title = suggestedTitle?.trim() ? suggestedTitle.trim() : fallback;
@@ -1298,17 +1539,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
-   * A brand-new account (no menus, no restaurants) adopts this browser's
-   * drafts in one go. The café name comes from the menu titles, never a
-   * placeholder the owner cannot recognise.
+   * An account with no menus adopts this browser's drafts in one go. Where
+   * they land is the account's own café when it has one — an empty café is
+   * still *its* café — and only an account that owns none gets one created,
+   * named from the menu titles rather than a placeholder the owner cannot
+   * recognise. Reusing is what stops a retried claim from minting a second
+   * café next to the first.
    */
   async function handleAutoClaim(titles: string[]) {
     if (!accountKey) return;
     setClaimBusy(true);
     setClaimError(null);
     try {
-      const name = suggestRestaurantName(titles) ?? "My restaurant";
-      const created = await createRestaurant(name);
+      const target = resolveAutoClaimTarget(ownedRestaurantsForAccount, titles);
+      if (target.kind === "reuse") {
+        await runLocalDraftClaim(target.restaurantId, target.restaurantName);
+        return;
+      }
+      const created = await createRestaurant(target.name);
       setOwnedRestaurants((current) =>
         current.some((restaurant) => restaurant.id === created.id) ? current : [...current, created]
       );
@@ -1337,12 +1585,48 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setClaimAnswer({ accountKey, status: "dismissed" });
   }
 
+  function resetLiveDoc() {
+    setLiveDoc(null);
+    setLiveDocMenuId(null);
+    setLiveDocState("idle");
+  }
+
+  /**
+   * Read the live snapshot, but only while the draft is ahead of it: with no
+   * unpublished changes there is nothing to compare, and a paused or
+   * never-published menu has no serving version at all.
+   */
+  async function refreshLiveDoc(menuId: string, status: PublicationStatus | null) {
+    if (!status?.isLive || !status.hasUnpublishedChanges) {
+      resetLiveDoc();
+      return;
+    }
+    setLiveDocMenuId(menuId);
+    setLiveDocState("loading");
+    try {
+      const doc = await fetchLiveMenuDoc(menuId);
+      if (docRef.current?.id !== menuId) return;
+      setLiveDoc(doc);
+      setLiveDocState("ready");
+    } catch (error) {
+      if (docRef.current?.id !== menuId) return;
+      if (error instanceof SyncError && error.code === "not_found") {
+        setLiveDoc(null);
+        setLiveDocState("ready");
+        return;
+      }
+      setLiveDoc(null);
+      setLiveDocState("error");
+    }
+  }
+
   /** Load the open menu's publication state (signed in only). */
   async function refreshPublication(menuId: string) {
     if (!signedInRef.current) {
       setPublication(null);
       setPublicationMenuId(null);
       setPublicationLoaded(false);
+      resetLiveDoc();
       return;
     }
     setPublicationMenuId(menuId);
@@ -1351,13 +1635,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (docRef.current?.id !== menuId) return;
       setPublication(status);
       setPublishError(null);
+      void refreshLiveDoc(menuId, status);
     } catch (error) {
       if (docRef.current?.id !== menuId) return;
       if (error instanceof SyncError && error.code === "not_found") {
         setPublication(null);
       } else {
-        setPublishError("Could not check the public link. Try again in a moment.");
+        setPublishError("Could not check the menu’s status. Try again in a moment.");
       }
+      resetLiveDoc();
     } finally {
       if (docRef.current?.id === menuId) setPublicationLoaded(true);
     }
@@ -1389,20 +1675,38 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * Publish (or publish changes): flush the pending save first so the
    * snapshot is of what the owner just saw, never of a stale draft.
    */
-  async function handlePublish(theme: PreviewThemeId, layout: PreviewLayoutId) {
+  async function handlePublish() {
     const doc = docRef.current;
     if (!doc) return;
     setPublishError(null);
     setPublishBusy(true);
     try {
       await flushSave();
-      if (!serverIdsRef.current.has(doc.id)) {
+      // An unread account list is not an answer, so ask this menu's own
+      // endpoint rather than refusing on an empty set (003). Only a definite
+      // "no such menu" refuses; an unreachable server is left to the publish
+      // call, whose errors are already honest.
+      let onAccount = serverIdsRef.current.has(doc.id);
+      if (
+        !onAccount &&
+        signedInRef.current &&
+        accountMenusSettledRef.current !== accountKeyRef.current
+      ) {
+        onAccount = await fetchServerMenu(doc.id).then(
+          () => true,
+          (error: unknown) => !(error instanceof SyncError && error.code === "not_found")
+        );
+        if (onAccount) addServerId(doc.id);
+      }
+      if (!onAccount) {
         setPublishError("Add this menu to your account first, then publish it.");
         return;
       }
-      const status = await publishMenu(doc.id, { theme, layout });
+      const status = await publishMenu(doc.id);
       setPublication(status);
       setPublicationLoaded(true);
+      // Nothing is unpublished any more, so there is nothing left to compare.
+      void refreshLiveDoc(doc.id, status);
     } catch (error) {
       setPublishError(publishErrorMessage(error));
     } finally {
@@ -1424,20 +1728,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
   }
 
-  async function handleChangeSlug(slug: string) {
-    const doc = docRef.current;
-    if (!doc) return;
-    setPublishError(null);
-    setPublishBusy(true);
-    try {
-      setPublication(await setPublicationSlug(doc.id, slug));
-    } catch (error) {
-      setPublishError(publishErrorMessage(error));
-    } finally {
-      setPublishBusy(false);
-    }
-  }
-
   /**
    * The wizard published (or attached) this menu. Make the shell agree with
    * the server immediately: the library chip, the publication panel and the
@@ -1450,6 +1740,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setPublicationMenuId(menuId);
     setPublicationLoaded(true);
     setPublishError(null);
+    resetLiveDoc();
     void (async () => {
       try {
         const server = await fetchServerMenu(menuId);
@@ -1525,6 +1816,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       setPublicationMenuId(null);
       setPublicationLoaded(false);
       setPublishError(null);
+      resetLiveDoc();
       await refreshLibrary();
       if (accountNote) setLibraryError(accountNote);
       navigateTo({ screen: "library" }, false, false);
@@ -1549,11 +1841,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }));
   }
 
-  function confirmDiscard(
+  async function confirmDiscard(
     message = "This will discard the current extracted menu. Continue?"
-  ): boolean {
+  ): Promise<boolean> {
     if (!extracted && !demoDoc) return true;
-    return window.confirm(message);
+    return confirm({ message, confirmLabel: "Discard", destructive: true });
   }
 
   /**
@@ -1581,9 +1873,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /** Start (or restart) a selection from the dropzone — replaces every page. */
-  function selectFiles(incoming: File[]) {
+  async function selectFiles(incoming: File[]) {
     if (incoming.length === 0) return;
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     const check = validateImageBatch(incoming);
     if (!check.valid) {
       setFileError(check.message);
@@ -1599,7 +1891,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * new extraction runs right away over the old pages plus the new ones
    * instead of making the user press Extract a second time.
    */
-  function addPages(incoming: File[]) {
+  async function addPages(incoming: File[]) {
     if (incoming.length === 0) return;
     if (phase === "extracting") {
       setFileError("An extraction is running — add pages once it finishes.");
@@ -1619,7 +1911,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       `A new extraction will run on all ${combined.length} images together: the ` +
       `${pages.length} already selected plus ${incoming.length} new ` +
       `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
-    if (!confirmDiscard(confirmMessage)) return;
+    if (!(await confirmDiscard(confirmMessage))) return;
     applySelection(combined);
     void extractFiles(combined);
   }
@@ -1636,8 +1928,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /** Drop one page; dropping the last one returns to the dropzone. */
-  function removePage(index: number) {
-    if (!confirmDiscard()) return;
+  async function removePage(index: number) {
+    if (!(await confirmDiscard())) return;
     applySelection(pages.filter((_, i) => i !== index).map((page) => page.file));
   }
 
@@ -1704,8 +1996,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     void extractFiles(pages.map((page) => page.file));
   }
 
-  function handleDemo() {
-    if (!confirmDiscard()) return;
+  async function handleDemo() {
+    if (!(await confirmDiscard())) return;
     clearCapture();
     const doc = createSampleMenuDocument();
     setDemoDoc(doc);
@@ -1890,7 +2182,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       doc,
       category.id,
       item.id,
-      item.price === null && price !== null ? { price, reviewNotes: [] } : { price }
+      !hasAnyPrice(item) && price !== null ? { price, reviewNotes: [] } : { price }
     );
     patchResultDoc(next);
     void persistResultDoc(next);
@@ -1906,9 +2198,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       for (const item of category.items) {
         if (!isItemFlagged(item)) continue;
         next =
-          item.price === null
-            ? acceptItemUnpriced(next, category.id, item.id)
-            : confirmItemReviewed(next, category.id, item.id);
+          hasAnyPrice(item)
+            ? confirmItemReviewed(next, category.id, item.id)
+            : acceptItemUnpriced(next, category.id, item.id);
       }
     }
     patchResultDoc(next);
@@ -1935,10 +2227,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
   }
 
-  /** From the extraction result: save the draft, then open the publish wizard. */
+  /** From the extraction result: save the draft, then open the publish wizard.
+   * The marker lets that screen continue the four-stop journey; a menu opened
+   * straight from the library gets a plain heading instead of a false "3 done". */
   async function handleStartPublish() {
     try {
       const saved = await saveResultAndOpen(false);
+      rememberPublishJourney(saved.id);
       navigateTo({ screen: "editor", menuId: saved.id, mode: "publish" });
     } catch (error) {
       showOpenError(error);
@@ -1998,6 +2293,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // Library rows carry their account state: menus on the server show as
   // synced; the rest are browser-only until moved (or downloaded).
   const libraryMenus = visibleMenus.map((menu) => ({ ...menu, onServer: serverIds.has(menu.id) }));
+  /**
+   * The chip column may only speak once the account's menu list has been read
+   * (001). Before that an empty id set is "not asked yet", so the rows keep
+   * their skeleton; after a *failed* read they render with no chip at all —
+   * an unknown membership is never reported as "this browser only".
+   */
+  // The gate reads the *settled* marker, not the id set: a read that failed
+  // still ends the wait (rows appear without a chip), while only a read that
+  // answered lets the rows name membership (001).
+  const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
+  const libraryAccountMode = signedIn && serverMenusFor === accountKey;
   const localOnly = libraryMenus.filter((menu) => !menu.onServer);
   const localOnlyCount = localOnly.length;
   // A list cached from another account is never offered as a move target.
@@ -2019,33 +2325,55 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // auto-import: signing in inside the publish wizard is the onboarding
   // path, and leaving it ungated strands the draft as anonymous — the next
   // sign-out resurrects the resume banner for a menu the account owns.
-  // "pending" is a real third value, not a stand-in for "none": while the
-  // session or the account's inventory is still loading the decision is
-  // *unknown*. The resume banner used to read that unknown as a settled
-  // "none", pass its `!== "offer"` check, and render in the load gap — the
-  // flicker. Signed out and settled, the decision really is "none".
-  const claimDecisionPending =
-    sessionPending ||
-    (signedIn && (serverMenusFor !== accountKey || restaurantCountFor !== accountKey));
-  const localDraftsDecision: LocalDraftClaimAction | "pending" = claimDecisionPending
-    ? "pending"
-    : signedIn
-      ? decideLocalDraftClaim({
-          localCount: localOnlyCount,
-          accountMenuCount: serverIds.size,
-          restaurantCount,
-          ownedRestaurantCount: ownedRestaurantsForAccount.length,
-          status: claimStatus,
-        })
-      : "none";
+  //
+  // "pending" and "unavailable" are real answers, not stand-ins for "none".
+  // While the session or the account's inventory is still loading the
+  // decision is *unknown* (the resume banner once read that unknown as a
+  // settled "none", passed its `!== "offer"` check and rendered in the load
+  // gap — the flicker). A read that *failed* is unknown too, and must never
+  // be read as an empty account: that would push this browser's drafts at a
+  // server that did not answer. Signed out and settled, the decision really
+  // is "none".
+  const claimGate = deriveClaimGate({
+    sessionPending,
+    signedIn,
+    menus: accountReadState({
+      accountKey,
+      settledFor: serverMenusFor,
+      failedFor: serverMenusReadFailedFor,
+    }),
+    restaurants: accountReadState({
+      accountKey,
+      settledFor: restaurantCountFor,
+      failedFor: restaurantReadFailedFor,
+    }),
+  });
+  const localDraftsDecision = decideLocalDraftClaimSurface({
+    gate: claimGate,
+    signedIn,
+    claim: {
+      localCount: localOnlyCount,
+      accountMenuCount: serverIds.size,
+      restaurantCount,
+      ownedRestaurantCount: ownedRestaurantsForAccount.length,
+      status: claimStatus,
+    },
+  });
+  // Neither claim surface renders while the gate says the account is unknown.
+  const claimSurfaceQuiet =
+    localDraftsDecision === "none" || localDraftsDecision === "unavailable";
 
-  // The resume banner may only render once everything it reads has
-  // settled: the session (who is this?), the IndexedDB library (what is
-  // saved in this browser?) and — signed in — the account's server menu
-  // and restaurant lists (are these drafts really unpublished?). Before
-  // that it renders nothing at all; a late answer can only remove it,
-  // never move it.
-  const resumeReady = !libraryLoading && !claimDecisionPending;
+  // The resume banner names one menu as an unpublished browser draft, which it
+  // reads off the account's id set — so it waits for that set to have actually
+  // answered. A failed read settles the gate (002's notice says so), but it
+  // cannot tell an account menu from a draft: every menu would look local and
+  // the banner would hand an account menu back as unpublished (017).
+  const resumeReady = resumeBannerReady({
+    libraryLoading,
+    gate: claimGate,
+    signedIn,
+    accountMenusSettled: libraryAccountMode,
+  });
 
   // Confirm the dismissal only after the inputs settle, so the banner's
   // very first render is already a confirmed decision, not an assumption.
@@ -2059,7 +2387,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   useEffect(() => {
     if (!signedIn || !accountKey) return;
-    if (serverMenusFor !== accountKey || restaurantCountFor !== accountKey) return;
+    // Unknown is not "empty": no server work while a read is in flight, and
+    // none after one failed. The evaluation stays unmarked, so a later
+    // successful read in this session can still run it.
+    if (claimGate.pending || claimGate.incomplete) return;
     if (claimEvaluatedRef.current === accountKey) return;
     claimEvaluatedRef.current = accountKey;
     if (localDraftsDecision !== "auto-import") return;
@@ -2070,11 +2401,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     accountKey,
+    claimGate.incomplete,
+    claimGate.pending,
     claimStatus,
     localDraftsDecision,
-    restaurantCountFor,
     screen,
-    serverMenusFor,
     signedIn,
   ]);
 
@@ -2091,6 +2422,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   return (
     <OrderMonitorProvider userId={session?.user?.id ?? null}>
     <div className="flex min-h-full flex-1 flex-col">
+      {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
       <SiteHeader />
       <main
@@ -2200,11 +2532,20 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           </div>
         )}
 
+        {/* A failed account read is no longer silent: the gate settles, the
+            server paths stay off, and this says so once. */}
+        {signedIn && claimGate.incomplete && screen !== "editor" && (
+          <p className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-stone-600">
+            We couldn&apos;t check your account just now, so nothing was imported from this
+            browser. Reload when you&apos;re back online and it will try again.
+          </p>
+        )}
+
         {/* Q7 resume banner: the way back for anyone who wandered off (or
             returns from the magic-link email) with a saved-but-unpublished
             draft. Whether a draft is unpublished is *server* knowledge, so
             this renders only after `resumeReady` (session, library and —
-            signed in — account inventory all settled) and only with a
+            signed in — an account menu list that answered) and only with a
             confirmed `resumeDismissed === false`: until then it is
             invisible, never provisional. Hidden in the editor (it has its
             own publish entry), while the result is on screen (it IS the
@@ -2215,7 +2556,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           resumeDismissed === false &&
           localOnlyCount > 0 &&
           !claimNotice &&
-          localDraftsDecision === "none" &&
+          claimSurfaceQuiet &&
           (() => {
             const resumable = localOnly.find((menu) => !menu.corrupt);
             if (!resumable) return null;
@@ -2224,7 +2565,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-amber-950">
-                      📍 Continue getting your link →
+                      📍 Finish publishing your menu →
                     </p>
                     <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
                       {localOnlyCount === 1
@@ -2257,18 +2598,26 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
         {screen === "library" && (
           <div className="flex flex-col gap-4">
-            {libraryError && (
+            {visibleLibraryError && (
               <p
                 role="alert"
                 className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
               >
-                {libraryError}
+                {visibleLibraryError}{" "}
+                {isSessionGateMessage(visibleLibraryError) && (
+                  <a
+                    href="/sign-in"
+                    className="font-semibold text-red-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
+                  >
+                    Sign in
+                  </a>
+                )}
               </p>
             )}
             <LibraryPanel
               menus={libraryMenus}
-              loading={libraryLoading}
-              accountMode={signedIn}
+              loading={libraryLoading || libraryAccountPending}
+              accountMode={libraryAccountMode}
               hasHiddenMenus={hasHiddenMenus}
               ownedRestaurants={signedIn ? ownedRestaurantsForAccount : []}
               onMoveToAccount={handleMoveMenuToAccount}
@@ -2281,7 +2630,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             {/* The manual route stays available, quietly: the post-sign-in
                 offer handles the common case, and this is where a partial
                 import is retried. */}
-            {signedIn && localOnlyCount > 0 && (
+            {signedIn && libraryAccountMode && localOnlyCount > 0 && (
               <details className="rounded-2xl border border-stone-200 bg-white">
                 <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-700 marker:text-stone-400">
                   Import from this browser
@@ -2417,7 +2766,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 saveState={saveState}
                 syncMode={signedIn ? "account" : "local"}
                 canManage={!activeMenuIsStaff}
-                onServer={serverIds.has(activeDoc.id)}
+                onServer={activeMenuOnServer}
+                accountCheckFailed={activeMenuAccountCheckFailed}
+                onRetryAccountCheck={handleRetryAccountCheck}
+                restaurantName={
+                  ownedRestaurantsForAccount.find(
+                    (restaurant) => restaurant.id === activePublication?.restaurantId
+                  )?.name ?? null
+                }
                 onStartPublish={() =>
                   navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "publish" })
                 }
@@ -2433,10 +2789,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   loaded: activePublicationLoaded,
                   busy: publishBusy,
                   error: publishError,
-                  inAccount: serverIds.has(activeDoc.id),
-                  onPublish: (theme, layout) => void handlePublish(theme, layout),
+                  inAccount: activeMenuOnServer,
+                  accountCheckFailed: activeMenuAccountCheckFailed,
+                  onRetryAccountCheck: handleRetryAccountCheck,
+                  liveDoc: liveDocMenuId === activeDoc.id ? liveDoc : null,
+                  liveDocState: liveDocMenuId === activeDoc.id ? liveDocState : "idle",
+                  onPublish: () => void handlePublish(),
                   onUnpublish: () => void handleUnpublish(),
-                  onChangeSlug: (slug) => void handleChangeSlug(slug),
                 }}
                 onPreviewOpen={() => {
                   if (docRef.current) void refreshPublication(docRef.current.id);
@@ -2456,33 +2815,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 Upload a photo or scan of a menu, extract it into categories and items with AI, then
                 review and correct the draft. AI output is never guaranteed — you stay in charge.
               </p>
+              {!signedIn && !sessionPending && (
+                <p className="mt-1.5 max-w-xl text-xs leading-5 text-stone-500">
+                  You can upload and review first. Publishing needs an account — we’ll email you a
+                  sign-in link, and your draft stays in this browser.
+                </p>
+              )}
             </div>
 
-            <ol aria-label="Progress" className="flex items-center gap-2">
-              {STEPS.map((label, index) => (
-                <li key={label} className="flex flex-1 items-center gap-2 last:flex-none">
-                  <span
-                    aria-current={index === activeStep ? "step" : undefined}
-                    className={[
-                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
-                      index <= activeStep
-                        ? "bg-amber-700 text-white"
-                        : "bg-stone-200 text-stone-500",
-                    ].join(" ")}
-                  >
-                    {index + 1}
-                  </span>
-                  <span
-                    className={`text-xs font-medium sm:text-sm ${index <= activeStep ? "text-stone-900" : "text-stone-400"}`}
-                  >
-                    {label}
-                  </span>
-                  {index < STEPS.length - 1 && (
-                    <span aria-hidden="true" className="h-px flex-1 bg-stone-200" />
-                  )}
-                </li>
-              ))}
-            </ol>
+            <JourneySteps current={activeStep} />
 
             {phase === "upload" && pages.length === 0 && (
               <div className="flex flex-col gap-3">
@@ -2646,7 +2987,38 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             onStartFresh={() => navigateTo({ screen: "capture" })}
           />
         )}
-        {screen === "editor" && !activeDoc && !missingPublishMenuId && (
+        {screen === "editor" && !activeDoc && !missingPublishMenuId && sessionCheckGaveUp && (
+          <section className="rounded-2xl border border-stone-200 bg-white p-6 text-center">
+            <h1 className="font-medium text-stone-900">Checking your session…</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft
+              is still saved in this browser — nothing is lost.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSessionRetries(0);
+                  void refetchSession?.();
+                }}
+                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => navigateTo({ screen: "library" })}
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Back to My menus
+              </button>
+            </div>
+          </section>
+        )}
+        {screen === "editor" &&
+          !activeDoc &&
+          !missingPublishMenuId &&
+          !sessionCheckGaveUp && (
           <div role="status" aria-busy="true" className="flex flex-col gap-4">
             <span className="sr-only">Opening menu…</span>
             <div className="flex items-center gap-3">

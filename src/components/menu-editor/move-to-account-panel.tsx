@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { moveLocalMenusToAccount, type MoveReport } from "@/features/menus/move-to-account";
@@ -49,6 +50,7 @@ export function MoveToAccountPanel({
   onMoved,
   onOwnedChange,
 }: MoveToAccountPanelProps) {
+  const { confirm, dialog } = useConfirm();
   const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -138,13 +140,12 @@ export function MoveToAccountPanel({
 
   async function handleDelete() {
     if (!selected || mutating) return;
-    if (
-      !window.confirm(
-        `Delete “${selected.name}” permanently? Its menus, published pages and orders are deleted too. This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      message: `Delete “${selected.name}” permanently? Its menus, published pages and orders are deleted too. This cannot be undone.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setMutating(true);
     setError(null);
     try {
@@ -362,6 +363,7 @@ export function MoveToAccountPanel({
           </button>
         </div>
       )}
+      {dialog}
     </section>
   );
 }

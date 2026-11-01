@@ -33,10 +33,11 @@ point the owner at the contact address on /privacy. Never promise a feature that
    editor. Nothing an owner edits is visible to diners until it is published.
 
 4. Preview and publish (Editor → Preview)
-   The Preview screen shows the customer view, theme and layout. "Publish" creates the public page at
-   /r/<restaurant>/m/<menu>, with an editable link name, a QR code and a cookie-free view count. Later edits
-   stay private until "Publish changes" is pressed. "Unpublish" takes the page offline; republishing reuses
-   the link and keeps the view count.
+   The Preview screen renders the diner's order page for this menu, with ordering off — the same page a
+   table card opens, so the owner checks exactly what diners get. "Publish" makes the menu orderable at the
+   tables: it snapshots the menu and marks it live. There is no public menu page, menu link or menu QR code.
+   Later edits stay private until "Publish changes" is pressed. "Unpublish" takes the menu out of table
+   ordering; republishing reuses its reserved address.
 
 5. Opening hours (Editor → availability)
    Hours are set per menu, not per restaurant: weekday windows in the restaurant's time zone, with overnight
@@ -62,12 +63,11 @@ point the owner at the contact address on /privacy. Never promise a feature that
    owner and staff; staff are read-only for menus. The team activity list shows the last events.
 
 9. Settings (tab: Settings, path /settings)
-   Rename the restaurant, see and copy the public /r/<restaurant> link, manage the team, and delete the
-   account behind a typed confirmation. There is no restaurant profile: no address, phone number, logo,
+   Rename the restaurant, manage the team, and delete the account behind a typed confirmation. There is no restaurant profile: no address, phone number, logo,
    cuisine, description or opening-hours field on the restaurant itself.
 
 10. Launch (page /launch)
-    The free-launch checklist (extract, review, theme, print table cards, publish, first order), the free
+    The free-launch checklist (extract, review, print table cards, publish, first order), the free
     offer, this month's extraction usage against its cap, and the data controls: download everything as JSON,
     or delete the account.
 

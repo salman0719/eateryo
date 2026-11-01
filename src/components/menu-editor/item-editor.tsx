@@ -1,15 +1,20 @@
 "use client";
 
+import { useMemo } from "react";
+
+import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import {
   duplicateItem,
+  hasAnyPrice,
   isItemFlagged,
   moveItem,
   moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
-import type { MenuDocument, MenuItem } from "@/features/menu/schema";
+import type { MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 
-import { CommitInput, CommitNumber } from "./fields";
+import { CommitInput, CommitNumber, CommitTags } from "./fields";
+import { ItemImagePanel } from "./item-image-panel";
 
 interface ItemEditorProps {
   doc: MenuDocument;
@@ -28,6 +33,10 @@ interface ItemEditorProps {
   /** Bulk reassignment checkbox state (see menu-editor's bulk actions bar). */
   selected: boolean;
   onToggle: () => void;
+  /** Signed in, so the upload endpoint will authorize a photo. */
+  canUploadImage: boolean;
+  /** Attach, replace, or (null) remove this item's photo. */
+  onAttachImage: (image: MenuItemImage | null) => void;
 }
 
 const smallButton =
@@ -45,10 +54,15 @@ export function ItemEditor({
   duplicate,
   selected,
   onToggle,
+  canUploadImage,
+  onAttachImage,
 }: ItemEditorProps) {
   const category = doc.categories.find((c) => c.id === categoryId);
   const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
   const needsReview = isItemFlagged(item);
+  // Labels this menu already uses, most-used first: the reuse list is a view
+  // over the document in hand, so there is nothing new to store or fetch.
+  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
 
   function patch(patch: Parameters<typeof updateItem>[3]) {
     onChange(updateItem(doc, categoryId, item.id, patch));
@@ -73,10 +87,10 @@ export function ItemEditor({
         <CommitNumber
           label="Price"
           value={item.price}
-          placeholder="Blank if unknown"
+          placeholder={item.variants.length > 0 ? "Blank — priced per size" : "Blank if unknown"}
           onCommit={(price) =>
             patch(
-              item.price === null && price !== null ? { price, reviewNotes: [] } : { price }
+              !hasAnyPrice(item) && price !== null ? { price, reviewNotes: [] } : { price }
             )
           }
         />
@@ -119,19 +133,17 @@ export function ItemEditor({
       </div>
 
       <div className="mt-3">
-        <CommitInput
-          label="Dietary labels (comma-separated, only if shown on the menu)"
-          value={item.dietaryLabels.join(", ")}
-          validate={() => null}
-          placeholder="e.g. vegan, gluten-free"
-          onCommit={(raw) =>
-            patch({
-              dietaryLabels: raw
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
+        <ItemImagePanel item={item} canUpload={canUploadImage} onAttach={onAttachImage} />
+      </div>
+
+      <div className="mt-3">
+        <CommitTags
+          label="Dietary labels"
+          value={item.dietaryLabels}
+          suggestions={labelVocabulary}
+          placeholder="Add a label…"
+          hint="Only labels the menu itself shows — never inferred."
+          onCommit={(dietaryLabels) => patch({ dietaryLabels })}
         />
       </div>
 
@@ -324,7 +336,7 @@ export function ItemEditor({
       )}
       {needsReview && (
         <div className="mt-2 flex flex-wrap gap-2">
-          {item.price !== null ? (
+          {hasAnyPrice(item) ? (
             <button
               type="button"
               onClick={() => patch({ reviewNotes: [] })}
@@ -406,7 +418,7 @@ export function ItemEditor({
           </label>
           {needsReview && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-              {item.price === null ? "Check price" : "Couldn't read"}
+              {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
             </span>
           )}
           {duplicate && (

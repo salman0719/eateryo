@@ -34,6 +34,7 @@ import { useOrderMonitor } from "@/features/orders/monitor";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   new: "bg-amber-100 text-amber-900",
@@ -96,6 +97,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function ServerOrdersBoard() {
+  const { confirm, dialog } = useConfirm();
   // The poller lives in the app-wide monitor (shared cursor with the tab
   // badge and toasts); the board only guards its own optimistic writes.
   const {
@@ -139,9 +141,13 @@ export function ServerOrdersBoard() {
     }
   }
 
-  function cancel(order: Order) {
-    if (!window.confirm(`Cancel order #${orderCode(order.id)} for ${formatTableLabel(order.tableLabel)}?`))
-      return;
+  async function cancel(order: Order) {
+    const ok = await confirm({
+      message: `Cancel order #${orderCode(order.id)} for ${formatTableLabel(order.tableLabel)}?`,
+      confirmLabel: "Cancel order",
+      destructive: true,
+    });
+    if (!ok) return;
     void move(order, "cancelled");
   }
 
@@ -306,6 +312,7 @@ export function ServerOrdersBoard() {
           })}
         </ul>
       )}
+      {dialog}
     </div>
   );
 }

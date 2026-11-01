@@ -9,6 +9,7 @@ import {
   deleteCategory,
   deleteItem,
   duplicateItem,
+  hasAnyPrice,
   isItemFlagged,
   moveCategory,
   moveItem,
@@ -17,6 +18,8 @@ import {
   defaultNewMenuTitle,
   isPlaceholderMenuTitle,
   renameCategory,
+  resolveFirstMenuTitle,
+  serviceMenuName,
   setItemAvailability,
   suggestRestaurantName,
   suggestSecondMenuNames,
@@ -180,6 +183,31 @@ describe("menu-utils", () => {
     expect(isItemFlagged(accepted.categories[0].items[0])).toBe(false);
   });
 
+  it("treats an item priced per size as priced, not unpriced", () => {
+    const { doc, drinksId } = setupTwoCategoryMenu();
+    const itemId = doc.categories[0].items[0].id;
+    // Small/Medium/Large: the root price is null by design, the variants
+    // carry the prices — nothing for the owner to check.
+    const sized = updateItem(doc, drinksId, itemId, {
+      price: null,
+      variants: [
+        { name: "Small", price: 9 },
+        { name: "Medium", price: 11 },
+        { name: "Large", price: null },
+      ],
+    });
+    expect(hasAnyPrice(sized.categories[0].items[0])).toBe(true);
+    expect(isItemFlagged(sized.categories[0].items[0])).toBe(false);
+
+    // Variants with no prices anywhere are still genuinely unpriced.
+    const unpriced = updateItem(doc, drinksId, itemId, {
+      price: null,
+      variants: [{ name: "Small", price: null }],
+    });
+    expect(hasAnyPrice(unpriced.categories[0].items[0])).toBe(false);
+    expect(isItemFlagged(unpriced.categories[0].items[0])).toBe(true);
+  });
+
   it("throws on unknown ids", () => {
     const { doc } = setupTwoCategoryMenu();
     expect(() => renameCategory(doc, "nope", "X")).toThrow();
@@ -203,34 +231,69 @@ describe("suggestRestaurantName", () => {
 
   it("keeps the most common candidate and its first-seen casing", () => {
     expect(
-      suggestRestaurantName(["Lunch Menu", "Brunch Menu", "lunch - Dinner Menu", "Lunch — Drinks"])
-    ).toBe("Lunch");
+      suggestRestaurantName(["my café — Lunch", "My Café — Dinner", "My Café · Drinks"])
+    ).toBe("my café");
   });
 
   it("invents nothing when the titles say nothing", () => {
     expect(suggestRestaurantName([])).toBeNull();
     expect(suggestRestaurantName(["", "   "])).toBeNull();
     expect(suggestRestaurantName(["Menu"])).toBeNull();
+    // The onboarding default names the menu, not a place.
+    expect(suggestRestaurantName(["Main Menu"])).toBeNull();
+    expect(suggestRestaurantName(["Food"])).toBeNull();
+  });
+
+  it("never offers a menu service as the café's name", () => {
+    // "Lunch Menu" names which menu this is; the café is still unknown, so
+    // onboarding must ask rather than publish under "Lunch".
+    expect(suggestRestaurantName(["Lunch Menu"])).toBeNull();
+    expect(suggestRestaurantName(["Dinner", "Dinner Menu"])).toBeNull();
+    expect(suggestRestaurantName(["Happy Hour"])).toBeNull();
+    // A real place name that merely contains a service word is kept.
+    expect(suggestRestaurantName(["Lunchbox Café"])).toBe("Lunchbox Café");
   });
 });
 
 describe("menu naming (Q2)", () => {
-  it("defaults the first menu to Main menu, then numbers honestly", () => {
-    expect(defaultNewMenuTitle([])).toBe("Main menu");
-    expect(defaultNewMenuTitle(["Lunch"])).toBe("Main menu");
-    expect(defaultNewMenuTitle(["Main menu"])).toBe("Menu 2");
-    expect(defaultNewMenuTitle(["main MENU", "Menu 2"])).toBe("Menu 3");
+  it("names the first menu Main Menu, then numbers honestly", () => {
+    expect(defaultNewMenuTitle([])).toBe("Main Menu");
+    expect(defaultNewMenuTitle(["Lunch"])).toBe("Main Menu");
+    expect(defaultNewMenuTitle(["Main Menu"])).toBe("Menu 2");
+    expect(defaultNewMenuTitle(["main menu", "Menu 2"])).toBe("Menu 3");
   });
 
   it("suggests unused service names for the second menu", () => {
-    expect(suggestSecondMenuNames(["Main menu"])).toEqual(["Lunch", "Dinner", "Happy Hour", "Drinks"]);
-    expect(suggestSecondMenuNames(["Main menu", "Lunch", "Dinner"])).toEqual([
+    expect(suggestSecondMenuNames(["Main Menu"])).toEqual(["Lunch", "Dinner", "Happy Hour", "Drinks"]);
+    expect(suggestSecondMenuNames(["Main Menu", "Lunch", "Dinner"])).toEqual([
       "Happy Hour",
       "Drinks",
       "Breakfast",
       "Brunch",
     ]);
-    expect(suggestSecondMenuNames(["Main menu", "lunch"])).not.toContain("Lunch");
+    expect(suggestSecondMenuNames(["Main Menu", "lunch"])).not.toContain("Lunch");
+  });
+
+  it("keeps a service name the photo is clear about, else Main Menu", () => {
+    expect(resolveFirstMenuTitle("Lunch Menu")).toBe("Lunch");
+    expect(resolveFirstMenuTitle("Sunny Side Café — Dinner")).toBe("Dinner");
+    expect(resolveFirstMenuTitle("My Café · Drinks List")).toBe("Drinks");
+    expect(resolveFirstMenuTitle("Happy Hour Menu")).toBe("Happy Hour");
+    expect(resolveFirstMenuTitle("breakfast")).toBe("breakfast");
+    // A place, a placeholder, or nothing: the first menu is the main menu.
+    expect(resolveFirstMenuTitle("Pizza Tabrabane")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle("Sunny Side Café Menu")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle("Menu")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle("   ")).toBe("Main Menu");
+    expect(resolveFirstMenuTitle(null)).toBe("Main Menu");
+  });
+
+  it("only trusts an exact service word", () => {
+    expect(serviceMenuName("Dinner at Sunny's")).toBeNull();
+    expect(serviceMenuName("The Lunch Room")).toBeNull();
+    expect(serviceMenuName("Lunch Menu")).toBe("Lunch");
+    expect(serviceMenuName("Café — Wine")).toBe("Wine");
+    expect(serviceMenuName("  ")).toBeNull();
   });
 
   it("spots placeholder titles the photo missed", () => {

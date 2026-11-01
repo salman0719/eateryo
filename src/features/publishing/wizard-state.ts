@@ -3,35 +3,27 @@
  *
  * The draft itself already survives a round trip through the magic-link email
  * because it lives in IndexedDB. This module covers the rest of the form:
- * restaurant name, chosen restaurant, link and style are kept in
- * localStorage so signing in never makes the owner fill the form again.
+ * restaurant name and chosen restaurant are kept in localStorage so signing
+ * in never makes the owner fill the form again.
  *
  * The helpers are pure except for the three storage functions, which fail
  * silently when storage is unavailable (private mode, quota, SSR).
+ *
+ * There is no link-name field: onboarding never asks the owner to name a
+ * menu or pick its address. A first menu is "Main Menu" (or the service the
+ * photo clearly names, e.g. "Lunch"); its address segment is derived from
+ * that title because a menu's own order page uses it.
  */
 
 import { suggestRestaurantName } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
-import {
-  DEFAULT_PREVIEW_LAYOUT_ID,
-  DEFAULT_PREVIEW_THEME_ID,
-  isPreviewLayoutId,
-  isPreviewThemeId,
-  type PreviewLayoutId,
-  type PreviewThemeId,
-} from "@/features/menu/preview-themes";
 import type { RestaurantOption } from "@/features/tenancy/client";
-
-import { slugifyMenuTitle } from "./slug";
 
 export interface PublishWizardState {
   /** Only used to create a restaurant when the owner has none. */
   restaurantName: string;
   /** The owner's choice when they have more than one restaurant. */
   restaurantId: string;
-  slug: string;
-  theme: PreviewThemeId;
-  layout: PreviewLayoutId;
 }
 
 const STORAGE_PREFIX = "eateryo:publish-wizard:";
@@ -45,14 +37,17 @@ export function wizardStorageKey(menuId: string): string {
   return `${STORAGE_PREFIX}${menuId}`;
 }
 
-/** Prefill the short form from the draft, with nothing invented. */
-export function defaultWizardState(doc: Pick<MenuDocument, "title">): PublishWizardState {
+/** Prefill the short form from the draft, with nothing invented.
+ *
+ * The café name comes from the title the photo carried, not from the menu's
+ * own (now normalised) title: a photo of "Sunny Side Café" becomes the main
+ * menu, and "Sunny Side Café" is still the café to publish under. */
+export function defaultWizardState(
+  doc: Pick<MenuDocument, "title" | "source">
+): PublishWizardState {
   return {
-    restaurantName: suggestRestaurantName([doc.title]) ?? "",
+    restaurantName: suggestRestaurantName([doc.source?.originalTitle ?? doc.title]) ?? "",
     restaurantId: "",
-    slug: slugifyMenuTitle(doc.title),
-    theme: DEFAULT_PREVIEW_THEME_ID,
-    layout: DEFAULT_PREVIEW_LAYOUT_ID,
   };
 }
 
@@ -71,9 +66,6 @@ export function parseWizardState(value: unknown, fallback: PublishWizardState): 
       typeof value.restaurantName === "string" ? value.restaurantName : fallback.restaurantName,
     restaurantId:
       typeof value.restaurantId === "string" ? value.restaurantId : fallback.restaurantId,
-    slug: typeof value.slug === "string" ? value.slug : fallback.slug,
-    theme: isPreviewThemeId(value.theme) ? value.theme : fallback.theme,
-    layout: isPreviewLayoutId(value.layout) ? value.layout : fallback.layout,
   };
 }
 
@@ -115,6 +107,51 @@ export function clearWizardState(menuId: string): void {
     storage.removeItem(wizardStorageKey(menuId));
   } catch {
     // Nothing to do: a stale form is harmless.
+  }
+}
+
+/**
+ * Whether publish was opened from the review screen.
+ *
+ * The publish screen continues the same four-stop journey only when the
+ * flow came through upload, extraction and review. A menu opened straight
+ * from My menus has no marker, so it gets a plain heading rather than a
+ * tracker claiming three stops are done. The marker lives in localStorage
+ * because the magic-link return reloads the page.
+ */
+const JOURNEY_STORAGE_PREFIX = "eateryo:publish-journey:";
+
+export function publishJourneyStorageKey(menuId: string): string {
+  return `${JOURNEY_STORAGE_PREFIX}${menuId}`;
+}
+
+export function rememberPublishJourney(menuId: string): void {
+  const storage = browserStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(publishJourneyStorageKey(menuId), "1");
+  } catch {
+    // The publish screen just shows a plain heading; nothing else changes.
+  }
+}
+
+export function hasPublishJourney(menuId: string): boolean {
+  const storage = browserStorage();
+  if (!storage) return false;
+  try {
+    return storage.getItem(publishJourneyStorageKey(menuId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function forgetPublishJourney(menuId: string): void {
+  const storage = browserStorage();
+  if (!storage) return;
+  try {
+    storage.removeItem(publishJourneyStorageKey(menuId));
+  } catch {
+    // Nothing to do: the marker only hides chrome.
   }
 }
 

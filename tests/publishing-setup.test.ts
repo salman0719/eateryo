@@ -10,7 +10,8 @@ import { restaurantMembership } from "@/lib/db/schema";
 import type { TestDb } from "./helpers/pg-test-db";
 
 /**
- * R1 publish setup: one submit from a browser-only draft to a live link.
+ * R1 publish setup: one submit from a browser-only draft to a menu that
+ * table ordering offers.
  *
  * These tests use the real PGlite schema and the real route handler, with
  * only the session lookup and the DB singleton stubbed. They pin the two
@@ -63,8 +64,6 @@ function menuParams(menuId = MENU_ID): { params: Promise<{ menuId: string }> } {
   return { params: Promise.resolve({ menuId }) };
 }
 
-const PUBLISH_STYLE = { theme: "bistro", layout: "columns" } as const;
-
 let ownerId: string;
 
 beforeEach(async () => {
@@ -81,7 +80,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
       jsonRequest({
         doc,
         restaurantName: "Sunny Side Café",
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -90,20 +88,15 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     const body = await res.json();
     expect(body.created).toEqual({ restaurant: true, menu: true });
     expect(body.restaurant.name).toBe("Sunny Side Café");
-    expect(body.publication).toMatchObject({
-      restaurantSlug: "sunny-side-cafe",
-      isLive: true,
-      theme: "bistro",
-      layout: "columns",
-    });
-    expect(body.publication.urlPath).toMatch(/^\/r\/sunny-side-cafe\/m\//);
+    expect(body.publication).toMatchObject({ menuId: MENU_ID, isLive: true });
 
     expect(await listRestaurantsForUser(holder.db!, ownerId)).toHaveLength(1);
     expect(await listMenusForUser(holder.db!, ownerId)).toHaveLength(1);
+    // The snapshot is addressed by the café and the derived menu slug.
     const live = await getPublishedMenuByPath(
       holder.db!,
-      body.publication.restaurantSlug,
-      body.publication.slug
+      "sunny-side-cafe",
+      "sunny-side-cafe-lunch"
     );
     expect(live?.doc.id).toBe(MENU_ID);
     expect(live?.doc.title).toBe("Sunny Side Café — Lunch");
@@ -117,7 +110,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
         // The wizard prefills a name; with one owned restaurant the id is
         // what counts and no second café is created.
         restaurantName: "A Different Name",
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -137,7 +129,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
       jsonRequest({
         doc: sampleDoc("Stale local version"),
         restaurantId,
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -147,8 +138,8 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     expect(body.created).toEqual({ restaurant: false, menu: false });
     const live = await getPublishedMenuByPath(
       holder.db!,
-      body.publication.restaurantSlug,
-      body.publication.slug
+      "account-cafe",
+      "account-version"
     );
     expect(live?.doc.title).toBe("Account version");
     expect((await getMenuForUser(holder.db!, ownerId, MENU_ID)).doc.title).toBe("Account version");
@@ -158,7 +149,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     const body = {
       doc: sampleDoc("Retry Lunch"),
       restaurantName: "Retry Café",
-      ...PUBLISH_STYLE,
     };
 
     const first = await publishSetup(jsonRequest(body), menuParams());
@@ -170,7 +160,8 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     expect(second.status).toBe(200);
     const secondBody = await second.json();
     expect(secondBody.created).toEqual({ restaurant: false, menu: false });
-    expect(secondBody.publication.urlPath).toBe(firstBody.publication.urlPath);
+    expect(secondBody.publication.menuId).toBe(firstBody.publication.menuId);
+    expect(secondBody.publication.isLive).toBe(true);
 
     expect(await listRestaurantsForUser(holder.db!, ownerId)).toHaveLength(1);
     expect(await listMenusForUser(holder.db!, ownerId)).toHaveLength(1);
@@ -178,7 +169,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
 
   it("asks for a restaurant name when the owner has none", async () => {
     const res = await publishSetup(
-      jsonRequest({ doc: sampleDoc("Nameless"), ...PUBLISH_STYLE }),
+      jsonRequest({ doc: sampleDoc("Nameless") }),
       menuParams()
     );
 
@@ -193,7 +184,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     await createRestaurant(holder.db!, ownerId, "Two Café");
 
     const undecided = await publishSetup(
-      jsonRequest({ doc: sampleDoc("Lunch"), ...PUBLISH_STYLE }),
+      jsonRequest({ doc: sampleDoc("Lunch") }),
       menuParams()
     );
     expect(undecided.status).toBe(400);
@@ -203,7 +194,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
       jsonRequest({
         doc: sampleDoc("Lunch"),
         restaurantId: first.id,
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -216,7 +206,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
       jsonRequest({
         doc: sampleDoc("Wrong id", "another-menu"),
         restaurantName: "Café",
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -239,7 +228,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     holder.userId = staffId;
 
     const staffRes = await publishSetup(
-      jsonRequest({ doc: sampleDoc("Staff copy"), ...PUBLISH_STYLE }),
+      jsonRequest({ doc: sampleDoc("Staff copy") }),
       menuParams()
     );
     expect(staffRes.status).toBe(403);
@@ -248,7 +237,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     await createRestaurant(holder.db!, outsiderId, "Other Café");
     holder.userId = outsiderId;
     const outsiderRes = await publishSetup(
-      jsonRequest({ doc: sampleDoc("Outsider copy"), ...PUBLISH_STYLE }),
+      jsonRequest({ doc: sampleDoc("Outsider copy") }),
       menuParams()
     );
     expect(outsiderRes.status).toBe(404);
@@ -259,7 +248,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     const restaurantId = (await createRestaurant(holder.db!, ownerId, "Link Café")).id;
     await createMenuForUser(holder.db!, ownerId, restaurantId, sampleDoc("First", "first-menu"));
     await publishMenuForUser(holder.db!, ownerId, "first-menu", {
-      ...PUBLISH_STYLE,
       slug: "lunch",
     });
 
@@ -268,7 +256,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
         doc: sampleDoc("Second"),
         restaurantId,
         slug: "lunch",
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -281,7 +268,6 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
       jsonRequest({
         doc: sampleDoc("Second"),
         restaurantId,
-        ...PUBLISH_STYLE,
       }),
       menuParams()
     );
@@ -292,7 +278,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
   it("requires a session and refuses another site", async () => {
     holder.userId = null;
     const signedOut = await publishSetup(
-      jsonRequest({ doc: sampleDoc("No session"), restaurantName: "Café", ...PUBLISH_STYLE }),
+      jsonRequest({ doc: sampleDoc("No session"), restaurantName: "Café" }),
       menuParams()
     );
     expect(signedOut.status).toBe(401);
@@ -300,7 +286,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     holder.userId = ownerId;
     const crossOrigin = await publishSetup(
       jsonRequest(
-        { doc: sampleDoc("Cross origin"), restaurantName: "Café", ...PUBLISH_STYLE },
+        { doc: sampleDoc("Cross origin"), restaurantName: "Café" },
         "http://evil.test"
       ),
       menuParams()

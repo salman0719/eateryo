@@ -3,8 +3,8 @@ export type AppScreen =
 
 /**
  * The surface shown for an open menu: the edit workspace, the compact
- * reorder list, the customer preview, or the get-your-link publish wizard
- * (R1). Table QR cards moved to the Tables tab (R0), so there is no `qr`
+ * reorder list, the customer preview, or the publish wizard (R1). Table QR
+ * cards moved to the Tables tab (R0), so there is no `qr`
  * mode. Each mode has its own deep-linkable URL.
  */
 export type EditorMode = "edit" | "reorder" | "preview" | "publish";
@@ -69,6 +69,21 @@ export function unresolvableMenuMessage(route: AppRoute): string {
     return MISSING_PUBLISH_DRAFT_MESSAGE;
   }
   return "That menu could not be opened. It may have been deleted or moved.";
+}
+
+/**
+ * Where the shell lands when a real session ends. Sign-out is a privacy
+ * boundary: an open editor or capture result can hold an account menu, so
+ * the shell dismisses those surfaces and returns to Capture. Local menus
+ * are never deleted — anonymous drafts remain in My menus — and an initial
+ * signed-out load (never signed in) must not redirect. Returning null means
+ * no boundary action is due.
+ */
+export function signOutLandingRoute(input: {
+  wasSignedIn: boolean;
+  signedIn: boolean;
+}): AppRoute | null {
+  return input.wasSignedIn && !input.signedIn ? { screen: "capture" } : null;
 }
 
 /** Read an application screen from a URL, defaulting unknown URLs to capture. */

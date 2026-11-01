@@ -25,6 +25,7 @@ import {
   type RestaurantOption,
 } from "@/features/tenancy/client";
 import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * Restaurant settings: rename inline, manage the team (owner-only writes),
@@ -49,6 +50,7 @@ export function RestaurantSettings({
   sessionPending = false,
   currentUserId,
 }: RestaurantSettingsProps) {
+  const { confirm, dialog } = useConfirm();
   const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -100,13 +102,12 @@ export function RestaurantSettings({
 
   async function handleDeleteRestaurant() {
     if (!selected || deleting) return;
-    if (
-      !window.confirm(
-        `Delete “${selected.name}” permanently? Its menus, published pages and orders are deleted too. This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      message: `Delete “${selected.name}” permanently? Its menus, published pages and orders are deleted too. This cannot be undone.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     setError(null);
     try {
@@ -267,6 +268,7 @@ export function RestaurantSettings({
           <DataControls />
         </>
       )}
+      {dialog}
     </div>
   );
 }
@@ -281,6 +283,7 @@ interface TeamCardProps {
 
 /** The team list plus add/role/remove controls, scoped to one restaurant. */
 function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }: TeamCardProps) {
+  const { confirm, dialog } = useConfirm();
   const [members, setMembers] = useState<MemberOption[] | null>(null);
   const [pending, setPending] = useState<PendingInvitation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -419,13 +422,12 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
 
   async function handleRemoveMember(member: MemberOption) {
     if (memberBusy) return;
-    if (
-      !window.confirm(
-        `Remove “${member.name}” from ${restaurantName}? They lose access to its menus and orders.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      message: `Remove “${member.name}” from ${restaurantName}? They lose access to its menus and orders.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     setMemberBusy(member.userId);
     setError(null);
     try {
@@ -589,6 +591,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           </ul>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

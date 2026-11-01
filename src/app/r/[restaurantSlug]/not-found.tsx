@@ -11,8 +11,8 @@ export default function RestaurantNotFound() {
         This restaurant link isn’t live
       </h1>
       <p className="text-sm leading-6 text-stone-600">
-        The link may be mistyped, or the café hasn’t set up table ordering yet. Ask them for a
-        fresh QR code from one of their table cards.
+        The link may be mistyped, or the café hasn’t published a menu yet. Ask them for a fresh
+        link or a QR code from one of their table cards.
       </p>
       <p className="mt-2 text-sm text-stone-500">
         <Link

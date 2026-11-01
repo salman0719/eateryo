@@ -3,7 +3,7 @@
 /**
  * Reusable "look here" primitive: scroll a region into view and/or pulse it
  * when `active` flips false → true. Use it wherever one step of a flow
- * unlocks the next (e.g. the last price check revealing "Get your link").
+ * unlocks the next (e.g. the last price check revealing "Publish").
  *
  * - Outer instance scrolls (and optionally pulses the box).
  * - Nested `inline` instance pulses just the button inside without scrolling

@@ -17,12 +17,12 @@ const WHAT_YOU_GET = [
     body: "Upload up to four pages at once. Every name, section, and price is read into a draft you can edit — and anything the AI was unsure about is flagged instead of invented.",
   },
   {
-    title: "Your own public link",
-    body: "Publish to a link like /r/your-cafe/m/lunch. It opens on any phone with no login, shows your menu with your chosen theme, and only changes when you press Publish.",
+    title: "Menus your tables can order from",
+    body: "Publishing makes a menu orderable at your tables. Diners scan a card, pick items, and the order lands on your board — no account, no app. Edits stay private until you press Publish changes.",
   },
   {
     title: "QR codes for every table",
-    body: "Print one card per table from the editor. Scanning it opens your menu and the order screen for that table — no app to install.",
+    body: "Print one card per table from the Tables tab. Scanning it opens the table's menus and the order screen for that table — no app to install.",
   },
   {
     title: "Orders that reach the counter",

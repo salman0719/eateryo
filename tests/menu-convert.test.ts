@@ -60,9 +60,29 @@ describe("extractedMenuToDocument", () => {
 
   it("falls back to a default title for empty extractions", () => {
     const doc = extractedMenuToDocument({ title: null, currency: null, categories: [] });
-    expect(doc.title).toBe("Main menu");
+    expect(doc.title).toBe("Main Menu");
+    expect(doc.source?.originalTitle).toBeUndefined();
     expect(doc.categories).toEqual([]);
     expect(() => menuDocumentSchema.parse(doc)).not.toThrow();
+  });
+
+  it("names the first menu for the owner and keeps the photo's title", () => {
+    // A café name on the photo is the café, not the menu: the menu is the
+    // main one (and its address becomes /m/main-menu), while the café name
+    // survives as provenance for the onboarding suggestion.
+    const cafe = extractedMenuToDocument({ title: "Pizza Tabrabane", currency: null, categories: [] });
+    expect(cafe.title).toBe("Main Menu");
+    expect(cafe.source?.originalTitle).toBe("Pizza Tabrabane");
+
+    // A title that clearly names the service is kept as the menu's name.
+    const lunch = extractedMenuToDocument({
+      title: "Pizza Tabrabane — Lunch Menu",
+      currency: null,
+      categories: [],
+    });
+    expect(lunch.title).toBe("Lunch");
+    expect(lunch.source?.originalTitle).toBe("Pizza Tabrabane — Lunch Menu");
+    expect(() => menuDocumentSchema.parse(lunch)).not.toThrow();
   });
 });
 
@@ -135,7 +155,7 @@ describe("appendExtractionToDocument", () => {
     expect(() => menuDocumentSchema.parse(merged)).not.toThrow();
     // Existing content is byte-identical; the menu title stands.
     expect(merged.categories[0]).toEqual(before);
-    expect(merged.title).toBe("Café");
+    expect(merged.title).toBe(doc.title);
     // New categories continue the sort order with fresh ids.
     expect(merged.categories.map((c) => c.name)).toEqual(["Drinks", "Desserts"]);
     expect(merged.categories.map((c) => c.sortOrder)).toEqual([0, 1]);

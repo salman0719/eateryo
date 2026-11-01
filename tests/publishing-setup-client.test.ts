@@ -6,15 +6,9 @@ import { SyncError } from "@/features/menus/sync";
 const publication = {
   menuId: "menu-1",
   restaurantId: "r-1",
-  restaurantSlug: "sunny-side-cafe",
-  slug: "lunch",
-  urlPath: "/r/sunny-side-cafe/m/lunch",
   isLive: true,
   publishedAt: "2026-10-24T10:00:00.000Z",
   liveRevisionId: "rev-1",
-  viewCount: 0,
-  theme: "bistro",
-  layout: "columns",
   sourceUpdatedAt: "2026-10-24T09:59:00.000Z",
   hasUnpublishedChanges: false,
 };
@@ -42,20 +36,16 @@ describe("publishMenuWithSetup", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await publishMenuWithSetup("menu id/1", {
-      theme: "bistro",
-      layout: "columns",
       slug: "lunch",
       restaurantName: "Sunny Side Café",
     });
 
-    expect(result.publication.urlPath).toBe("/r/sunny-side-cafe/m/lunch");
+    expect(result.publication.isLive).toBe(true);
     expect(result.created).toEqual({ restaurant: true, menu: true });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/menus/menu%20id%2F1/publish-setup");
     expect(init.method).toBe("POST");
     expect(JSON.parse(String(init.body))).toEqual({
-      theme: "bistro",
-      layout: "columns",
       slug: "lunch",
       restaurantName: "Sunny Side Café",
     });
@@ -74,7 +64,7 @@ describe("publishMenuWithSetup", () => {
     );
 
     await expect(
-      publishMenuWithSetup("menu-1", { theme: "bistro", layout: "columns" })
+      publishMenuWithSetup("menu-1", { restaurantName: "Café" })
     ).rejects.toMatchObject({ code: clientCode });
   });
 
@@ -84,8 +74,7 @@ describe("publishMenuWithSetup", () => {
     });
 
     const error = await publishMenuWithSetup("menu-1", {
-      theme: "bistro",
-      layout: "columns",
+      restaurantName: "Café",
     }).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(SyncError);
@@ -96,7 +85,7 @@ describe("publishMenuWithSetup", () => {
     vi.stubGlobal("fetch", async () => jsonResponse({ unexpected: true }));
 
     await expect(
-      publishMenuWithSetup("menu-1", { theme: "bistro", layout: "columns" })
+      publishMenuWithSetup("menu-1", { restaurantName: "Café" })
     ).rejects.toMatchObject({ code: "unavailable" });
   });
 });

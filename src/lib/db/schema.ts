@@ -290,11 +290,12 @@ export const menu = pgTable(
 
 /**
  * An immutable published snapshot of a menu (Step 9). Publishing copies the
- * canonical document here, so a later edit never silently changes what the
- * public page shows — "publish changes" creates the next revision and moves
- * the live pointer. `sourceUpdatedAt` records the `menu.updated_at` the
- * snapshot was taken from: when the live revision's value no longer matches
- * the menu row, the owner has draft changes that are not published.
+ * canonical document here, so a later edit never silently changes what a
+ * diner's order is priced against — "publish changes" creates the next
+ * revision and moves the live pointer. `sourceUpdatedAt` records the
+ * `menu.updated_at` the snapshot was taken from: when the live revision's
+ * value no longer matches the menu row, the owner has draft changes that are
+ * not published.
  *
  * `doc` is re-validated with the canonical Zod schema on read, exactly like
  * `menu.doc`; history rows are never rewritten.
@@ -312,8 +313,6 @@ export const menuRevision = pgTable(
       .notNull()
       .references(() => restaurant.id, { onDelete: "cascade" }),
     doc: jsonb("doc").$type<unknown>().notNull(),
-    theme: text("theme").notNull(),
-    layout: text("layout").notNull(),
     /** The menu revision this snapshot was published from (conflict-free compare). */
     sourceUpdatedAt: timestamp("source_updated_at").notNull(),
     createdAt: createdAt(),
@@ -324,17 +323,19 @@ export const menuRevision = pgTable(
 );
 
 /**
- * The public pointer for a menu (Step 9): its address segment under the
- * café's `/r/<slug>` — `/r/<restaurant>/<slug>` — the live revision, and a
- * cookie-free view count.
+ * The live pointer for a menu (Step 9): whether table ordering offers it,
+ * which revision it serves, and its address segment under the café.
+ *
+ * There is no public menu page to serve: diners arrive through a table card
+ * and order from the snapshot the pointer selects. A view count was removed
+ * with that page — nothing counts a "view" that no longer exists.
  *
  * The slug is unique **inside one restaurant**, not globally: two cafés can
- * both publish `/m/lunch` under their own addresses, so no one gets an
- * unpredictable "-2" suffix for a title somebody else happened to publish
- * first. Unpublishing keeps this row and its slug (`publishedAt` and
- * `liveRevisionId` become null), so the address stays reserved for the same
- * café instead of being recycled by whoever grabs it next. Publishing again
- * reuses it.
+ * both hold `lunch` in their own addresses, so no one gets an unpredictable
+ * "-2" suffix for a title somebody else happened to use first. Unpublishing
+ * keeps this row and its slug (`publishedAt` and `liveRevisionId` become
+ * null), so the address stays with the same café instead of being recycled
+ * by whoever grabs it next. Publishing again reuses it.
  */
 export const publishedMenu = pgTable(
   "published_menu",
@@ -352,9 +353,8 @@ export const publishedMenu = pgTable(
     liveRevisionId: text("live_revision_id").references(() => menuRevision.id, {
       onDelete: "set null",
     }),
-    /** Null = reserved but not serving (the page 404s). */
+    /** Null = reserved but not offered by table ordering. */
     publishedAt: timestamp("published_at"),
-    viewCount: integer("view_count").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt().$onUpdateFn(() => new Date()),
   },
