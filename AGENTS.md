@@ -107,6 +107,10 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
   session guard, sign-in page
+- `src/features/session/state.ts` — the pure tri-state session read
+  (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
+  matrix; a page load whose session has not answered is **never** treated as
+  signed out, so a reload of `/menus/<id>` cannot accuse its owner
 - `src/features/tenancy/repo.ts`, `src/app/api/restaurants/` —
   ownership-scoped restaurant repository + API (session id only);
   `src/features/tenancy/client.ts` — typed browser client for it
