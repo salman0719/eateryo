@@ -56,7 +56,21 @@ describe("CommitTags", () => {
     expect(render([], [])).toContain("Only labels the menu itself shows");
   });
 
-  it("names the keys that add a label, on the label row itself", () => {
-    expect(render([], [])).toContain("Enter, Tab or comma adds");
+  it("separates the field name from the key hint with a divider", () => {
+    const markup = render([], []);
+    expect(markup).toContain(">Dietary labels</span>");
+    expect(markup).toContain("w-px self-center bg-stone-300");
+    expect(markup).toContain("Press");
+    expect(markup).toContain("Enter");
+    expect(markup).toContain("Tab");
+    expect(markup).toContain("comma");
+    expect(markup).toContain("to add");
+  });
+
+  it("puts each named key's glyph in a keycap beside it", () => {
+    const markup = render([], []);
+    expect(markup.match(/<kbd/g)).toHaveLength(3);
+    expect(markup).toContain("⏎");
+    expect(markup).toContain("⇥");
   });
 });
