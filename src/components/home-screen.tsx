@@ -132,6 +132,7 @@ import {
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
   resolveAutoClaimTarget,
+  resumeBannerReady,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 import {
@@ -2356,21 +2357,21 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       status: claimStatus,
     },
   });
-  // The resume banner asserts only local truth ("this is saved in this
-  // browser"), so a failed account read does not silence it — it is the one
-  // surface that still works offline. Neither claim surface renders while
-  // the gate says the account is unknown.
+  // Neither claim surface renders while the gate says the account is unknown.
   const claimSurfaceQuiet =
     localDraftsDecision === "none" || localDraftsDecision === "unavailable";
 
-  // The resume banner may only render once everything it reads has
-  // settled: the session (who is this?), the IndexedDB library (what is
-  // saved in this browser?) and — signed in — the account's server menu
-  // and restaurant lists (are these drafts really unpublished?). Before
-  // that it renders nothing at all; a late answer can only remove it,
-  // never move it. A failed read settles the gate (as `incomplete`), so the
-  // banner appears instead of waiting forever.
-  const resumeReady = !libraryLoading && !claimGate.pending;
+  // The resume banner names one menu as an unpublished browser draft, which it
+  // reads off the account's id set — so it waits for that set to have actually
+  // answered. A failed read settles the gate (002's notice says so), but it
+  // cannot tell an account menu from a draft: every menu would look local and
+  // the banner would hand an account menu back as unpublished (017).
+  const resumeReady = resumeBannerReady({
+    libraryLoading,
+    gate: claimGate,
+    signedIn,
+    accountMenusSettled: libraryAccountMode,
+  });
 
   // Confirm the dismissal only after the inputs settle, so the banner's
   // very first render is already a confirmed decision, not an assumption.
@@ -2541,7 +2542,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             returns from the magic-link email) with a saved-but-unpublished
             draft. Whether a draft is unpublished is *server* knowledge, so
             this renders only after `resumeReady` (session, library and —
-            signed in — account inventory all settled) and only with a
+            signed in — an account menu list that answered) and only with a
             confirmed `resumeDismissed === false`: until then it is
             invisible, never provisional. Hidden in the editor (it has its
             own publish entry), while the result is on screen (it IS the
