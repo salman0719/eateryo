@@ -70,15 +70,19 @@ function renderPublishPanel(inAccount: boolean | null): string {
 describe("editor storage copy", () => {
   it("claims neither home while the account's list has not answered", () => {
     const html = renderEditor(null);
+    // The wait is a placeholder, not a sentence the page then retracts.
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain("animate-pulse");
     expect(html).toContain("Checking where this menu is saved");
     expect(html).not.toContain("Add it to your account");
     expect(html).not.toContain("saved to your account");
     // The café-creating CTA is only for a menu proven to be browser-only.
     expect(html).not.toContain("we create your café");
     // Same for the helper paragraph above the fields: an unread list is not
-    // "your café already exists" and not "one click publishes it" either.
+    // "your café already exists", not "one click publishes it", and not the
+    // account's "go to Preview" wording either.
     expect(html).not.toContain("to publish it for your tables");
-    expect(html).toContain("to see it as diners will");
+    expect(html).not.toContain("to see it as diners will");
   });
 
   it("offers the move once a read proved the menu is browser-only", () => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
   addItem,
@@ -389,7 +390,7 @@ export function MenuEditor({
           ↩ Undo {undoLabel}
         </button>
       )}
-      <p
+      <div
         role="status"
         title={saveState.detail}
         className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
@@ -404,17 +405,14 @@ export function MenuEditor({
           </span>
         ) : saveState.kind === "checking" ? (
           <span>
-            <span
-              aria-hidden="true"
-              className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-stone-400 border-t-transparent align-[-2px]"
-            />
-            {saveState.message}
+            <span className="sr-only">{saveState.message}</span>
+            <Skeleton className="inline-block h-3 w-36 align-[-1px]" />
           </span>
         ) : (
           saveState.message
         )}
         {saveState.detail && <span className="sr-only"> — {saveState.detail}</span>}
-      </p>
+      </div>
       <span className="flex-1" />
       {!canManage ? (
         <>
@@ -634,21 +632,14 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
+      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
         {onStartPublish && onServer === null ? (
-          <>
-            Once your menu is set,{" "}
-            <button
-              type="button"
-              onClick={() => changeMode("preview")}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-            >
-              preview the order page
-            </button>{" "}
-            to see it as diners will.
-          </>
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Checking where this menu is saved…</span>
+            <Skeleton className="h-3 w-3/4" />
+          </div>
         ) : onStartPublish && onServer === false ? (
-          <>
+          <p>
             Once your menu is set,{" "}
             <button
               type="button"
@@ -666,9 +657,9 @@ export function MenuEditor({
               preview the order page
             </button>
             .
-          </>
+          </p>
         ) : (
-          <>
+          <p>
             Once your menu is set,{" "}
             <button
               type="button"
@@ -678,9 +669,9 @@ export function MenuEditor({
               go to Preview
             </button>{" "}
             to publish it for your tables.
-          </>
+          </p>
         )}
-      </p>
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
@@ -1109,15 +1100,24 @@ export function MenuEditor({
           {addPages.message}
         </p>
       )}{" "}
-      <p className="text-xs leading-5 text-stone-500">
-        {onServer === null
-          ? "Checking where this menu is saved. Your edits are saved either way."
-          : onServer
-            ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
-            : syncMode === "account"
-              ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
-              : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
-      </p>
+      <div className="text-xs leading-5 text-stone-500">
+        {onServer === null ? (
+          <div role="status" aria-busy="true" className="flex flex-col gap-2">
+            <span className="sr-only">
+              Checking where this menu is saved. Your edits are saved either way.
+            </span>
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        ) : (
+          <p>
+            {onServer
+              ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
+              : syncMode === "account"
+                ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
+                : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -213,11 +213,15 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
-          <span className={`${pill} bg-stone-100 text-stone-600`}>Checking</span>
+          <Skeleton className="h-5 w-16 rounded-full" />
         </div>
-        <p className="mt-2 text-xs leading-5 text-stone-600" role="status">
-          Checking whether this menu is on your account. Publishing opens here once that answers.
-        </p>
+        <div role="status" aria-busy="true" className="mt-3 flex flex-col gap-2">
+          <span className="sr-only">
+            Checking whether this menu is on your account. Publishing opens here once that answers.
+          </span>
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-3/5" />
+        </div>
       </div>
     );
   }
