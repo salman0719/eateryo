@@ -141,6 +141,7 @@ import {
   menuOpenBlockedMessage,
   type SessionState,
 } from "@/features/session/state";
+import { decideMenuMembership, membershipFlag } from "@/features/menus/membership";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -446,6 +447,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * set means "not asked yet", never "this browser only".
    */
   const [serverMenusReadFor, setServerMenusReadFor] = useState<string | null>(null);
+  /**
+   * The same marker as a ref: the save status and the publish gate decide in
+   * async code that finishes after an await (003).
+   */
+  const accountMenusSettledRef = useRef<string | null>(null);
+  /**
+   * Where the open menu is saved. `null` while the account read is still
+   * pending, so nothing claims "this browser only" on a guess (001, 003).
+   */
+  const activeMenuOnServer: boolean | null = activeDoc
+    ? membershipFlag(
+        decideMenuMembership({
+          signedIn,
+          readSettled: serverMenusReadFor === accountKey,
+          onServer: serverIds.has(activeDoc.id),
+        })
+      )
+    : null;
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   /** The answer just given here; the stored per-account value is the fallback. */
@@ -714,6 +733,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       setServerMenusFor(null);
       setServerMenusReadFailedFor(null);
       setServerMenusReadFor(null);
+      accountMenusSettledRef.current = null;
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
@@ -860,6 +880,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         // "this browser only" (001).
         if (signedInRef.current && accountKeyRef.current) {
           setServerMenusReadFor(accountKeyRef.current);
+          accountMenusSettledRef.current = accountKeyRef.current;
         }
       }
     })();
@@ -928,9 +949,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     if (!doc || storageDownRef.current) return;
     const json = JSON.stringify(doc);
     if (json === lastSavedRef.current) {
-      setSaveState(
-        savedState(serverBaseRef.current ? "Saved to your account." : "Saved in this browser.")
-      );
+      setSaveState(storageSaveState(doc.id));
       return;
     }
     try {
@@ -1023,6 +1042,25 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }
   }
 
+  /**
+   * Where this document's saves go, as far as the client can honestly say.
+   * Before the account's list settles the answer is "checking", not "in this
+   * browser": the latter is false for every account menu (003).
+   */
+  function storageSaveState(id: string): SaveState {
+    if (serverBaseRef.current) return savedState("Saved to your account.");
+    const membership = decideMenuMembership({
+      signedIn: signedInRef.current,
+      readSettled: accountMenusSettledRef.current === accountKeyRef.current,
+      onServer: serverIdsRef.current.has(id),
+    });
+    if (membership === "account") return savedState("Saved to your account.");
+    if (membership === "unknown") {
+      return { kind: "checking", message: "Checking your account…" };
+    }
+    return savedState("Saved in this browser.");
+  }
+
   async function flushSave() {
     if (saveTimer.current) {
       clearTimeout(saveTimer.current);
@@ -1067,7 +1105,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setSaveState(
       storageDownRef.current
         ? { kind: "error", message: "Storage unavailable — edits are kept in memory only." }
-        : savedState("Saved in this browser.")
+        : storageSaveState(doc.id)
     );
     setImportError(null);
     setEditorImage(imageBlob ? URL.createObjectURL(imageBlob) : null);
@@ -1607,7 +1645,23 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setPublishBusy(true);
     try {
       await flushSave();
-      if (!serverIdsRef.current.has(doc.id)) {
+      // An unread account list is not an answer, so ask this menu's own
+      // endpoint rather than refusing on an empty set (003). Only a definite
+      // "no such menu" refuses; an unreachable server is left to the publish
+      // call, whose errors are already honest.
+      let onAccount = serverIdsRef.current.has(doc.id);
+      if (
+        !onAccount &&
+        signedInRef.current &&
+        accountMenusSettledRef.current !== accountKeyRef.current
+      ) {
+        onAccount = await fetchServerMenu(doc.id).then(
+          () => true,
+          (error: unknown) => !(error instanceof SyncError && error.code === "not_found")
+        );
+        if (onAccount) addServerId(doc.id);
+      }
+      if (!onAccount) {
         setPublishError("Add this menu to your account first, then publish it.");
         return;
       }
@@ -2674,7 +2728,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 saveState={saveState}
                 syncMode={signedIn ? "account" : "local"}
                 canManage={!activeMenuIsStaff}
-                onServer={serverIds.has(activeDoc.id)}
+                onServer={activeMenuOnServer}
                 restaurantName={
                   ownedRestaurantsForAccount.find(
                     (restaurant) => restaurant.id === activePublication?.restaurantId
@@ -2695,7 +2749,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   loaded: activePublicationLoaded,
                   busy: publishBusy,
                   error: publishError,
-                  inAccount: serverIds.has(activeDoc.id),
+                  inAccount: activeMenuOnServer,
                   liveDoc: liveDocMenuId === activeDoc.id ? liveDoc : null,
                   liveDocState: liveDocMenuId === activeDoc.id ? liveDocState : "idle",
                   onPublish: () => void handlePublish(),
