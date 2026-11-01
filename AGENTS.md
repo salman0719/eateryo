@@ -142,6 +142,12 @@ errors, or add lint/type suppressions just to make checks pass.
   `tests/menus-repo.test.ts`, `tests/menus-api.test.ts`,
   `tests/menus-sync.test.ts`, `tests/move-to-account.test.ts` — Step 8
   (PGlite + stubbed fetch; conflict, tenancy, import fidelity)
+- `src/features/menus/membership.ts` — the one tri-state answer to "where is
+  this menu saved?" (`account` / `browser` / `unknown`), so the editor and the
+  publish panel never claim "this browser only" before the account's menu list
+  has been read (001, 003); `membershipFlag` maps it to the `boolean | null`
+  the components take. Tests: `tests/menu-membership.test.ts`,
+  `tests/editor-membership.test.ts`.
 - `src/features/item-images/` — dish photos on menu items: `sizes.ts` (the
   pre-sized copies: display ≤1024px, thumb ≤256px), `prepare.ts` (browser
   decode/resize/encode, so the camera original is never uploaded), `ref.ts`
