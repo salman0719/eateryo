@@ -134,6 +134,13 @@ import {
   resolveAutoClaimTarget,
   type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
+import {
+  decideMenuOpen,
+  decideSessionState,
+  isSessionGateMessage,
+  menuOpenBlockedMessage,
+  type SessionState,
+} from "@/features/session/state";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -280,9 +287,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // for anonymous drafts): orders/tables/settings/assistant need an account,
   // so a signed-out visitor who lands on one (typed URL, old bookmark)
   // goes back to capture. Runs every render by design; the guard goes
-  // quiet once the screen moves on.
+  // quiet once the screen moves on, and stays inert while the session read is
+  // unanswered (015): unknown is not signed out.
   useEffect(() => {
-    if (!sessionPending && !signedIn) {
+    if (sessionState === "signed-out") {
       const guarded = routeRef.current.screen;
       if (
         guarded === "assistant" ||
@@ -353,14 +361,34 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // the whole local-first flow above keeps working untouched.
   const {
     data: session,
+    error: sessionError,
     isPending: sessionLoading,
-    isRefetching: sessionRefetching,
   } = authClient.useSession();
-  // A background refetch (e.g. returning to the tab) must not flash skeletons
-  // or unmount in-progress forms: only the first load counts as pending.
-  const sessionPending = sessionLoading && !sessionRefetching;
+  /**
+   * Three answers, not two (015). The session is a request: while it is in
+   * flight — the first read of every page load — or after it failed, nothing
+   * is known, and nothing may be refused or hidden on a guess. `isRefetching`
+   * cannot express that (the first read sets it too), so the decision reads
+   * `pending` and `error` instead. A background refetch keeps `data`, so it
+   * still cannot flash skeletons or unmount in-progress forms.
+   */
+  const sessionState: SessionState = decideSessionState({
+    hasUser: session?.user != null,
+    pending: sessionLoading,
+    error: sessionError ?? null,
+  });
+  /** Waiting on the session: guarded surfaces stay inert, skeletons stay up. */
+  const sessionPending = sessionState === "unknown";
   const signedIn = session?.user != null;
   const accountKey = session?.user?.id ?? null;
+  /**
+   * The ownership wall's sentence is only true while nobody is known, so it is
+   * derived away the moment a session settles signed in — never cleared by an
+   * effect that could render it for a frame first (015). Derived, not deleted:
+   * the stored message is what a later genuine sign-out has to say.
+   */
+  const visibleLibraryError =
+    signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
   // Server-evaluated release decisions (A4). Both assistant flags default
   // off, so the tab and panel appear only for a released account or a
   // preview link; the loading state below avoids flashing “unavailable” while
@@ -369,6 +397,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     session?.user?.id ?? null
   );
   const signedInRef = useRef(false);
+  /** Session state at decision time (a closure may outlive the render). */
+  const sessionStateRef = useRef<SessionState>("unknown");
   /** Current account id for async work (closures may outlive the render). */
   const accountKeyRef = useRef<string | null>(null);
   /** The server updatedAt the open menu was last synced at; null = don't push. */
@@ -450,8 +480,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   useEffect(() => {
     signedInRef.current = signedIn;
+    sessionStateRef.current = sessionState;
     accountKeyRef.current = accountKey;
-  }, [signedIn, accountKey]);
+  }, [signedIn, sessionState, accountKey]);
 
   // Moving a single menu needs the owned restaurants up front, so each
   // browser-only row can offer its target without opening the move panel.
@@ -509,7 +540,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   editorImageUrlRef.current = editorImageUrl;
 
   useEffect(() => {
-    if (!navigationReadyRef.current || !routeMenuId(route) || sessionPending) return;
+    if (!navigationReadyRef.current || !routeMenuId(route) || sessionState === "unknown") return;
     const menuId = routeMenuId(route);
     if (!menuId) return;
     if (activeDocIdRef.current === menuId) {
@@ -545,16 +576,30 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         let imageBlob: Blob | null = null;
         try {
           doc = await getMenu(menuId);
-          if (!signedInRef.current) {
-            // Sign-out is a privacy boundary: a stamped row belongs to its
-            // owner and never opens for nobody signed out (direct URL included).
-            const origin = await getDraftOrigin(menuId).catch(() => undefined);
-            if (origin) {
-              setLibraryError("That menu belongs to an account — sign in to view it.");
-              openedRouteMenuRef.current = null;
-              navigateToRef.current?.({ screen: "library" }, true);
-              return;
-            }
+          // The device stamp is a privacy boundary, not an accusation (015): a
+          // row stamped to this account is the account's own copy, an unstamped
+          // row is the shared anonymous working set, and only a row stamped to
+          // somebody else stays shut. An unanswered session decides nothing
+          // here — the effect re-runs when the read settles.
+          const origin = await getDraftOrigin(menuId).catch(() => undefined);
+          const access = decideMenuOpen({
+            session: sessionStateRef.current,
+            stampAccountId: origin?.accountId,
+            accountKey: accountKeyRef.current,
+          });
+          if (access.state === "wait") {
+            if (cancelled) return;
+            openedRouteMenuRef.current = null;
+            return;
+          }
+          if (access.state === "blocked") {
+            // A torn-down run must never navigate: this was the one branch in
+            // the effect without the cancellation guard (015).
+            if (cancelled) return;
+            setLibraryError(menuOpenBlockedMessage(access.reason));
+            openedRouteMenuRef.current = null;
+            navigateToRef.current?.({ screen: "library" }, true);
+            return;
           }
           try {
             imageBlob = (await getImage(menuId))?.blob ?? null;
@@ -587,7 +632,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       cancelled = true;
       if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
     };
-  }, [route, sessionPending, signedIn]);
+  }, [route, sessionState, signedIn]);
 
   useEffect(() => {
     const wasSignedIn = wasSignedInRef.current;
@@ -2403,12 +2448,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
         {screen === "library" && (
           <div className="flex flex-col gap-4">
-            {libraryError && (
+            {visibleLibraryError && (
               <p
                 role="alert"
                 className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
               >
-                {libraryError}
+                {visibleLibraryError}
               </p>
             )}
             <LibraryPanel
