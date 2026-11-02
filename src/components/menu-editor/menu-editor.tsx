@@ -466,7 +466,7 @@ export function MenuEditor({
           />
         )}
         <PhoneFrame
-          label="Diner ordering page"
+          label="What a table card opens"
           heightClass="h-[min(78vh,860px)]"
           widthClass="max-w-[420px]"
         >
