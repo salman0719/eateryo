@@ -3,10 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { authClient } from "@/lib/auth-client";
-import {
-  linkExpiryCopy,
-  type WizardLinkSent,
-} from "@/features/publishing/wizard-state";
+import { linkExpiryCopy, type WizardLinkSent } from "@/features/publishing/wizard-state";
 
 type Status =
   | { kind: "idle" }
@@ -57,6 +54,7 @@ export function MagicLinkForm({
   initialSent,
   onSent,
   onSentCleared,
+  devSignIn = false,
 }: {
   /** Same-origin path the emailed link returns to. */
   callbackURL: string;
@@ -66,12 +64,23 @@ export function MagicLinkForm({
   onSent?: (sent: WizardLinkSent) => void;
   /** The sent panel was dismissed (forget the stored request). */
   onSentCleared?: () => void;
+  /**
+   * Development shortcut: read the one-time link back from the server and
+   * offer it here instead of waiting for an email. The server only answers
+   * when `DEV_SIGN_IN_BYPASS` is on outside production; off by default.
+   */
+  devSignIn?: boolean;
 }) {
   const [email, setEmail] = useState(initialSent?.email ?? "");
   const [status, setStatus] = useState<Status>(() =>
-    initialSent ? { kind: "sent", email: initialSent.email, sentAt: initialSent.sentAt } : { kind: "idle" }
+    initialSent
+      ? { kind: "sent", email: initialSent.email, sentAt: initialSent.sentAt }
+      : { kind: "idle" }
   );
   const [linkError, setLinkError] = useState<boolean>(readLinkErrorParam);
+  // The captured dev link, tagged with the address it belongs to so a resent
+  // link never shows the previous one while the new one is being fetched.
+  const [devLink, setDevLink] = useState<{ email: string; url: string | null } | null>(null);
   const inputId = useId();
 
   // Ticks the expiry countdown while a link is pending. The clock starts
@@ -99,6 +108,27 @@ export function MagicLinkForm({
     onSentCleared?.();
   }, [linkError, onSentCleared]);
 
+  // Dev bypass: the server parked the link instead of emailing it. Read it
+  // back once; state only changes from the promise callbacks, never inline.
+  useEffect(() => {
+    if (!devSignIn || status.kind !== "sent") return;
+    const email = status.email;
+    let cancelled = false;
+    fetch(`/api/dev/magic-link?email=${encodeURIComponent(email)}`, { cache: "no-store" })
+      .then(async (response) =>
+        response.ok ? ((await response.json()) as { url?: string }) : null
+      )
+      .then((body) => {
+        if (!cancelled) setDevLink({ email, url: body?.url ?? null });
+      })
+      .catch(() => {
+        if (!cancelled) setDevLink({ email, url: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [devSignIn, status]);
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus({ kind: "sending" });
@@ -124,6 +154,45 @@ export function MagicLinkForm({
   }
 
   if (status.kind === "sent") {
+    if (devSignIn) {
+      const settling = devLink?.email !== status.email;
+      const url = settling ? null : devLink.url;
+      return (
+        <div className="rounded-xl border border-dashed border-stone-400 bg-stone-50 p-4 text-sm text-stone-700">
+          <p className="font-medium">Development sign-in — no email was sent</p>
+          <p className="mt-1">
+            <code className="rounded bg-stone-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
+            is on, so the one-time link for <span className="font-medium">{status.email}</span> is
+            shown here instead of being emailed. It expires in 5 minutes.
+          </p>
+          {settling ? (
+            <p className="mt-3 text-stone-500">Preparing the link…</p>
+          ) : url ? (
+            <a
+              href={url}
+              className="mt-3 inline-block rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
+            >
+              Open the sign-in link
+            </a>
+          ) : (
+            <p
+              role="alert"
+              className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800"
+            >
+              Couldn&apos;t read the link back — it may have expired. Send a fresh one.
+            </p>
+          )}
+          <button
+            type="button"
+            className="mt-3 block text-xs text-stone-600 underline underline-offset-2 hover:text-stone-900"
+            onClick={resetToIdle}
+          >
+            Use a different email
+          </button>
+        </div>
+      );
+    }
+
     const expiry = linkExpiryCopy(status.sentAt, now ?? status.sentAt);
     return (
       <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
@@ -152,8 +221,8 @@ export function MagicLinkForm({
           role="alert"
           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
         >
-          That sign-in link didn&apos;t work — it may have expired or been used already.
-          Send yourself a fresh one below.
+          That sign-in link didn&apos;t work — it may have expired or been used already. Send
+          yourself a fresh one below.
         </p>
       ) : null}
       <label htmlFor={inputId} className="text-sm font-medium text-stone-700">

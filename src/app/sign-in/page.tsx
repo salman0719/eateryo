@@ -1,15 +1,21 @@
-"use client";
-
 import Link from "next/link";
 
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { isDevSignInEnabled } from "@/lib/auth/dev-sign-in";
 
 /**
  * Magic-link sign-in (the only human sign-in — PHASE-2.md §3.6): one field,
  * one one-time link. Sign-up happens implicitly when a new email first uses
  * a link. Diners never see this page — ordering at a table stays anonymous.
+ *
+ * With `DEV_SIGN_IN_BYPASS=1` locally, the form offers the link on the page
+ * instead of emailing it; production never shows that panel. The flag is read
+ * here on the server, and `isDevSignInEnabled()` answers false in a production
+ * build whatever the build machine had set.
  */
 export default function SignInPage() {
+  const devSignIn = isDevSignInEnabled();
+
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <div>
@@ -20,7 +26,7 @@ export default function SignInPage() {
         </p>
       </div>
 
-      <MagicLinkForm callbackURL="/" />
+      <MagicLinkForm callbackURL="/" devSignIn={devSignIn} />
 
       <p className="text-sm text-stone-500">
         <Link href="/" className="underline underline-offset-2 hover:text-stone-800">
