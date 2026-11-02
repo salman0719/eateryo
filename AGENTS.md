@@ -99,6 +99,11 @@ errors, or add lint/type suppressions just to make checks pass.
   dependency): stroked 24-grid glyphs that inherit `currentColor` and are
   `aria-hidden`, so the control around them carries the label. Starts with
   `ChevronUpIcon`/`ChevronDownIcon` for the editor's disclosures.
+- `src/components/ui/collapse.tsx` — the disclosure animation: a one-row CSS
+  grid whose track goes 0fr ↔ 1fr, so both directions animate, a mid-flight
+  toggle retargets instead of jumping, and nothing is measured; content stays
+  mounted and `inert` while shut, and reduced motion snaps. The wrapper must
+  stay layout-neutral — padding and borders belong on the content inside.
 - `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
   reusable height-reveal animation: measures the rendered content and
   animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then

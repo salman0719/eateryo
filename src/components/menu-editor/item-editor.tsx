@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { Collapse } from "@/components/ui/collapse";
 import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
 import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import {
@@ -12,7 +13,7 @@ import {
   moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { formatItemPrice } from "@/features/menu/preview-utils";
 import type { MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { itemImageCopy } from "@/features/item-images/ref";
 
@@ -159,8 +160,8 @@ export function ItemEditor({
               <span className="mt-0.5 block truncate text-xs text-stone-500">{rowSummary}</span>
             )}
           </span>
-          <span className="shrink-0 text-sm tabular-nums text-stone-600">
-            {formatPreviewPrice(item.price, item.currency, doc.currency)}
+          <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-stone-600">
+            {formatItemPrice(item, doc.currency)}
           </span>
           {open ? (
             <ChevronUpIcon className="shrink-0 text-stone-400" />
@@ -169,7 +170,7 @@ export function ItemEditor({
           )}
         </button>
       </div>
-      {open && (
+      <Collapse open={open}>
         <div id={panelId} className="border-t border-stone-100 p-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_120px_90px]">
             <CommitInput
@@ -549,7 +550,7 @@ export function ItemEditor({
             </div>
           </div>
         </div>
-      )}
+      </Collapse>
     </li>
   );
 }

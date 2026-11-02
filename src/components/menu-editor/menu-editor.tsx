@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { Collapse } from "@/components/ui/collapse";
 import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -19,7 +20,7 @@ import {
   renameCategory,
   setItemImage,
 } from "@/features/menu/menu-utils";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { formatItemPrice } from "@/features/menu/preview-utils";
 import {
   findDuplicateGroups,
   duplicateItemIds,
@@ -614,8 +615,8 @@ export function MenuEditor({
                                 {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
                             )}
-                            <span className="shrink-0 text-xs text-stone-500">
-                              {formatPreviewPrice(item.price, item.currency, doc.currency)}
+                            <span className="shrink-0 text-xs whitespace-nowrap text-stone-500">
+                              {formatItemPrice(item, doc.currency)}
                             </span>
                             <button
                               type="button"
@@ -1097,7 +1098,7 @@ export function MenuEditor({
                   </button>
                 </div>
               </div>
-              {categoryOpen && (
+              <Collapse open={categoryOpen}>
                 <div id={categoryPanelId} className="p-4">
                   {items.length === 0 ? (
                     <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
@@ -1136,7 +1137,7 @@ export function MenuEditor({
                     + Add item
                   </button>
                 </div>
-              )}
+              </Collapse>
             </section>
           );
         })
