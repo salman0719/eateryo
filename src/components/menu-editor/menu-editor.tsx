@@ -1171,7 +1171,12 @@ export function MenuEditor({
                     </span>
                   )}
                 </p>
-                <div className="flex shrink-0 items-center gap-1">
+                {/* Inline reordering shows only where the list does. A phone
+                    shows one section at a time, so ↑ moved a category the
+                    owner could not watch move, right beside the stepper's
+                    ‹ › — two axes, one apparent control. Arranging on a phone
+                    belongs to the reorder view, which lists every category. */}
+                <div className="hidden shrink-0 items-center gap-1 sm:flex">
                   <button
                     type="button"
                     aria-label={`Move ${category.name} up`}
@@ -1190,14 +1195,14 @@ export function MenuEditor({
                   >
                     ↓
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteCategory(category, index)}
-                    className={`${tinyButton} hover:border-red-700 hover:text-red-800`}
-                  >
-                    Delete
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCategory(category, index)}
+                  className={`${tinyButton} hover:border-red-700 hover:text-red-800`}
+                >
+                  Delete
+                </button>
               </div>
               <Collapse open={categoryOpen}>
                 <div id={categoryPanelId} className="p-4">
