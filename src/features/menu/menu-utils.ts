@@ -8,7 +8,13 @@
  * from the current document.
  */
 
-import { SCHEMA_VERSION, type MenuCategory, type MenuDocument, type MenuItem } from "./schema";
+import {
+  SCHEMA_VERSION,
+  type MenuCategory,
+  type MenuDocument,
+  type MenuItem,
+  type MenuItemImage,
+} from "./schema";
 import type { ItemPatch, NewCategoryInput, NewItemInput } from "./types";
 
 export function generateId(): string {
@@ -96,7 +102,41 @@ function buildItem(
     variants: input.variants ? clone(input.variants) : [],
     options: input.options ? clone(input.options) : [],
     reviewNotes: input.reviewNotes ? [...input.reviewNotes] : [],
+    unpricedAccepted: input.unpricedAccepted ?? false,
   };
+}
+
+/** True when the item carries at least one honest price: its own, or one of
+ * its size/tier variants. An item priced per size has a null root `price` by
+ * design (see the extraction prompt), so the variants are its prices — that
+ * is pricing, not a missing price. */
+export function hasAnyPrice(item: Pick<MenuItem, "price" | "variants">): boolean {
+  if (item.price !== null) return true;
+  return item.variants.some((variant) => variant.price !== null);
+}
+
+/** An exception, not everything: unpriced (unless explicitly accepted) or
+ * carrying an extraction note. Single canonical definition — the result
+ * list, editor rows, badges, and launch derivation must all agree. */
+export function isItemFlagged(
+  item: Pick<MenuItem, "price" | "variants" | "reviewNotes" | "unpricedAccepted">
+): boolean {
+  if (item.reviewNotes.length > 0) return true;
+  if (!hasAnyPrice(item) && !item.unpricedAccepted) return true;
+  return false;
+}
+
+/** Owner reviewed the AI notes and the data is right — drop the notes.
+ * Never invents a price; a null price stays flagged unless accepted. */
+export function confirmItemReviewed(doc: MenuDocument, categoryId: string, itemId: string): MenuDocument {
+  return updateItem(doc, categoryId, itemId, { reviewNotes: [] });
+}
+
+/** Owner confirms this item is intentionally unpriced (e.g. market price).
+ * Clears the notes and stops the null price from flagging. Prices stay
+ * null — totals stay honestly null downstream. */
+export function acceptItemUnpriced(doc: MenuDocument, categoryId: string, itemId: string): MenuDocument {
+  return updateItem(doc, categoryId, itemId, { reviewNotes: [], unpricedAccepted: true });
 }
 
 // --- Categories -----------------------------------------------------------
@@ -262,6 +302,24 @@ export function moveItemsToCategory(
   return finalize(next);
 }
 
+/**
+ * Attach, replace, or (with `null`) remove an item's photo. Removing drops the
+ * reference only — the stored file is kept, because a published revision may
+ * still be serving it to diners (see `menuItemImageSchema`).
+ */
+export function setItemImage(
+  doc: MenuDocument,
+  categoryId: string,
+  itemId: string,
+  image: MenuItemImage | null
+): MenuDocument {
+  const next = clone(doc);
+  const item = findItem(findCategory(next, categoryId), itemId);
+  if (image) item.image = clone(image);
+  else delete item.image;
+  return finalize(next);
+}
+
 /** Mark an item available/unavailable (null = unknown) without deleting it. */
 export function setItemAvailability(
   doc: MenuDocument,
@@ -302,6 +360,78 @@ export function suggestRestaurantName(titles: string[]): string | null {
   return best.display.slice(0, 120).trim() || null;
 }
 
+/** Leftovers that name a role, not a place: never suggest these as a café. */
+const GENERIC_NAME_WORDS = new Set(["main", "the", "our", "this", "food", "drinks"]);
+
+/**
+ * Names that say *which* menu this is (a meal or a service), not which place
+ * it belongs to. Exact, case-insensitive matches only: guessing that
+ * "Lunchbox Café" is a service would be worse than asking.
+ */
+const SERVICE_MENU_NAMES = new Set([
+  "breakfast",
+  "brunch",
+  "lunch",
+  "dinner",
+  "supper",
+  "drink",
+  "drinks",
+  "beverage",
+  "beverages",
+  "cocktail",
+  "cocktails",
+  "wine",
+  "wines",
+  "beer",
+  "beers",
+  "dessert",
+  "desserts",
+  "sweet",
+  "sweets",
+  "starter",
+  "starters",
+  "appetizer",
+  "appetizers",
+  "entree",
+  "entrees",
+  "main",
+  "mains",
+  "side",
+  "sides",
+  "kid",
+  "kids",
+  "special",
+  "specials",
+  "happy hour",
+  "coffee",
+  "tea",
+  "takeaway",
+  "takeout",
+  "delivery",
+  "all day",
+]);
+
+/** The trailing "place — service" part of a title (the whole title with none). */
+function titleTail(title: string): string {
+  const parts = title.split(/\s*[—–·|:]\s*|\s+-\s+/);
+  return (parts[parts.length - 1] ?? title).trim();
+}
+
+/**
+ * The meal/service a menu title names ("Lunch Menu" → "Lunch",
+ * "My Café — Dinner" → "Dinner"), or null when the title does not clearly
+ * say — a café name, a placeholder, or nothing at all.
+ */
+export function serviceMenuName(title: string | null | undefined): string | null {
+  const raw = title?.trim();
+  if (!raw) return null;
+  const tail = titleTail(raw)
+    .replace(/(\s+|^)(menus?|card|list|sheet)$/i, "")
+    .trim();
+  if (!tail) return null;
+  return SERVICE_MENU_NAMES.has(tail.toLowerCase()) ? tail : null;
+}
+
 /** The restaurant-name part of one title, or null when it has none. */
 function restaurantNameCandidate(title: string): string | null {
   let candidate = title.trim();
@@ -315,5 +445,64 @@ function restaurantNameCandidate(title: string): string | null {
   }
   candidate = candidate.replace(/(\s+|^)menu$/i, "").trim();
   if (!candidate) candidate = title.trim().replace(/(\s+|^)menu$/i, "").trim();
+  if (GENERIC_NAME_WORDS.has(candidate.toLowerCase())) return null;
+  // "Lunch Menu" names a menu, not a place: never offer it as a café name.
+  // Checked after the split, so "My Café — Lunch" still yields "My Café".
+  if (serviceMenuName(candidate)) return null;
   return candidate || null;
+}
+
+/** First menu name: the main menu is never a choice. Its address follows
+ * from the title (`/m/main-menu`), and a restaurant with only this menu
+ * serves it at its own `/r/<restaurant>` address. The owner can still
+ * rename it in the editor. */
+export const DEFAULT_FIRST_MENU_TITLE = "Main Menu";
+
+/** Service-name chips offered when a second menu is created. */
+export const SECOND_MENU_SUGGESTIONS = [
+  "Lunch",
+  "Dinner",
+  "Happy Hour",
+  "Drinks",
+  "Breakfast",
+  "Brunch",
+] as const;
+
+/** Titles the product treats as "the photo missed it" placeholders. */
+export function isPlaceholderMenuTitle(title: string): boolean {
+  const normalized = title.trim().toLowerCase();
+  return normalized === "" || normalized === "untitled" || normalized === "untitled menu" || normalized === "menu";
+}
+
+/**
+ * The title a first menu is saved with, so onboarding never asks for one: a
+ * title that clearly names a service ("Lunch Menu", "Café — Dinner") keeps
+ * that name — and its address follows (`/m/lunch`) — while a café name, a
+ * placeholder, or nothing at all becomes the main menu (`/m/main-menu`).
+ * The owner can rename it later; nothing here is invented.
+ */
+export function resolveFirstMenuTitle(title: string | null | undefined): string {
+  return serviceMenuName(title) ?? DEFAULT_FIRST_MENU_TITLE;
+}
+
+/**
+ * Default title for a blank new menu: "Main Menu" while it is free, then
+ * "Menu 2", "Menu 3", … — honest numbering, never an invented service.
+ * Comparison is case-insensitive over trimmed titles.
+ */
+export function defaultNewMenuTitle(existingTitles: string[]): string {
+  const used = new Set(existingTitles.map((title) => title.trim().toLowerCase()));
+  if (!used.has(DEFAULT_FIRST_MENU_TITLE.toLowerCase())) return DEFAULT_FIRST_MENU_TITLE;
+  let n = 2;
+  while (used.has(`menu ${n}`)) n += 1;
+  return `Menu ${n}`;
+}
+
+/**
+ * Second-menu contextual ask: service names not already in use, capped at
+ * four. Pure so tests pin the filtering; the UI adds the why.
+ */
+export function suggestSecondMenuNames(existingTitles: string[], limit = 4): string[] {
+  const used = new Set(existingTitles.map((title) => title.trim().toLowerCase()));
+  return SECOND_MENU_SUGGESTIONS.filter((name) => !used.has(name.toLowerCase())).slice(0, limit);
 }

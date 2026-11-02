@@ -76,16 +76,23 @@ export async function moveLocalMenuToAccount(
 }
 
 /**
- * Copy every local menu into the caller's restaurant on the server.
+ * Copy local menus into the caller's restaurant on the server. Pass `onlyIds`
+ * to move just the visible browser-only rows — hidden rows belong to another
+ * session and must never be swept into this account.
  * Returns which menus were imported, skipped (already there), or failed.
  */
-export async function moveLocalMenusToAccount(restaurantId: string): Promise<MoveReport> {
+export async function moveLocalMenusToAccount(
+  restaurantId: string,
+  onlyIds?: readonly string[]
+): Promise<MoveReport> {
   const summaries = await listMenus();
+  const wanted = onlyIds ? new Set(onlyIds) : null;
   const report: MoveReport = { imported: [], skipped: [], failed: [] };
 
   // Sequential on purpose: each menu is a validated round trip, and a
   // predictable order makes partial failures easy to read and re-run.
   for (const summary of summaries) {
+    if (wanted && !wanted.has(summary.id)) continue;
     if (summary.corrupt) {
       report.failed.push({
         id: summary.id,

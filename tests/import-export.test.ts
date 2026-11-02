@@ -60,6 +60,7 @@ describe("menuToCsv", () => {
             variants: [],
             options: [],
             reviewNotes: [],
+            unpricedAccepted: false,
           },
           {
             id: "i2",
@@ -73,6 +74,7 @@ describe("menuToCsv", () => {
             variants: [],
             options: [],
             reviewNotes: [],
+            unpricedAccepted: false,
           },
         ],
       },

@@ -79,10 +79,7 @@ export interface AccountExport {
   publications: Array<{
     menuId: string;
     slug: string;
-    theme: string | null;
-    layout: string | null;
     publishedAt: string | null;
-    viewCount: number;
     liveDoc: unknown;
   }>;
   orders: Array<{
@@ -156,10 +153,7 @@ export async function buildAccountExport(
     .select({
       menuId: publishedMenu.menuId,
       slug: publishedMenu.slug,
-      theme: menuRevision.theme,
-      layout: menuRevision.layout,
       publishedAt: publishedMenu.publishedAt,
-      viewCount: publishedMenu.viewCount,
       liveDoc: menuRevision.doc,
     })
     .from(publishedMenu)

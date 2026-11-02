@@ -371,6 +371,11 @@ phase-3 candidates once someone is paying.
 
 ## 6. I3 — One-click publish + the free promotion
 
+> **Superseded (2026-10-28):** the public menu page, the page QR, the view
+> count and the theme/layout choice described below were retired. Publishing
+> now makes a menu orderable at the café's tables; the only diner entry is a
+> table card (`/r/<restaurant>/t/<table>`). See `ROADMAP.md`.
+
 **Outcome:** an owner clicks **Publish** and gets
 `https://<app>/m/<their-cafe>` that works on any phone with no login — **free,
 while the promotion lasts**. This is the first user-facing feature of Phase 2.
@@ -478,7 +483,8 @@ backlog below Phase 2 revenue work.
 | Billing provider     | **Stripe — parked.** Billing is the last thing built, riding with the parked B2B step.                                          |
 | Charge anything now  | **No.** Free launch promotion: no checkout or payment links anywhere; pricing revisited after measurement, early users in mind. |
 | Pilot price          | Deferred by design: suggest pricing only after real cost-per-extraction and effort are measured.                                |
-| Public URL shape     | **`/r/<restaurant>/m/<menu>`** on the current domain (decided 2026-10-22: menu slugs are scoped to their café, so two restaurants can both publish `lunch`). Custom domains stay out of scope. |
+| Public URL shape     | **`/r/<restaurant>`** for a café with one live menu (that menu is the primary one by derivation, never by a picker); **`/r/<restaurant>/m/<menu>`** always works as the targeted link (decided 2026-10-22: menu slugs are scoped to their café, so two restaurants can both publish `lunch`). Several live menus make the root a menu index, and every menu page links back to it. Custom domains stay out of scope. |
+| First-menu naming    | **Decided 2026-10-28:** onboarding names the first menu itself — `Main Menu` (`/m/main-menu`), or the service when the photo clearly names one (`Lunch`, `Dinner`, `Drinks`) — and never shows a name or link field. The café name is confirmed from the photo ("Publishing under …") with a small Change control. |
 | Local vs server mode | **Keep both** — signed-out = local prototype, signed-in = server.                                                               |
 | Error tracking       | **Approved:** Sentry (free tier) plus cookie-free view counts only.                                                             |
 

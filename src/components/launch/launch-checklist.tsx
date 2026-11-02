@@ -16,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchLaunchStatus } from "@/features/launch/client";
 import type { LaunchStatus } from "@/features/launch/schema";
 import { launchSteps, verifiedProgress, type LaunchStep } from "@/features/launch/steps";
-import { formatMicroUsd } from "@/features/usage/pricing";
 import { SyncError } from "@/features/menus/sync";
 
 const CARDS_PRINTED_KEY = "eateryo:launch:cards-printed";
@@ -35,11 +34,12 @@ function cardsPrintedOnThisDevice(): boolean {
   }
 }
 
-function stepHref(step: LaunchStep, status: LaunchStatus): string {
+function stepHref(step: LaunchStep): string {
   // Table cards belong to the restaurant, not to a menu: the Tables tab is
   // the only place that can print them for every open menu at once.
   if (step.id === "cards") return "/tables";
-  if (step.id === "order" && status.livePath) return status.livePath;
+  // Orders start at a table card, which is printed from the same tab.
+  if (step.id === "order") return "/tables";
   return "/";
 }
 
@@ -49,14 +49,12 @@ function stepActionLabel(step: LaunchStep): string {
       return "Upload a menu";
     case "review":
       return "Open the editor";
-    case "theme":
-      return "Preview themes";
     case "cards":
       return "Open Tables";
     case "publish":
       return "Publish";
     case "order":
-      return "Open the public menu";
+      return "Open Tables";
   }
 }
 
@@ -138,7 +136,7 @@ export function LaunchChecklist() {
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
         <h2 className="text-base font-semibold text-amber-950">Sign in to start the checklist</h2>
         <p className="mt-1 text-sm text-amber-900">
-          Your menus, public link, and table orders need an account so a phone at the table can
+          Your menus, publishing, and table orders need an account so a phone at the table can
           reach the same menu your laptop published. It is still free, and there is no card step.
         </p>
         <Link
@@ -231,7 +229,7 @@ export function LaunchChecklist() {
                 {!step.done || step.manual ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <Link
-                      href={stepHref(step, status)}
+                      href={stepHref(step)}
                       className="text-xs font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
                     >
                       {stepActionLabel(step)}
@@ -261,52 +259,6 @@ export function LaunchChecklist() {
           </p>
         ) : null}
       </section>
-
-      <UsageCard status={status} />
     </div>
-  );
-}
-
-function UsageCard({ status }: { status: LaunchStatus }) {
-  const usage = status.usage;
-  if (!usage) return null;
-
-  const used = usage.requests;
-  const percent = Math.min(100, Math.round((used / usage.cap) * 100));
-
-  return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h2 className="text-base font-semibold text-stone-900">AI extraction this month</h2>
-      <p className="mt-1 text-sm text-stone-600">
-        {used} of {usage.cap} free extractions used · {usage.remaining} left
-      </p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100">
-        <div className="h-full rounded-full bg-stone-500" style={{ width: `${percent}%` }} />
-      </div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-stone-600">
-        <dt>Successful</dt>
-        <dd className="text-right tabular-nums">{usage.succeeded}</dd>
-        <dt>Failed attempts</dt>
-        <dd className="text-right tabular-nums">{usage.failed}</dd>
-        <dt>Pages read</dt>
-        <dd className="text-right tabular-nums">{usage.pages}</dd>
-        <dt>Tokens</dt>
-        <dd className="text-right tabular-nums">
-          {usage.inputTokens === null && usage.outputTokens === null
-            ? "not reported"
-            : `${usage.inputTokens ?? "?"} in / ${usage.outputTokens ?? "?"} out`}
-        </dd>
-      </dl>
-      <p className="mt-3 text-xs text-stone-500">
-        {usage.costMicros !== null
-          ? `Provider cost this month: ${formatMicroUsd(usage.costMicros)}.`
-          : usage.ratesConfigured
-            ? "Cost is unknown for this month because some calls did not report token counts or used a vendor without configured rates."
-            : "Provider cost is not configured on this server yet, so only usage is counted."}
-      </p>
-      <p className="mt-1 text-xs text-stone-400">
-        Failed attempts that reached the AI still count: the provider bills them.
-      </p>
-    </section>
   );
 }

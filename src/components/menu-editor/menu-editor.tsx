@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
   addItem,
   deleteCategory,
   deleteItem,
+  hasAnyPrice,
+  isItemFlagged,
   moveCategory,
   moveItem,
   moveItemToCategory,
   moveItemsToCategory,
   renameCategory,
+  setItemImage,
 } from "@/features/menu/menu-utils";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import {
@@ -20,7 +25,7 @@ import {
   loadDismissedDuplicateKeys,
   saveDismissedDuplicateKeys,
 } from "@/features/menu/duplicates";
-import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
+import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import { searchMenu } from "@/features/menu/search";
 import { describeExtractionSource } from "@/features/menu/source-label";
@@ -35,38 +40,37 @@ import {
   type DeleteUndo,
 } from "@/features/menu/undo";
 
-import {
-  DEFAULT_PREVIEW_LAYOUT_ID,
-  DEFAULT_PREVIEW_THEME_ID,
-  PREVIEW_THEMES,
-  PREVIEW_THEME_IDS,
-  isPreviewLayoutId,
-  isPreviewThemeId,
-  type PreviewLayoutId,
-  type PreviewThemeId,
-} from "@/features/menu/preview-themes";
-
-import { TableQrPanel } from "@/components/tables/table-qr-panel";
+import { OrderPagePreview } from "@/components/order/order-page-preview";
+import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
 import { ItemEditor } from "./item-editor";
-import { MenuPreview } from "./menu-preview";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
-  kind: "saved" | "saving" | "error";
+  /**
+   * `checking` is the honest third answer while it is unknown where a save
+   * will land — the account read has not come back yet (003).
+   */
+  kind: "saved" | "saving" | "checking" | "error";
+  /** Short status: "Saved", or the failure/conflict sentence. */
   message: string;
+  /**
+   * Where the save went ("Saved in this browser" / "Saved to your account").
+   * Shown as a tooltip and to screen readers so the main status stays one
+   * word; storage mode is a detail, not a concept to learn.
+   */
+  detail?: string;
 }
 
 interface MenuEditorProps {
   doc: MenuDocument;
   selectedItemId?: string | null;
-  onOpenItem: (itemId: string) => void;
   /**
-   * Which surface is shown (edit workspace, reorder list, table QR cards,
-   * customer preview). Owned by the URL so each mode is deep-linkable and
-   * works with browser back/forward (see navigation/routes.ts).
+   * Which surface is shown (edit workspace, reorder list, customer
+   * preview). Owned by the URL so each mode is deep-linkable and works
+   * with browser back/forward (see navigation/routes.ts).
    */
   mode: EditorMode;
   onModeChange: (mode: EditorMode) => void;
@@ -77,8 +81,6 @@ interface MenuEditorProps {
    * signed-in account with the local copy as an offline cache (Step 8).
    */
   syncMode: "local" | "account";
-  /** Navigate to My menus with this menu's move button highlighted. */
-  onMoveToAccount?: () => void;
   imageUrl: string | null;
   onExportJson: () => void;
   onExportCsv: () => void;
@@ -92,17 +94,32 @@ interface MenuEditorProps {
    */
   canManage?: boolean;
   /**
-   * True when this menu lives on the server. Table cards are restaurant-wide,
-   * so account menus print them from the Tables tab; only a browser-only menu
-   * keeps the in-editor QR mode (its codes really are per menu).
+   * True when this menu lives on the server. Table cards are restaurant-wide
+   * and print from the Tables tab; this only decides whether opening hours
+   * sync to the server copy or stay in this browser.
+   *
+   * Null when the account's menu list has not answered yet: neither claim is
+   * true then, so the copy says it is checking instead (003).
    */
-  onServer?: boolean;
+  onServer?: boolean | null;
+  /**
+   * True when the account's menu read failed. `onServer` is `null` then, but
+   * this is an answer, not a wait: the surfaces say the account couldn't be
+   * checked and offer a retry, and the café-creating CTA stays off (016).
+   */
+  accountCheckFailed?: boolean;
+  /** Re-runs the account read behind those surfaces. */
+  onRetryAccountCheck?: () => void;
+  /** The café's name, shown on the diner preview when the account knows it. */
+  restaurantName?: string | null;
+  /** Open the publish wizard for a browser-only menu (R1). */
+  onStartPublish?: () => void;
   /**
    * Publishing state and actions (Step 9). Absent when nothing can publish
    * in this context, in which case the preview simply omits the panel.
    */
   publishing?: PublishingControls;
-  /** Fired when the customer preview opens; the page refreshes publish state. */
+  /** Fired when the diner preview opens; the page refreshes publish state. */
   onPreviewOpen?: () => void;
 }
 
@@ -119,51 +136,20 @@ const tinyButton =
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
   "focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
 
-/**
- * The preview's eyebrow must never claim the draft is what visitors see:
- * "Live page preview" only when the live snapshot matches both the document
- * and the selected style.
- */
-function previewEyebrow(
-  status: PublishingControls["status"],
-  themeId: PreviewThemeId,
-  layout: PreviewLayoutId
-): string {
-  if (!status?.isLive) return "Preview · not published";
-  const styleDiffers = status.theme !== themeId || status.layout !== layout;
-  return status.hasUnpublishedChanges || styleDiffers
-    ? "Draft preview · public page is older"
-    : "Live page preview";
-}
-
-/**
- * Category layout: "single" shows one category at a time behind a horizontal
- * chip carousel; "all" is the legacy vertical stack of every category. The
- * choice is a tiny UI preference, so it is remembered in localStorage.
- */
-type CategoryViewMode = "single" | "all";
-
-const VIEW_MODE_STORAGE_KEY = "menu-editor-category-view";
-
-function viewModeButton(active: boolean): string {
-  return (
-    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 " +
-    (active ? "bg-amber-800 text-white" : "text-stone-600 hover:text-amber-900")
-  );
-}
-
 export function MenuEditor({
   doc,
   selectedItemId = null,
-  onOpenItem,
   mode,
   onModeChange,
   onChange,
   saveState,
   syncMode,
-  onMoveToAccount,
   canManage = true,
   onServer = false,
+  restaurantName = null,
+  accountCheckFailed = false,
+  onRetryAccountCheck,
+  onStartPublish,
   imageUrl,
   onExportJson,
   onExportCsv,
@@ -175,9 +161,12 @@ export function MenuEditor({
   onPreviewOpen,
 }: MenuEditorProps) {
   const reviewCount = doc.categories.reduce(
-    (sum, c) => sum + c.items.filter((i) => i.price === null || i.reviewNotes.length > 0).length,
+    (sum, c) => sum + c.items.filter(isItemFlagged).length,
     0
   );
+  // Photos are uploaded under the signed-in session, so a browser-only menu
+  // (nobody signed in) cannot attach one yet.
+  const canUploadItemImages = canManage && syncMode === "account";
   // Provenance, so a surprising line can be traced to the model that read it.
   const sourceLabel = describeExtractionSource(doc.source);
 
@@ -186,27 +175,30 @@ export function MenuEditor({
   const search = searchMenu(doc, query);
   const isFiltering = query.trim().length > 0;
 
-  // Category carousel. The active category resolves against the visible
-  // (search-filtered) list, so a deleted category — or one filtered out of a
-  // search — falls back to the first visible category instead of blanking.
-  // Restore the persisted layout preference. The editor only ever mounts
-  // client-side (the page opens it after user interaction), so reading
-  // localStorage in the initializer is hydration-safe; if storage is blocked
-  // or empty, default to the carousel.
-  const [viewMode, setViewMode] = useState<CategoryViewMode>(() => {
-    if (typeof window === "undefined") return "single";
-    try {
-      return window.localStorage.getItem(VIEW_MODE_STORAGE_KEY) === "all" ? "all" : "single";
-    } catch {
-      return "single";
-    }
-  });
+  // Category navigation (R0: the One-at-a-time/All toggle is deleted).
+  // Phones show one section behind the stepper; larger screens show the full
+  // menu and search covers everything. The active category resolves against
+  // the visible (search-filtered) list, so a deleted category — or one
+  // filtered out of a search — falls back to the first visible category
+  // instead of blanking.
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-  const activeChipRef = useRef<HTMLButtonElement | null>(null);
   const activeMatch =
     search.categories.find((match) => match.category.id === activeCategoryId) ??
     search.categories[0] ??
     null;
+  const activeIndex = Math.max(
+    0,
+    search.categories.findIndex((match) => match.category.id === activeMatch?.category.id)
+  );
+
+  /** Step through the visible categories from the phone stepper. */
+  function stepCategory(delta: 1 | -1) {
+    const ids = search.categories.map((match) => match.category.id);
+    if (ids.length === 0) return;
+    const current = ids.indexOf(activeMatch?.category.id ?? "");
+    const next = ids[(current + delta + ids.length) % ids.length];
+    if (next) setActiveCategoryId(next);
+  }
 
   useEffect(() => {
     if (!selectedItemId) return;
@@ -218,36 +210,6 @@ export function MenuEditor({
     );
     return () => cancelAnimationFrame(frame);
   }, [selectedItemId]);
-
-  // Keep the active chip visible inside the horizontally scrolling row.
-  useEffect(() => {
-    activeChipRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [activeMatch?.category.id, viewMode, query]);
-
-  function changeViewMode(mode: CategoryViewMode) {
-    setViewMode(mode);
-    try {
-      window.localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode);
-    } catch {
-      /* storage unavailable — the session default is fine */
-    }
-  }
-
-  /** Left/Right/Home/End navigation across the category chips. */
-  function handleChipListKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const ids = search.categories.map((match) => match.category.id);
-    const currentIndex = ids.indexOf(activeMatch?.category.id ?? "");
-    let nextIndex: number | null = null;
-    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % ids.length;
-    else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + ids.length) % ids.length;
-    else if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = ids.length - 1;
-    if (nextIndex === null || !ids[nextIndex]) return;
-    event.preventDefault();
-    const nextId = ids[nextIndex];
-    setActiveCategoryId(nextId);
-    requestAnimationFrame(() => document.getElementById(`category-chip-${nextId}`)?.focus());
-  }
 
   // Duplicate review (flags only, never auto-deletes — see duplicates.ts).
   // Dismissals are remembered per document, in session state and localStorage.
@@ -269,12 +231,16 @@ export function MenuEditor({
   // document still matches the post-delete state — see undo.ts.
   const [undo, setUndo] = useState<DeleteUndo | null>(null);
   const undoLabel = undo && canRestoreDeleteUndo(undo, doc) ? undo.label : null;
+  const { confirm, dialog } = useConfirm();
 
   /** Delete an item, keeping a one-level undo of the document beforehand. */
-  function removeItem(categoryId: string, item: MenuItem) {
-    if (!window.confirm(`Delete “${item.name}”? You can undo this until your next change.`)) {
-      return;
-    }
+  async function removeItem(categoryId: string, item: MenuItem) {
+    const ok = await confirm({
+      message: `Delete “${item.name}”? You can undo this until your next change.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     const next = deleteItem(doc, categoryId, item.id);
     setUndo(captureDeleteUndo(doc, next, `deleted “${item.name}”`));
     onChange(next);
@@ -287,81 +253,42 @@ export function MenuEditor({
   }
 
   /** Delete a category (after confirm), keeping undo and the carousel sane. */
-  function handleDeleteCategory(category: MenuCategory, index: number) {
-    if (
-      !window.confirm(
-        `Delete category “${category.name}” and its ${category.items.length} items? You can undo this until your next change.`
-      )
-    ) {
-      return;
-    }
+  async function handleDeleteCategory(category: MenuCategory, index: number) {
+    const ok = await confirm({
+      message: `Delete category “${category.name}” and its ${category.items.length} items? You can undo this until your next change.`,
+      confirmLabel: "Delete category",
+      destructive: true,
+    });
+    if (!ok) return;
     const next = deleteCategory(doc, category.id);
     setUndo(captureDeleteUndo(doc, next, `deleted category “${category.name}”`));
-    // Keep the carousel on the category that takes this one's place (or the
+    // Keep the stepper on the category that takes this one's place (or the
     // new last one); null when the menu is now empty.
     setActiveCategoryId(next.categories[Math.min(index, next.categories.length - 1)]?.id ?? null);
     onChange(next);
   }
 
-  /** Add a category and, in single view, open it straight away. */
+  /** Add a category and open it straight away. */
   function handleAddCategory() {
     const next = addCategory(doc, { name: "New category" });
     setActiveCategoryId(next.categories[next.categories.length - 1]?.id ?? null);
     onChange(next);
   }
 
-  // View mode swaps the editing surface for the customer preview, the
-  // printable table QR cards, or the compact reorder list, while the header
-  // (back, save state) stays put. "edit" is the workspace; "preview" is a
-  // read-only presentation; "reorder" arranges without the editing boxes.
-  // The mode itself lives in the URL (via onModeChange), so each surface
-  // has its own link and back/forward moves between them.
+  // View mode swaps the editing surface for the diner's order page or the
+  // compact reorder list, while the header (back, save state) stays put.
+  // "edit" is the workspace; "preview" is the read-only order page a table
+  // card opens; "reorder" arranges without the editing boxes. The mode lives
+  // in the URL (via onModeChange), so each surface has its own link and
+  // back/forward moves between them.
   function changeMode(next: EditorMode) {
     if (next === "preview") onPreviewOpen?.();
     onModeChange(next);
   }
 
-  // Preview style is a tiny UI preference (like the category layout above), so
-  // it lives in localStorage rather than the menu document.
-  const PREVIEW_THEME_STORAGE_KEY = "menu-preview-theme";
-  const [previewThemeId, setPreviewThemeId] = useState<PreviewThemeId>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREVIEW_THEME_ID;
-    try {
-      const stored = window.localStorage.getItem(PREVIEW_THEME_STORAGE_KEY);
-      return isPreviewThemeId(stored) ? stored : DEFAULT_PREVIEW_THEME_ID;
-    } catch {
-      return DEFAULT_PREVIEW_THEME_ID;
-    }
-  });
-
-  function changePreviewTheme(id: PreviewThemeId) {
-    setPreviewThemeId(id);
-    try {
-      window.localStorage.setItem(PREVIEW_THEME_STORAGE_KEY, id);
-    } catch {
-      /* storage unavailable — the session choice still applies */
-    }
-  }
-
-  const PREVIEW_LAYOUT_STORAGE_KEY = "menu-preview-layout";
-  const [previewLayout, setPreviewLayout] = useState<PreviewLayoutId>(() => {
-    if (typeof window === "undefined") return DEFAULT_PREVIEW_LAYOUT_ID;
-    try {
-      const stored = window.localStorage.getItem(PREVIEW_LAYOUT_STORAGE_KEY);
-      return isPreviewLayoutId(stored) ? stored : DEFAULT_PREVIEW_LAYOUT_ID;
-    } catch {
-      return DEFAULT_PREVIEW_LAYOUT_ID;
-    }
-  });
-
-  function changePreviewLayout(id: PreviewLayoutId) {
-    setPreviewLayout(id);
-    try {
-      window.localStorage.setItem(PREVIEW_LAYOUT_STORAGE_KEY, id);
-    } catch {
-      /* storage unavailable — the session choice still applies */
-    }
-  }
+  /** The draft is ahead of what table ordering serves right now. */
+  const needsPublish =
+    publishing?.status?.isLive === true && publishing.status.hasUnpublishedChanges;
 
   // Bulk reassignment: selection is tracked by item id and pruned against
   // the live document, so deleted or filtered-out items never linger.
@@ -392,6 +319,21 @@ export function MenuEditor({
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
+
+  /**
+   * Apply a finished photo upload to the *current* document. The upload takes
+   * seconds, and an item edit made meanwhile must survive it — so this reads
+   * the latest document instead of the one captured when the upload started,
+   * and finds the dish by id even if it moved to another section meanwhile.
+   */
+  function attachItemImage(itemId: string, image: MenuItemImage | null) {
+    const current = docRef.current;
+    const category = current.categories.find((candidate) =>
+      candidate.items.some((item) => item.id === itemId)
+    );
+    if (!category) return;
+    onChange(setItemImage(current, category.id, itemId, image));
+  }
 
   // Add pages: photograph more of the same menu later and merge the new
   // extraction in. Repeats are flagged by the duplicate review, never
@@ -449,7 +391,7 @@ export function MenuEditor({
   }
 
   const headerRow = (
-    <div data-print-hide className="flex items-center gap-3">
+    <div data-print-hide className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <button type="button" onClick={onBack} className={smallButton}>
         ← All menus
       </button>
@@ -462,9 +404,10 @@ export function MenuEditor({
           ↩ Undo {undoLabel}
         </button>
       )}
-      <p
+      <div
         role="status"
-        className={`text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
+        title={saveState.detail}
+        className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
       >
         {saveState.kind === "saving" ? (
           <span>
@@ -474,21 +417,22 @@ export function MenuEditor({
             />
             Saving…
           </span>
+        ) : saveState.kind === "checking" ? (
+          <span>
+            <span className="sr-only">{saveState.message}</span>
+            <Skeleton className="inline-block h-3 w-36 align-[-1px]" />
+          </span>
         ) : (
           saveState.message
         )}
-      </p>
+        {saveState.detail && <span className="sr-only"> — {saveState.detail}</span>}
+      </div>
       <span className="flex-1" />
       {!canManage ? (
         <>
-          {!onServer && mode !== "qr" && (
-            <button type="button" onClick={() => changeMode("qr")} className={smallButton}>
-              Table QR
-            </button>
-          )}
           {mode !== "preview" && (
             <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-              Preview menu
+              Preview order page
             </button>
           )}
         </>
@@ -497,13 +441,8 @@ export function MenuEditor({
           <button type="button" onClick={() => changeMode("reorder")} className={smallButton}>
             ↕ Reorder
           </button>
-          {!onServer && (
-            <button type="button" onClick={() => changeMode("qr")} className={smallButton}>
-              Table QR
-            </button>
-          )}
           <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-            Preview menu
+            Preview order page
           </button>
         </>
       ) : (
@@ -514,94 +453,38 @@ export function MenuEditor({
     </div>
   );
 
-  if (mode === "qr") {
-    return (
-      <div className="flex flex-col gap-4">
-        {headerRow}
-        <TableQrPanel
-          context="menu"
-          doc={doc}
-          // Only a live publication can serve a stranger's phone; an
-          // unpublished menu keeps the browser-scoped Phase 1 codes.
-          publicRestaurantSlug={
-            publishing?.status?.isLive ? publishing.status.restaurantSlug : null
-          }
-          publicSlug={publishing?.status?.isLive ? publishing.status.slug : null}
-          menuId={doc.id}
-          syncMode={syncMode}
-          canManage={canManage}
-        />
-      </div>
-    );
-  }
-
   if (mode === "preview") {
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div
-          data-print-hide
-          className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white p-3"
-        >
-          <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Style</p>
-          <div role="group" aria-label="Preview style" className="flex flex-wrap gap-1.5">
-            {PREVIEW_THEME_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={previewThemeId === id}
-                onClick={() => changePreviewTheme(id)}
-                className={
-                  previewThemeId === id
-                    ? "rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    : "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                }
-              >
-                {PREVIEW_THEMES[id].name}
-              </button>
-            ))}
-          </div>
-          <span className="mx-1 hidden h-5 w-px bg-stone-200 sm:block" aria-hidden="true" />
-          <p className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Layout</p>
-          <div role="group" aria-label="Preview layout" className="flex flex-wrap gap-1.5">
-            {[
-              { id: "list" as const, label: "List" },
-              { id: "columns" as const, label: "Two columns" },
-            ].map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={previewLayout === option.id}
-                onClick={() => changePreviewLayout(option.id)}
-                className={
-                  previewLayout === option.id
-                    ? "rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                    : "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                }
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <span className="flex-1" />
-          <button type="button" onClick={() => window.print()} className={smallButton}>
-            Print / save PDF
-          </button>
+        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
+          <p className="text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
+            The diner’s view
+          </p>
+          <p className="mt-1 text-xs leading-5 text-stone-600">
+            This is the page a table card opens. Ordering is off in this preview, so nothing here
+            reaches the kitchen.
+          </p>
         </div>
         {publishing && canManage && (
           <PublishPanel
             signedIn={syncMode === "account"}
-            themeId={previewThemeId}
-            layout={previewLayout}
             controls={publishing}
+            draftDoc={doc}
+            onStartWizard={onStartPublish}
           />
         )}
-        <MenuPreview
-          doc={doc}
-          themeId={previewThemeId}
-          layout={previewLayout}
-          eyebrow={previewEyebrow(publishing?.status ?? null, previewThemeId, previewLayout)}
-        />
+        <PhoneFrame
+          label="Diner ordering page"
+          heightClass="h-[min(78vh,860px)]"
+          widthClass="max-w-[420px]"
+        >
+          <OrderPagePreview
+            doc={doc}
+            restaurantName={restaurantName}
+            draftAheadOfLive={needsPublish}
+          />
+        </PhoneFrame>
       </div>
     );
   }
@@ -688,7 +571,7 @@ export function MenuEditor({
                                 title={item.reviewNotes.join("\n")}
                                 className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600"
                               >
-                                needs review
+                                {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
                             )}
                             <span className="shrink-0 text-xs text-stone-500">
@@ -763,31 +646,60 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      {/* The public link panel now lives in Preview only, so the edit screen
-          stays compact and food items show sooner. Kept below (commented out)
-          in case it needs to come back. */}
-      <p className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
-        Once your menu is set,{" "}
-        <button
-          type="button"
-          onClick={() => changeMode("preview")}
-          className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-        >
-          go to Preview
-        </button>{" "}
-        to publish it and get your public link.
-      </p>
-      {/*
-      {publishing && canManage && (
-        <PublishPanel
-          signedIn={syncMode === "account"}
-          themeId={previewThemeId}
-          layout={previewLayout}
-          controls={publishing}
-          onOpenPreview={() => changeMode("preview")}
-        />
-      )}
-      */}
+      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
+        {onStartPublish && accountCheckFailed ? (
+          <p>
+            We couldn&apos;t check your account just now, so publishing is paused.{" "}
+            {onRetryAccountCheck && (
+              <button
+                type="button"
+                onClick={onRetryAccountCheck}
+                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+            )}
+            {onRetryAccountCheck ? "." : null}
+          </p>
+        ) : onStartPublish && onServer === null ? (
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Checking where this menu is saved…</span>
+            <Skeleton className="h-3 w-3/4" />
+          </div>
+        ) : onStartPublish && onServer === false ? (
+          <p>
+            Once your menu is set,{" "}
+            <button
+              type="button"
+              onClick={onStartPublish}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              set up table ordering
+            </button>{" "}
+            — we create your café if you don&apos;t have one yet. Or{" "}
+            <button
+              type="button"
+              onClick={() => changeMode("preview")}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              preview the order page
+            </button>
+            .
+          </p>
+        ) : (
+          <p>
+            Once your menu is set,{" "}
+            <button
+              type="button"
+              onClick={() => changeMode("preview")}
+              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              go to Preview
+            </button>{" "}
+            to publish it for your tables.
+          </p>
+        )}
+      </div>
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
@@ -866,18 +778,17 @@ export function MenuEditor({
           )}
           {reviewCount > 0 && (
             <p className="mt-2 text-xs font-medium text-amber-800">
-              {reviewCount} {reviewCount === 1 ? "item needs" : "items need"} review.
+              {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
             </p>
           )}
         </div>
         <AvailabilityPanel
           key={doc.id}
           menuId={doc.id}
-          // Opening hours live with the server copy: a browser-only menu has
-          // no availability row to fetch, account mode or not.
+          // Opening hours live with the menu in your account: a browser-only
+          // menu has no availability row to fetch, account mode or not.
           syncMode={onServer ? "account" : "local"}
           canManage={canManage}
-          onMoveToAccount={onMoveToAccount}
         />
       </div>
       {duplicateGroups.length > 0 && (
@@ -1000,67 +911,43 @@ export function MenuEditor({
           </button>
         </div>
       )}
-      {doc.categories.length > 0 && search.categories.length > 0 && (
-        <div className="sticky top-0 z-20 -mx-4 flex items-center gap-3 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm">
-          {viewMode === "single" && (
-            <div
-              role="navigation"
-              aria-label="Menu categories"
-              onKeyDown={handleChipListKeyDown}
-              className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1"
-            >
-              {search.categories.map(({ category, items }) => {
-                const isActive = category.id === activeMatch?.category.id;
-                return (
-                  <button
-                    key={category.id}
-                    id={`category-chip-${category.id}`}
-                    type="button"
-                    aria-current={isActive ? "true" : undefined}
-                    ref={isActive ? activeChipRef : null}
-                    onClick={() => setActiveCategoryId(category.id)}
-                    className={`shrink-0 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
-                      isActive
-                        ? "border-amber-800 bg-amber-800 text-white"
-                        : "border-stone-300 bg-white text-stone-600 hover:border-amber-700 hover:text-amber-900"
-                    }`}
-                  >
-                    {category.name}
-                    <span
-                      className={`ml-1.5 rounded-full px-1.5 text-xs ${
-                        isActive ? "bg-white/20" : "bg-stone-100 text-stone-500"
-                      }`}
-                    >
-                      {items.length}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {viewMode === "all" && <span className="flex-1" />}
-          <div
-            role="group"
-            aria-label="Category layout"
-            className="flex shrink-0 rounded-full border border-stone-300 bg-white p-0.5"
-          >
+      {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
+        <div className="sticky top-0 z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden">
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              aria-pressed={viewMode === "single"}
-              onClick={() => changeViewMode("single")}
-              className={viewModeButton(viewMode === "single")}
+              onClick={() => stepCategory(-1)}
+              aria-label="Previous category"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-white text-lg font-bold text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              One at a time
+              ‹
             </button>
+            <label className="flex min-h-[44px] min-w-0 flex-1 items-center">
+              <span className="sr-only">Category</span>
+              <select
+                value={activeMatch.category.id}
+                onChange={(event) => setActiveCategoryId(event.target.value)}
+                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-900 focus:border-amber-700 focus:outline-none"
+              >
+                {search.categories.map(({ category, items }) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name} ({items.length})
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               type="button"
-              aria-pressed={viewMode === "all"}
-              onClick={() => changeViewMode("all")}
-              className={viewModeButton(viewMode === "all")}
+              onClick={() => stepCategory(1)}
+              aria-label="Next category"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-white text-lg font-bold text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              All categories
+              ›
             </button>
           </div>
+          <p className="mt-1 text-center text-xs text-stone-500">
+            Category {activeIndex + 1} of {search.categories.length}
+          </p>
         </div>
       )}
       {doc.categories.length === 0 ? (
@@ -1079,15 +966,16 @@ export function MenuEditor({
           </button>
         </div>
       ) : (
-        search.categories
-          .filter((match) => viewMode === "all" || match.category.id === activeMatch?.category.id)
-          .map(({ category, items }) => {
+        search.categories.map(({ category, items }) => {
             const index = doc.categories.findIndex((c) => c.id === category.id);
+            // R0: phones show the stepper's category only; sm+ shows every section.
+            const phoneOnly =
+              category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
             return (
               <section
                 key={category.id}
                 aria-label={`Category ${category.name}`}
-                className="rounded-2xl border border-stone-200 bg-stone-50/60 p-4"
+                className={`${phoneOnly}rounded-2xl border border-stone-200 bg-stone-50/60 p-4`}
               >
                 <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
                   <CommitInput
@@ -1133,7 +1021,6 @@ export function MenuEditor({
                       <ItemEditor
                         key={item.id}
                         isRouteTarget={selectedItemId === item.id}
-                        onOpenItem={() => onOpenItem(item.id)}
                         doc={doc}
                         categoryId={category.id}
                         item={item}
@@ -1143,6 +1030,8 @@ export function MenuEditor({
                         duplicate={duplicateIds.has(item.id)}
                         selected={selectedIds.has(item.id)}
                         onToggle={() => toggleSelected(item.id)}
+                        canUploadImage={canUploadItemImages}
+                        onAttachImage={(image) => attachItemImage(item.id, image)}
                       />
                     ))}
                   </ul>
@@ -1165,40 +1054,41 @@ export function MenuEditor({
       >
         + Add category
       </button>
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         <span className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Menu</span>
-        <button type="button" onClick={onExportJson} className={smallButton}>
-          Export JSON
-        </button>
-        <button type="button" onClick={onExportCsv} className={smallButton}>
-          Export CSV
-        </button>
-        <label className={`${smallButton} cursor-pointer`}>
-          Import JSON
-          <input
-            type="file"
-            accept="application/json,.json"
-            className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onImportFile(file);
-              event.target.value = "";
-            }}
-          />
-        </label>
-        <span className="flex-1" />
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onExportJson} className={smallButton}>
+            Export JSON
+          </button>
+          <button type="button" onClick={onExportCsv} className={smallButton}>
+            Export CSV
+          </button>
+          <label className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}>
+            Import JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onImportFile(file);
+                event.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <span aria-hidden="true" className="hidden flex-1 sm:block" />
         <button
           type="button"
-          onClick={() => {
-            if (
-              window.confirm(
-                `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`
-              )
-            ) {
-              onDeleteMenu();
-            }
+          onClick={async () => {
+            const ok = await confirm({
+              message: `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`,
+              confirmLabel: "Delete menu",
+              destructive: true,
+            });
+            if (ok) onDeleteMenu();
           }}
-          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:self-auto"
         >
           Delete menu
         </button>
@@ -1237,11 +1127,39 @@ export function MenuEditor({
           {addPages.message}
         </p>
       )}{" "}
-      <p className="text-xs leading-5 text-stone-500">
-        {syncMode === "account"
-          ? "This menu syncs to your account — signing in on another device shows the same data. A local copy stays in this browser as an offline cache."
-          : "Menus are stored locally in this browser on this device — they don't follow you to other devices. Sign in to sync them to your account, or export JSON backups."}
-      </p>
+      <div className="text-xs leading-5 text-stone-500">
+        {onServer === null && accountCheckFailed ? (
+          <p>
+            This browser has your menu saved. We couldn&apos;t check your account just now, so it
+            may also be there — nothing was lost either way.{" "}
+            {onRetryAccountCheck && (
+              <button
+                type="button"
+                onClick={onRetryAccountCheck}
+                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                Try again
+              </button>
+            )}
+          </p>
+        ) : onServer === null ? (
+          <div role="status" aria-busy="true" className="flex flex-col gap-2">
+            <span className="sr-only">
+              Checking where this menu is saved. Your edits are saved either way.
+            </span>
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+        ) : (
+          <p>
+            {onServer
+              ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
+              : syncMode === "account"
+                ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
+                : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
+          </p>
+        )}
+      </div>
+      {dialog}
     </div>
   );
 }

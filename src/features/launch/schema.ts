@@ -6,13 +6,12 @@
 
 import { z } from "zod";
 
+import { assistantSpendSummarySchema } from "@/features/assistant/schema";
 import { usageSummarySchema } from "@/features/usage/schema";
 
 export const launchSnapshotSchema = z.object({
   menuCount: z.number().int().nonnegative(),
   publishedCount: z.number().int().nonnegative(),
-  /** Path of the most recently published menu, when one is live. */
-  livePath: z.string().min(1).nullable(),
   orderCount: z.number().int().nonnegative(),
   /** Items with no price — the review step's first signal. */
   unpricedItems: z.number().int().nonnegative(),
@@ -26,6 +25,8 @@ export type LaunchSnapshot = z.infer<typeof launchSnapshotSchema>;
 
 export const launchStatusSchema = launchSnapshotSchema.extend({
   usage: usageSummarySchema.nullable(),
+  /** The assistant's own ledger, shown next to extraction spend (A4). */
+  assistant: assistantSpendSummarySchema,
 });
 
 export type LaunchStatus = z.infer<typeof launchStatusSchema>;

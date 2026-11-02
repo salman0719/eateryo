@@ -7,7 +7,7 @@
 
 import type { ExtractedMenu } from "@/lib/ai/extraction-schema";
 
-import { generateId, nowIso } from "./menu-utils";
+import { generateId, nowIso, resolveFirstMenuTitle } from "./menu-utils";
 import { SCHEMA_VERSION, type MenuDocument } from "./schema";
 
 export interface ExtractionSource {
@@ -20,10 +20,16 @@ export function extractedMenuToDocument(
   extracted: ExtractedMenu,
   source?: ExtractionSource
 ): MenuDocument {
+  // The photo's own title is kept as provenance: onboarding names the menu
+  // ("Main Menu", or the service when the title is confident about it) and
+  // the café-name suggestion needs the place the photo showed.
+  const originalTitle = extracted.title?.trim() || null;
   return {
     schemaVersion: SCHEMA_VERSION,
     id: generateId(),
-    title: extracted.title?.trim() ? extracted.title.trim() : "Untitled menu",
+    // Q2: a photo that missed the name still arrives titled — the owner
+    // renames inline on the result screen, never through a naming gate.
+    title: resolveFirstMenuTitle(originalTitle),
     currency: extracted.currency ?? null,
     categories: extracted.categories.map((category, categoryIndex) => ({
       id: generateId(),
@@ -44,10 +50,12 @@ export function extractedMenuToDocument(
           choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
         })),
         reviewNotes: [...item.reviewNotes],
+        unpricedAccepted: false,
       })),
     })),
     source: {
       ...(source?.originalFileName ? { originalFileName: source.originalFileName } : {}),
+      ...(originalTitle ? { originalTitle } : {}),
       extractedAt: nowIso(),
       ...(source?.provider ? { provider: source.provider } : {}),
       ...(source?.model ? { model: source.model } : {}),

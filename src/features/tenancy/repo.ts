@@ -54,6 +54,33 @@ export async function getRestaurantForUser(
 }
 
 /**
+ * The restaurant the user owns, or null.
+ *
+ * An account may own at most one restaurant (006). Ownership is granted in
+ * only a few places — creating one, adding a member as owner, promoting a
+ * member, accepting an owner invitation — and each reads this first. Staff
+ * memberships in other cafés are deliberately unaffected: a bookkeeper who
+ * owns their own café can still work at yours.
+ */
+export async function getOwnedRestaurantForUser(
+  db: TenancyDb,
+  userId: string
+): Promise<RestaurantWithRole | null> {
+  const rows = await membershipSelect(db).where(
+    and(eq(restaurantMembership.userId, userId), eq(restaurantMembership.role, "owner"))
+  );
+  return rows[0] ?? null;
+}
+
+/**
+ * The one-café invariant as a question, for callers that keep their own
+ * error taxonomy (invitations throw `InvitationError`, not ours).
+ */
+export async function ownsAnyRestaurant(db: TenancyDb, userId: string): Promise<boolean> {
+  return (await getOwnedRestaurantForUser(db, userId)) !== null;
+}
+
+/**
  * Create a restaurant with the caller as its owner (single implicit
  * transaction via compensation: if the membership insert fails, the
  * restaurant row is removed again — no ownerless tenants).
@@ -123,7 +150,8 @@ export type TenancyRepoErrorCode =
   | "forbidden"
   | "user_not_found"
   | "already_member"
-  | "last_owner";
+  | "last_owner"
+  | "restaurant_exists";
 
 export class TenancyRepoError extends Error {
   readonly code: TenancyRepoErrorCode;
@@ -222,6 +250,13 @@ export async function addMemberForOwner(
   if (await getMember(db, restaurantId, target.id)) {
     throw new TenancyRepoError("already_member", "That account already belongs to this restaurant.");
   }
+  // An account owns at most one café (006); they can still join as staff.
+  if (role === "owner" && (await ownsAnyRestaurant(db, target.id))) {
+    throw new TenancyRepoError(
+      "restaurant_exists",
+      "That account already owns a restaurant, so it cannot own a second one. Add them as staff instead."
+    );
+  }
 
   try {
     await db.insert(restaurantMembership).values({ restaurantId, userId: target.id, role });
@@ -259,6 +294,13 @@ export async function updateMemberRoleForOwner(
     throw new TenancyRepoError("not_found", "That member does not belong to this restaurant.");
   }
   if (target.role === role) return target;
+
+  if (role === "owner" && (await ownsAnyRestaurant(db, targetUserId))) {
+    throw new TenancyRepoError(
+      "restaurant_exists",
+      "That member already owns a restaurant, so they cannot own a second one."
+    );
+  }
 
   if (target.role === "owner") {
     const updated = await db

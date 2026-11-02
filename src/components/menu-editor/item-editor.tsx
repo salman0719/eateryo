@@ -1,19 +1,26 @@
 "use client";
 
+import { useMemo } from "react";
+
+import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import {
   duplicateItem,
+  hasAnyPrice,
+  isItemFlagged,
   moveItem,
   moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
-import type { MenuDocument, MenuItem } from "@/features/menu/schema";
+import type { MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 
-import { CommitInput, CommitNumber } from "./fields";
+import { CommitInput, CommitNumber, CommitTags } from "./fields";
+import { ItemImagePanel } from "./item-image-panel";
 
 interface ItemEditorProps {
   doc: MenuDocument;
+  /** Deep-link target: a pasted /menus/<id>/items/<itemId> URL scrolls here
+      and rings it, even though nothing in the UI links to items. */
   isRouteTarget: boolean;
-  onOpenItem: () => void;
   categoryId: string;
   item: MenuItem;
   /** All categories, for the move-to-another-category control. */
@@ -26,6 +33,10 @@ interface ItemEditorProps {
   /** Bulk reassignment checkbox state (see menu-editor's bulk actions bar). */
   selected: boolean;
   onToggle: () => void;
+  /** Signed in, so the upload endpoint will authorize a photo. */
+  canUploadImage: boolean;
+  /** Attach, replace, or (null) remove this item's photo. */
+  onAttachImage: (image: MenuItemImage | null) => void;
 }
 
 const smallButton =
@@ -36,7 +47,6 @@ export function ItemEditor({
   doc,
   categoryId,
   isRouteTarget,
-  onOpenItem,
   item,
   categories,
   onChange,
@@ -44,10 +54,15 @@ export function ItemEditor({
   duplicate,
   selected,
   onToggle,
+  canUploadImage,
+  onAttachImage,
 }: ItemEditorProps) {
   const category = doc.categories.find((c) => c.id === categoryId);
   const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
-  const needsReview = item.price === null || item.reviewNotes.length > 0;
+  const needsReview = isItemFlagged(item);
+  // Labels this menu already uses, most-used first: the reuse list is a view
+  // over the document in hand, so there is nothing new to store or fetch.
+  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
 
   function patch(patch: Parameters<typeof updateItem>[3]) {
     onChange(updateItem(doc, categoryId, item.id, patch));
@@ -58,17 +73,10 @@ export function ItemEditor({
       id={`menu-item-${item.id}`}
       className={`rounded-xl border bg-white p-4 ${isRouteTarget ? "border-amber-600 ring-2 ring-amber-200" : "border-stone-200"}`}
     >
-      <div className="mb-3 flex items-center justify-between gap-2 border-b border-stone-100 pb-2">
-        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-stone-900">
+      <div className="mb-3 border-b border-stone-100 pb-2">
+        <p className="truncate text-sm font-semibold text-stone-900">
           {item.name || "Untitled item"}
         </p>
-        <button
-          type="button"
-          onClick={onOpenItem}
-          className="shrink-0 text-xs text-stone-500 underline hover:text-amber-900"
-        >
-          {isRouteTarget ? "Direct link selected" : "Link to item"}
-        </button>
       </div>
       <div className="grid gap-3 sm:grid-cols-[1fr_120px_90px]">
         <CommitInput
@@ -79,8 +87,12 @@ export function ItemEditor({
         <CommitNumber
           label="Price"
           value={item.price}
-          placeholder="Blank if unknown"
-          onCommit={(price) => patch({ price })}
+          placeholder={item.variants.length > 0 ? "Blank — priced per size" : "Blank if unknown"}
+          onCommit={(price) =>
+            patch(
+              !hasAnyPrice(item) && price !== null ? { price, reviewNotes: [] } : { price }
+            )
+          }
         />
         <CommitInput
           label="Currency"
@@ -121,19 +133,17 @@ export function ItemEditor({
       </div>
 
       <div className="mt-3">
-        <CommitInput
-          label="Dietary labels (comma-separated, only if shown on the menu)"
-          value={item.dietaryLabels.join(", ")}
-          validate={() => null}
-          placeholder="e.g. vegan, gluten-free"
-          onCommit={(raw) =>
-            patch({
-              dietaryLabels: raw
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-          }
+        <ItemImagePanel item={item} canUpload={canUploadImage} onAttach={onAttachImage} />
+      </div>
+
+      <div className="mt-3">
+        <CommitTags
+          label="Dietary labels"
+          value={item.dietaryLabels}
+          suggestions={labelVocabulary}
+          placeholder="Add a label…"
+          hint="Only labels the menu itself shows — never inferred."
+          onCommit={(dietaryLabels) => patch({ dietaryLabels })}
         />
       </div>
 
@@ -148,7 +158,7 @@ export function ItemEditor({
           {item.variants.map((variant, vIndex) => (
             <li
               key={`${variant.name}-${vIndex}`}
-              className="grid grid-cols-[1fr_110px_auto] items-end gap-2"
+              className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[1fr_110px_auto]"
             >
               <CommitInput
                 label={vIndex === 0 ? "Name" : `Variant ${vIndex + 1}`}
@@ -230,7 +240,7 @@ export function ItemEditor({
                 {option.choices.map((choice, cIndex) => (
                   <li
                     key={`${choice.name}-${cIndex}`}
-                    className="grid grid-cols-[1fr_110px_auto] items-end gap-2 pl-3"
+                    className="grid grid-cols-1 items-end gap-2 pl-3 sm:grid-cols-[1fr_110px_auto]"
                   >
                     <CommitInput
                       label="Choice"
@@ -324,84 +334,116 @@ export function ItemEditor({
           ))}
         </ul>
       )}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
-        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-stone-600">
-          <input
-            type="checkbox"
-            checked={selected}
-            onChange={onToggle}
-            aria-label={`Select ${item.name} for bulk move`}
-            className="h-4 w-4 rounded border-stone-300 accent-amber-700"
-          />
-          Select for bulk move
-        </label>
-        <button
-          type="button"
-          disabled={index <= 0}
-          onClick={() => onChange(moveItem(doc, categoryId, item.id, index - 1))}
-          className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-        >
-          ↑ Move up
-        </button>
-        <button
-          type="button"
-          disabled={category === undefined || index === -1 || index >= category.items.length - 1}
-          onClick={() => onChange(moveItem(doc, categoryId, item.id, index + 1))}
-          className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-        >
-          ↓ Move down
-        </button>
-        {categories.length > 1 && (
-          <label className="flex items-center gap-1.5 text-xs text-stone-500">
-            Move to
-            <select
-              aria-label={`Move ${item.name} to another category`}
-              defaultValue=""
-              onChange={(event) => {
-                if (event.target.value) {
-                  onChange(moveItemToCategory(doc, categoryId, event.target.value, item.id));
-                  event.target.value = "";
-                }
-              }}
-              className="rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none"
+      {needsReview && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {hasAnyPrice(item) ? (
+            <button
+              type="button"
+              onClick={() => patch({ reviewNotes: [] })}
+              className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
             >
-              <option value="">Category…</option>
-              {categories
-                .filter((c) => c.id !== categoryId)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
+              ✓ Looks good
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => patch({ reviewNotes: [], unpricedAccepted: true })}
+              title="Keeps the price blank — totals stay honestly blank for this item."
+              className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+            >
+              ✓ Leave unpriced
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* One control group per row on phones (sm:contents dissolves the rows
+          back into today's single wrapping row, so desktop is unchanged). */}
+      <div className="mt-3 flex flex-col gap-2 border-t border-stone-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex gap-2 sm:contents">
+          <button
+            type="button"
+            disabled={index <= 0}
+            onClick={() => onChange(moveItem(doc, categoryId, item.id, index - 1))}
+            className={`${smallButton} flex-1 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none`}
+          >
+            ↑ Move up
+          </button>
+          <button
+            type="button"
+            disabled={category === undefined || index === -1 || index >= category.items.length - 1}
+            onClick={() => onChange(moveItem(doc, categoryId, item.id, index + 1))}
+            className={`${smallButton} flex-1 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none`}
+          >
+            ↓ Move down
+          </button>
+        </div>
+        {categories.length > 1 && (
+          <div className="sm:contents">
+            <label className="flex w-full flex-col gap-1 text-xs text-stone-500 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
+              Move to
+              <select
+                aria-label={`Move ${item.name} to another category`}
+                defaultValue=""
+                onChange={(event) => {
+                  if (event.target.value) {
+                    onChange(moveItemToCategory(doc, categoryId, event.target.value, item.id));
+                    event.target.value = "";
+                  }
+                }}
+                className="w-full rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none sm:w-auto"
+              >
+                <option value="">Category…</option>
+                {categories
+                  .filter((c) => c.id !== categoryId)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2 sm:contents">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-stone-600">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggle}
+              aria-label={`Select ${item.name} for bulk move`}
+              className="h-4 w-4 rounded border-stone-300 accent-amber-700"
+            />
+            Select for bulk move
           </label>
-        )}
-        <span className="flex-1" />
-        {needsReview && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
-            Needs review
-          </span>
-        )}
-        {duplicate && (
-          <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-900">
-            Possible duplicate
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={() => onChange(duplicateItem(doc, categoryId, item.id))}
-          className={smallButton}
-        >
-          Duplicate
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-        >
-          Delete
-        </button>
+          {needsReview && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+              {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
+            </span>
+          )}
+          {duplicate && (
+            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-900">
+              Possible duplicate
+            </span>
+          )}
+        </div>
+        <span className="hidden flex-1 sm:block" />
+        <div className="flex gap-2 sm:contents">
+          <button
+            type="button"
+            onClick={() => onChange(duplicateItem(doc, categoryId, item.id))}
+            className={`${smallButton} flex-1 sm:flex-none`}
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:flex-none"
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </li>
   );
