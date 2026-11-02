@@ -252,6 +252,25 @@ export function MenuEditor({
     search.categories.findIndex((match) => match.category.id === activeMatch?.category.id)
   );
 
+  /**
+   * True below Tailwind's `sm`, where the page shows one section at a time
+   * behind the stepper. There the stepper *is* the fold: a section has no fold
+   * of its own, and the chevron that would reopen one is hidden, so the
+   * visible section must stay open even when the desktop list left it
+   * collapsed. Read from the same width as the `sm:` styles so the two cannot
+   * disagree, and guarded so it stays quiet where `matchMedia` does not exist
+   * (the server render and the tests).
+   */
+  const [phoneWidth, setPhoneWidth] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 639.98px)");
+    const update = () => setPhoneWidth(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
   /** Step through the visible categories from the phone stepper. */
   function stepCategory(delta: 1 | -1) {
     const ids = search.categories.map((match) => match.category.id);
@@ -981,11 +1000,15 @@ export function MenuEditor({
         </p>
         {doc.categories.length > 0 && (
           <div className="flex items-center gap-2">
+            {/* Below `sm` a section cannot fold — the stepper is the fold — so
+                only the dish forms answer here, and the label says which. */}
             <button type="button" onClick={() => setEverythingOpen(true)} className={smallButton}>
-              Expand all
+              <span className="sm:hidden">Open every dish</span>
+              <span className="hidden sm:inline">Expand all</span>
             </button>
             <button type="button" onClick={() => setEverythingOpen(false)} className={smallButton}>
-              Collapse all
+              <span className="sm:hidden">Close every dish</span>
+              <span className="hidden sm:inline">Collapse all</span>
             </button>
           </div>
         )}
@@ -1096,11 +1119,12 @@ export function MenuEditor({
       ) : (
         search.categories.map(({ category, items }) => {
           const index = doc.categories.findIndex((c) => c.id === category.id);
-          // R0: phones show the stepper's category only; sm+ shows every section.
+          // R0: phones show the stepper's category only, always open (see
+          // `phoneWidth`); sm+ shows every section with its own fold.
           const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
           // Searching always shows what it found: a match inside a collapsed
           // section would be a result the page refuses to reveal.
-          const categoryOpen = isFiltering || isCategoryOpen(foldState, category.id);
+          const categoryOpen = isFiltering || phoneWidth || isCategoryOpen(foldState, category.id);
           const categoryPanelId = `menu-category-panel-${category.id}`;
           const toCheck = items.filter(isItemFlagged).length;
           return (
@@ -1126,7 +1150,7 @@ export function MenuEditor({
                         ? "Collapse this section"
                         : "Expand this section"
                   }
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
                 >
                   {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </button>
