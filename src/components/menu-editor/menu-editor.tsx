@@ -27,6 +27,14 @@ import {
 } from "@/features/menu/duplicates";
 import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
+import {
+  isItemOpen,
+  readFoldState,
+  revealItem,
+  toggleItem,
+  writeFoldState,
+  type FoldState,
+} from "@/features/menu/fold";
 import { searchMenu } from "@/features/menu/search";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
@@ -174,6 +182,35 @@ export function MenuEditor({
   const [query, setQuery] = useState("");
   const search = searchMenu(doc, query);
   const isFiltering = query.trim().length > 0;
+
+  // Which dishes have their form open (fold.ts). Remembered per menu, and
+  // kept with the menu id it belongs to so switching menus never paints the
+  // previous menu's rows first.
+  const [fold, setFold] = useState<{ menuId: string; state: FoldState }>(() => ({
+    menuId: doc.id,
+    state: readFoldState(doc.id),
+  }));
+  const foldState = fold.menuId === doc.id ? fold.state : readFoldState(doc.id);
+
+  function applyFold(next: FoldState) {
+    writeFoldState(doc.id, next);
+    setFold({ menuId: doc.id, state: next });
+  }
+
+  /**
+   * Add a dish and open its form, so naming it is the next keystroke instead
+   * of a scroll and a click.
+   */
+  function handleAddItem(categoryId: string) {
+    const next = addItem(doc, categoryId, { name: "New item" });
+    const created = next.categories.find((c) => c.id === categoryId)?.items;
+    const last = created?.[created.length - 1];
+    if (last) {
+      applyFold(revealItem(foldState, last.id, categoryId));
+      setActiveCategoryId(categoryId);
+    }
+    onChange(next);
+  }
 
   // Category navigation (R0: the One-at-a-time/All toggle is deleted).
   // Phones show one section behind the stepper; larger screens show the full
@@ -958,85 +995,88 @@ export function MenuEditor({
         </div>
       ) : (
         search.categories.map(({ category, items }) => {
-            const index = doc.categories.findIndex((c) => c.id === category.id);
-            // R0: phones show the stepper's category only; sm+ shows every section.
-            const phoneOnly =
-              category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
-            return (
-              <section
-                key={category.id}
-                aria-label={`Category ${category.name}`}
-                className={`${phoneOnly}rounded-2xl border border-stone-200 bg-stone-50/60 p-4`}
-              >
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                  <CommitInput
-                    label={`Category ${index + 1}`}
-                    value={category.name}
-                    onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
-                  />
-                  <div className="flex items-end gap-1.5 pb-0.5">
-                    <button
-                      type="button"
-                      aria-label={`Move ${category.name} up`}
-                      disabled={index === 0}
-                      onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
-                      className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Move ${category.name} down`}
-                      disabled={index === doc.categories.length - 1}
-                      onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
-                      className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCategory(category, index)}
-                      className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
+          const index = doc.categories.findIndex((c) => c.id === category.id);
+          // R0: phones show the stepper's category only; sm+ shows every section.
+          const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
+          return (
+            <section
+              key={category.id}
+              aria-label={`Category ${category.name}`}
+              className={`${phoneOnly}rounded-2xl border border-stone-200 bg-stone-50/60 p-4`}
+            >
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <CommitInput
+                  label={`Category ${index + 1}`}
+                  value={category.name}
+                  onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
+                />
+                <div className="flex items-end gap-1.5 pb-0.5">
+                  <button
+                    type="button"
+                    aria-label={`Move ${category.name} up`}
+                    disabled={index === 0}
+                    onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
+                    className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${category.name} down`}
+                    disabled={index === doc.categories.length - 1}
+                    onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
+                    className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCategory(category, index)}
+                    className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  >
+                    Delete
+                  </button>
                 </div>
-                {items.length === 0 ? (
-                  <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
-                    No items — add the first one below.
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-3">
-                    {items.map((item) => (
-                      <ItemEditor
-                        key={item.id}
-                        isRouteTarget={selectedItemId === item.id}
-                        doc={doc}
-                        categoryId={category.id}
-                        item={item}
-                        categories={doc.categories.map((c) => ({ id: c.id, name: c.name }))}
-                        onChange={onChange}
-                        onDelete={() => removeItem(category.id, item)}
-                        duplicate={duplicateIds.has(item.id)}
-                        selected={selectedIds.has(item.id)}
-                        onToggle={() => toggleSelected(item.id)}
-                        canUploadImage={canUploadItemImages}
-                        onAttachImage={(image) => attachItemImage(item.id, image)}
-                      />
-                    ))}
-                  </ul>
-                )}
-                <button
-                  type="button"
-                  onClick={() => onChange(addItem(doc, category.id, { name: "New item" }))}
-                  className={`${smallButton} mt-3`}
-                >
-                  + Add item
-                </button>
-              </section>
-            );
-          })
+              </div>
+              {items.length === 0 ? (
+                <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
+                  No items — add the first one below.
+                </p>
+              ) : (
+                <ul className="mt-3 space-y-3">
+                  {items.map((item) => (
+                    <ItemEditor
+                      key={item.id}
+                      isRouteTarget={selectedItemId === item.id}
+                      // A pasted /menus/<id>/items/<itemId> link opens the
+                      // dish without rewriting what the owner folded.
+                      open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
+                      onToggleOpen={() => applyFold(toggleItem(foldState, item.id))}
+                      doc={doc}
+                      categoryId={category.id}
+                      item={item}
+                      categories={doc.categories.map((c) => ({ id: c.id, name: c.name }))}
+                      onChange={onChange}
+                      onDelete={() => removeItem(category.id, item)}
+                      duplicate={duplicateIds.has(item.id)}
+                      selected={selectedIds.has(item.id)}
+                      onToggle={() => toggleSelected(item.id)}
+                      canUploadImage={canUploadItemImages}
+                      onAttachImage={(image) => attachItemImage(item.id, image)}
+                    />
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => handleAddItem(category.id)}
+                className={`${smallButton} mt-3`}
+              >
+                + Add item
+              </button>
+            </section>
+          );
+        })
       )}
       <button
         type="button"
@@ -1054,7 +1094,9 @@ export function MenuEditor({
           <button type="button" onClick={onExportCsv} className={smallButton}>
             Export CSV
           </button>
-          <label className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}>
+          <label
+            className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}
+          >
             Import JSON
             <input
               type="file"
