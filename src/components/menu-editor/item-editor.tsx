@@ -110,7 +110,7 @@ export function ItemEditor({
       >
         <label
           title="Select for bulk move"
-          className="flex min-h-[32px] min-w-[28px] cursor-pointer items-center justify-center"
+          className="flex min-h-[32px] min-w-[28px] cursor-pointer items-center justify-center pointer-coarse:min-h-[44px]"
         >
           <input
             type="checkbox"
