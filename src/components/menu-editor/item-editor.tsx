@@ -8,7 +8,6 @@ import {
   duplicateItem,
   hasAnyPrice,
   isItemFlagged,
-  moveItem,
   moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
@@ -79,8 +78,6 @@ export const ItemEditor = memo(function ItemEditor({
   selected,
   canUploadImage,
 }: ItemEditorProps) {
-  const category = doc.categories.find((c) => c.id === categoryId);
-  const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
   const needsReview = isItemFlagged(item);
   // The photo reference for the row thumbnail; the form below owns changing it.
   const copy = itemImageCopy(item.image);
@@ -475,26 +472,6 @@ export const ItemEditor = memo(function ItemEditor({
           {/* One control group per row on phones (sm:contents dissolves the rows
           back into today's single wrapping row, so desktop is unchanged). */}
           <div className="mt-3 flex flex-col gap-2 border-t border-stone-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="flex gap-2 sm:contents">
-              <button
-                type="button"
-                disabled={index <= 0}
-                onClick={() => actions.change(moveItem(doc, categoryId, item.id, index - 1))}
-                className={`${smallButton} flex-1 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none`}
-              >
-                ↑ Move up
-              </button>
-              <button
-                type="button"
-                disabled={
-                  category === undefined || index === -1 || index >= category.items.length - 1
-                }
-                onClick={() => actions.change(moveItem(doc, categoryId, item.id, index + 1))}
-                className={`${smallButton} flex-1 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none`}
-              >
-                ↓ Move down
-              </button>
-            </div>
             {categories.length > 1 && (
               <div className="sm:contents">
                 <label className="flex w-full flex-col gap-1 text-xs text-stone-500 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
@@ -525,16 +502,6 @@ export const ItemEditor = memo(function ItemEditor({
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2 sm:contents">
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-stone-600">
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  onChange={() => actions.toggleSelected(item.id)}
-                  aria-label={`Select ${item.name} for bulk move`}
-                  className="h-4 w-4 rounded border-stone-300 accent-amber-700"
-                />
-                Select for bulk move
-              </label>
               {needsReview && (
                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
                   {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
