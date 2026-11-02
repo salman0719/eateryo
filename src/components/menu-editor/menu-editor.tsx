@@ -457,15 +457,6 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
-            The diner’s view
-          </p>
-          <p className="mt-1 text-xs leading-5 text-stone-600">
-            This is the page a table card opens. Ordering is off in this preview, so nothing here
-            reaches the kitchen.
-          </p>
-        </div>
         {publishing && canManage && (
           <PublishPanel
             signedIn={syncMode === "account"}
