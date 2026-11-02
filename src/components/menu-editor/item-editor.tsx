@@ -85,16 +85,14 @@ export const ItemEditor = memo(function ItemEditor({
   /**
    * What the closed row says under the name: the description when the menu has
    * one, then the shape of the dish — so a row whose fields are hidden still
-   * says it has sizes or option groups behind it.
+   * says it has sizes behind it.
+   *
+   * Option groups belong here too, but the form no longer collects them (see
+   * the parked block below), so the closed row must not advertise them either.
    */
   const shape: string[] = [];
   if (item.variants.length > 0) {
     shape.push(`${item.variants.length} ${item.variants.length === 1 ? "size" : "sizes"}`);
-  }
-  if (item.options.length > 0) {
-    shape.push(
-      `${item.options.length} ${item.options.length === 1 ? "option group" : "option groups"}`
-    );
   }
   const rowSummary = [item.description?.trim() ?? "", shape.join(" · ")]
     .filter((part) => part.length > 0)
@@ -308,7 +306,14 @@ export const ItemEditor = memo(function ItemEditor({
             </button>
           </div>
 
-          <div className="mt-3 rounded-lg bg-stone-50 p-3">
+          {/* Options / add-ons are parked until the rest of the feature exists.
+              Nothing renders an option group on the diner page and an order
+              line cannot carry a choice, so this block would only collect data
+              the product cannot serve. Hidden with CSS — not deleted — so the
+              capture UI comes back intact once table ordering supports choices
+              (local/issues/020); re-enable by dropping `hidden` here and
+              restoring the row's option count in `shape` above. */}
+          <div className="mt-3 hidden rounded-lg bg-stone-50 p-3">
             <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">
               Options / add-ons
             </p>
