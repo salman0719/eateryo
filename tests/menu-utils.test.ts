@@ -8,6 +8,7 @@ import {
   createMenuDocument,
   deleteCategory,
   deleteItem,
+  deleteItems,
   duplicateItem,
   hasAnyPrice,
   isItemFlagged,
@@ -99,6 +100,24 @@ describe("menu-utils", () => {
     const afterCatDelete = deleteCategory(afterDelete, foodId);
     expect(afterCatDelete.categories).toHaveLength(1);
     expect(afterCatDelete.categories[0].sortOrder).toBe(0);
+  });
+
+  it("deletes several items across categories at once", () => {
+    const { doc } = setupTwoCategoryMenu();
+    const espressoId = doc.categories[0].items[0].id; // in Drinks
+    const toastId = doc.categories[1].items[0].id; // in Food
+
+    // A repeated id must not delete twice or throw.
+    const after = deleteItems(doc, [espressoId, toastId, espressoId]);
+    expect(after.categories[0].items.map((i) => i.name)).toEqual(["Latte"]);
+    expect(after.categories[0].items.map((i) => i.sortOrder)).toEqual([0]);
+    expect(after.categories[1].items).toHaveLength(0);
+    // Inputs are never mutated.
+    expect(doc.categories[0].items).toHaveLength(2);
+    expect(doc.categories[1].items).toHaveLength(1);
+
+    expect(deleteItems(doc, [])).toBe(doc);
+    expect(() => deleteItems(doc, ["nope"])).toThrow();
   });
 
   it("moves multiple items across categories at once", () => {
@@ -230,9 +249,9 @@ describe("suggestRestaurantName", () => {
   });
 
   it("keeps the most common candidate and its first-seen casing", () => {
-    expect(
-      suggestRestaurantName(["my café — Lunch", "My Café — Dinner", "My Café · Drinks"])
-    ).toBe("my café");
+    expect(suggestRestaurantName(["my café — Lunch", "My Café — Dinner", "My Café · Drinks"])).toBe(
+      "my café"
+    );
   });
 
   it("invents nothing when the titles say nothing", () => {
@@ -264,7 +283,12 @@ describe("menu naming (Q2)", () => {
   });
 
   it("suggests unused service names for the second menu", () => {
-    expect(suggestSecondMenuNames(["Main Menu"])).toEqual(["Lunch", "Dinner", "Happy Hour", "Drinks"]);
+    expect(suggestSecondMenuNames(["Main Menu"])).toEqual([
+      "Lunch",
+      "Dinner",
+      "Happy Hour",
+      "Drinks",
+    ]);
     expect(suggestSecondMenuNames(["Main Menu", "Lunch", "Dinner"])).toEqual([
       "Happy Hour",
       "Drinks",

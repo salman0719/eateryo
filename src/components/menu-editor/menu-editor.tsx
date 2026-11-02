@@ -11,6 +11,7 @@ import {
   addItem,
   deleteCategory,
   deleteItem,
+  deleteItems,
   hasAnyPrice,
   isItemFlagged,
   moveCategory,
@@ -367,6 +368,24 @@ export function MenuEditor({
     onChange(moveItemsToCategory(doc, selected, bulkTarget));
     setSelectedIds(new Set());
     setBulkTarget("");
+  }
+
+  /** Delete every selected item behind one confirmation and one undo step. */
+  async function handleBulkDelete() {
+    if (selected.length === 0) return;
+    const count = selected.length;
+    const ok = await confirm({
+      message: `Delete ${count} selected ${count === 1 ? "item" : "items"}? You can undo this until your next change.`,
+      confirmLabel: count === 1 ? "Delete item" : `Delete ${count} items`,
+      destructive: true,
+    });
+    if (!ok) return;
+    const next = deleteItems(doc, selected);
+    setUndo(
+      captureDeleteUndo(doc, next, count === 1 ? "deleted 1 item" : `deleted ${count} items`)
+    );
+    setSelectedIds(new Set());
+    onChange(next);
   }
 
   // The row handlers, created once. They read the live editor state through a
@@ -975,7 +994,7 @@ export function MenuEditor({
         <div
           role="region"
           aria-label="Bulk actions"
-          className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-3"
+          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3 shadow-sm backdrop-blur"
         >
           <p className="text-xs font-semibold text-amber-900">
             {selected.length} {selected.length === 1 ? "item" : "items"} selected
@@ -1004,13 +1023,24 @@ export function MenuEditor({
           >
             Move selected
           </button>
+          <button
+            type="button"
+            onClick={() => void handleBulkDelete()}
+            className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          >
+            Delete selected
+          </button>
           <button type="button" onClick={() => setSelectedIds(new Set())} className={smallButton}>
             Clear
           </button>
         </div>
       )}
       {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
-        <div className="sticky top-0 z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden">
+        <div
+          className={`z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
+            selected.length === 0 ? "sticky top-0" : ""
+          }`}
+        >
           <div className="flex items-center gap-2">
             <button
               type="button"
