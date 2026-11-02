@@ -95,6 +95,10 @@ errors, or add lint/type suppressions just to make checks pass.
   wizard continues it only when the flow came through review
   (`rememberPublishJourney`), so a plain library deep link gets a heading
   instead of a tracker with a false "3 done".
+- `src/components/ui/icons.tsx` — the hand-drawn icon set (no icon
+  dependency): stroked 24-grid glyphs that inherit `currentColor` and are
+  `aria-hidden`, so the control around them carries the label. Starts with
+  `ChevronUpIcon`/`ChevronDownIcon` for the editor's disclosures.
 - `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
   reusable height-reveal animation: measures the rendered content and
   animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then
@@ -150,7 +154,7 @@ errors, or add lint/type suppressions just to make checks pass.
   surfaces (save status, publish hint, Table ordering card, storage footnote)
   render placeholders with the wait announced only to screen readers, so no
   sentence is printed and then retracted. `unreachable` is the read that
-  settled by *failing*: those surfaces say the account couldn't be checked and
+  settled by _failing_: those surfaces say the account couldn't be checked and
   offer **Try again**, the save status never claims browser-only, and the
   café-creating flow stays off because it would mint tenancy on a guess (016).
   Tests: `tests/menu-membership.test.ts`, `tests/editor-membership.test.ts`.

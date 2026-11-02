@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
 import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import {
   duplicateItem,
@@ -161,12 +162,11 @@ export function ItemEditor({
           <span className="shrink-0 text-sm tabular-nums text-stone-600">
             {formatPreviewPrice(item.price, item.currency, doc.currency)}
           </span>
-          <span
-            aria-hidden="true"
-            className={`shrink-0 text-xs text-stone-400 transition-transform ${open ? "rotate-180" : ""}`}
-          >
-            ⌄
-          </span>
+          {open ? (
+            <ChevronUpIcon className="shrink-0 text-stone-400" />
+          ) : (
+            <ChevronDownIcon className="shrink-0 text-stone-400" />
+          )}
         </button>
       </div>
       {open && (

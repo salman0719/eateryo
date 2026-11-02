@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
@@ -1049,12 +1050,7 @@ export function MenuEditor({
                   }
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`transition-transform ${categoryOpen ? "rotate-180" : ""}`}
-                  >
-                    ⌄
-                  </span>
+                  {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </button>
                 <div className="min-w-[9rem] flex-1">
                   <CommitInput
