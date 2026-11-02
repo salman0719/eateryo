@@ -1,10 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo } from "react";
 
 import { Collapse } from "@/components/ui/collapse";
 import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
-import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import {
   duplicateItem,
   hasAnyPrice,
@@ -29,9 +28,14 @@ interface ItemEditorProps {
   item: MenuItem;
   /** All categories, for the move-to-another-category control. */
   categories: Array<{ id: string; name: string }>;
-  onChange: (next: MenuDocument) => void;
-  /** Request deletion of this item; the editor confirms and handles undo. */
-  onDelete: () => void;
+  /**
+   * The row's write path, created once by the editor. Keeping it in one stable
+   * object (rather than a handful of fresh closures per row) is what lets this
+   * component's memo actually hold when a fold toggle re-renders the editor.
+   */
+  actions: ItemActions;
+  /** Labels this menu already uses, computed once for the whole editor. */
+  labelVocabulary: readonly string[];
   /** Flagged by duplicate detection (review-only badge, see duplicates.ts). */
   duplicate: boolean;
   /**
@@ -39,42 +43,45 @@ interface ItemEditorProps {
    * the form is the exception, which is what keeps a long menu navigable.
    */
   open: boolean;
-  onToggleOpen: () => void;
   /** Bulk reassignment checkbox state (see menu-editor's bulk actions bar). */
   selected: boolean;
-  onToggle: () => void;
   /** Signed in, so the upload endpoint will authorize a photo. */
   canUploadImage: boolean;
-  /** Attach, replace, or (null) remove this item's photo. */
-  onAttachImage: (image: MenuItemImage | null) => void;
+}
+
+/** Everything a row can ask the editor to do, addressed by id. */
+export interface ItemActions {
+  change: (next: MenuDocument) => void;
+  /** Show or hide this dish's form. */
+  toggleOpen: (itemId: string) => void;
+  /** Tick or untick this dish for a bulk move. */
+  toggleSelected: (itemId: string) => void;
+  /** Ask for confirmation, then delete — with the editor's one-level undo. */
+  delete: (categoryId: string, itemId: string) => void;
+  /** Attach, replace, or (null) remove a dish's photo. */
+  attachImage: (itemId: string, image: MenuItemImage | null) => void;
 }
 
 const smallButton =
   "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors " +
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
 
-export function ItemEditor({
+export const ItemEditor = memo(function ItemEditor({
   doc,
   categoryId,
   isRouteTarget,
   item,
   categories,
-  onChange,
-  onDelete,
+  actions,
+  labelVocabulary,
   duplicate,
   open,
-  onToggleOpen,
   selected,
-  onToggle,
   canUploadImage,
-  onAttachImage,
 }: ItemEditorProps) {
   const category = doc.categories.find((c) => c.id === categoryId);
   const index = category ? category.items.findIndex((i) => i.id === item.id) : -1;
   const needsReview = isItemFlagged(item);
-  // Labels this menu already uses, most-used first: the reuse list is a view
-  // over the document in hand, so there is nothing new to store or fetch.
-  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
   // The photo reference for the row thumbnail; the form below owns changing it.
   const copy = itemImageCopy(item.image);
   const panelId = `menu-item-panel-${item.id}`;
@@ -97,7 +104,7 @@ export function ItemEditor({
     .join(" · ");
 
   function patch(patch: Parameters<typeof updateItem>[3]) {
-    onChange(updateItem(doc, categoryId, item.id, patch));
+    actions.change(updateItem(doc, categoryId, item.id, patch));
   }
 
   return (
@@ -117,7 +124,7 @@ export function ItemEditor({
           <input
             type="checkbox"
             checked={selected}
-            onChange={onToggle}
+            onChange={() => actions.toggleSelected(item.id)}
             aria-label={`Select ${item.name} for bulk move`}
             className="h-4 w-4 rounded border-stone-300 accent-amber-700"
           />
@@ -135,7 +142,7 @@ export function ItemEditor({
         ) : null}
         <button
           type="button"
-          onClick={onToggleOpen}
+          onClick={() => actions.toggleOpen(item.id)}
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
           className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
@@ -170,7 +177,9 @@ export function ItemEditor({
           )}
         </button>
       </div>
-      <Collapse open={open}>
+      {/* Lazy: forty shut dish forms must not cost ~5,000 DOM nodes, and this
+          one is rebuilt from the document when it is reopened. */}
+      <Collapse open={open} lazy>
         <div id={panelId} className="border-t border-stone-100 p-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_120px_90px]">
             <CommitInput
@@ -227,7 +236,11 @@ export function ItemEditor({
           </div>
 
           <div className="mt-3">
-            <ItemImagePanel item={item} canUpload={canUploadImage} onAttach={onAttachImage} />
+            <ItemImagePanel
+              item={item}
+              canUpload={canUploadImage}
+              onAttach={(image) => actions.attachImage(item.id, image)}
+            />
           </div>
 
           <div className="mt-3">
@@ -466,7 +479,7 @@ export function ItemEditor({
               <button
                 type="button"
                 disabled={index <= 0}
-                onClick={() => onChange(moveItem(doc, categoryId, item.id, index - 1))}
+                onClick={() => actions.change(moveItem(doc, categoryId, item.id, index - 1))}
                 className={`${smallButton} flex-1 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none`}
               >
                 ↑ Move up
@@ -476,7 +489,7 @@ export function ItemEditor({
                 disabled={
                   category === undefined || index === -1 || index >= category.items.length - 1
                 }
-                onClick={() => onChange(moveItem(doc, categoryId, item.id, index + 1))}
+                onClick={() => actions.change(moveItem(doc, categoryId, item.id, index + 1))}
                 className={`${smallButton} flex-1 disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none`}
               >
                 ↓ Move down
@@ -491,7 +504,9 @@ export function ItemEditor({
                     defaultValue=""
                     onChange={(event) => {
                       if (event.target.value) {
-                        onChange(moveItemToCategory(doc, categoryId, event.target.value, item.id));
+                        actions.change(
+                          moveItemToCategory(doc, categoryId, event.target.value, item.id)
+                        );
                         event.target.value = "";
                       }
                     }}
@@ -514,7 +529,7 @@ export function ItemEditor({
                 <input
                   type="checkbox"
                   checked={selected}
-                  onChange={onToggle}
+                  onChange={() => actions.toggleSelected(item.id)}
                   aria-label={`Select ${item.name} for bulk move`}
                   className="h-4 w-4 rounded border-stone-300 accent-amber-700"
                 />
@@ -535,14 +550,14 @@ export function ItemEditor({
             <div className="flex gap-2 sm:contents">
               <button
                 type="button"
-                onClick={() => onChange(duplicateItem(doc, categoryId, item.id))}
+                onClick={() => actions.change(duplicateItem(doc, categoryId, item.id))}
                 className={`${smallButton} flex-1 sm:flex-none`}
               >
                 Duplicate
               </button>
               <button
                 type="button"
-                onClick={onDelete}
+                onClick={() => actions.delete(categoryId, item.id)}
                 className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:flex-none"
               >
                 Delete
@@ -553,4 +568,4 @@ export function ItemEditor({
       </Collapse>
     </li>
   );
-}
+});

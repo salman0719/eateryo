@@ -10,9 +10,15 @@
  * from the current frame instead of jumping, nothing is measured, nothing is
  * left inline afterwards, and it works before hydration.
  *
- * - The content stays mounted, so a panel keeps what the owner typed and
- *   images are not re-fetched when it closes and reopens; `inert` takes it out
- *   of the tab order and the accessibility tree while it is shut.
+ * - By default the content stays mounted, so a panel keeps what the owner
+ *   typed and images are not re-fetched when it closes and reopens; `inert`
+ *   takes it out of the tab order and the accessibility tree while it is shut.
+ * - `lazy` gives that up for panels that are expensive to keep: a shut panel
+ *   renders nothing at all, so it contributes no nodes, no form controls and
+ *   no effects. It still animates open (the content mounts into the expanding
+ *   track); closing is instant, because the content leaves with the toggle.
+ *   Use it where a page holds many disclosures — forty shut dish forms are
+ *   ~5,000 nodes nobody is looking at.
  * - `prefers-reduced-motion` snaps open and shut.
  * - Timing matches the app's height-reveal base (300ms, decelerating), so a
  *   disclosure and a revealed banner move together.
@@ -27,9 +33,17 @@ export interface CollapseProps {
   children: ReactNode;
   /** Extra classes for the grid wrapper. */
   className?: string;
+  /**
+   * Render the content only while the panel is open. A closed panel then costs
+   * nothing, at the price of uncommitted local state inside it not surviving a
+   * close, and of the close being a snap rather than a glide.
+   */
+  lazy?: boolean;
 }
 
-export function Collapse({ open, children, className = "" }: CollapseProps) {
+export function Collapse({ open, children, className = "", lazy = false }: CollapseProps) {
+  const show = !lazy || open;
+
   return (
     <div
       className={[
@@ -41,7 +55,7 @@ export function Collapse({ open, children, className = "" }: CollapseProps) {
         .join(" ")}
     >
       <div className="min-h-0 overflow-hidden">
-        <div inert={!open}>{children}</div>
+        <div inert={!open}>{show ? children : null}</div>
       </div>
     </div>
   );

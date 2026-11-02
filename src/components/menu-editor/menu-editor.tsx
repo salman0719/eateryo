@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Collapse } from "@/components/ui/collapse";
@@ -27,7 +27,7 @@ import {
   loadDismissedDuplicateKeys,
   saveDismissedDuplicateKeys,
 } from "@/features/menu/duplicates";
-import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
+import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import {
   isCategoryOpen,
@@ -42,6 +42,7 @@ import {
   type FoldState,
 } from "@/features/menu/fold";
 import { searchMenu } from "@/features/menu/search";
+import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
 import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
@@ -59,7 +60,7 @@ import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
-import { ItemEditor } from "./item-editor";
+import { ItemEditor, type ItemActions } from "./item-editor";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
@@ -183,10 +184,19 @@ export function MenuEditor({
   const canUploadItemImages = canManage && syncMode === "account";
   // Provenance, so a surprising line can be traced to the model that read it.
   const sourceLabel = describeExtractionSource(doc.source);
+  // One category list for every row's "Move to" select and one label
+  // vocabulary for every row's tag input: both are views over the document, so
+  // they are built once here instead of forty-five times per render. Stable
+  // identities are also what let the row's memo hold.
+  const categoryChoices = useMemo(
+    () => doc.categories.map((category) => ({ id: category.id, name: category.name })),
+    [doc.categories]
+  );
+  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
 
   // Search box: pure client-side filter, see search.ts for the rules.
   const [query, setQuery] = useState("");
-  const search = searchMenu(doc, query);
+  const search = useMemo(() => searchMenu(doc, query), [doc, query]);
   const isFiltering = query.trim().length > 0;
 
   // Which dishes have their form open (fold.ts). Remembered per menu, and
@@ -264,15 +274,20 @@ export function MenuEditor({
   // Duplicate review (flags only, never auto-deletes — see duplicates.ts).
   // Dismissals are remembered per document, in session state and localStorage.
   const [dismissedMap, setDismissedMap] = useState<Record<string, string[]>>({});
-  const dismissedKeys = dismissedMap[doc.id] ?? loadDismissedDuplicateKeys(doc.id);
-  const duplicateGroups = findDuplicateGroups(doc).filter(
-    (group) => !dismissedKeys.includes(group.key)
+  // One storage read per document, not one per render: the fallback used to
+  // run a JSON.parse on every keystroke and every fold toggle.
+  const dismissedKeys = useMemo(
+    () => dismissedMap[doc.id] ?? loadDismissedDuplicateKeys(doc.id),
+    [dismissedMap, doc.id]
+  );
+  const duplicateGroups = useMemo(
+    () => findDuplicateGroups(doc).filter((group) => !dismissedKeys.includes(group.key)),
+    [doc, dismissedKeys]
   );
   const duplicateIds = duplicateItemIds(duplicateGroups);
 
   function dismissGroup(key: string) {
-    const current = dismissedMap[doc.id] ?? dismissedKeys;
-    const next = current.includes(key) ? current : [...current, key];
+    const next = dismissedKeys.includes(key) ? dismissedKeys : [...dismissedKeys, key];
     saveDismissedDuplicateKeys(doc.id, next);
     setDismissedMap((prev) => ({ ...prev, [doc.id]: next }));
   }
@@ -347,15 +362,6 @@ export function MenuEditor({
   const presentIds = new Set(doc.categories.flatMap((c) => c.items.map((i) => i.id)));
   const selected = [...selectedIds].filter((id) => presentIds.has(id));
 
-  function toggleSelected(itemId: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-  }
-
   function handleBulkMove() {
     if (selected.length === 0 || !bulkTarget) return;
     onChange(moveItemsToCategory(doc, selected, bulkTarget));
@@ -363,27 +369,68 @@ export function MenuEditor({
     setBulkTarget("");
   }
 
+  // The row handlers, created once. They read the live editor state through a
+  // ref, so React.memo(ItemEditor) holds: a fold toggle re-renders the one row
+  // whose `open` changed and leaves the other forty-four alone.
+  const liveRef = useRef({ doc, foldState, onChange, confirm });
+  useEffect(() => {
+    liveRef.current = { doc, foldState, onChange, confirm };
+  }, [doc, foldState, onChange, confirm]);
+
+  const itemActions = useMemo<ItemActions>(
+    () => ({
+      change: (next) => liveRef.current.onChange(next),
+      toggleOpen: (itemId) => {
+        const live = liveRef.current;
+        const next = toggleItem(live.foldState, itemId);
+        writeFoldState(live.doc.id, next);
+        setFold({ menuId: live.doc.id, state: next });
+      },
+      toggleSelected: (itemId) => {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(itemId)) next.delete(itemId);
+          else next.add(itemId);
+          return next;
+        });
+      },
+      delete: (categoryId, itemId) => {
+        void (async () => {
+          const item = liveRef.current.doc.categories
+            .find((category) => category.id === categoryId)
+            ?.items.find((candidate) => candidate.id === itemId);
+          if (!item) return;
+          const ok = await liveRef.current.confirm({
+            message: `Delete “${item.name}”? You can undo this until your next change.`,
+            confirmLabel: "Delete",
+            destructive: true,
+          });
+          if (!ok) return;
+          // Re-read after the dialog: the document may have moved on meanwhile.
+          const latest = liveRef.current.doc;
+          const next = deleteItem(latest, categoryId, itemId);
+          setUndo(captureDeleteUndo(latest, next, `deleted “${item.name}”`));
+          liveRef.current.onChange(next);
+        })();
+      },
+      attachImage: (itemId, image) => {
+        const current = liveRef.current.doc;
+        const category = current.categories.find((candidate) =>
+          candidate.items.some((item) => item.id === itemId)
+        );
+        if (!category) return;
+        liveRef.current.onChange(setItemImage(current, category.id, itemId, image));
+      },
+    }),
+    []
+  );
+
   // Latest document for async completions: an extraction can take a
   // minute, and edits made while it runs must survive the merge.
   const docRef = useRef(doc);
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
-
-  /**
-   * Apply a finished photo upload to the *current* document. The upload takes
-   * seconds, and an item edit made meanwhile must survive it — so this reads
-   * the latest document instead of the one captured when the upload started,
-   * and finds the dish by id even if it moved to another section meanwhile.
-   */
-  function attachItemImage(itemId: string, image: MenuItemImage | null) {
-    const current = docRef.current;
-    const category = current.categories.find((candidate) =>
-      candidate.items.some((item) => item.id === itemId)
-    );
-    if (!category) return;
-    onChange(setItemImage(current, category.id, itemId, image));
-  }
 
   // Add pages: photograph more of the same menu later and merge the new
   // extraction in. Repeats are flagged by the duplicate review, never
@@ -1113,18 +1160,15 @@ export function MenuEditor({
                           // A pasted /menus/<id>/items/<itemId> link opens the
                           // dish without rewriting what the owner folded.
                           open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
-                          onToggleOpen={() => applyFold(toggleItem(foldState, item.id))}
                           doc={doc}
                           categoryId={category.id}
                           item={item}
-                          categories={doc.categories.map((c) => ({ id: c.id, name: c.name }))}
-                          onChange={onChange}
-                          onDelete={() => removeItem(category.id, item)}
+                          categories={categoryChoices}
+                          actions={itemActions}
+                          labelVocabulary={labelVocabulary}
                           duplicate={duplicateIds.has(item.id)}
                           selected={selectedIds.has(item.id)}
-                          onToggle={() => toggleSelected(item.id)}
                           canUploadImage={canUploadItemImages}
-                          onAttachImage={(image) => attachItemImage(item.id, image)}
                         />
                       ))}
                     </ul>
