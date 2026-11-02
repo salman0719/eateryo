@@ -28,9 +28,13 @@ import {
 import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import {
+  isCategoryOpen,
   isItemOpen,
   readFoldState,
   revealItem,
+  setCategoriesOpen,
+  setItemsOpen,
+  toggleCategory,
   toggleItem,
   writeFoldState,
   type FoldState,
@@ -195,6 +199,13 @@ export function MenuEditor({
   function applyFold(next: FoldState) {
     writeFoldState(doc.id, next);
     setFold({ menuId: doc.id, state: next });
+  }
+
+  /** Every section and every dish at once — the two buttons by the search. */
+  function setEverythingOpen(open: boolean) {
+    const categoryIds = doc.categories.map((category) => category.id);
+    const itemIds = doc.categories.flatMap((category) => category.items.map((item) => item.id));
+    applyFold(setItemsOpen(setCategoriesOpen(foldState, categoryIds, open), itemIds, open));
   }
 
   /**
@@ -900,6 +911,16 @@ export function MenuEditor({
             ? `${search.matchCount} of ${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`
             : `${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`}
         </p>
+        {doc.categories.length > 0 && (
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setEverythingOpen(true)} className={smallButton}>
+              Expand all
+            </button>
+            <button type="button" onClick={() => setEverythingOpen(false)} className={smallButton}>
+              Collapse all
+            </button>
+          </div>
+        )}
       </div>
       {selected.length > 0 && (
         <div
@@ -998,25 +1019,67 @@ export function MenuEditor({
           const index = doc.categories.findIndex((c) => c.id === category.id);
           // R0: phones show the stepper's category only; sm+ shows every section.
           const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
+          // Searching always shows what it found: a match inside a collapsed
+          // section would be a result the page refuses to reveal.
+          const categoryOpen = isFiltering || isCategoryOpen(foldState, category.id);
+          const categoryPanelId = `menu-category-panel-${category.id}`;
+          const toCheck = items.filter(isItemFlagged).length;
           return (
             <section
               key={category.id}
               aria-label={`Category ${category.name}`}
-              className={`${phoneOnly}rounded-2xl border border-stone-200 bg-stone-50/60 p-4`}
+              className={`${phoneOnly}overflow-hidden rounded-2xl border border-stone-200 bg-white`}
             >
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <CommitInput
-                  label={`Category ${index + 1}`}
-                  value={category.name}
-                  onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
-                />
-                <div className="flex items-end gap-1.5 pb-0.5">
+              {/* The band says what the section is and how much is in it, and
+                  holds its own actions — so a collapsed section is still
+                  legible and still manageable. */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-stone-200 bg-stone-100 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => applyFold(toggleCategory(foldState, category.id))}
+                  disabled={isFiltering}
+                  aria-expanded={categoryOpen}
+                  aria-controls={categoryOpen ? categoryPanelId : undefined}
+                  title={
+                    isFiltering
+                      ? "Search shows every matching section"
+                      : categoryOpen
+                        ? "Collapse this section"
+                        : "Expand this section"
+                  }
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`transition-transform ${categoryOpen ? "rotate-180" : ""}`}
+                  >
+                    ⌄
+                  </span>
+                </button>
+                <div className="min-w-[9rem] flex-1">
+                  <CommitInput
+                    label={`Category ${index + 1}`}
+                    value={category.name}
+                    hideLabel
+                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-stone-300 focus:border-amber-700 focus:bg-white"
+                    onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
+                  />
+                </div>
+                <p className="shrink-0 text-xs text-stone-500">
+                  {items.length} {items.length === 1 ? "item" : "items"}
+                  {toCheck > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                      {toCheck} to check
+                    </span>
+                  )}
+                </p>
+                <div className="flex shrink-0 items-center gap-1">
                   <button
                     type="button"
                     aria-label={`Move ${category.name} up`}
                     disabled={index === 0}
                     onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
-                    className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                    className={tinyButton}
                   >
                     ↑
                   </button>
@@ -1025,55 +1088,59 @@ export function MenuEditor({
                     aria-label={`Move ${category.name} down`}
                     disabled={index === doc.categories.length - 1}
                     onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
-                    className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                    className={tinyButton}
                   >
                     ↓
                   </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteCategory(category, index)}
-                    className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className={`${tinyButton} hover:border-red-700 hover:text-red-800`}
                   >
                     Delete
                   </button>
                 </div>
               </div>
-              {items.length === 0 ? (
-                <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
-                  No items — add the first one below.
-                </p>
-              ) : (
-                <ul className="mt-3 space-y-3">
-                  {items.map((item) => (
-                    <ItemEditor
-                      key={item.id}
-                      isRouteTarget={selectedItemId === item.id}
-                      // A pasted /menus/<id>/items/<itemId> link opens the
-                      // dish without rewriting what the owner folded.
-                      open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
-                      onToggleOpen={() => applyFold(toggleItem(foldState, item.id))}
-                      doc={doc}
-                      categoryId={category.id}
-                      item={item}
-                      categories={doc.categories.map((c) => ({ id: c.id, name: c.name }))}
-                      onChange={onChange}
-                      onDelete={() => removeItem(category.id, item)}
-                      duplicate={duplicateIds.has(item.id)}
-                      selected={selectedIds.has(item.id)}
-                      onToggle={() => toggleSelected(item.id)}
-                      canUploadImage={canUploadItemImages}
-                      onAttachImage={(image) => attachItemImage(item.id, image)}
-                    />
-                  ))}
-                </ul>
+              {categoryOpen && (
+                <div id={categoryPanelId} className="p-4">
+                  {items.length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
+                      No items — add the first one below.
+                    </p>
+                  ) : (
+                    <ul className="mt-3 space-y-3">
+                      {items.map((item) => (
+                        <ItemEditor
+                          key={item.id}
+                          isRouteTarget={selectedItemId === item.id}
+                          // A pasted /menus/<id>/items/<itemId> link opens the
+                          // dish without rewriting what the owner folded.
+                          open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
+                          onToggleOpen={() => applyFold(toggleItem(foldState, item.id))}
+                          doc={doc}
+                          categoryId={category.id}
+                          item={item}
+                          categories={doc.categories.map((c) => ({ id: c.id, name: c.name }))}
+                          onChange={onChange}
+                          onDelete={() => removeItem(category.id, item)}
+                          duplicate={duplicateIds.has(item.id)}
+                          selected={selectedIds.has(item.id)}
+                          onToggle={() => toggleSelected(item.id)}
+                          canUploadImage={canUploadItemImages}
+                          onAttachImage={(image) => attachItemImage(item.id, image)}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleAddItem(category.id)}
+                    className={`${smallButton} mt-3`}
+                  >
+                    + Add item
+                  </button>
+                </div>
               )}
-              <button
-                type="button"
-                onClick={() => handleAddItem(category.id)}
-                className={`${smallButton} mt-3`}
-              >
-                + Add item
-              </button>
             </section>
           );
         })
