@@ -20,7 +20,6 @@ import type { MenuAvailability } from "@/features/availability/schema";
 import { formatAvailability } from "@/features/availability/format";
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu, type SearchMatch } from "@/features/menu/search";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { placeOrder } from "@/features/orders/client";
 import {
   addLine,
@@ -33,7 +32,9 @@ import {
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import { OrderSheet } from "./order-sheet";
 
 /** One open menu on the table landing (serializable for the client). */
 export interface TableOrderMenu {
@@ -93,12 +94,18 @@ export function TableOrderTabs({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const viewOrderButton = useRef<HTMLButtonElement | null>(null);
+  /** Wide screens keep the order in its own column; phones raise the sheet. */
+  const wide = useWideLayout();
 
   const searching = query.trim().length > 0;
 
   /** The closed menu whose opening times are currently revealed, if any. */
   const infoMenu =
-    closedInfo === null ? null : closedMenus.find((menu) => menu.menuId === closedInfo.menuId) ?? null;
+    closedInfo === null
+      ? null
+      : (closedMenus.find((menu) => menu.menuId === closedInfo.menuId) ?? null);
 
   /**
    * Reveal a closed menu's opening times as a fixed-position tooltip: it
@@ -175,6 +182,8 @@ export function TableOrderTabs({
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
   const showMenuBadges = menus.length > 1;
+  /** One currency for the ticket when every menu agrees, else an em dash. */
+  const cartCurrency = distinctCurrency(menus.map((menu) => menu.doc));
 
   /**
    * One menu means no navigation: the tab row (All + one identical tab)
@@ -183,7 +192,7 @@ export function TableOrderTabs({
    * a single out-of-hours menu is still "the menu" to the diner.
    */
   const singleMenu = menus.length + closedMenus.length <= 1;
-  const onlyClosedMenu = singleMenu && menus.length === 0 ? closedMenus[0] ?? null : null;
+  const onlyClosedMenu = singleMenu && menus.length === 0 ? (closedMenus[0] ?? null) : null;
 
   function choiceKey(menuId: string, itemId: string): string {
     return `${menuId}:${itemId}`;
@@ -228,6 +237,13 @@ export function TableOrderTabs({
     setError(null);
   }
 
+  /** Quantity changes go through here so emptying the order closes the sheet. */
+  function setQuantity(index: number, quantity: number) {
+    const next = setLineQuantity(lines, index, quantity);
+    setLines(next);
+    if (next.length === 0) setSheetOpen(false);
+  }
+
   function menuSlugForLine(line: OrderLine): string | null {
     return menus.find((menu) => menu.menuId === line.menuId)?.menuSlug ?? null;
   }
@@ -256,6 +272,7 @@ export function TableOrderTabs({
       setPlaced(order);
       setLines([]);
       setNote("");
+      setSheetOpen(false);
     } catch (submitError: unknown) {
       setError(
         submitError instanceof SyncError
@@ -272,6 +289,41 @@ export function TableOrderTabs({
   }
 
   const frame = "rounded-2xl border border-stone-200 bg-white";
+
+  /**
+   * What sits under the cart's total — one node for the phone sheet and the
+   * wide-screen column, so both show the same total, warning, error and button.
+   */
+  const orderFooter = (
+    <>
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm font-medium text-stone-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-stone-900">
+          {formatOrderTotal(cartCurrency, total)}
+        </p>
+      </div>
+      {lines.length > 0 && total === null && (
+        <p className="mt-1 text-xs text-amber-800">
+          Some items have no price on the menu, so no total is shown. Staff confirm the price.
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={submitting || lines.length === 0}
+        onClick={() => void sendOrder()}
+        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {submitting ? "Sending…" : "Send order to the kitchen"}
+      </button>
+    </>
+  );
 
   if (placed) {
     return (
@@ -304,275 +356,191 @@ export function TableOrderTabs({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-      <div className="flex min-w-0 flex-col gap-4">
-        <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
-          {!singleMenu && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {menus.length > 0 && (
-                <TabButton
-                  active={activeTab === ALL_TAB}
-                  onClick={() => {
-                    hideClosedInfo();
-                    setActiveTab(ALL_TAB);
-                  }}
-                  label="All"
-                />
-              )}
-              {menus.map((menu) => (
-                <TabButton
-                  key={menu.menuId}
-                  active={activeTab === menu.menuId}
-                  onClick={() => {
-                    hideClosedInfo();
-                    setActiveTab(menu.menuId);
-                  }}
-                  label={menuLabel(menu)}
-                />
-              ))}
-              {closedMenus.map((menu) => (
-                <ClosedTabButton
-                  key={menu.menuId}
-                  menu={menu}
-                  show={closedInfo?.menuId === menu.menuId}
-                  onShow={(anchor) => showClosedInfo(menu, anchor)}
-                  onHide={hideClosedInfo}
-                />
-              ))}
-            </div>
-          )}
-          {onlyClosedMenu ? (
-            <div>
-              <p className="text-sm font-semibold text-stone-900">
-                {menuLabel(onlyClosedMenu)} is closed right now
-              </p>
-              <p className="mt-1 text-sm leading-6 text-stone-600">
-                Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
-              </p>
-            </div>
-          ) : menus.length > 0 ? (
-            <>
-              <label className={!singleMenu ? "mt-2 block" : "block"}>
-                <span className="sr-only">Search dishes</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={
-                    singleMenu
-                      ? "Search dishes…"
-                      : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
-                  }
-                  className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
-                />
-              </label>
-              {searching && (
-                <p className="mt-2 text-xs text-stone-500" role="status">
-                  {visibleCount === 0
-                    ? `No dishes match “${query.trim()}”.`
-                    : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="mt-2 text-xs text-stone-500">
-              Nothing to order at the moment — tap a menu to see when it opens.
-            </p>
-          )}
-        </nav>
-
-        {menus.length === 0 ? (
-          <div className={`${frame} p-8 text-center`}>
-            <p className="text-lg font-semibold text-stone-900">Nothing is open right now</p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
-              {singleMenu
-                ? "The kitchen is between services — opening hours are shown above."
-                : "Every menu is between services — tap one above to see when it opens."}
-            </p>
-          </div>
-        ) : visibleCount === 0 ? (
-          <div className={`${frame} p-8 text-center`}>
-            <p className="text-lg font-semibold text-stone-900">No dishes match</p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
-              Nothing on {activeTab === ALL_TAB ? "these menus" : "this menu"} matches “
-              {query.trim()}”. Try a shorter search,{" "}
-              {singleMenu ? "or clear it to browse the whole menu." : "or browse the tabs above."}
-            </p>
-          </div>
-        ) : (
-          filtered.map(({ menu, result }) =>
-            result.categories.length === 0 ? null : (
-              <div key={menu.menuId} className="flex flex-col gap-4">
-                {activeTab === ALL_TAB && menus.length > 1 && (
-                  <h2 className="px-1 text-sm font-bold tracking-wider text-stone-500 uppercase">
-                    {menuLabel(menu)}
-                  </h2>
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex min-w-0 flex-col gap-4">
+          <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
+            {!singleMenu && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {menus.length > 0 && (
+                  <TabButton
+                    active={activeTab === ALL_TAB}
+                    onClick={() => {
+                      hideClosedInfo();
+                      setActiveTab(ALL_TAB);
+                    }}
+                    label="All"
+                  />
                 )}
-                {result.categories.map((match: SearchMatch) => (
-                  <OrderMenuSection
-                    key={`${menu.menuId}:${match.category.id}`}
-                    category={{ ...match.category, items: match.items }}
-                    currency={menu.doc.currency}
-                    variantChoice={scopedVariantChoice(menu.menuId, match.items)}
-                    onVariantChange={(itemId, name) =>
-                      setVariantChoice((current) => ({
-                        ...current,
-                        [choiceKey(menu.menuId, itemId)]: name,
-                      }))
-                    }
-                    onAdd={(item) => addItem(menu, item)}
-                    itemCount={(item, variantName) =>
-                      lines.find(
-                        (line) =>
-                          line.menuId === menu.menuId &&
-                          line.menuItemId === item.id &&
-                          (line.variantName ?? null) === (variantName ?? null)
-                      )?.quantity ?? 0
-                    }
+                {menus.map((menu) => (
+                  <TabButton
+                    key={menu.menuId}
+                    active={activeTab === menu.menuId}
+                    onClick={() => {
+                      hideClosedInfo();
+                      setActiveTab(menu.menuId);
+                    }}
+                    label={menuLabel(menu)}
+                  />
+                ))}
+                {closedMenus.map((menu) => (
+                  <ClosedTabButton
+                    key={menu.menuId}
+                    menu={menu}
+                    show={closedInfo?.menuId === menu.menuId}
+                    onShow={(anchor) => showClosedInfo(menu, anchor)}
+                    onHide={hideClosedInfo}
                   />
                 ))}
               </div>
+            )}
+            {onlyClosedMenu ? (
+              <div>
+                <p className="text-sm font-semibold text-stone-900">
+                  {menuLabel(onlyClosedMenu)} is closed right now
+                </p>
+                <p className="mt-1 text-sm leading-6 text-stone-600">
+                  Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
+                </p>
+              </div>
+            ) : menus.length > 0 ? (
+              <>
+                <label className={!singleMenu ? "mt-2 block" : "block"}>
+                  <span className="sr-only">Search dishes</span>
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={
+                      singleMenu
+                        ? "Search dishes…"
+                        : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
+                    }
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+                  />
+                </label>
+                {searching && (
+                  <p className="mt-2 text-xs text-stone-500" role="status">
+                    {visibleCount === 0
+                      ? `No dishes match “${query.trim()}”.`
+                      : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-2 text-xs text-stone-500">
+                Nothing to order at the moment — tap a menu to see when it opens.
+              </p>
+            )}
+          </nav>
+
+          {menus.length === 0 ? (
+            <div className={`${frame} p-8 text-center`}>
+              <p className="text-lg font-semibold text-stone-900">Nothing is open right now</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+                {singleMenu
+                  ? "The kitchen is between services — opening hours are shown above."
+                  : "Every menu is between services — tap one above to see when it opens."}
+              </p>
+            </div>
+          ) : visibleCount === 0 ? (
+            <div className={`${frame} p-8 text-center`}>
+              <p className="text-lg font-semibold text-stone-900">No dishes match</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+                Nothing on {activeTab === ALL_TAB ? "these menus" : "this menu"} matches “
+                {query.trim()}”. Try a shorter search,{" "}
+                {singleMenu ? "or clear it to browse the whole menu." : "or browse the tabs above."}
+              </p>
+            </div>
+          ) : (
+            filtered.map(({ menu, result }) =>
+              result.categories.length === 0 ? null : (
+                <div key={menu.menuId} className="flex flex-col gap-4">
+                  {activeTab === ALL_TAB && menus.length > 1 && (
+                    <h2 className="px-1 text-sm font-bold tracking-wider text-stone-500 uppercase">
+                      {menuLabel(menu)}
+                    </h2>
+                  )}
+                  {result.categories.map((match: SearchMatch) => (
+                    <OrderMenuSection
+                      key={`${menu.menuId}:${match.category.id}`}
+                      category={{ ...match.category, items: match.items }}
+                      currency={menu.doc.currency}
+                      variantChoice={scopedVariantChoice(menu.menuId, match.items)}
+                      onVariantChange={(itemId, name) =>
+                        setVariantChoice((current) => ({
+                          ...current,
+                          [choiceKey(menu.menuId, itemId)]: name,
+                        }))
+                      }
+                      onAdd={(item) => addItem(menu, item)}
+                      itemCount={(item, variantName) =>
+                        lines.find(
+                          (line) =>
+                            line.menuId === menu.menuId &&
+                            line.menuItemId === item.id &&
+                            (line.variantName ?? null) === (variantName ?? null)
+                        )?.quantity ?? 0
+                      }
+                    />
+                  ))}
+                </div>
+              )
             )
-          )
+          )}
+        </div>
+
+        {wide && (
+          <OrderCartPanel
+            lines={lines}
+            currency={cartCurrency}
+            subtitle={`${restaurantName} · ${formatTableLabel(tableLabel)}`}
+            showMenuBadges={showMenuBadges}
+            onQuantityChange={setQuantity}
+            note={note}
+            onNoteChange={setNote}
+            noteId="order-note"
+            footer={orderFooter}
+          />
         )}
       </div>
 
-      <aside
-        id="your-order"
-        className={`${frame} h-fit scroll-mt-4 p-5 lg:sticky lg:top-4`}
-        aria-label="Your order"
-      >
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-bold text-stone-900">Your order</h2>
-          <span className="text-xs font-medium text-stone-500">
-            {itemCount} {itemCount === 1 ? "item" : "items"}
-          </span>
-        </div>
-
-        {lines.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-dashed border-stone-300 p-4 text-center text-sm text-stone-500">
-            Nothing added yet.
-          </p>
-        ) : (
-          <ul className="mt-3 divide-y divide-stone-100">
-            {lines.map((line, index) => (
-              <li key={`${line.menuId ?? ""}:${line.menuItemId}-${line.variantName ?? "base"}`}>
-                <div className="flex items-baseline justify-between gap-2">
-                  <p className="min-w-0 text-sm font-medium text-stone-900">
-                    <span className="block truncate">
-                      {line.name}
-                      {line.variantName && (
-                        <span className="ml-1 text-xs font-normal text-stone-500">
-                          {line.variantName}
-                        </span>
-                      )}
-                    </span>
-                    {showMenuBadges && line.menuTitle && (
-                      <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
-                        {line.menuTitle.trim() || "Menu"}
-                      </span>
-                    )}
-                  </p>
-                  <p className="shrink-0 text-sm tabular-nums text-stone-800">
-                    {line.unitPrice === null
-                      ? "—"
-                      : formatPreviewPrice(line.unitPrice * line.quantity, null, null)}
-                  </p>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2 pb-3">
-                  <button
-                    type="button"
-                    aria-label={`Decrease ${line.name}`}
-                    onClick={() => setLines((current) => setLineQuantity(current, index, line.quantity - 1))}
-                    className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
-                  >
-                    −
-                  </button>
-                  <span className="w-6 text-center text-sm tabular-nums">{line.quantity}</span>
-                  <button
-                    type="button"
-                    aria-label={`Increase ${line.name}`}
-                    onClick={() => setLines((current) => setLineQuantity(current, index, line.quantity + 1))}
-                    className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
-                  >
-                    +
-                  </button>
-                  <span className="flex-1" />
-                  <button
-                    type="button"
-                    onClick={() => setLines((current) => setLineQuantity(current, index, 0))}
-                    className="text-xs font-medium text-stone-500 underline hover:text-red-800"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <p className="mt-2 text-xs text-stone-500">
-          {restaurantName} · {formatTableLabel(tableLabel)}
-        </p>
-
-        <label htmlFor="order-note" className="mt-3 block text-xs font-semibold text-stone-600">
-          Note for the kitchen (optional)
-        </label>
-        <textarea
-          id="order-note"
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          rows={2}
-          maxLength={280}
-          placeholder="Allergies, no onions…"
-          className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+      <label aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+        Website
+        <input
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
         />
+      </label>
 
-        <label aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
-          Website
-          <input
-            type="text"
-            tabIndex={-1}
-            autoComplete="off"
-            value={honeypot}
-            onChange={(event) => setHoneypot(event.target.value)}
-          />
-        </label>
-
-        <div className="mt-4 flex items-baseline justify-between border-t border-stone-200 pt-3">
-          <p className="text-sm font-medium text-stone-600">Total</p>
-          <p className="text-lg font-bold tabular-nums text-stone-900">
-            {formatOrderTotal(
-              distinctCurrency(menus.map((menu) => menu.doc)),
-              total
-            )}
-          </p>
-        </div>
-        {total === null && lines.length > 0 && (
-          <p className="mt-1 text-xs text-amber-800">
-            Some items have no price on the menu, so no total is shown. Staff confirm the price.
-          </p>
-        )}
-
-        {error && (
-          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="button"
-          disabled={lines.length === 0 || submitting}
-          onClick={() => void sendOrder()}
-          className="mt-4 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >            {submitting ? "Sending…" : "Send order to the kitchen"}
-          </button>
-      </aside>
+      {!wide && (
         <StickyCartBar
           itemCount={itemCount}
           total={total}
-          currency={distinctCurrency(menus.map((menu) => menu.doc))}
+          currency={cartCurrency}
+          onViewOrder={() => setSheetOpen(true)}
+          buttonRef={viewOrderButton}
         />
+      )}
+
+      {!wide && sheetOpen && lines.length > 0 && (
+        <OrderSheet
+          lines={lines}
+          currency={cartCurrency}
+          subtitle={`${restaurantName} · ${formatTableLabel(tableLabel)}`}
+          showMenuBadges={showMenuBadges}
+          onQuantityChange={setQuantity}
+          note={note}
+          onNoteChange={setNote}
+          noteId="order-note"
+          onClose={() => setSheetOpen(false)}
+          returnFocusTo={viewOrderButton}
+          footer={orderFooter}
+        />
+      )}
 
       {closedInfo &&
         infoMenu &&
@@ -590,8 +558,8 @@ export function TableOrderTabs({
               role="tooltip"
               className="w-max max-w-[16rem] rounded-xl bg-stone-900 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg"
             >
-              <span className="font-semibold">{menuLabel(infoMenu)}</span> is closed right now.
-              Open {formatAvailability(infoMenu.availability).join("; ")}.
+              <span className="font-semibold">{menuLabel(infoMenu)}</span> is closed right now. Open{" "}
+              {formatAvailability(infoMenu.availability).join("; ")}.
             </div>
           </div>,
           document.body

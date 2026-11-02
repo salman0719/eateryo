@@ -20,6 +20,7 @@ where useful). Secrets stay server-side; none of them may be `NEXT_PUBLIC_`.
 | `DATABASE_URL` | yes | Neon Postgres. |
 | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | yes | Magic-link sessions. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | yes | Sign-in email and ops alerts. |
+| `UPLOADTHING_TOKEN` | optional | Dish photos on menu items. Without it, photo uploads answer 503 and the editor tells the owner photos are not set up; the rest of the app is unaffected. |
 | `OPS_ALERT_EMAIL` | yes | Where failure/volume alerts land. Without it, alerts only reach the logs. |
 | `CONTACT_EMAIL` | yes | Shown on the privacy and terms pages. |
 | `GEMINI_INPUT_USD_PER_MTOK`, `GEMINI_OUTPUT_USD_PER_MTOK` | recommended | Enables cost for Gemini calls in the spend panel. |
@@ -39,6 +40,20 @@ cron service, GitHub Action, uptime pinger) at
 `retention.purged`. Consequences of leaving it parked: the order table grows
 with real usage, and a single tenant's restore/export gets larger. Revisit
 before that matters.
+
+### Dish photo storage
+
+Replacing or removing a dish photo never deletes the file: a published
+revision may still be serving it, so storage only grows. The one kind of file
+that is genuinely orphaned is an upload that never made it into a saved menu
+(the save failed, or the tab closed mid-edit).
+
+`npm run photos:sweep` lists those (a dry run) and
+`npm run photos:sweep -- --delete --yes` deletes the ones older than 30 days
+(`--days` changes the window). It reads `DATABASE_URL` and `UPLOADTHING_TOKEN`,
+refuses to run against a database with no menus at all, and leaves every file
+that is not named `dish-…` alone. Nothing schedules it — run it by hand when
+storage looks large, or wire it to an external scheduler once one exists.
 
 ## 2. Prove a production failure is visible
 
@@ -74,23 +89,24 @@ Target: under ten minutes from photo to first order.
    result.
 3. **Review**: open every item flagged, fill in prices the AI left empty, and
    remove anything that is not on the menu.
-4. **Theme**: open Preview, pick a theme and layout.
-5. **Table QR**: open Table QR, print one card per table, and tick the step in
-   `/launch`.
-6. **Publish**: press Publish, copy the public link, open it on a phone that
-   has never seen the app.
-7. **First order**: scan a table card, order one item, confirm it lands on the
-   board. Run `docs/two-device-test.md` if this is the first café.
+4. **Preview and publish**: open Preview to check the diner page, then press
+   Publish. There is no public menu link to share — publishing makes the menu
+   orderable at the tables.
+5. **Table QR**: open the Tables tab, print one card per table, and tick the
+   step in `/launch`.
+6. **First order**: scan a table card on a phone that has never seen the app,
+   order one item, confirm it lands on the board. Run
+   `docs/two-device-test.md` if this is the first café.
 
-Then check `/launch`: five verifiable steps should read done, and the usage
-panel should show one or two extractions against the cap.
+Then check `/launch`: four verifiable steps should read done. Check Settings →
+Usage for one or two extractions against the cap.
 
 Nothing in this flow asks for a card. If any screen does, that is a bug and the
 launch must not be advertised until it is fixed.
 
 ## 4. First week watch list
 
-- `/launch` usage: requests against `EXTRACTION_MONTHLY_CAP` per café.
+- Settings → Usage: requests against `EXTRACTION_MONTHLY_CAP` per café.
 - Orders per day per café (the Orders board is the source; the launch snapshot
   counts them too).
 - 429s in the logs (`orders.rate_limited`, `extract.rate_limited`,
@@ -105,8 +121,8 @@ launch must not be advertised until it is fixed.
 - **Error tracking vendor**: alert emails and structured logs are live; the
   Sentry project from PHASE-2 §7 does not exist yet, so there is no third-party
   error dashboard. Add the DSN and SDK before scaling the promotion.
-- **Sending domain**: sign-in mail still uses Resend's sandbox sender, which
-  only delivers to the account owner's address. Verify a domain before
-  onboarding a café that is not you.
+- **Sending domain**: verified — sign-in mail sends from
+  `notifications@send.eateryo.com`. If sign-in mail ever fails, check that
+  `EMAIL_FROM` matches the verified sender in both `.env.local` and Vercel.
 - **Custom domains** are out of scope; the public menu lives on the app's
   domain.

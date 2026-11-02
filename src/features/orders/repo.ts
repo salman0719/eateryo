@@ -87,6 +87,12 @@ export interface PlaceOrderInput {
   tableLabel: string;
   note?: string | null;
   lines: OrderLineRequest[];
+  /**
+   * Test clock for the open-hours check and the row stamps. Production
+   * never sets this (the route builds the input without it), so callers
+   * cannot invent the time — tests pin it instead of depending on today.
+   */
+  now?: Date;
 }
 
 export interface TableOrderLineRequest extends OrderLineRequest {
@@ -100,6 +106,12 @@ export interface PlaceTableOrderInput {
   tableLabel: string;
   note?: string | null;
   lines: TableOrderLineRequest[];
+  /**
+   * Test clock for the open-hours check and the row stamps. Production
+   * never sets this (the route builds the input without it), so callers
+   * cannot invent the time — tests pin it instead of depending on today.
+   */
+  now?: Date;
 }
 
 export interface StaffOrderQuery {
@@ -288,7 +300,8 @@ export async function placeOrderFromSlug(
     throw new OrderRepoError("menu_not_live", "This menu is not published.");
   }
   const { tableLabel, note } = validateOrderEnvelope(input.tableLabel, input.note, input.lines.length);
-  await assertMenuOpen(db, page.menuId, new Date());
+  const openAt = input.now ?? new Date();
+  await assertMenuOpen(db, page.menuId, openAt);
 
   const doc = menuDocumentSchema.parse(page.doc);
   const items = collectItems(doc);
@@ -303,7 +316,7 @@ export async function placeOrderFromSlug(
     ? null
     : lines.reduce((sum, line) => sum + (line.unitPriceCents ?? 0) * line.quantity, 0);
 
-  const now = new Date();
+  const now = input.now ?? new Date();
   const inserted = await db
     .insert(orderTable)
     .values({
@@ -362,7 +375,7 @@ export async function placeTableOrder(
     throw new OrderRepoError("menu_not_live", "This restaurant link is not live.");
   }
 
-  const now = new Date();
+  const now = input.now ?? new Date();
   const pages = new Map<string, PublishedMenuPage>();
   for (const request of input.lines) {
     if (!pages.has(request.menuSlug)) {

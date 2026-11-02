@@ -50,6 +50,7 @@ describe("menu storage", () => {
           variants: [],
           options: [],
           reviewNotes: [],
+          unpricedAccepted: false,
         },
       ],
     });

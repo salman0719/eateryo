@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET as getOrders, POST as placeOrderRoute } from "@/app/api/orders/route";
@@ -7,7 +8,7 @@ import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { createRestaurant } from "@/features/tenancy/repo";
-import { order as orderTable, restaurantMembership } from "@/lib/db/schema";
+import { order as orderTable, publishedMenu, restaurantMembership } from "@/lib/db/schema";
 import type { TestDb } from "./helpers/pg-test-db";
 
 /**
@@ -117,7 +118,7 @@ beforeEach(async () => {
   restaurantId = (await createRestaurant(holder.db, ownerId, "Café API")).id;
   publishedDoc = menuDoc();
   await createMenuForUser(holder.db, ownerId, restaurantId, publishedDoc);
-  await publishMenuForUser(holder.db, ownerId, menuId, { theme: "classic", layout: "list" });
+  await publishMenuForUser(holder.db, ownerId, menuId);
   holder.userId = ownerId;
 }, 30_000);
 
@@ -179,12 +180,13 @@ describe("POST /api/orders", () => {
       currency: "USD",
     });
     await createMenuForUser(holder.db!, ownerId, dosRestaurantId, dosDoc);
-    const published = await publishMenuForUser(holder.db!, ownerId, "menu-api-dos", {
-      theme: "classic",
-      layout: "list",
-    });
-    expect(published.slug).toBe("cafe-api-orders");
-    expect(published.restaurantSlug).toBe("cafe-dos");
+    await publishMenuForUser(holder.db!, ownerId, "menu-api-dos");
+    const publicationRows = await holder.db!
+      .select({ slug: publishedMenu.slug })
+      .from(publishedMenu)
+      .where(eq(publishedMenu.menuId, "menu-api-dos"));
+    // The identical title claims the slug inside this café, not globally.
+    expect(publicationRows[0]?.slug).toBe("cafe-api-orders");
 
     const dosItem = dosDoc.categories
       .flatMap((category) => category.items)
@@ -337,7 +339,7 @@ describe("POST /api/orders from a table QR", () => {
       currency: "USD",
     });
     await createMenuForUser(holder.db!, ownerId, restaurantId, barDoc);
-    await publishMenuForUser(holder.db!, ownerId, barMenuId, { theme: "bistro", layout: "list" });
+    await publishMenuForUser(holder.db!, ownerId, barMenuId);
     const barItem = barDoc.categories
       .flatMap((category) => category.items)
       .find((candidate) => candidate.available !== false)!;

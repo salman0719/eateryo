@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { flushSync } from "react-dom";
 
+import {
+  dedupeDietaryLabels,
+  sameDietaryLabels,
+  suggestDietaryLabels,
+} from "@/features/menu/dietary-labels";
+
 /**
  * Inputs that commit on blur/Enter and revert on invalid values, so the
  * document only ever holds valid data (helpers throw on empty names, and
@@ -21,7 +27,8 @@ interface CommitInputProps {
 
 const baseInput =
   "w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 " +
-  "focus:border-amber-700 focus:outline-none";
+  // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
+  "resize-none focus:border-amber-700 focus:outline-none sm:resize-y";
 
 export function CommitInput({
   label,
@@ -87,6 +94,177 @@ export function CommitInput({
       {multiline ? <textarea rows={2} {...shared} /> : <input type="text" {...shared} />}
       {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
     </label>
+  );
+}
+
+interface CommitTagsProps {
+  label: string;
+  value: readonly string[];
+  onCommit: (next: string[]) => void;
+  /** Ranked candidates; offered as one-click additions under the input. */
+  suggestions?: readonly string[];
+  hint?: string;
+  placeholder?: string;
+}
+
+/**
+ * The key an instruction names, with the glyph printed on it in a keycap, so
+ * "press Enter" is never ambiguous about which physical key adds the label.
+ * The keycap is decorative: the word beside it already says the key's name.
+ */
+function KeyHint({ glyph, children }: { glyph: string; children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap">
+      <span className="font-semibold text-stone-700">{children}</span>
+      <kbd
+        aria-hidden="true"
+        className="rounded border border-stone-300 bg-white px-1 py-px font-sans text-[10px] leading-none text-stone-500"
+      >
+        {glyph}
+      </kbd>
+    </span>
+  );
+}
+
+/**
+ * Tag input for a list of short strings (010). Commits on Enter, on blur and
+ * on every add/remove, with the same `flushSync` contract as `CommitInput` so
+ * a click in the same tick sees the committed list instead of stale props.
+ *
+ * A label is never split on commas: one that contains a comma survives a round
+ * trip intact, which the old comma string could not promise.
+ */
+export function CommitTags({
+  label,
+  value,
+  onCommit,
+  suggestions = [],
+  hint,
+  placeholder,
+}: CommitTagsProps) {
+  const [draft, setDraft] = useState("");
+  // Render the deduped list: a document saved before this was a tag input (a
+  // CSV import can hold `vegan` twice) must not produce duplicate keys.
+  const tags = dedupeDietaryLabels(value);
+  const offered = suggestDietaryLabels(suggestions, { exclude: tags, query: draft, limit: 8 });
+
+  function commit(next: readonly string[]) {
+    flushSync(() => {
+      setDraft("");
+      const cleaned = dedupeDietaryLabels(next);
+      if (sameDietaryLabels(cleaned, tags)) return;
+      onCommit(cleaned);
+    });
+  }
+
+  return (
+    <div role="group" aria-label={label}>
+      {/* One row, two parts: the label names the field, a hairline divider
+          marks where the instruction starts, and the muted hint keeps the
+          bold key names from reading as more of the field's name. */}
+      <span className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+        <span className="font-medium text-stone-700">{label}</span>
+        <span aria-hidden="true" className="h-3 w-px self-center bg-stone-300" />
+        <span className="inline-flex flex-wrap items-center gap-x-1 text-[11px] text-stone-500">
+          <span>Press</span>
+          <KeyHint glyph="⏎">Enter</KeyHint>
+          <span>,</span>
+          <KeyHint glyph="⇥">Tab</KeyHint>
+          <span>or</span>
+          <KeyHint glyph=",">comma</KeyHint>
+          <span>to add</span>
+        </span>
+      </span>
+      {tags.length > 0 && (
+        <ul className="mb-1.5 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <li key={tag}>
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-green-900">
+                {tag}
+                <button
+                  type="button"
+                  aria-label={`Remove ${tag}`}
+                  // mousedown, not click: the input's blur would otherwise
+                  // commit a draft and leave this handler with stale props.
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    commit(tags.filter((candidate) => candidate !== tag));
+                  }}
+                  className="rounded-full px-1 leading-none text-green-900/70 hover:text-green-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-700"
+                >
+                  ✕
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <input
+        type="text"
+        aria-label={label}
+        placeholder={placeholder ?? "Add a label…"}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={(event) => {
+          // Tabbing from the input into this field's own suggestions is not
+          // leaving the field: committing here would add a half-typed label
+          // first, and the suggestion the person is reaching for second.
+          const next = event.relatedTarget;
+          if (next instanceof Element && next.closest("[data-suggestion-row]")) return;
+          if (event.target.value.trim()) commit([...tags, event.target.value]);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === ",") {
+            // A comma must not land in the field, and Enter must not submit a
+            // surrounding form.
+            event.preventDefault();
+            if (draft.trim()) commit([...tags, draft]);
+          } else if (event.key === "Tab") {
+            // Tab is advertised as a key that adds, so a draft is added here
+            // and the key stops there instead of jumping to the next control.
+            // With nothing typed, Tab is left alone: Escape (or simply not
+            // typing) still gets anyone out of the field by keyboard.
+            if (draft.trim()) {
+              event.preventDefault();
+              commit([...tags, draft]);
+            }
+          } else if (event.key === "Backspace" && draft === "" && tags.length > 0) {
+            commit(tags.slice(0, -1));
+          } else if (event.key === "Escape") {
+            setDraft("");
+          }
+        }}
+        className={baseInput}
+      />
+      {offered.length > 0 && (
+        <div data-suggestion-row className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-stone-500">
+            {draft.trim() ? "Matching" : "Already used"}:
+          </span>
+          {offered.map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              // Keep a primary-button press from moving focus: the input's
+              // blur would commit a half-typed label first. A right (or middle)
+              // press is not a request to add anything, and its default has to
+              // stay for the context menu, so it is skipped entirely.
+              onMouseDown={(event) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+              }}
+              // The click adds it: for the mouse, and for Enter or Space on the
+              // focused button, which is what a button is expected to do.
+              onClick={() => commit([...tags, candidate])}
+              className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-[11px] text-stone-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            >
+              + {candidate}
+            </button>
+          ))}
+        </div>
+      )}
+      {hint && <span className="mt-1 block text-[11px] text-stone-500">{hint}</span>}
+    </div>
   );
 }
 

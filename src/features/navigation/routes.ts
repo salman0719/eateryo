@@ -1,15 +1,16 @@
 export type AppScreen =
-  "capture" | "library" | "orders" | "tables" | "settings" | "editor" | "item";
+  "capture" | "library" | "orders" | "assistant" | "tables" | "settings" | "editor" | "item";
 
 /**
  * The surface shown for an open menu: the edit workspace, the compact
- * reorder list, the printable table QR cards, or the customer preview.
- * Mirrors the editor modes, each with its own deep-linkable URL.
+ * reorder list, the customer preview, or the publish wizard (R1). Table QR
+ * cards moved to the Tables tab (R0), so there is no `qr`
+ * mode. Each mode has its own deep-linkable URL.
  */
-export type EditorMode = "edit" | "reorder" | "qr" | "preview";
+export type EditorMode = "edit" | "reorder" | "preview" | "publish";
 
 export type AppRoute =
-  | { screen: "capture" | "library" | "orders" | "tables" | "settings" }
+  | { screen: "capture" | "library" | "orders" | "assistant" | "tables" | "settings" }
   | { screen: "editor"; menuId: string; mode: EditorMode }
   | { screen: "item"; menuId: string; itemId: string };
 
@@ -17,13 +18,19 @@ export type AppRoute =
 export function menuSelectionFromPathname(
   pathname: string
 ): { menuId: string; mode?: EditorMode; itemId?: string } | null {
-  const menuMatch = /^\/menus\/([^/]+)(?:\/(reorder|qr|preview)|\/items\/([^/]+))?$/.exec(pathname);
+  const menuMatch = /^\/menus\/([^/]+)(?:\/(reorder|preview|publish)|\/items\/([^/]+))?$/.exec(
+    pathname
+  );
   if (!menuMatch?.[1]) return null;
   try {
     const menuId = decodeURIComponent(menuMatch[1]).trim();
     if (!menuId) return null;
     const [, , modeSegment, rawItemId] = menuMatch;
-    if (modeSegment === "reorder" || modeSegment === "qr" || modeSegment === "preview") {
+    if (
+      modeSegment === "reorder" ||
+      modeSegment === "preview" ||
+      modeSegment === "publish"
+    ) {
       return { menuId, mode: modeSegment };
     }
     if (rawItemId !== undefined) {
@@ -40,12 +47,52 @@ export function menuIdFromPathname(pathname: string): string | null {
   return menuSelectionFromPathname(pathname)?.menuId ?? null;
 }
 
+/**
+ * Why a publish link resolves nowhere: it only ever points at the draft it
+ * was created from, so a dead one almost always means the sign-in link was
+ * opened in a different browser than the one holding the draft (drafts
+ * never leave their device until they are published). Shared by the library
+ * banner and the missing-draft card so the two never drift apart.
+ */
+export const MISSING_PUBLISH_DRAFT_MESSAGE =
+  "That link opened in a browser without your draft. Drafts stay on the device " +
+  "they were made on until they are published — open the sign-in link in the " +
+  "original browser, then continue to your link there.";
+
+/**
+ * What to say when a menu URL resolves nowhere — not in this browser, not
+ * on the account. Publish links get the wrong-browser explanation above;
+ * everything else keeps the generic "deleted or moved".
+ */
+export function unresolvableMenuMessage(route: AppRoute): string {
+  if (route.screen === "editor" && route.mode === "publish") {
+    return MISSING_PUBLISH_DRAFT_MESSAGE;
+  }
+  return "That menu could not be opened. It may have been deleted or moved.";
+}
+
+/**
+ * Where the shell lands when a real session ends. Sign-out is a privacy
+ * boundary: an open editor or capture result can hold an account menu, so
+ * the shell dismisses those surfaces and returns to Capture. Local menus
+ * are never deleted — anonymous drafts remain in My menus — and an initial
+ * signed-out load (never signed in) must not redirect. Returning null means
+ * no boundary action is due.
+ */
+export function signOutLandingRoute(input: {
+  wasSignedIn: boolean;
+  signedIn: boolean;
+}): AppRoute | null {
+  return input.wasSignedIn && !input.signedIn ? { screen: "capture" } : null;
+}
+
 /** Read an application screen from a URL, defaulting unknown URLs to capture. */
 export function parseAppRoute(input: string | URL): AppRoute {
   const url = input instanceof URL ? input : new URL(input, "https://eateryo.invalid");
   if (url.pathname === "/") return { screen: "capture" };
   if (url.pathname === "/menus") return { screen: "library" };
   if (url.pathname === "/orders") return { screen: "orders" };
+  if (url.pathname === "/assistant") return { screen: "assistant" };
   if (url.pathname === "/tables") return { screen: "tables" };
   if (url.pathname === "/settings") return { screen: "settings" };
 
@@ -60,6 +107,53 @@ export function parseAppRoute(input: string | URL): AppRoute {
   return { screen: "capture" };
 }
 
+/**
+ * R0 phone nav: the bottom tab bar pins Capture · My menus · Orders, so the
+ * R0.3 order monitor keeps a persistent home for its badge. Everything else
+ * lives in the More sheet, led by Tables. Desktop keeps pills. Pure data so
+ * tests can pin the order without rendering the shell. Signed out the shell
+ * is capture-only (home-screen gates this list: Capture, plus My menus
+ * while anonymous drafts exist) — no Orders, no More.
+ */
+export interface PhoneTab {
+  id: "capture" | "library" | "orders";
+  label: string;
+  icon: string;
+}
+
+export function phoneTabs(): PhoneTab[] {
+  return [
+    { id: "capture", label: "Capture", icon: "📸" },
+    { id: "library", label: "My menus", icon: "📚" },
+    { id: "orders", label: "Orders", icon: "🧾" },
+  ];
+}
+
+export interface MoreSheetRow {
+  id: "tables" | "assistant" | "settings";
+  label: string;
+  why: string;
+}
+
+/**
+ * More-sheet rows in display order: Tables first (R0 promotes tables over
+ * orders everywhere — Orders already has its tab), then the Assistant for
+ * signed-in accounts where the flag is on (never signed out, whatever the
+ * flag says), then Settings. The Settings blurb names Usage so the moved
+ * allowance panel stays discoverable.
+ */
+export function moreSheetRows(options: {
+  signedIn: boolean;
+  assistantEnabled: boolean;
+}): MoreSheetRow[] {
+  const rows: MoreSheetRow[] = [{ id: "tables", label: "Tables", why: "QR cards per table" }];
+  if (options.signedIn && options.assistantEnabled) {
+    rows.push({ id: "assistant", label: "Assistant", why: "Guided fixes and answers" });
+  }
+  rows.push({ id: "settings", label: "Settings", why: "Restaurant · Team · Usage" });
+  return rows;
+}
+
 /** Build the canonical path for an application screen. */
 export function appRouteHref(route: AppRoute): string {
   switch (route.screen) {
@@ -69,6 +163,8 @@ export function appRouteHref(route: AppRoute): string {
       return "/menus";
     case "orders":
       return "/orders";
+    case "assistant":
+      return "/assistant";
     case "tables":
       return "/tables";
     case "settings":

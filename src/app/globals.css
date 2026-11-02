@@ -56,12 +56,146 @@ body {
   }
 }
 
+/* Reusable "look here" pulse for the Attention primitive
+   (src/components/ui/attention.tsx): a warm amber ring that breathes five
+   times (~8s), then rests on the steady button, plus a slight lift so the
+   wrapped button itself visibly moves. The shadow follows the wrapped
+   element's own border-radius, so the same class works on cards and pill
+   buttons. Re-activating the step replays it (the class is reapplied). */
+@keyframes eateryo-attention-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(180, 83, 9, 0.65);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 9px rgba(180, 83, 9, 0);
+    transform: scale(1.05);
+  }
+}
+
+.attention-pulse {
+  animation: eateryo-attention-pulse 1.6s ease-in-out 5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attention-pulse {
+    animation: none;
+    outline: 3px solid #b45309;
+    outline-offset: 2px;
+  }
+}/* R0 mobile floor: 16px form text stops iOS focus-zoom; coarse-pointer
+targets get a 44px minimum so phone taps land; secondary copy never drops
+below 12px on phones (print keeps its 10px QR captions — this is screen-only). */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  [class*="text-[10px]"],
+  [class*="text-[11px]"] {
+    font-size: 12px !important;
+  }
+}
+
+@media (pointer: coarse) {
+  /* Height only: a blanket min-width forces dense rows (reorder arrows,
+  delete buttons, pills) wider than their tracks and that is what pushes
+  the page into horizontal overflow. Width stays with the components.
+  Pills (rounded-full) keep their designed rhythm: compact tabs like the
+  diner's "All" pill stay compact, while form controls, list rows and
+  other full-size targets keep the 44px minimum so phone taps land. */
+  button:not(.rounded-full),
+  [role="button"]:not(.rounded-full) {
+    min-height: 44px;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    height: 1.25rem;
+    width: 1.25rem;
+  }
+}
+
 ::selection {
   background: #fcd9a8;
 }
 
-/* Printing the customer preview should produce a clean paper menu: chrome
-   hidden, every theme flattened to black on white, sections kept whole. */
+/* Phone-preview scrollbar (src/components/ui/phone-frame.tsx): the frame's
+   inner screen is a scroll area inside a phone bezel, so the platform's
+   native bar (thick, opaque, space-taking) reads as a desktop scrollbar
+   inside a phone. Restyle it as a slim warm pill that darkens on hover, and
+   gate every rule behind a fine pointer: touch devices already draw a thin
+   overlay indicator that costs no layout width, and a styled bar would steal
+   ~10px from the 340px-wide screen. `overscroll-behavior: contain` is
+   unconditional, so a scroll that reaches the preview's edge never drags the
+   page behind it — the real mobile annoyance here. */
+.phone-scroll {
+  overscroll-behavior: contain;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Standard properties are the Firefox path only. Since Chrome 121 the
+     presence of scrollbar-color/scrollbar-width *overrides* ::-webkit-scrollbar,
+     so setting them here would silently drop the pill in the browsers that
+     render it best. Firefox lacks ::-webkit-scrollbar, so it never sees the
+     rules below and gets a slim bar instead of the platform default. */
+  @supports not selector(::-webkit-scrollbar) {
+    .phone-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(120, 113, 108, 0.4) transparent;
+    }
+  }
+
+  /* 12px hit area with a 4px visible thumb: the transparent border insets
+     the fill, so the bar is easy to grab without looking heavy. */
+  .phone-scroll::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+
+  .phone-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .phone-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(120, 113, 108, 0.4);
+    background-clip: padding-box;
+    border: 4px solid transparent;
+    border-radius: 999px;
+    transition: background-color 150ms ease;
+  }
+
+  .phone-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(120, 113, 108, 0.75);
+  }
+}
+
+/* The preview's order sheet rises from the phone screen's bottom edge. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sheet-up {
+  animation: sheet-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-up {
+    animation: none;
+  }
+}
+
+/* Printing table cards: chrome hidden, cards kept whole. */
 @media print {
   [data-print-hide] {
     display: none !important;
@@ -69,21 +203,6 @@ body {
 
   body {
     background: white;
-  }
-
-  [data-menu-preview] {
-    background: white !important;
-  }
-
-  [data-menu-preview] * {
-    background-color: transparent !important;
-    color: #1c1917 !important;
-    border-color: #d6d3d1 !important;
-    box-shadow: none !important;
-  }
-
-  [data-menu-preview] section {
-    break-inside: avoid;
   }
 
   /* Table QR cards: two per row, never split across pages. */

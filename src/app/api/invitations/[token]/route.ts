@@ -32,6 +32,8 @@ function mapInvitationError(error: InvitationError): NextResponse {
       return errorResponse("wrong_account", error.message, 403);
     case "already_member":
       return errorResponse("already_member", error.message, 409);
+    case "restaurant_exists":
+      return errorResponse("restaurant_exists", error.message, 409);
     case "forbidden":
       return errorResponse("forbidden", error.message, 403);
     case "not_found":

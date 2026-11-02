@@ -15,7 +15,7 @@ demands it; all user-facing copy uses Eateryo.
 
 Phase 1 (the local-first P0/P1 prototype) is complete and deployed.
 Phase 2 — accounts, a server DB, cross-device table ordering, one-click
-public menu publishing, and a usage-billed B2B extraction API — is scoped
+publishing for table ordering, and a usage-billed B2B extraction API — is scoped
 in `PHASE-2.md`. Work follows `ROADMAP.md` step by step: auth, billing, a
 remote DB, and public publishing are allowed **only when a roadmap step
 schedules them**, and nothing outside `PHASE-2.md`'s scope.
@@ -85,16 +85,32 @@ errors, or add lint/type suppressions just to make checks pass.
   `storage.ts`, `import-export.ts` — editor + persistence (Agent D owns)
 - `src/components/tables/restaurant-tables.tsx` — the signed-in Tables tab:
   restaurant picker for owners and staff; one QR per table, scoped to the
-  restaurant (`/r/<slug>/t/<label>`), never to one menu.
-  `table-qr-panel.tsx` is shared with the menu editor, where it survives only
-  as the browser-only menu fallback.
+  restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
+  serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
+  the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
+  shared by capture and the publish wizard. Signing in is a gate inside
+  Publish, never a stop, so the tracker's length is fixed for everyone; the
+  wizard continues it only when the flow came through review
+  (`rememberPublishJourney`), so a plain library deep link gets a heading
+  instead of a tracker with a false "3 done".
+- `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
+  reusable height-reveal animation: measures the rendered content and
+  animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then
+  releases to `height: auto`; `observeResize` is the opt-in for animating later
+  content/reflow height changes and reduced motion shows content instantly.
+  Dev showcase at `/dev/height-reveal`; tests in `tests/height-reveal.test.ts`
 - `tests/` — schema, utils, import-export, route tests
 - `src/lib/db/`, `drizzle/` — Drizzle schema + lazy Neon client; generated
   migrations (do not hand-edit `drizzle/`)
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
   session guard, sign-in page
+- `src/features/session/state.ts` — the pure tri-state session read
+  (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
+  matrix; a page load whose session has not answered is **never** treated as
+  signed out, so a reload of `/menus/<id>` cannot accuse its owner
 - `src/features/tenancy/repo.ts`, `src/app/api/restaurants/` —
   ownership-scoped restaurant repository + API (session id only);
   `src/features/tenancy/client.ts` — typed browser client for it
@@ -106,6 +122,15 @@ errors, or add lint/type suppressions just to make checks pass.
   `src/app/api/restaurants/[restaurantId]/audit/` — team audit trail:
   snapshot actor/target names, member-scoped reads (404 across tenants),
   best-effort writes; UI in `src/components/settings/team-activity.tsx`
+- `src/components/order/order-cart.tsx` + `order-sheet.tsx` — one cart, two
+  homes, chosen by `useWideLayout` at Tailwind's `lg`: a one-column phone gets
+  the bottom sheet that "View order" raises (`order-sheet.tsx`, pinned to the
+  frame in a `PhoneFrame`, viewport-fixed with the page scroll locked on a real
+  diner page), and a wide page gets the sticky right-hand column
+  (`OrderCartPanel`) beside the menu. `OrderCartLines` is the only line/note
+  markup, so the two cannot drift. Only one is mounted at a time, which is why
+  the kitchen note id stays unique. The owner preview is always phone-shaped
+  inside its frame, so it always uses the sheet, never the column.
 - `src/features/menus/` — Step 8 server menus: `repo.ts` (tenancy-scoped,
   conditional-UPDATE `updatedAt` conflict detection), `sync.ts` (typed
   browser client with `SyncError` codes), `move-to-account.ts` (one-way
@@ -117,21 +142,63 @@ errors, or add lint/type suppressions just to make checks pass.
   `tests/menus-repo.test.ts`, `tests/menus-api.test.ts`,
   `tests/menus-sync.test.ts`, `tests/move-to-account.test.ts` — Step 8
   (PGlite + stubbed fetch; conflict, tenancy, import fidelity)
+- `src/features/menus/membership.ts` — the one tri-state answer to "where is
+  this menu saved?" (`account` / `browser` / `unknown` / `unreachable`), so the
+  editor and the publish panel never claim "this browser only" before the
+  account's menu list has been read (001, 003); `membershipFlag` maps it to the
+  `boolean | null` the components take. While it is `unknown` the membership
+  surfaces (save status, publish hint, Table ordering card, storage footnote)
+  render placeholders with the wait announced only to screen readers, so no
+  sentence is printed and then retracted. `unreachable` is the read that
+  settled by *failing*: those surfaces say the account couldn't be checked and
+  offer **Try again**, the save status never claims browser-only, and the
+  café-creating flow stays off because it would mint tenancy on a guess (016).
+  Tests: `tests/menu-membership.test.ts`, `tests/editor-membership.test.ts`.
+- `src/features/item-images/` — dish photos on menu items: `sizes.ts` (the
+  pre-sized copies: display ≤1024px, thumb ≤256px), `prepare.ts` (browser
+  decode/resize/encode, so the camera original is never uploaded), `ref.ts`
+  (build/read the stored reference), `upload.ts` (UploadThing browser client),
+  `src/app/api/uploadthing/` (session-gated file router, `UPLOADTHING_TOKEN`
+  server-side only; 503 until it is set). Photos are part of the menu document
+  like any other field, so publishing snapshots them. Rendered with a plain
+  `<img>` straight from the CDN — never `next/image`, so Vercel's image
+  optimizer never touches a dish photo. Stored files are never deleted on
+  replace/remove: a published revision may still be serving the old one.
+  Tests: `tests/item-images.test.ts`, `tests/item-image-prepare.test.ts`.
+- `scripts/cleanup-dish-photos.mjs`, `scripts/lib/dish-photo-sweep.mjs` — the
+  maintenance sweep that reclaims abandoned dish photos: it deletes only
+  `dish-…` files that no `menu`/`menu_revision` document references and that
+  are older than the retention window (30 days), and lists every file it keeps
+  with the reason. Dry run by default; `--delete --yes` acts, and it refuses a
+  database with no menus. `npm run photos:sweep`; tests in
+  `tests/dish-photo-sweep.test.ts`. Nothing schedules it.
 - `src/features/publishing/` — Step 9 publish: `schema.ts` (slug rules +
-  publication status + `publicationPath`), `slug.ts` (deterministic slug
-  generation and collision candidates), `repo.ts` (snapshot revisions,
-  publish/unpublish, slug changes, scoped public read path, view counter),
-  `client.ts` (typed browser client). Menu slugs are unique per restaurant
-  (`published_menu_restaurant_slug_unique`), never globally: the canonical
-  address is `/r/<restaurant>/m/<menu>` and two cafés may both hold `lunch`.
-  Routes: `src/app/api/menus/[menuId]/publication/`,
-  `src/app/api/r/[restaurantSlug]/m/[menuSlug]/view/`, public page
-  `src/app/r/[restaurantSlug]/m/[menuSlug]/page.tsx` (partial prerender;
-  snapshot only). Editor UI `src/components/menu-editor/publish-panel.tsx`,
-  view beacon `view-counter.tsx`. Tests: `tests/publishing-slug.test.ts`,
-  `tests/publishing-repo.test.ts`, `tests/publishing-api.test.ts`.
-  Invariant: the public page renders `menu_revision`, never `menu.doc`, so
-  edits stay private until "Publish changes".
+  publication status), `slug.ts` (deterministic slug generation and collision
+  candidates), `repo.ts` (snapshot revisions, publish/unpublish, the diner
+  read path ordering uses, plus `getLiveMenuDoc` for the owner's "what
+  changed" comparison), `client.ts` (typed browser client), `changes.ts` (the
+  pure live-vs-draft diff behind the publish panel's "Since you last
+  published" counts and list — matched by id, never by name). Publishing
+  means "make this menu orderable at the tables": it snapshots the menu and
+  marks it live. There is no public menu page, no menu URL, no menu QR code
+  and no view count — a menu is reached only through a table card at
+  `/r/<restaurant>/t/<table>`, and its own order address is
+  `/r/<restaurant>/m/<menu>/order?table=<label>`. Menu slugs are unique per
+  restaurant (`published_menu_restaurant_slug_unique`), never globally, so
+  two cafés may both hold `lunch`. Onboarding names the first menu itself
+  (`resolveFirstMenuTitle`: "Main Menu", or the service the photo clearly
+  names) and never asks for a name or link; the photo's own title is kept in
+  `source.originalTitle` for the café-name suggestion only. Routes:
+  `src/app/api/menus/[menuId]/publication/` (and its `/live` read, the
+  snapshot diners see now). Editor UI
+  `src/components/menu-editor/publish-panel.tsx`; the owner-facing preview is
+  a read-only rendering of the diner order page
+  (`src/components/order/order-page-preview.tsx`, ordering off), shared by
+  the editor, publish wizard and onboarding result. Tests:
+  `tests/publishing-slug.test.ts`, `tests/publishing-repo.test.ts`,
+  `tests/publishing-api.test.ts`, `tests/menu-changes.test.ts`. Invariant: table ordering renders
+  `menu_revision`, never `menu.doc`, so edits stay private until "Publish
+  changes".
 - `src/features/orders/` — Step 10 table orders: `schema.ts` (canonical
   order schema, the status transitions, totals), `repo.ts` (server-only:
   snapshot-priced placement, membership-scoped board + cursor, conditional
@@ -141,8 +208,9 @@ errors, or add lint/type suppressions just to make checks pass.
   `src/app/api/orders/[orderId]/` (PATCH). Diner page
   `src/app/r/[restaurantSlug]/m/[menuSlug]/order/page.tsx` (snapshot only,
   noindex) with
-  `src/components/order/` (`order-menu.tsx` shared UI, `server-table-order.tsx`,
-  `table-order.tsx` for local mode); staff board
+  `src/components/order/` (`order-menu.tsx` shared UI, `order-sheet.tsx` the
+  shared cart sheet, `server-table-order.tsx`, `table-order.tsx` for local
+  mode, `table-order-tabs.tsx` for the multi-menu landing); staff board
   `src/components/orders/server-orders-board.tsx` (5 s polling with backoff
   and a visible reconnect state) behind the session switch in
   `orders-board.tsx`. Tests: `tests/orders-repo.test.ts`,

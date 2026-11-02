@@ -33,6 +33,8 @@ function mapRepoError(error: TenancyRepoError): NextResponse {
       return errorResponse("forbidden", error.message, 403);
     case "last_owner":
       return errorResponse("last_owner", error.message, 409);
+    case "restaurant_exists":
+      return errorResponse("restaurant_exists", error.message, 409);
     case "not_found":
     default:
       return errorResponse("not_found", error.message, 404);

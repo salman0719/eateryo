@@ -30,6 +30,7 @@ import { authClient } from "@/lib/auth-client";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 
 import { OrdersSkeleton, ServerOrdersBoard } from "./server-orders-board";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const REFRESH_MS = 5000;
 
@@ -59,6 +60,7 @@ function formatTime(iso: string): string {
 }
 
 function LocalOrdersBoard() {
+  const { confirm, dialog } = useConfirm();
   const [orders, setOrders] = useState<Order[]>([]);
   const [corruptCount, setCorruptCount] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -119,8 +121,12 @@ function LocalOrdersBoard() {
   }
 
   async function cancel(order: Order) {
-    if (!window.confirm(`Cancel order #${orderCode(order.id)} for ${formatTableLabel(order.tableLabel)}?`))
-      return;
+    const ok = await confirm({
+      message: `Cancel order #${orderCode(order.id)} for ${formatTableLabel(order.tableLabel)}?`,
+      confirmLabel: "Cancel order",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(order.id);
     try {
       await updateOrderStatus(order.id, "cancelled");
@@ -137,7 +143,12 @@ function LocalOrdersBoard() {
   }
 
   async function remove(order: Order) {
-    if (!window.confirm(`Delete order #${orderCode(order.id)} permanently?`)) return;
+    const ok = await confirm({
+      message: `Delete order #${orderCode(order.id)} permanently?`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(order.id);
     try {
       await deleteOrder(order.id);
@@ -295,6 +306,7 @@ function LocalOrdersBoard() {
           })}
         </ul>
       )}
+      {dialog}
     </div>
   );
 }

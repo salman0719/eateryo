@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { appRouteHref, menuIdFromPathname, parseAppRoute } from "../src/features/navigation/routes";
+import {
+  appRouteHref,
+  menuIdFromPathname,
+  parseAppRoute,
+  signOutLandingRoute,
+  unresolvableMenuMessage,
+} from "../src/features/navigation/routes";
 
 describe("application routes", () => {
   it("defaults the root and unknown paths to capture", () => {
@@ -36,15 +42,18 @@ describe("application routes", () => {
       menuId: "menu-1",
       mode: "reorder",
     });
-    expect(parseAppRoute("/menus/menu-1/qr")).toEqual({
-      screen: "editor",
-      menuId: "menu-1",
-      mode: "qr",
-    });
+    // The in-editor Table QR mode is gone: menu pages never print cards.
+    // A stale /qr link lands on the library, never a blank screen.
+    expect(parseAppRoute("/menus/menu-1/qr")).toEqual({ screen: "library" });
     expect(parseAppRoute("/menus/menu-1/preview")).toEqual({
       screen: "editor",
       menuId: "menu-1",
       mode: "preview",
+    });
+    expect(parseAppRoute("/menus/menu-1/publish")).toEqual({
+      screen: "editor",
+      menuId: "menu-1",
+      mode: "publish",
     });
     // Unknown editor sub-paths fall back to the library, never a blank screen.
     expect(parseAppRoute("/menus/menu-1/nope")).toEqual({ screen: "library" });
@@ -53,6 +62,24 @@ describe("application routes", () => {
   it("rejects malformed menu path encoding", () => {
     expect(menuIdFromPathname("/menus/%E0%A4%A")).toBeNull();
     expect(parseAppRoute("/menus/%E0%A4%A")).toEqual({ screen: "library" });
+  });
+
+  it("explains a dead publish link as a wrong-browser miss, not a deletion", () => {
+    const message = unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "publish" });
+    expect(message).toContain("without your draft");
+    expect(message).toContain("original browser");
+    expect(
+      unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })
+    ).toContain("deleted or moved");
+    expect(unresolvableMenuMessage({ screen: "library" })).toContain("deleted or moved");
+  });
+
+  it("lands on Capture only when a live session actually ends", () => {
+    expect(signOutLandingRoute({ wasSignedIn: false, signedIn: false })).toBeNull();
+    expect(signOutLandingRoute({ wasSignedIn: true, signedIn: true })).toBeNull();
+    expect(signOutLandingRoute({ wasSignedIn: true, signedIn: false })).toEqual({
+      screen: "capture",
+    });
   });
 
   it("round-trips every supported route and URL-encodes menu ids", () => {
@@ -64,8 +91,8 @@ describe("application routes", () => {
       { screen: "settings" },
       { screen: "editor", menuId: "menu id/&1", mode: "edit" },
       { screen: "editor", menuId: "menu id/&1", mode: "reorder" },
-      { screen: "editor", menuId: "menu id/&1", mode: "qr" },
       { screen: "editor", menuId: "menu id/&1", mode: "preview" },
+      { screen: "editor", menuId: "menu id/&1", mode: "publish" },
       { screen: "item", menuId: "menu id/&1", itemId: "item /&2" },
     ] as const;
     for (const route of routes) {

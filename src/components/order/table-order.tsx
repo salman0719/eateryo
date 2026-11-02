@@ -11,7 +11,7 @@
  */
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import {
@@ -24,7 +24,6 @@ import {
 } from "@/features/orders/schema";
 import { createOrder, OrderStorageError } from "@/features/orders/storage";
 import { formatTableLabel } from "@/features/orders/table-links";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { getMenu, StorageError } from "@/features/menu/storage";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 
@@ -35,6 +34,8 @@ import {
   StickyCartBar,
   formatOrderTotal as formatTotal,
 } from "./order-menu";
+import { OrderCartPanel, useWideLayout } from "./order-cart";
+import { OrderSheet } from "./order-sheet";
 
 type LoadState = "idle" | "loading" | "ready" | "missing" | "error" | "invalid_link";
 
@@ -55,6 +56,10 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const viewOrderButton = useRef<HTMLButtonElement | null>(null);
+  /** Wide screens keep the order in its own column; phones raise the sheet. */
+  const wide = useWideLayout();
 
   useEffect(() => {
     let cancelled = false;
@@ -111,8 +116,11 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     setError(null);
   }
 
+  /** Quantity changes go through here so emptying the order closes the sheet. */
   function changeQuantity(index: number, quantity: number) {
-    setLines((current) => setLineQuantity(current, index, quantity));
+    const next = setLineQuantity(lines, index, quantity);
+    setLines(next);
+    if (next.length === 0) setSheetOpen(false);
   }
 
   async function placeOrder() {
@@ -131,6 +139,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
       setPlaced(order);
       setLines([]);
       setNote("");
+      setSheetOpen(false);
     } catch (submitError: unknown) {
       setError(
         submitError instanceof OrderStorageError
@@ -229,10 +238,45 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     );
   }
 
+  /**
+   * What sits under the cart's total — one node for the phone sheet and the
+   * wide-screen column, so both show the same total, warning, error and button.
+   */
+  const orderFooter = (
+    <>
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm font-medium text-stone-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-stone-900">
+          {formatTotal(menu.currency, total)}
+        </p>
+      </div>
+      {lines.length > 0 && total === null && (
+        <p className="mt-1 text-xs text-amber-800">
+          Some items have no price on the menu, so no total is shown.
+        </p>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="button"
+        disabled={submitting || lines.length === 0}
+        onClick={() => void placeOrder()}
+        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {submitting ? "Sending…" : "Send order"}
+      </button>
+    </>
+  );
+
   return (
     <Shell tableLabel={tableLabel}>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
             <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
               {formatTableLabel(tableLabel)}
@@ -256,130 +300,59 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
               category={category}
               currency={menu.currency}
               variantChoice={variantChoice}
-            onVariantChange={(itemId, name) =>
-              setVariantChoice((current) => ({ ...current, [itemId]: name }))
-            }
-            onAdd={addItem}
-            itemCount={(item, variantName) =>
-              lines.find(
-                (line) =>
-                  line.menuItemId === item.id &&
-                  (line.variantName ?? null) === (variantName ?? null)
-              )?.quantity ?? 0
-            }
-          />
+              onVariantChange={(itemId, name) =>
+                setVariantChoice((current) => ({ ...current, [itemId]: name }))
+              }
+              onAdd={addItem}
+              itemCount={(item, variantName) =>
+                lines.find(
+                  (line) =>
+                    line.menuItemId === item.id &&
+                    (line.variantName ?? null) === (variantName ?? null)
+                )?.quantity ?? 0
+              }
+            />
           ))}
         </div>
 
-        <aside
-          id="your-order"
-          className={`${frame} h-fit scroll-mt-4 p-5 lg:sticky lg:top-4`}
-          aria-label="Your order"
-        >
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-bold text-stone-900">Your order</h2>
-            <span className="text-xs font-medium text-stone-500">
-              {itemCount} {itemCount === 1 ? "item" : "items"}
-            </span>
-          </div>
-
-          {lines.length === 0 ? (
-            <p className="mt-3 rounded-xl border border-dashed border-stone-300 p-4 text-center text-sm text-stone-500">
-              Nothing added yet.
-            </p>
-          ) : (
-            <ul className="mt-3 divide-y divide-stone-100">
-              {lines.map((line, index) => (
-                <li key={`${line.menuItemId}-${line.variantName ?? "base"}`} className="py-3">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-sm font-medium text-stone-900">
-                      {line.name}
-                      {line.variantName && (
-                        <span className="ml-1 text-xs font-normal text-stone-500">
-                          {line.variantName}
-                        </span>
-                      )}
-                    </p>
-                    <p className="shrink-0 text-sm tabular-nums text-stone-800">
-                      {line.unitPrice === null
-                        ? "—"
-                        : formatPreviewPrice(line.unitPrice * line.quantity, menu.currency, null)}
-                    </p>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <button
-                      type="button"
-                      aria-label={`Decrease ${line.name}`}
-                      onClick={() => changeQuantity(index, line.quantity - 1)}
-                      className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center text-sm tabular-nums">{line.quantity}</span>
-                    <button
-                      type="button"
-                      aria-label={`Increase ${line.name}`}
-                      onClick={() => changeQuantity(index, line.quantity + 1)}
-                      className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
-                    >
-                      +
-                    </button>
-                    <span className="flex-1" />
-                    <button
-                      type="button"
-                      onClick={() => changeQuantity(index, 0)}
-                      className="text-xs font-medium text-stone-500 underline hover:text-red-800"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <label htmlFor="order-note" className="mt-4 block text-xs font-semibold text-stone-600">
-            Note for the kitchen (optional)
-          </label>
-          <textarea
-            id="order-note"
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            rows={2}
-            placeholder="Allergies, no onions…"
-            className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+        {wide && (
+          <OrderCartPanel
+            lines={lines}
+            currency={menu.currency}
+            subtitle={formatTableLabel(tableLabel)}
+            onQuantityChange={changeQuantity}
+            note={note}
+            onNoteChange={setNote}
+            noteId="order-note"
+            footer={orderFooter}
           />
-
-          <div className="mt-4 flex items-baseline justify-between border-t border-stone-200 pt-3">
-            <p className="text-sm font-medium text-stone-600">Total</p>
-            <p className="text-lg font-bold tabular-nums text-stone-900">
-              {formatTotal(menu.currency, total)}
-            </p>
-          </div>
-          {total === null && lines.length > 0 && (
-            <p className="mt-1 text-xs text-amber-800">
-              Some items have no price on the menu, so no total is shown.
-            </p>
-          )}
-
-          {error && (
-            <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
-              {error}
-            </p>
-          )}
-
-          <button
-            type="button"
-            disabled={lines.length === 0 || submitting}
-            onClick={() => void placeOrder()}
-            className="mt-4 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {submitting ? "Sending…" : "Send order"}
-          </button>
-        </aside>
-        <StickyCartBar itemCount={itemCount} total={total} currency={menu.currency} />
+        )}
       </div>
+
+      {!wide && (
+        <StickyCartBar
+          itemCount={itemCount}
+          total={total}
+          currency={menu.currency}
+          onViewOrder={() => setSheetOpen(true)}
+          buttonRef={viewOrderButton}
+        />
+      )}
+
+      {!wide && sheetOpen && lines.length > 0 && (
+        <OrderSheet
+          lines={lines}
+          currency={menu.currency}
+          subtitle={formatTableLabel(tableLabel)}
+          onQuantityChange={changeQuantity}
+          note={note}
+          onNoteChange={setNote}
+          noteId="order-note"
+          onClose={() => setSheetOpen(false)}
+          returnFocusTo={viewOrderButton}
+          footer={orderFooter}
+        />
+      )}
     </Shell>
   );
 }
-

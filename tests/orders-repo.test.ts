@@ -36,7 +36,7 @@ describe("orders repo", () => {
     ownerB = await seedUser(db, "orders-owner-b@cafe.test", "Owner B");
     restaurantA = (await createRestaurant(db, ownerA, "Café A")).id;
     await createMenuForUser(db, ownerA, restaurantA, menuDoc());
-    await publishMenuForUser(db, ownerA, menuId, { theme: "classic", layout: "list" });
+    await publishMenuForUser(db, ownerA, menuId);
   }, 30_000);
 
   function menuDoc(): MenuDocument {

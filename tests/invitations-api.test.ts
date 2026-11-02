@@ -345,6 +345,34 @@ describe("POST /api/invitations/[token]", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("refuses an owner invitation for an account that already owns a café", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const { restaurantId } = await seedOwnerAndRestaurant();
+    await addMember(
+      jsonRequest(`/api/restaurants/${restaurantId}/members`, "POST", {
+        email: "rival@cafe.test",
+        role: "owner",
+      }),
+      restaurantParams(restaurantId)
+    );
+    const token = tokenFromUrl(emailHolder.calls[0]!.url);
+
+    // They own a café of their own, so a second ownership is refused…
+    const rival = await seedUser(holder.db!, "rival@cafe.test", "Rival");
+    await createRestaurant(holder.db!, rival, "Rival Cafe");
+    holder.userId = rival;
+    const refused = await acceptInvitationRoute(
+      asRequest(`/api/invitations/${token}`, { method: "POST" }),
+      invitationParams(token)
+    );
+    expect(refused.status).toBe(409);
+    expect((await refused.json()).error.code).toBe("restaurant_exists");
+
+    // …and the link is left pending, so a staff invite can replace it.
+    const { getInvitationByToken } = await import("@/features/tenancy/invitations");
+    expect(await getInvitationByToken(holder.db!, token)).toMatchObject({ status: "pending" });
+  });
+
   it("refuses a different signed-in account and expired links", async () => {
     const { seedUser } = await import("./helpers/pg-test-db");
     const { restaurantId } = await seedOwnerAndRestaurant();

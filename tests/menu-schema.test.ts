@@ -7,7 +7,10 @@ describe("menuDocumentSchema", () => {
   it("accepts the sample menu fixture", () => {
     const parsed = menuDocumentSchema.parse(createSampleMenuDocument());
     expect(parsed.categories).toHaveLength(2);
-    expect(parsed.title).toBe("Sunny Side Café");
+    // The fixture mirrors a real extraction: the photo names the café, so the
+    // menu itself is the main one and the café name is kept as provenance.
+    expect(parsed.title).toBe("Main Menu");
+    expect(parsed.source?.originalTitle).toBe("Sunny Side Café");
   });
 
   it("fills collection defaults for a minimal document", () => {
@@ -52,6 +55,7 @@ describe("menuDocumentSchema", () => {
     const item = parsed.categories[0].items[0];
     expect(item.price).toBeNull();
     expect(item.available).toBeNull();
+    expect(item.unpricedAccepted).toBe(false);
     expect(item.dietaryLabels).toEqual([]);
     expect(item.reviewNotes).toEqual([]);
   });

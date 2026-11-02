@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Eateryo",
   description:
-    "Turn a menu photo into structured, editable menu data, preview themed menus, and take table orders.",
+    "Turn a menu photo into structured, editable menu data, preview the diner's order page, and take table orders.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

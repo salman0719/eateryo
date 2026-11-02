@@ -3,7 +3,6 @@ import Link from "next/link";
 
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
-import { DataControls } from "@/components/launch/data-controls";
 import { LaunchChecklist } from "@/components/launch/launch-checklist";
 
 export const metadata: Metadata = {
@@ -18,12 +17,12 @@ const WHAT_YOU_GET = [
     body: "Upload up to four pages at once. Every name, section, and price is read into a draft you can edit — and anything the AI was unsure about is flagged instead of invented.",
   },
   {
-    title: "Your own public address",
-    body: "Publish to a link like /r/your-cafe/m/lunch. It opens on any phone with no login, shows your menu with your chosen theme, and only changes when you press Publish.",
+    title: "Menus your tables can order from",
+    body: "Publishing makes a menu orderable at your tables. Diners scan a card, pick items, and the order lands on your board — no account, no app. Edits stay private until you press Publish changes.",
   },
   {
     title: "QR codes for every table",
-    body: "Print one card per table from the editor. Scanning it opens your menu and the order screen for that table — no app to install.",
+    body: "Print one card per table from the Tables tab. Scanning it opens the table's menus and the order screen for that table — no app to install.",
   },
   {
     title: "Orders that reach the counter",
@@ -35,7 +34,7 @@ const WHAT_YOU_GET = [
   },
   {
     title: "Nothing to install",
-    body: "It runs in the browser. The signed-out editor still works offline in local mode for a quick look before you commit to an account.",
+    body: "It runs in the browser. You can try the editor before signing in — the draft stays in that browser until you do.",
   },
 ];
 
@@ -60,10 +59,6 @@ export default function LaunchPage() {
 
         <div className="mt-6">
           <LaunchChecklist />
-        </div>
-
-        <div className="mt-4">
-          <DataControls />
         </div>
 
         <section className="mt-10">

@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createMenuForUser } from "@/features/menus/repo";
@@ -6,7 +7,7 @@ import { placeTableOrder } from "@/features/orders/repo";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { createRestaurant } from "@/features/tenancy/repo";
 import { setMenuAvailabilityForUser, setRestaurantSlugForUser } from "@/features/tables/repo";
-import { order as orderTable } from "@/lib/db/schema";
+import { order as orderTable, publishedMenu } from "@/lib/db/schema";
 import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 
 /**
@@ -66,8 +67,8 @@ describe("multi-menu table orders", () => {
       restaurantA,
       menuDoc("menu-bar", "Bar", [item({ id: "item-beer", name: "Beer", price: 5 })])
     );
-    await publishMenuForUser(db, ownerA, "menu-lunch", { theme: "classic", layout: "list" });
-    await publishMenuForUser(db, ownerA, "menu-bar", { theme: "bistro", layout: "list" });
+    await publishMenuForUser(db, ownerA, "menu-lunch");
+    await publishMenuForUser(db, ownerA, "menu-bar");
   }, 30_000);
 
   it("places one ticket across two menus with per-line provenance and a joined title", async () => {
@@ -139,7 +140,7 @@ describe("multi-menu table orders", () => {
       restaurantB,
       menuDoc("menu-secret", "Secret", [item({ id: "item-secret", name: "Secret", price: 9 })])
     );
-    await publishMenuForUser(db, ownerB, "menu-secret", { theme: "classic", layout: "list" });
+    await publishMenuForUser(db, ownerB, "menu-secret");
     await expect(
       placeTableOrder(db, {
         restaurantSlug: "cafe-a",
@@ -157,12 +158,14 @@ describe("multi-menu table orders", () => {
     await setMenuAvailabilityForUser(db, ownerA, "menu-bar", [
       { days: [0], start: "11:00", end: "15:00" },
     ]);
-    // Monday noon UTC is not Sunday: the bar is closed.
+    // Pinned to Monday noon UTC, not the real clock: Sunday-only means the
+    // bar is closed, whatever day this runs on.
     await expect(
       placeTableOrder(db, {
         restaurantSlug: "cafe-a",
         tableLabel: "3",
         note: null,
+        now: new Date("2026-10-19T12:00:00.000Z"),
         lines: [
           { menuSlug: "lunch", menuItemId: "item-soup", quantity: 1 },
           { menuSlug: "bar", menuItemId: "item-beer", quantity: 1 },
@@ -204,11 +207,12 @@ describe("multi-menu table orders", () => {
       restaurantB,
       menuDoc("menu-lunch-b", "Lunch", [item({ id: "item-taco", name: "Taco", price: 7 })])
     );
-    const publishedB = await publishMenuForUser(db, ownerB, "menu-lunch-b", {
-      theme: "bistro",
-      layout: "list",
-    });
-    expect(publishedB.slug).toBe("lunch");
+    await publishMenuForUser(db, ownerB, "menu-lunch-b");
+    const publicationRows = await db
+      .select({ slug: publishedMenu.slug })
+      .from(publishedMenu)
+      .where(eq(publishedMenu.menuId, "menu-lunch-b"));
+    expect(publicationRows[0]?.slug).toBe("lunch");
 
     const { placeOrderFromSlug } = await import("@/features/orders/repo");
     const atA = await placeOrderFromSlug(db, {

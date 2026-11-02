@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 
+import { DataControls } from "@/components/launch/data-controls";
 import { CommitInput } from "@/components/menu-editor/fields";
+import { OrderAlertsCard } from "@/components/settings/order-alerts";
 import { TeamActivity } from "@/components/settings/team-activity";
+import { UsagePanel } from "@/components/settings/usage-panel";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,6 +24,8 @@ import {
   type PendingInvitation,
   type RestaurantOption,
 } from "@/features/tenancy/client";
+import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * Restaurant settings: rename inline, manage the team (owner-only writes),
@@ -45,6 +50,7 @@ export function RestaurantSettings({
   sessionPending = false,
   currentUserId,
 }: RestaurantSettingsProps) {
+  const { confirm, dialog } = useConfirm();
   const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState("");
@@ -76,7 +82,7 @@ export function RestaurantSettings({
 
   const owned = restaurants?.filter((r) => r.role === "owner") ?? [];
   const staffOnly = restaurants !== null && owned.length === 0 && restaurants.length > 0;
-  const selected = owned.find((r) => r.id === selectedId) ?? null;
+  const selected = selectedRestaurant(owned, selectedId);
 
   async function handleRename(name: string) {
     if (!selected) return;
@@ -96,13 +102,12 @@ export function RestaurantSettings({
 
   async function handleDeleteRestaurant() {
     if (!selected || deleting) return;
-    if (
-      !window.confirm(
-        `Delete “${selected.name}” permanently? Its menus, published pages and orders are deleted too. This cannot be undone.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      message: `Delete “${selected.name}” permanently? Its menus, published pages and orders are deleted too. This cannot be undone.`,
+      confirmLabel: "Delete",
+      destructive: true,
+    });
+    if (!ok) return;
     setDeleting(true);
     setError(null);
     try {
@@ -164,14 +169,14 @@ export function RestaurantSettings({
           title="You don't own a restaurant yet"
           steps={[
             "Open My menus and pick a menu — upload a photo first if you don't have one yet.",
-            "Use “Move my menus to my account” on it: moving a menu creates the restaurant that owns it.",
+            "Use “Import from this browser” in My menus: adding a menu creates the café that owns it.",
             "Come back here to rename it, staff it, or delete it.",
           ]}
           action={{ href: "/menus", label: "Go to My menus" }}
         />
       )}
 
-      {owned.length > 0 && (
+      {showRestaurantPicker(owned) && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
             Restaurant
@@ -190,9 +195,13 @@ export function RestaurantSettings({
               ))}
             </select>
           </label>
-
-          {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
         </div>
+      )}
+
+      {error && (
+        <p role="alert" className="text-xs text-red-700">
+          {error}
+        </p>
       )}
 
       {selected && (
@@ -225,6 +234,12 @@ export function RestaurantSettings({
             refreshKey={teamVersion}
           />
 
+          <OrderAlertsCard
+            key={`alerts-${selected.id}`}
+            restaurantId={selected.id}
+            restaurantName={selected.name}
+          />
+
           <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
             <h3 className="text-sm font-bold tracking-tight text-red-900">Danger zone</h3>
             <p className="mt-1 text-xs leading-5 text-red-800">
@@ -242,6 +257,18 @@ export function RestaurantSettings({
           </div>
         </>
       )}
+
+      {/* Account-level, not restaurant-level: usage allowances and the account
+          export/delete live here for every signed-in user, including staff
+          and owners who have not picked a restaurant. Both cards self-gate
+          on the session, so there is no dead UI while it resolves. */}
+      {signedIn && (
+        <>
+          <UsagePanel />
+          <DataControls />
+        </>
+      )}
+      {dialog}
     </div>
   );
 }
@@ -256,6 +283,7 @@ interface TeamCardProps {
 
 /** The team list plus add/role/remove controls, scoped to one restaurant. */
 function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }: TeamCardProps) {
+  const { confirm, dialog } = useConfirm();
   const [members, setMembers] = useState<MemberOption[] | null>(null);
   const [pending, setPending] = useState<PendingInvitation[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -394,13 +422,12 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
 
   async function handleRemoveMember(member: MemberOption) {
     if (memberBusy) return;
-    if (
-      !window.confirm(
-        `Remove “${member.name}” from ${restaurantName}? They lose access to its menus and orders.`
-      )
-    ) {
-      return;
-    }
+    const ok = await confirm({
+      message: `Remove “${member.name}” from ${restaurantName}? They lose access to its menus and orders.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
+    if (!ok) return;
     setMemberBusy(member.userId);
     setError(null);
     try {
@@ -564,6 +591,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           </ul>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import {
   bigint,
   boolean,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -119,6 +120,12 @@ export const restaurant = pgTable(
      * for restaurants that have never saved hours).
      */
     timeZone: text("time_zone"),
+    /**
+     * New-order email alerts (R0.4): on by default; a null address means
+     * the owners' account emails. Owners flip both in Settings.
+     */
+    orderAlertsEnabled: boolean("order_alerts_enabled").notNull().default(true),
+    orderAlertEmail: text("order_alert_email"),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -283,11 +290,12 @@ export const menu = pgTable(
 
 /**
  * An immutable published snapshot of a menu (Step 9). Publishing copies the
- * canonical document here, so a later edit never silently changes what the
- * public page shows — "publish changes" creates the next revision and moves
- * the live pointer. `sourceUpdatedAt` records the `menu.updated_at` the
- * snapshot was taken from: when the live revision's value no longer matches
- * the menu row, the owner has draft changes that are not published.
+ * canonical document here, so a later edit never silently changes what a
+ * diner's order is priced against — "publish changes" creates the next
+ * revision and moves the live pointer. `sourceUpdatedAt` records the
+ * `menu.updated_at` the snapshot was taken from: when the live revision's
+ * value no longer matches the menu row, the owner has draft changes that are
+ * not published.
  *
  * `doc` is re-validated with the canonical Zod schema on read, exactly like
  * `menu.doc`; history rows are never rewritten.
@@ -305,8 +313,6 @@ export const menuRevision = pgTable(
       .notNull()
       .references(() => restaurant.id, { onDelete: "cascade" }),
     doc: jsonb("doc").$type<unknown>().notNull(),
-    theme: text("theme").notNull(),
-    layout: text("layout").notNull(),
     /** The menu revision this snapshot was published from (conflict-free compare). */
     sourceUpdatedAt: timestamp("source_updated_at").notNull(),
     createdAt: createdAt(),
@@ -317,17 +323,19 @@ export const menuRevision = pgTable(
 );
 
 /**
- * The public pointer for a menu (Step 9): its address segment under the
- * café's `/r/<slug>` — `/r/<restaurant>/<slug>` — the live revision, and a
- * cookie-free view count.
+ * The live pointer for a menu (Step 9): whether table ordering offers it,
+ * which revision it serves, and its address segment under the café.
+ *
+ * There is no public menu page to serve: diners arrive through a table card
+ * and order from the snapshot the pointer selects. A view count was removed
+ * with that page — nothing counts a "view" that no longer exists.
  *
  * The slug is unique **inside one restaurant**, not globally: two cafés can
- * both publish `/m/lunch` under their own addresses, so no one gets an
- * unpredictable "-2" suffix for a title somebody else happened to publish
- * first. Unpublishing keeps this row and its slug (`publishedAt` and
- * `liveRevisionId` become null), so the address stays reserved for the same
- * café instead of being recycled by whoever grabs it next. Publishing again
- * reuses it.
+ * both hold `lunch` in their own addresses, so no one gets an unpredictable
+ * "-2" suffix for a title somebody else happened to use first. Unpublishing
+ * keeps this row and its slug (`publishedAt` and `liveRevisionId` become
+ * null), so the address stays with the same café instead of being recycled
+ * by whoever grabs it next. Publishing again reuses it.
  */
 export const publishedMenu = pgTable(
   "published_menu",
@@ -345,9 +353,8 @@ export const publishedMenu = pgTable(
     liveRevisionId: text("live_revision_id").references(() => menuRevision.id, {
       onDelete: "set null",
     }),
-    /** Null = reserved but not serving (the page 404s). */
+    /** Null = reserved but not offered by table ordering. */
     publishedAt: timestamp("published_at"),
-    viewCount: integer("view_count").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt().$onUpdateFn(() => new Date()),
   },
@@ -441,6 +448,34 @@ export const orderRateLimit = pgTable("order_rate_limit", {
 });
 
 /**
+ * New-order email receipts (R0.4): one row per emailed order. The unique
+ * order id makes sends idempotent (a retry never double-emails), and the
+ * restaurant+time index backs the digest guard that skips the chatter when
+ * a rush would otherwise fire an email per order every minute.
+ */
+export const orderEmailLog = pgTable(
+  "order_email_log",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    restaurantId: text("restaurant_id")
+      .notNull()
+      .references(() => restaurant.id, { onDelete: "cascade" }),
+    orderId: text("order_id").notNull(),
+    email: text("email").notNull(),
+    sentAt: createdAt(),
+  },
+  (t) => ({
+    orderUnique: uniqueIndex("order_email_log_order_unique").on(t.orderId),
+    restaurantSentIdx: index("order_email_log_restaurant_sent_idx").on(
+      t.restaurantId,
+      t.sentAt
+    ),
+  })
+);
+
+/**
  * One Gemini extraction, recorded for the free-launch cost brake (Step 11).
  *
  * `user_id` is null for the anonymous local-first flow, which is instead
@@ -486,6 +521,42 @@ export const extractionUsage = pgTable(
   })
 );
 
+/**
+ * Assistant usage ledger (A1). One row per model attempt, successful or not.
+ *
+ * `neurons` is the provider's own metering (Workers AI returns `usage.neurons`)
+ * so the cost column is exact rather than rate-guessed; it is null when the
+ * provider omitted the figure. The daily ceiling counts rows across all
+ * accounts because the Workers AI free allocation is shared by the account.
+ */
+export const assistantUsage = pgTable(
+  "assistant_usage",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    requestId: text("request_id").notNull(),
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    /** Fractional neurons are normal (e.g. 0.794 for a 32-token ping). */
+    neurons: doublePrecision("neurons"),
+    /** Paid-equivalent micro-USD at $0.011 / 1,000 neurons; null when unknown. */
+    costMicros: bigint("cost_micros", { mode: "number" }),
+    latencyMs: integer("latency_ms"),
+    status: text("status", { enum: ["succeeded", "failed"] }).notNull(),
+    errorCode: text("error_code"),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    userCreatedIdx: index("assistant_usage_user_created_idx").on(t.userId, t.createdAt),
+    createdIdx: index("assistant_usage_created_idx").on(t.createdAt),
+  })
+);
+
 /** Everything the Drizzle adapter and app code share. */
 export const schema = {
   user,
@@ -502,7 +573,9 @@ export const schema = {
   order,
   orderLine,
   orderRateLimit,
+  orderEmailLog,
   extractionUsage,
+  assistantUsage,
 };
 
 /** A restaurant as seen by a member: restaurant fields + that member's role. */

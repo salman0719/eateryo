@@ -105,9 +105,9 @@ renders and fails gracefully without a DB; anonymous flow untouched.
 **Verified 2026-10-18 (all done-when criteria met):** credentials landed —
 migration applied to the real Neon DB (6 tables), endpoints verified live
 (anonymous 401, signed-out mode untouched). Magic-link sign-in ran end to
-end: link delivered by Resend through the **sandbox sender
-`onboarding@resend.dev`** (clearly marked in `.env.local`; swaps to a
-verified domain later — `.env.example` documents both), clicked → session
+end: link delivered by Resend through `EMAIL_FROM` (then the sandbox
+`onboarding@resend.dev`; `.env.local` has since moved to
+`notifications@send.eateryo.com` — `.env.example` documents both), clicked → session
 → `POST /api/restaurants` 201 → owner-role restaurant listed scoped to
 that session, against Neon through the real API. Tenancy isolation tests
 pass (PGlite, real generated DDL); gates green (lint, typecheck, 128
@@ -390,9 +390,9 @@ it live.
       arrives.
 - [x] **Neon project** — created; migration applied and sign-in verified
       against it locally (2026-10-18). Env vars land in Vercel at deploy.
-- [ ] **Resend sending domain** — account + API key are live and sending
-      (sandbox `onboarding@resend.dev`, marked in `.env.local`); add a
-      verified domain before anything beyond throwaway testing.
+- [x] **Resend sending domain** — verified; `.env.local` sends from
+      `notifications@send.eateryo.com`. Keep the same sender in Vercel env
+      vars at deploy.
 - [ ] **Sentry project** — Step 11 ships structured logs + email alerts;
       the Sentry DSN is still needed for a third-party error dashboard.
 - [ ] **Contact address** — `CONTACT_EMAIL` for `/privacy` and `/terms`.
@@ -454,24 +454,19 @@ deployed app after the next deploy.
   localStorage. The chip row sticks to the top of the viewport while
   editing long categories (`src/components/menu-editor/menu-editor.tsx`).
 
-## Customer preview — parked ideas
+## Customer preview — retired
 
-Delivered first: a **Preview menu** toggle in the editor renders the live
-document as a clean customer-facing view — availability, variants, options
-and dietary labels, no review chrome, unset prices shown as an em dash, and
-a "not published" label so it never reads as a hosted page
-(`src/components/menu-editor/menu-preview.tsx`,
-`src/features/menu/preview-utils.ts`, `tests/menu-preview.test.ts`).
-Ideas to revisit after that foundation:
+The static customer preview is gone: four themes, two layouts, the print/PDF
+stylesheet, and the published menu pages they served were removed. A themed
+generic menu never matched a café's own design, so owners read it as a promise
+about how their menu would look instead of a check of what was extracted —
+and it competed with the real job of reviewing prices.
 
-- **Menu themes** — a few branded styles (café, bistro, takeaway) so owners
-  see the menu matching their look.
-- **Phone/QR mockup framing** — render the preview inside a phone frame to
-  show the customer's mobile view (QR code generation stays out of scope).
-- **Print stylesheet / PDF export** — print the preview for the counter,
-  alongside the existing JSON/CSV exports.
-- **Side-by-side editing** — form + live preview in parallel now that the
-  editor canvas is wide (`max-w-6xl`).
+The owner-facing preview now renders the real diner order page
+(`src/components/order/order-page-preview.tsx`) from the draft, with ordering
+off: the editor, publish wizard and onboarding result all show what a table
+card opens, and nothing in it can reach the kitchen. Publishing is for table
+ordering only; see `AGENTS.md` for the route and file map.
 
 ## local/ sandbox convention (untracked)
 

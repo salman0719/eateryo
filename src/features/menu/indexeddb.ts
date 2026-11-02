@@ -2,10 +2,12 @@
  * Native IndexedDB access for menus and image blobs. Browser-only — never
  * import from server code (there is no `indexedDB` in Node/edge runtimes).
  *
- * Database `ai-menu-digitizer`, version 2:
+ * Database `ai-menu-digitizer`, version 3:
  * - `menus` (keyPath `id`): validated `MenuDocument` records.
  * - `images` (keyPath `menuId`): `{ menuId, blob, mimeType, updatedAt }`.
  * - `orders` (keyPath `id`): validated `Order` records (table orders).
+ * - `menu_origins` (keyPath `menuId`): device-local ownership records
+ *   (`DraftOrigin`) — which account a draft belongs to. Never synced.
  *
  * Upgrades create missing stores per version step so future versions can
  * extend the switch without breaking existing data.
@@ -17,11 +19,12 @@
  * stays as-is; only the object stores above evolve.
  */
 export const DB_NAME = "ai-menu-digitizer";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export const MENUS_STORE = "menus";
 export const IMAGES_STORE = "images";
 export const ORDERS_STORE = "orders";
+export const ORIGINS_STORE = "menu_origins";
 
 export class IndexedDbUnavailableError extends Error {
   constructor(message = "This browser does not support IndexedDB, or it is disabled.") {
@@ -78,6 +81,9 @@ export function openDatabase(): Promise<IDBDatabase> {
         }
         if (!db.objectStoreNames.contains(ORDERS_STORE)) {
           db.createObjectStore(ORDERS_STORE, { keyPath: "id" });
+        }
+        if (!db.objectStoreNames.contains(ORIGINS_STORE)) {
+          db.createObjectStore(ORIGINS_STORE, { keyPath: "menuId" });
         }
       };
       request.onsuccess = () => {

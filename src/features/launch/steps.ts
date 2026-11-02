@@ -1,8 +1,8 @@
 /**
- * The onboarding checklist: extract → review → theme → print table cards →
- * publish → first order.
+ * The onboarding checklist: extract → review → print table cards → publish
+ * → first order.
  *
- * Five of the six steps are derived from real server state. Printing is the
+ * Four of the five steps are derived from real server state. Printing is the
  * exception — the server cannot see a printer — so that step is marked
  * `manual` and the browser remembers the tick, labelled as such. A checklist
  * that claims "done" for something we did not observe would be a lie.
@@ -13,7 +13,6 @@ import type { LaunchSnapshot } from "./schema";
 export const LAUNCH_STEP_IDS = [
   "extract",
   "review",
-  "theme",
   "cards",
   "publish",
   "order",
@@ -66,14 +65,6 @@ export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
           : `${plural(reviewLeft, "item")} still need a look`,
     },
     {
-      id: "theme",
-      title: "Pick how the menu looks",
-      guidance: "Preview the four themes and choose a layout; your choice is saved with the publish.",
-      done: published,
-      manual: false,
-      detail: published ? "Saved with your published menu" : "Choose it in the preview",
-    },
-    {
       id: "cards",
       title: "Print the table cards",
       guidance: "Open the Tables tab and print one card per table; each card covers every open menu.",
@@ -84,10 +75,10 @@ export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
     {
       id: "publish",
       title: "Publish the menu",
-      guidance: "Publishing gives you a public link and a QR code anyone can scan.",
+      guidance: "Publishing makes the menu orderable at your tables.",
       done: published,
       manual: false,
-      detail: snapshot.livePath ? `Live at ${snapshot.livePath}` : "Not published yet",
+      detail: published ? "Offered at your table cards" : "Not published yet",
     },
     {
       id: "order",

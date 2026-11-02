@@ -8,7 +8,8 @@
 
 Upload a photo or scan of a menu, extract it into structured categories and
 items with Gemini, review and correct the draft in an editable workspace,
-preview it in themed menus, take table orders, and export JSON/CSV any time.
+preview it as the diner's order page, take table orders, and export JSON/CSV
+any time.
 AI output is a draft — the app flags anything
 uncertain for review and never invents missing prices, descriptions, or
 dietary labels.
@@ -67,7 +68,7 @@ sample data, so the editor, persistence, and export can all be exercised.
 | `DATABASE_URL`       | Server (optional) | Neon Postgres URL. Absent = local-only mode.                      |
 | `BETTER_AUTH_SECRET` | Server only       | Better Auth secret; generate with `openssl rand -base64 32`.      |
 | `BETTER_AUTH_URL`    | Server            | App base URL (local `http://localhost:3200`; prod = site URL).    |
-| `RESEND_API_KEY`     | Server only       | Resend key for sign-in and invitation emails (sandbox sender until a verified domain exists). |
+| `RESEND_API_KEY`     | Server only       | Resend key for sign-in and invitation emails (sends from the verified domain). |
 | `EMAIL_FROM`         | Server only       | Verified sending address for sign-in mail.                        |
 | `OPS_ALERT_EMAIL`    | Server only       | Inbox for failure and volume alerts (Step 11).                    |
 | `CONTACT_EMAIL`      | Server            | Address shown on `/privacy` and `/terms`; unset renders an explicit notice. |
@@ -112,10 +113,10 @@ npm run secrets:check  # after build: fail if a server secret reached the client
 ## Accounts, publishing, and ordering (Phase 2 — built on `staging`, locally verified)
 
 Steps 7–11 are complete in code and proven against Neon locally: magic-link
-sign-in → session → restaurant → server menus → published public page →
-cross-device table ordering, plus the free-launch packaging. What's left
+sign-in → session → restaurant → server menus → publishing for table
+ordering → cross-device orders, plus the free-launch packaging. What's left
 before a public launch is the deploy plus the open items in
-`docs/launch-runbook.md` (Sentry project, verified sending domain, contact
+`docs/launch-runbook.md` (Sentry project, contact
 address, promotion dates):
 
 - **Sign-in** — `/sign-in` sends a one-time magic link (Better Auth, implicit
@@ -132,8 +133,10 @@ address, promotion dates):
   guard; ownership is enforced in `src/features/tenancy/repo.ts` using only
   the session user id, and diners resolve prices server-side from the
   published snapshot (never a client-supplied total).
-- **Ordering** — a diner orders from `/r/<restaurant>/m/<menu>/order?table=<n>`
-  on any phone; the staff board (~5 s polling, visible reconnect state)
+- **Ordering** — a table card opens `/r/<restaurant>/t/<table>` on any
+  phone, listing every open menu (a menu's own order page lives at
+  `/r/<restaurant>/m/<menu>/order?table=<n>`); the staff board (~5 s polling,
+  visible reconnect state)
   receives it on every signed-in device. Opening hours are judged in the
   restaurant's own time zone, and the Tables tab prints one QR per table.
 - **Launch packaging** — `/launch` runs the free onboarding checklist,
@@ -155,8 +158,11 @@ address, promotion dates):
    clearly labelled demo data instead.
 3. **Review** — the draft opens in the editor: fix names, prices,
    descriptions, categories, variants/options, dietary labels, and
-   availability; add, duplicate, delete, reorder, and move items. Uncertain
-   fields carry a visible "needs review" note.
+   availability; add, duplicate, delete, reorder, and move items. Uncertain    fields carry a visible action pill ("Check price" / "Couldn't read") with
+    an inline confirm ("Looks good" clears the note, "Leave unpriced" accepts
+    a blank price such as market price — totals stay honestly blank). An item
+    priced per size (Small/Medium/Large) counts as priced: its variants carry
+    the prices, so a blank item price is not a missing price.
 4. **Save** — edits autosave to IndexedDB (debounced; "Saving… / Saved
    locally" status). Nothing is claimed saved before the transaction succeeds.
 5. **Export** — download the menu as JSON (round-trips through Import JSON)
@@ -203,9 +209,11 @@ npm run secrets:check   # needs the build output above
   ordering acceptance script, on real devices and networks.
 - [`docs/backup-restore.md`](docs/backup-restore.md) — what lives in Postgres,
   the quarterly restore drill, and the bad-migration runbook.
+- [`docs/ai-assistant.md`](docs/ai-assistant.md) — the Workers AI assistant:
+  setup, caps, feature flags, failure copy and acceptance results.
 
 The launch promotion is free, with no payment step anywhere; the app enforces
-per-account extraction caps instead, and shows them on `/launch`.
+per-account extraction caps instead, and shows them in Settings → Usage.
 
 **Parked:** automatic order purging. Scheduling needs a paid Vercel cron plan,
 so `/api/cron/retention` is a secret-gated maintenance endpoint that nothing
@@ -242,8 +250,12 @@ Two modes exist side by side. **Signed out**, the local-first prototype still
 works exactly as before: menus and table orders live in this browser's
 IndexedDB, nothing leaves the device except extraction, and the QR page says
 honestly that the menu lives on the owner's device. **Signed in**, menus sync
-to Postgres, publishing gives a real public page at `/r/<restaurant>/m/<menu>`, and table
-orders reach every staff device through the live board.
+to Postgres, publishing makes a menu orderable at the café's tables — there
+is no public menu page and no link to share, so a menu is reached only
+through a printed table card — and table orders reach every staff device
+through the live board. The first menu is named for the owner: **Main Menu** unless the photo
+clearly names a service ("Lunch Menu" → *Lunch*), and the café's name is
+confirmed rather than typed. Onboarding never asks for a menu name or link.
 
 The free launch (Steps 7–11) is built and locally verified. The B2B extraction
 API and usage billing are parked by decision (Steps 12–13): nothing in the

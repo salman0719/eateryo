@@ -6,13 +6,26 @@
  */
 
 import type { MenuDocument } from "./schema";
-import { addCategory, addItem, createMenuDocument } from "./menu-utils";
+import { addCategory, addItem, createMenuDocument, resolveFirstMenuTitle } from "./menu-utils";
 
 export const DEMO_PROVIDER = "demo";
 
-/** Build a fresh sample document on every call (no shared mutable state). */
+/** The café the sample photo shows — also its café-name suggestion. */
+const DEMO_CAFE_NAME = "Sunny Side Café";
+
+/**
+ * Build a fresh sample document on every call (no shared mutable state).
+ *
+ * Shaped like a real extraction: the photo's header is the café, so
+ * onboarding names the menu itself ("Main Menu", `/m/main-menu`) and keeps
+ * the café name as provenance. "Preview with demo data" therefore walks the
+ * same publish path a real photo does, down to the suggested café.
+ */
 export function createSampleMenuDocument(): MenuDocument {
-  let doc = createMenuDocument({ title: "Sunny Side Café", currency: "USD" });
+  let doc = createMenuDocument({
+    title: resolveFirstMenuTitle(DEMO_CAFE_NAME),
+    currency: "USD",
+  });
 
   doc = addCategory(doc, { name: "Espresso & Coffee" });
   doc = addCategory(doc, { name: "Breakfast" });
@@ -50,5 +63,8 @@ export function createSampleMenuDocument(): MenuDocument {
     reviewNotes: ["Price shown as “market price” — enter the actual price."],
   });
 
-  return { ...doc, source: { provider: DEMO_PROVIDER } };
+  return {
+    ...doc,
+    source: { provider: DEMO_PROVIDER, originalTitle: DEMO_CAFE_NAME },
+  };
 }
