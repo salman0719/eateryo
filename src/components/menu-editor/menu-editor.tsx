@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { Collapse } from "@/components/ui/collapse";
+import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
   addItem,
   deleteCategory,
   deleteItem,
+  deleteItems,
   hasAnyPrice,
   isItemFlagged,
   moveCategory,
@@ -18,16 +21,29 @@ import {
   renameCategory,
   setItemImage,
 } from "@/features/menu/menu-utils";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { formatItemPrice } from "@/features/menu/preview-utils";
 import {
   findDuplicateGroups,
   duplicateItemIds,
   loadDismissedDuplicateKeys,
   saveDismissedDuplicateKeys,
 } from "@/features/menu/duplicates";
-import type { MenuCategory, MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
+import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
+import {
+  isCategoryOpen,
+  isItemOpen,
+  readFoldState,
+  revealItem,
+  setCategoriesOpen,
+  setItemsOpen,
+  toggleCategory,
+  toggleItem,
+  writeFoldState,
+  type FoldState,
+} from "@/features/menu/fold";
 import { searchMenu } from "@/features/menu/search";
+import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
 import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
@@ -45,7 +61,7 @@ import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
-import { ItemEditor } from "./item-editor";
+import { ItemEditor, type ItemActions } from "./item-editor";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
@@ -169,11 +185,56 @@ export function MenuEditor({
   const canUploadItemImages = canManage && syncMode === "account";
   // Provenance, so a surprising line can be traced to the model that read it.
   const sourceLabel = describeExtractionSource(doc.source);
+  // One category list for every row's "Move to" select and one label
+  // vocabulary for every row's tag input: both are views over the document, so
+  // they are built once here instead of forty-five times per render. Stable
+  // identities are also what let the row's memo hold.
+  const categoryChoices = useMemo(
+    () => doc.categories.map((category) => ({ id: category.id, name: category.name })),
+    [doc.categories]
+  );
+  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
 
   // Search box: pure client-side filter, see search.ts for the rules.
   const [query, setQuery] = useState("");
-  const search = searchMenu(doc, query);
+  const search = useMemo(() => searchMenu(doc, query), [doc, query]);
   const isFiltering = query.trim().length > 0;
+
+  // Which dishes have their form open (fold.ts). Remembered per menu, and
+  // kept with the menu id it belongs to so switching menus never paints the
+  // previous menu's rows first.
+  const [fold, setFold] = useState<{ menuId: string; state: FoldState }>(() => ({
+    menuId: doc.id,
+    state: readFoldState(doc.id),
+  }));
+  const foldState = fold.menuId === doc.id ? fold.state : readFoldState(doc.id);
+
+  function applyFold(next: FoldState) {
+    writeFoldState(doc.id, next);
+    setFold({ menuId: doc.id, state: next });
+  }
+
+  /** Every section and every dish at once — the two buttons by the search. */
+  function setEverythingOpen(open: boolean) {
+    const categoryIds = doc.categories.map((category) => category.id);
+    const itemIds = doc.categories.flatMap((category) => category.items.map((item) => item.id));
+    applyFold(setItemsOpen(setCategoriesOpen(foldState, categoryIds, open), itemIds, open));
+  }
+
+  /**
+   * Add a dish and open its form, so naming it is the next keystroke instead
+   * of a scroll and a click.
+   */
+  function handleAddItem(categoryId: string) {
+    const next = addItem(doc, categoryId, { name: "New item" });
+    const created = next.categories.find((c) => c.id === categoryId)?.items;
+    const last = created?.[created.length - 1];
+    if (last) {
+      applyFold(revealItem(foldState, last.id, categoryId));
+      setActiveCategoryId(categoryId);
+    }
+    onChange(next);
+  }
 
   // Category navigation (R0: the One-at-a-time/All toggle is deleted).
   // Phones show one section behind the stepper; larger screens show the full
@@ -190,6 +251,25 @@ export function MenuEditor({
     0,
     search.categories.findIndex((match) => match.category.id === activeMatch?.category.id)
   );
+
+  /**
+   * True below Tailwind's `sm`, where the page shows one section at a time
+   * behind the stepper. There the stepper *is* the fold: a section has no fold
+   * of its own, and the chevron that would reopen one is hidden, so the
+   * visible section must stay open even when the desktop list left it
+   * collapsed. Read from the same width as the `sm:` styles so the two cannot
+   * disagree, and guarded so it stays quiet where `matchMedia` does not exist
+   * (the server render and the tests).
+   */
+  const [phoneWidth, setPhoneWidth] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 639.98px)");
+    const update = () => setPhoneWidth(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
 
   /** Step through the visible categories from the phone stepper. */
   function stepCategory(delta: 1 | -1) {
@@ -214,15 +294,20 @@ export function MenuEditor({
   // Duplicate review (flags only, never auto-deletes — see duplicates.ts).
   // Dismissals are remembered per document, in session state and localStorage.
   const [dismissedMap, setDismissedMap] = useState<Record<string, string[]>>({});
-  const dismissedKeys = dismissedMap[doc.id] ?? loadDismissedDuplicateKeys(doc.id);
-  const duplicateGroups = findDuplicateGroups(doc).filter(
-    (group) => !dismissedKeys.includes(group.key)
+  // One storage read per document, not one per render: the fallback used to
+  // run a JSON.parse on every keystroke and every fold toggle.
+  const dismissedKeys = useMemo(
+    () => dismissedMap[doc.id] ?? loadDismissedDuplicateKeys(doc.id),
+    [dismissedMap, doc.id]
+  );
+  const duplicateGroups = useMemo(
+    () => findDuplicateGroups(doc).filter((group) => !dismissedKeys.includes(group.key)),
+    [doc, dismissedKeys]
   );
   const duplicateIds = duplicateItemIds(duplicateGroups);
 
   function dismissGroup(key: string) {
-    const current = dismissedMap[doc.id] ?? dismissedKeys;
-    const next = current.includes(key) ? current : [...current, key];
+    const next = dismissedKeys.includes(key) ? dismissedKeys : [...dismissedKeys, key];
     saveDismissedDuplicateKeys(doc.id, next);
     setDismissedMap((prev) => ({ ...prev, [doc.id]: next }));
   }
@@ -297,15 +382,6 @@ export function MenuEditor({
   const presentIds = new Set(doc.categories.flatMap((c) => c.items.map((i) => i.id)));
   const selected = [...selectedIds].filter((id) => presentIds.has(id));
 
-  function toggleSelected(itemId: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
-      return next;
-    });
-  }
-
   function handleBulkMove() {
     if (selected.length === 0 || !bulkTarget) return;
     onChange(moveItemsToCategory(doc, selected, bulkTarget));
@@ -313,27 +389,86 @@ export function MenuEditor({
     setBulkTarget("");
   }
 
+  /** Delete every selected item behind one confirmation and one undo step. */
+  async function handleBulkDelete() {
+    if (selected.length === 0) return;
+    const count = selected.length;
+    const ok = await confirm({
+      message: `Delete ${count} selected ${count === 1 ? "item" : "items"}? You can undo this until your next change.`,
+      confirmLabel: count === 1 ? "Delete item" : `Delete ${count} items`,
+      destructive: true,
+    });
+    if (!ok) return;
+    const next = deleteItems(doc, selected);
+    setUndo(
+      captureDeleteUndo(doc, next, count === 1 ? "deleted 1 item" : `deleted ${count} items`)
+    );
+    setSelectedIds(new Set());
+    onChange(next);
+  }
+
+  // The row handlers, created once. They read the live editor state through a
+  // ref, so React.memo(ItemEditor) holds: a fold toggle re-renders the one row
+  // whose `open` changed and leaves the other forty-four alone.
+  const liveRef = useRef({ doc, foldState, onChange, confirm });
+  useEffect(() => {
+    liveRef.current = { doc, foldState, onChange, confirm };
+  }, [doc, foldState, onChange, confirm]);
+
+  const itemActions = useMemo<ItemActions>(
+    () => ({
+      change: (next) => liveRef.current.onChange(next),
+      toggleOpen: (itemId) => {
+        const live = liveRef.current;
+        const next = toggleItem(live.foldState, itemId);
+        writeFoldState(live.doc.id, next);
+        setFold({ menuId: live.doc.id, state: next });
+      },
+      toggleSelected: (itemId) => {
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(itemId)) next.delete(itemId);
+          else next.add(itemId);
+          return next;
+        });
+      },
+      delete: (categoryId, itemId) => {
+        void (async () => {
+          const item = liveRef.current.doc.categories
+            .find((category) => category.id === categoryId)
+            ?.items.find((candidate) => candidate.id === itemId);
+          if (!item) return;
+          const ok = await liveRef.current.confirm({
+            message: `Delete “${item.name}”? You can undo this until your next change.`,
+            confirmLabel: "Delete",
+            destructive: true,
+          });
+          if (!ok) return;
+          // Re-read after the dialog: the document may have moved on meanwhile.
+          const latest = liveRef.current.doc;
+          const next = deleteItem(latest, categoryId, itemId);
+          setUndo(captureDeleteUndo(latest, next, `deleted “${item.name}”`));
+          liveRef.current.onChange(next);
+        })();
+      },
+      attachImage: (itemId, image) => {
+        const current = liveRef.current.doc;
+        const category = current.categories.find((candidate) =>
+          candidate.items.some((item) => item.id === itemId)
+        );
+        if (!category) return;
+        liveRef.current.onChange(setItemImage(current, category.id, itemId, image));
+      },
+    }),
+    []
+  );
+
   // Latest document for async completions: an extraction can take a
   // minute, and edits made while it runs must survive the merge.
   const docRef = useRef(doc);
   useEffect(() => {
     docRef.current = doc;
   }, [doc]);
-
-  /**
-   * Apply a finished photo upload to the *current* document. The upload takes
-   * seconds, and an item edit made meanwhile must survive it — so this reads
-   * the latest document instead of the one captured when the upload started,
-   * and finds the dish by id even if it moved to another section meanwhile.
-   */
-  function attachItemImage(itemId: string, image: MenuItemImage | null) {
-    const current = docRef.current;
-    const category = current.categories.find((candidate) =>
-      candidate.items.some((item) => item.id === itemId)
-    );
-    if (!category) return;
-    onChange(setItemImage(current, category.id, itemId, image));
-  }
 
   // Add pages: photograph more of the same menu later and merge the new
   // extraction in. Repeats are flagged by the duplicate review, never
@@ -457,15 +592,6 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3">
-          <p className="text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
-            The diner’s view
-          </p>
-          <p className="mt-1 text-xs leading-5 text-stone-600">
-            This is the page a table card opens. Ordering is off in this preview, so nothing here
-            reaches the kitchen.
-          </p>
-        </div>
         {publishing && canManage && (
           <PublishPanel
             signedIn={syncMode === "account"}
@@ -475,7 +601,7 @@ export function MenuEditor({
           />
         )}
         <PhoneFrame
-          label="Diner ordering page"
+          label="What a table card opens"
           heightClass="h-[min(78vh,860px)]"
           widthClass="max-w-[420px]"
         >
@@ -574,8 +700,8 @@ export function MenuEditor({
                                 {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
                             )}
-                            <span className="shrink-0 text-xs text-stone-500">
-                              {formatPreviewPrice(item.price, item.currency, doc.currency)}
+                            <span className="shrink-0 text-xs whitespace-nowrap text-stone-500">
+                              {formatItemPrice(item, doc.currency)}
                             </span>
                             <button
                               type="button"
@@ -872,12 +998,26 @@ export function MenuEditor({
             ? `${search.matchCount} of ${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`
             : `${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`}
         </p>
+        {doc.categories.length > 0 && (
+          <div className="flex items-center gap-2">
+            {/* Below `sm` a section cannot fold — the stepper is the fold — so
+                only the dish forms answer here, and the label says which. */}
+            <button type="button" onClick={() => setEverythingOpen(true)} className={smallButton}>
+              <span className="sm:hidden">Open every dish</span>
+              <span className="hidden sm:inline">Expand all</span>
+            </button>
+            <button type="button" onClick={() => setEverythingOpen(false)} className={smallButton}>
+              <span className="sm:hidden">Close every dish</span>
+              <span className="hidden sm:inline">Collapse all</span>
+            </button>
+          </div>
+        )}
       </div>
       {selected.length > 0 && (
         <div
           role="region"
           aria-label="Bulk actions"
-          className="flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-3"
+          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3 shadow-sm backdrop-blur"
         >
           <p className="text-xs font-semibold text-amber-900">
             {selected.length} {selected.length === 1 ? "item" : "items"} selected
@@ -906,13 +1046,24 @@ export function MenuEditor({
           >
             Move selected
           </button>
+          <button
+            type="button"
+            onClick={() => void handleBulkDelete()}
+            className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+          >
+            Delete selected
+          </button>
           <button type="button" onClick={() => setSelectedIds(new Set())} className={smallButton}>
             Clear
           </button>
         </div>
       )}
       {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
-        <div className="sticky top-0 z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden">
+        <div
+          className={`z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
+            selected.length === 0 ? "sticky top-0" : ""
+          }`}
+        >
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -967,85 +1118,132 @@ export function MenuEditor({
         </div>
       ) : (
         search.categories.map(({ category, items }) => {
-            const index = doc.categories.findIndex((c) => c.id === category.id);
-            // R0: phones show the stepper's category only; sm+ shows every section.
-            const phoneOnly =
-              category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
-            return (
-              <section
-                key={category.id}
-                aria-label={`Category ${category.name}`}
-                className={`${phoneOnly}rounded-2xl border border-stone-200 bg-stone-50/60 p-4`}
-              >
-                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+          const index = doc.categories.findIndex((c) => c.id === category.id);
+          // R0: phones show the stepper's category only, always open (see
+          // `phoneWidth`); sm+ shows every section with its own fold.
+          const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
+          // Searching always shows what it found: a match inside a collapsed
+          // section would be a result the page refuses to reveal.
+          const categoryOpen = isFiltering || phoneWidth || isCategoryOpen(foldState, category.id);
+          const categoryPanelId = `menu-category-panel-${category.id}`;
+          const toCheck = items.filter(isItemFlagged).length;
+          return (
+            <section
+              key={category.id}
+              aria-label={`Category ${category.name}`}
+              className={`${phoneOnly}overflow-hidden rounded-2xl border border-stone-200 bg-white`}
+            >
+              {/* The band says what the section is and how much is in it, and
+                  holds its own actions — so a collapsed section is still
+                  legible and still manageable. */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-stone-200 bg-stone-100 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={() => applyFold(toggleCategory(foldState, category.id))}
+                  disabled={isFiltering}
+                  aria-expanded={categoryOpen}
+                  aria-controls={categoryOpen ? categoryPanelId : undefined}
+                  title={
+                    isFiltering
+                      ? "Search shows every matching section"
+                      : categoryOpen
+                        ? "Collapse this section"
+                        : "Expand this section"
+                  }
+                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                >
+                  {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                </button>
+                <div className="min-w-[9rem] flex-1">
                   <CommitInput
                     label={`Category ${index + 1}`}
                     value={category.name}
+                    hideLabel
+                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-stone-300 focus:border-amber-700 focus:bg-white"
                     onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
                   />
-                  <div className="flex items-end gap-1.5 pb-0.5">
-                    <button
-                      type="button"
-                      aria-label={`Move ${category.name} up`}
-                      disabled={index === 0}
-                      onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
-                      className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Move ${category.name} down`}
-                      disabled={index === doc.categories.length - 1}
-                      onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
-                      className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCategory(category, index)}
-                      className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
                 </div>
-                {items.length === 0 ? (
-                  <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
-                    No items — add the first one below.
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-3">
-                    {items.map((item) => (
-                      <ItemEditor
-                        key={item.id}
-                        isRouteTarget={selectedItemId === item.id}
-                        doc={doc}
-                        categoryId={category.id}
-                        item={item}
-                        categories={doc.categories.map((c) => ({ id: c.id, name: c.name }))}
-                        onChange={onChange}
-                        onDelete={() => removeItem(category.id, item)}
-                        duplicate={duplicateIds.has(item.id)}
-                        selected={selectedIds.has(item.id)}
-                        onToggle={() => toggleSelected(item.id)}
-                        canUploadImage={canUploadItemImages}
-                        onAttachImage={(image) => attachItemImage(item.id, image)}
-                      />
-                    ))}
-                  </ul>
-                )}
+                <p className="shrink-0 text-xs text-stone-500">
+                  {items.length} {items.length === 1 ? "item" : "items"}
+                  {toCheck > 0 && (
+                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                      {toCheck} to check
+                    </span>
+                  )}
+                </p>
+                {/* Inline reordering shows only where the list does. A phone
+                    shows one section at a time, so ↑ moved a category the
+                    owner could not watch move, right beside the stepper's
+                    ‹ › — two axes, one apparent control. Arranging on a phone
+                    belongs to the reorder view, which lists every category. */}
+                <div className="hidden shrink-0 items-center gap-1 sm:flex">
+                  <button
+                    type="button"
+                    aria-label={`Move ${category.name} up`}
+                    disabled={index === 0}
+                    onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
+                    className={tinyButton}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${category.name} down`}
+                    disabled={index === doc.categories.length - 1}
+                    onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
+                    className={tinyButton}
+                  >
+                    ↓
+                  </button>
+                </div>
                 <button
                   type="button"
-                  onClick={() => onChange(addItem(doc, category.id, { name: "New item" }))}
-                  className={`${smallButton} mt-3`}
+                  onClick={() => handleDeleteCategory(category, index)}
+                  className={`${tinyButton} hover:border-red-700 hover:text-red-800`}
                 >
-                  + Add item
+                  Delete
                 </button>
-              </section>
-            );
-          })
+              </div>
+              <Collapse open={categoryOpen}>
+                <div id={categoryPanelId} className="p-4">
+                  {items.length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
+                      No items — add the first one below.
+                    </p>
+                  ) : (
+                    <ul className="mt-3 space-y-3">
+                      {items.map((item) => (
+                        <ItemEditor
+                          key={item.id}
+                          isRouteTarget={selectedItemId === item.id}
+                          // A pasted /menus/<id>/items/<itemId> link opens the
+                          // dish without rewriting what the owner folded.
+                          open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
+                          doc={doc}
+                          categoryId={category.id}
+                          item={item}
+                          categories={categoryChoices}
+                          actions={itemActions}
+                          labelVocabulary={labelVocabulary}
+                          duplicate={duplicateIds.has(item.id)}
+                          selected={selectedIds.has(item.id)}
+                          canUploadImage={canUploadItemImages}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleAddItem(category.id)}
+                    className={`${smallButton} mt-3`}
+                  >
+                    + Add item
+                  </button>
+                </div>
+              </Collapse>
+            </section>
+          );
+        })
       )}
       <button
         type="button"
@@ -1063,7 +1261,9 @@ export function MenuEditor({
           <button type="button" onClick={onExportCsv} className={smallButton}>
             Export CSV
           </button>
-          <label className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}>
+          <label
+            className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}
+          >
             Import JSON
             <input
               type="file"

@@ -95,6 +95,15 @@ errors, or add lint/type suppressions just to make checks pass.
   wizard continues it only when the flow came through review
   (`rememberPublishJourney`), so a plain library deep link gets a heading
   instead of a tracker with a false "3 done".
+- `src/components/ui/icons.tsx` — the hand-drawn icon set (no icon
+  dependency): stroked 24-grid glyphs that inherit `currentColor` and are
+  `aria-hidden`, so the control around them carries the label. Starts with
+  `ChevronUpIcon`/`ChevronDownIcon` for the editor's disclosures.
+- `src/components/ui/collapse.tsx` — the disclosure animation: a one-row CSS
+  grid whose track goes 0fr ↔ 1fr, so both directions animate, a mid-flight
+  toggle retargets instead of jumping, and nothing is measured; content stays
+  mounted and `inert` while shut, and reduced motion snaps. The wrapper must
+  stay layout-neutral — padding and borders belong on the content inside.
 - `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
   reusable height-reveal animation: measures the rendered content and
   animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then
@@ -107,6 +116,16 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
   session guard, sign-in page
+- `src/lib/auth/dev-sign-in.ts`, `src/app/api/dev/magic-link/` — the
+  `DEV_SIGN_IN_BYPASS=1` local shortcut: the auth instance parks the freshly
+  minted link instead of emailing it and the sign-in page offers it as an
+  explicit button, so the browser still walks the real verification route.
+  Off in production whatever the variable says (the flag check returns false
+  for `NODE_ENV=production`), never a direct session insert, one read per
+  link for the address that asked, five-minute window. The store sits on
+  `globalThis` because each route entrypoint is its own module instance: a
+  module-level one is empty in the route that reads it, which made every dev
+  sign-in report an expired link. Tests: `tests/dev-sign-in.test.ts`
 - `src/features/session/state.ts` — the pure tri-state session read
   (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
   matrix; a page load whose session has not answered is **never** treated as
@@ -150,7 +169,7 @@ errors, or add lint/type suppressions just to make checks pass.
   surfaces (save status, publish hint, Table ordering card, storage footnote)
   render placeholders with the wait announced only to screen readers, so no
   sentence is printed and then retracted. `unreachable` is the read that
-  settled by *failing*: those surfaces say the account couldn't be checked and
+  settled by _failing_: those surfaces say the account couldn't be checked and
   offer **Try again**, the save status never claims browser-only, and the
   café-creating flow stays off because it would mint tenancy on a guess (016).
   Tests: `tests/menu-membership.test.ts`, `tests/editor-membership.test.ts`.

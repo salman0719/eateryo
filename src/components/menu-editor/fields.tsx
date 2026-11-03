@@ -23,6 +23,8 @@ interface CommitInputProps {
   placeholder?: string;
   multiline?: boolean;
   inputClassName?: string;
+  /** Keep the label for screen readers only, when the field is a heading. */
+  hideLabel?: boolean;
 }
 
 const baseInput =
@@ -38,6 +40,7 @@ export function CommitInput({
   placeholder,
   multiline,
   inputClassName,
+  hideLabel = false,
 }: CommitInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -90,7 +93,9 @@ export function CommitInput({
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-stone-500">{label}</span>
+      <span className={hideLabel ? "sr-only" : "mb-1 block text-xs font-medium text-stone-500"}>
+        {label}
+      </span>
       {multiline ? <textarea rows={2} {...shared} /> : <input type="text" {...shared} />}
       {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
     </label>
