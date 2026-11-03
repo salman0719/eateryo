@@ -38,15 +38,16 @@ export function isCapability(value: string): value is Capability {
 }
 
 /**
- * What a plain `staff` membership can do today: read menus (drafts
- * included, until the projection commit), take and advance orders, print
- * table links, and read the team and settings. It never includes a write.
+ * What a plain `staff` membership can do: read the menus that are actually
+ * published, take and advance orders, print table links, and read the team
+ * and settings. Draft access is an explicit grant (`menus.read_draft`), so
+ * unpublished prices and notes never reach a staff account by default.
+ * It never includes a write.
  */
 export const STAFF_CAPABILITIES: readonly Capability[] = [
   "orders.read",
   "orders.update",
   "menus.read",
-  "menus.read_draft",
   "tables.print",
   "team.read",
   "settings.read",

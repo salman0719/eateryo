@@ -19,6 +19,8 @@ describe("membership capabilities", () => {
     expect(capabilities).toEqual([...STAFF_CAPABILITIES]);
     expect(hasCapability(capabilities, "menus.read")).toBe(true);
     expect(hasCapability(capabilities, "orders.update")).toBe(true);
+    // Drafts are an explicit grant, never a staff default.
+    expect(hasCapability(capabilities, "menus.read_draft")).toBe(false);
     for (const write of [
       "menus.write",
       "menus.publish",

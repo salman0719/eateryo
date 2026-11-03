@@ -105,6 +105,29 @@ export async function getRestaurantTimeZoneForMenu(
 }
 
 /**
+ * Opening windows for any member of the restaurant. This is operational
+ * information, not draft menu content: it stays readable even when the
+ * caller may not see the unpublished document itself.
+ */
+export async function getMenuAvailabilityForUser(
+  db: TenancyDb,
+  userId: string,
+  menuId: string
+): Promise<{ availability: MenuAvailability; restaurantId: string }> {
+  const rows = await db
+    .select({ availability: menu.availability, restaurantId: menu.restaurantId })
+    .from(menu)
+    .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
+    .where(and(eq(menu.id, menuId), eq(restaurantMembership.userId, userId)));
+  const row = rows[0];
+  if (!row) throw new TableRepoError("not_found", "That menu does not exist.");
+  return {
+    availability: parseAvailability(menuId, row.availability),
+    restaurantId: row.restaurantId,
+  };
+}
+
+/**
  * Owner-only: replace a menu's opening windows (empty = always open), and
  * optionally the zone those wall-clock times are written in. `timeZone`
  * of `undefined` leaves the stored zone untouched, `null` clears it (the

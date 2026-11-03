@@ -167,10 +167,13 @@ describe("POST /api/assistant/apply", () => {
     const { seedUser } = await import("./helpers/pg-test-db");
     const { restaurantId, menu, breakfastId } = await seedOwnerWithMenu();
     const staffId = await seedUser(holder.db!, "staff@cafe.test", "Staff");
+    // Draft visibility is explicit now; this test is about the write gate,
+    // so the staff member may read the draft but still cannot apply.
     await holder.db!.insert(restaurantMembership).values({
       restaurantId,
       userId: staffId,
       role: "staff",
+      permissions: ["menus.read", "menus.read_draft"],
     });
     holder.userId = staffId;
 

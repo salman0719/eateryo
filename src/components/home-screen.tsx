@@ -858,6 +858,21 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         let cachedAny = false;
         let originsChanged = false;
         for (const summary of serverMenus) {
+          // A member without the draft grant must never open a cached draft:
+          // replace it with the live snapshot before it can be read. This is
+          // the cache half of the server-side projection (the API already
+          // refuses to send the draft).
+          if (!summary.access.capabilities.includes("menus.read_draft")) {
+            try {
+              const full = await fetchServerMenu(summary.id);
+              await cacheMenu({ ...full.doc, updatedAt: full.updatedAt });
+              cachedAny = true;
+            } catch {
+              // One unreadable row never blocks the rest; the next refresh
+              // retries it.
+            }
+            continue;
+          }
           if (localIds.has(summary.id)) {
             // Backfill: this row is provably the account's (same id on the
             // server) but was never marked — signed out, it would resurface
