@@ -106,7 +106,12 @@ import {
   type EditorMode,
 } from "@/features/navigation/routes";
 import { useFeatureFlags } from "@/features/flags/client";
-import { staffMenuIds } from "@/features/tenancy/access";
+import {
+  accessCan,
+  accessIsStaff,
+  menuAccessById,
+  type MenuAccess,
+} from "@/features/tenancy/access";
 import {
   createRestaurant,
   fetchRestaurants,
@@ -247,7 +252,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     ((next: AppRoute, replace?: boolean, flushCurrent?: boolean) => void) | null
   >(null);
   const openDocRef = useRef<
-    ((doc: MenuDocument, image: Blob | null, updateRoute?: boolean) => Promise<void>) | null
+    ((
+      doc: MenuDocument,
+      image: Blob | null,
+      updateRoute?: boolean,
+      accessHint?: MenuAccess
+    ) => Promise<void>) | null
   >(null);
   const activeDocIdRef = useRef<string | null>(null);
   /** Previous session state, so only a real sign-out (not a first load) clears. */
@@ -428,8 +438,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const serverIdsRef = useRef<ReadonlySet<string>>(new Set());
   const [serverIds, setServerIds] = useState<ReadonlySet<string>>(new Set());
   /** Ids of account menus where the caller is staff only (view, never edit). */
-  const staffMenusRef = useRef<ReadonlySet<string>>(new Set());
-  const [staffMenus, setStaffMenus] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * Server-resolved access for each menu, keyed by id. A missing id is the
+   * unanswered state — never "no access" and never "owner". `"local"` is a
+   * browser-only menu the caller owns; `"none"` is a row the server refused,
+   * whose cached copy must not be rendered.
+   */
+  const menuAccessRef = useRef<ReadonlyMap<string, MenuAccess>>(new Map());
+  const [menuAccess, setMenuAccess] = useState<ReadonlyMap<string, MenuAccess>>(new Map());
   /** Restaurants the caller owns: the targets for moving menus to the account. */
   const [ownedRestaurants, setOwnedRestaurants] = useState<RestaurantOption[]>([]);
   /** Which account the list belongs to; a mismatch means it is still loading. */
@@ -644,6 +660,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         let doc: MenuDocument;
         let imageBlob: Blob | null = null;
+        let accessHint: MenuAccess | undefined;
         try {
           doc = await getMenu(menuId);
           // The device stamp is a privacy boundary, not an accusation (015): a
@@ -680,10 +697,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           if (!signedIn) throw localError;
           const serverMenu = await fetchServerMenu(menuId);
           doc = serverMenu.doc;
+          accessHint = serverMenu.access;
           await cacheMenu(doc).catch(() => undefined);
           await refreshLibrary();
         }
-        if (!cancelled) await openDocRef.current?.(doc, imageBlob, false);
+        if (!cancelled) await openDocRef.current?.(doc, imageBlob, false, accessHint);
       } catch {
         if (cancelled) return;
         openedRouteMenuRef.current = null;
@@ -746,7 +764,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         navigateTo(landing, true, false);
       }
       replaceServerIds(new Set());
-      replaceStaffMenus(new Set());
+      replaceMenuAccess(new Map());
       // The ids and the read that produced them reset together (001): a stale
       // "settled" marker over an empty id set would let the next sign-in paint
       // the same false chip.
@@ -782,9 +800,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setServerIds(next);
   }
 
-  function replaceStaffMenus(next: ReadonlySet<string>) {
-    staffMenusRef.current = next;
-    setStaffMenus(next);
+  function replaceMenuAccess(next: ReadonlyMap<string, MenuAccess>) {
+    menuAccessRef.current = next;
+    setMenuAccess(next);
+  }
+
+  /** Record one menu's access answer without touching the rest. */
+  function setMenuAccessFor(id: string, access: MenuAccess) {
+    if (menuAccessRef.current.get(id) === access) return;
+    const next = new Map(menuAccessRef.current);
+    next.set(id, access);
+    replaceMenuAccess(next);
   }
 
   function addServerId(id: string) {
@@ -849,11 +875,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           setServerMenusFor(accountKey);
           setServerMenusReadFailedFor(null);
         }
-        try {
-          replaceStaffMenus(staffMenuIds(serverMenus, await fetchRestaurants()));
-        } catch {
-          // Role lookup is best-effort; the server still refuses staff writes.
+        // One answer, no second role lookup: each summary already carries the
+        // caller's capabilities. A browser-only menu keeps its local answer
+        // while the server list has nothing to say about it.
+        const accessById = new Map<string, MenuAccess>(menuAccessById(serverMenus));
+        for (const [id, access] of menuAccessRef.current) {
+          if (access === "local" && !accessById.has(id)) accessById.set(id, "local");
         }
+        replaceMenuAccess(accessById);
         const localIds = new Set((await listMenus()).map((menu) => menu.id));
         let cachedAny = false;
         let originsChanged = false;
@@ -879,7 +908,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             // as an anonymous draft. The agreed revision comes from the
             // server, so a later return heals instead of conflicting.
             // Staff rows and someone else's cache are never touched.
-            if (staffMenusRef.current.has(summary.id)) continue;
+            if (!accessCan(menuAccessRef.current.get(summary.id), "menus.write")) continue;
             const backfillActor = accountKeyRef.current;
             if (!backfillActor) continue;
             try {
@@ -959,7 +988,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     let healedAny = false;
     for (const origin of origins.filter((item) => item.accountId === actor)) {
       if (docRef.current?.id === origin.menuId) continue;
-      if (staffMenusRef.current.has(origin.menuId)) continue;
+      if (!accessCan(menuAccessRef.current.get(origin.menuId), "menus.write")) continue;
       try {
         const local = await getMenu(origin.menuId);
         const server = await fetchServerMenu(origin.menuId);
@@ -1007,7 +1036,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       // keeps the last agreed revision when there is no new baseline, so a
       // later return can tell interrupted work from a stale cache.
       const actor = signedInRef.current ? accountKeyRef.current : null;
-      if (actor && !staffMenusRef.current.has(saved.id)) {
+      if (actor && accessCan(menuAccessRef.current.get(saved.id), "menus.write")) {
         await stampDraftOrigin(saved.id, actor, serverBaseRef.current ?? "");
       }
       setMenus(await listMenus());
@@ -1041,7 +1070,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   async function pushToAccount(saved: MenuDocument): Promise<boolean> {
     if (!signedInRef.current || serverBaseRef.current === null) return false;
     // Staff access is view-only: keep the local copy, never push an edit.
-    if (staffMenusRef.current.has(saved.id)) return false;
+    if (!accessCan(menuAccessRef.current.get(saved.id), "menus.write")) return false;
     if (conflictRef.current) return false;
     setSaveState({ kind: "saving", message: "Saving to your account…" });
     try {
@@ -1144,13 +1173,21 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     });
   }
 
-  async function openDoc(doc: MenuDocument, imageBlob: Blob | null, updateRoute = true) {
+  async function openDoc(
+    doc: MenuDocument,
+    imageBlob: Blob | null,
+    updateRoute = true,
+    accessHint?: MenuAccess
+  ) {
     setPublication(null);
     setPublicationMenuId(null);
     setPublicationLoaded(false);
     setPublishError(null);
     resetLiveDoc();
     void refreshPublication(doc.id);
+    // A caller that already knows the answer (a server route open, or a menu
+    // created here) hands it over so the first frame is decided, not guessed.
+    if (accessHint) setMenuAccessFor(doc.id, accessHint);
     docRef.current = doc;
     lastSavedRef.current = JSON.stringify(doc);
     setActiveDoc(doc);
@@ -1180,13 +1217,20 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     if (!signedInRef.current) return;
     try {
       const serverMenu = await fetchServerMenu(localDoc.id);
+      const serverAccess = serverMenu.access;
+      // A write-capable caller may be editable as soon as access is known. A
+      // read-only caller waits for the server's document to replace whatever
+      // this browser cached, so a stale draft is never painted as preview.
+      const serverCanWrite = accessCan(serverAccess, "menus.write");
+      if (serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
       if (docRef.current?.id !== localDoc.id) return;
       const actor = signedInRef.current ? accountKeyRef.current : null;
-      const staffOnly = staffMenusRef.current.has(localDoc.id);
+      const staffOnly = !serverCanWrite;
       const origin = actor ? await getDraftOrigin(localDoc.id).catch(() => undefined) : undefined;
       if (origin && actor && origin.accountId !== actor) {
         // Another account's cached row on this device: never touch it.
         removeServerId(localDoc.id);
+        setMenuAccessFor(localDoc.id, "none");
         setSaveState(savedState("Saved in this browser — not in your account."));
         return;
       }
@@ -1242,6 +1286,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (decision === "conflict") {
         // Both sides moved since the last agreement: an explicit choice,
         // never a silent adopt over unsynced work.
+        setMenuAccessFor(localDoc.id, serverAccess);
         conflictRef.current = { serverUpdatedAt: serverMenu.updatedAt };
         setConflict(conflictRef.current);
         setConflictError(null);
@@ -1260,12 +1305,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         docRef.current = next;
         lastSavedRef.current = JSON.stringify(next);
         setActiveDoc(next);
+        if (!serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
         if (actor && !staffOnly)
           await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, menuContentHash(next));
         setSaveState(savedState("Showing the version from your account."));
         await refreshLibrary();
         return;
       }
+      if (!serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
       if (actor && !staffOnly)
         await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, localHash);
       setSaveState(savedState("Saved to your account."));
@@ -1273,10 +1320,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (docRef.current?.id !== localDoc.id) return;
       if (error instanceof SyncError && error.code === "not_found") {
         removeServerId(localDoc.id);
-        setSaveState(savedState("Saved in this browser — not in your account yet."));
+        // The server has no row: a stamp for this account, or the local answer
+        // already recorded, means a browser-only draft. Anything else is a
+        // cached menu this account may not read, so its content stays shut
+        // instead of rendering a stale draft.
+        const originNow = await getDraftOrigin(localDoc.id).catch(() => undefined);
+        const localDraft =
+          menuAccessRef.current.get(localDoc.id) === "local" ||
+          (originNow != null && originNow.accountId === accountKeyRef.current);
+        setMenuAccessFor(localDoc.id, localDraft ? "local" : "none");
+        setSaveState(
+          localDraft
+            ? savedState("Saved in this browser — not in your account yet.")
+            : savedState("This menu isn't available to your account.")
+        );
         return;
       }
       if (error instanceof SyncError && error.code === "unauthorized") {
+        setMenuAccessFor(localDoc.id, "none");
         setSaveState(
           savedState("Saved in this browser — sign in again to save it to your account.")
         );
@@ -1293,6 +1354,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setConflictError(null);
     try {
       const serverMenu = await fetchServerMenu(doc.id);
+      setMenuAccessFor(doc.id, serverMenu.access);
       let next: MenuDocument = serverMenu.doc;
       if (!storageDownRef.current) {
         next = await saveMenu(serverMenu.doc).catch(() => serverMenu.doc);
@@ -1305,7 +1367,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       conflictRef.current = null;
       setConflict(null);
       const loadActor = accountKeyRef.current;
-      if (loadActor && !staffMenusRef.current.has(doc.id)) {
+      if (loadActor && accessCan(serverMenu.access, "menus.write")) {
         await refreshDraftSync(doc.id, loadActor, serverMenu.updatedAt, menuContentHash(next));
       }
       setSaveState(savedState("Showing the version from your account."));
@@ -1381,14 +1443,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     const newMenuActor = signedInRef.current ? accountKeyRef.current : null;
     if (newMenuActor) await stampDraftOrigin(doc.id, newMenuActor, "");
     if (!storageDownRef.current) await refreshLibrary();
-    await openDoc(doc, null);
+    await openDoc(doc, null, true, "local");
   }
 
   async function handleRenameMenu(id: string, title: string) {
     try {
       const renamed = await renameMenu(id, title);
       const renameActor = signedInRef.current ? accountKeyRef.current : null;
-      if (renameActor && !staffMenusRef.current.has(id)) {
+      if (renameActor && accessCan(menuAccessRef.current.get(id), "menus.write")) {
         // Keep the existing baseline when this menu is not open: the
         // editor's baseline belongs to another document.
         await stampDraftOrigin(
@@ -2115,13 +2177,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }
       }
       if (!storageDownRef.current) await refreshLibrary();
-      await openDoc(saved, firstPage ? firstPage.file : null, updateRoute);
+      await openDoc(saved, firstPage ? firstPage.file : null, updateRoute, "local");
       return saved;
     }
     const doc = demoDoc ?? createSampleMenuDocument();
     const saved = storageDownRef.current ? doc : await saveMenu(doc);
     if (!storageDownRef.current) await refreshLibrary();
-    await openDoc(saved, null, updateRoute);
+    await openDoc(saved, null, updateRoute, "local");
     return saved;
   }
 
@@ -2430,9 +2492,20 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const activePublication = publicationMenuId === activePublicationMenuId ? publication : null;
   const activePublicationLoaded =
     publicationMenuId === activePublicationMenuId && publicationLoaded;
+  /**
+   * The open menu's access answer. Missing is unanswered, not permission: the
+   * editor renders a placeholder until the server says what this caller may
+   * do. Staff without `menus.write` get a preview; a menu the server refused
+   * (`"none"`) is never rendered, cached draft or not.
+   */
+  const activeMenuAccess = activeDoc ? menuAccess.get(activeDoc.id) : undefined;
+  const activeMenuAccessPending = signedIn && activeDoc != null && activeMenuAccess === undefined;
+  const activeMenuAccessDenied = activeMenuAccess === "none";
+  const activeMenuCanWrite = !signedIn || accessCan(activeMenuAccess, "menus.write");
+  const activeMenuCanPublish = !signedIn || accessCan(activeMenuAccess, "menus.publish");
   // Staff on the menu's restaurant get a view-only editor (the server refuses
   // their writes anyway; the UI must not offer the controls at all).
-  const activeMenuIsStaff = activeDoc ? staffMenus.has(activeDoc.id) : false;
+  const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
 
   return (
     <OrderMonitorProvider userId={session?.user?.id ?? null}>
@@ -2700,7 +2773,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               proposalsEnabled={featureFlags.assistantProposals}
               menusLoading={libraryLoading}
               menus={menus
-                .filter((menu) => serverIds.has(menu.id) && !staffMenus.has(menu.id))
+                .filter(
+                  (menu) => serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
+                )
                 .map((menu) => ({ id: menu.id, title: menu.title }))}
             />
           ) : !signedIn ? (
@@ -2747,13 +2822,41 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 onKeepMine={() => void handleKeepMyVersion()}
               />
             )}
-            {activeMenuIsStaff && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                You have staff access to this restaurant — menus are view-only for staff. Ask an
-                owner to make changes.
-              </p>
-            )}
-            {editorMode === "publish" && !activeMenuIsStaff ? (
+            {activeMenuAccessDenied ? (
+              <section className="rounded-2xl border border-stone-200 bg-white p-6">
+                <h1 className="font-medium text-stone-900">This menu isn’t available</h1>
+                <p className="mt-2 max-w-md text-sm leading-6 text-stone-600">
+                  Your account can’t open this menu. Ask the restaurant owner if you think that’s a
+                  mistake.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleBackToLibrary()}
+                  className="mt-4 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                >
+                  Back to my menus
+                </button>
+              </section>
+            ) : activeMenuAccessPending ? (
+              <section
+                role="status"
+                aria-busy="true"
+                aria-label="Checking access"
+                className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-6"
+              >
+                <span className="sr-only">Checking your access to this menu…</span>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-40 w-full" />
+              </section>
+            ) : (
+              <>
+                {activeMenuIsStaff && (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    You have staff access to this restaurant — menus are view-only for staff. Ask an
+                    owner to make changes.
+                  </p>
+                )}
+                {editorMode === "publish" && activeMenuCanPublish ? (
               <PublishWizard
                 key={activeDoc.id}
                 doc={activeDoc}
@@ -2773,14 +2876,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <MenuEditor
                 doc={activeDoc}
                 selectedItemId={selectedItemId}
-                mode={activeMenuIsStaff ? "preview" : editorMode}
+                mode={activeMenuCanWrite ? editorMode : "preview"}
                 onModeChange={(mode) =>
                   navigateTo({ screen: "editor", menuId: activeDoc.id, mode })
                 }
                 onChange={handleDocChange}
                 saveState={saveState}
                 syncMode={signedIn ? "account" : "local"}
-                canManage={!activeMenuIsStaff}
+                canManage={activeMenuCanWrite}
                 onServer={activeMenuOnServer}
                 accountCheckFailed={activeMenuAccountCheckFailed}
                 onRetryAccountCheck={handleRetryAccountCheck}
@@ -2816,6 +2919,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   if (docRef.current) void refreshPublication(docRef.current.id);
                 }}
               />
+                )}
+              </>
             )}
           </>
         )}
