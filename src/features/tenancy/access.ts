@@ -11,7 +11,11 @@
  */
 
 import type { MembershipAccess } from "@/features/menus/sync";
-import { hasCapability, type Capability } from "@/features/tenancy/permissions";
+import {
+  capabilitiesForMembership,
+  hasCapability,
+  type Capability,
+} from "@/features/tenancy/permissions";
 
 export type MenuAccess = MembershipAccess | "local" | "none";
 
@@ -30,6 +34,27 @@ export function accessCan(
   if (access === "local") return true;
   if (access === undefined || access === "none") return false;
   return hasCapability(access.capabilities, capability);
+}
+
+/**
+ * A restaurant's capabilities. The server sends `access`; a stubbed or older
+ * payload without it falls back to the role's defaults, never to "allow".
+ */
+export function restaurantCapabilities(restaurant: {
+  role: "owner" | "staff";
+  access?: MembershipAccess;
+}): Capability[] {
+  return restaurant.access?.capabilities ?? capabilitiesForMembership(restaurant.role, null);
+}
+
+/** True when any restaurant on the account grants this capability. */
+export function anyRestaurantCan(
+  restaurants: readonly { role: "owner" | "staff"; access?: MembershipAccess }[],
+  capability: Capability
+): boolean {
+  return restaurants.some((restaurant) =>
+    hasCapability(restaurantCapabilities(restaurant), capability)
+  );
 }
 
 /** True when the caller is on the restaurant as staff (their role axis). */

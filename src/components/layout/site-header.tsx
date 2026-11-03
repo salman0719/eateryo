@@ -29,12 +29,14 @@ export function SiteHeader() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <a
-            href="/launch"
-            className="hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-50 hover:text-amber-900 sm:inline"
-          >
-            Get started
-          </a>
+          {!isPending && !user && (
+            <a
+              href="/launch"
+              className="hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-50 hover:text-amber-900 sm:inline"
+            >
+              Get started
+            </a>
+          )}
           {isPending ? (
             <div role="status" aria-busy="true" className="flex items-center gap-3">
               <span className="sr-only">Checking your session…</span>

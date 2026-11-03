@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   accessCan,
   accessIsStaff,
+  anyRestaurantCan,
   menuAccessById,
+  restaurantCapabilities,
   type MenuAccess,
 } from "@/features/tenancy/access";
 import type { MembershipAccess } from "@/features/menus/sync";
@@ -56,6 +58,39 @@ describe("accessCan", () => {
     };
     expect(accessCan(editor, "menus.write")).toBe(true);
     expect(accessCan(editor, "menus.publish")).toBe(false);
+  });
+});
+
+describe("restaurantCapabilities", () => {
+  it("uses the server's answer when one was sent", () => {
+    expect(restaurantCapabilities({ role: "staff", access: owner })).toEqual(
+      owner.capabilities
+    );
+  });
+
+  it("falls back to role defaults, never to a write grant", () => {
+    const staffCaps = restaurantCapabilities({ role: "staff" });
+    expect(staffCaps).toContain("orders.read");
+    expect(staffCaps).not.toContain("menus.write");
+    expect(restaurantCapabilities({ role: "owner" })).toContain("menus.write");
+  });
+});
+
+describe("anyRestaurantCan", () => {
+  it("is true when any membership grants the capability", () => {
+    expect(
+      anyRestaurantCan(
+        [
+          { role: "staff", access: { role: "staff", capabilities: ["orders.read"] } },
+          { role: "owner", access: owner },
+        ],
+        "menus.publish"
+      )
+    ).toBe(true);
+  });
+
+  it("is false for an empty account", () => {
+    expect(anyRestaurantCan([], "orders.read")).toBe(false);
   });
 });
 

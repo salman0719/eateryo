@@ -7,6 +7,8 @@ import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchRestaurants, type RestaurantOption } from "@/features/tenancy/client";
 import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
+import { restaurantCapabilities } from "@/features/tenancy/access";
+import { hasCapability } from "@/features/tenancy/permissions";
 
 /**
  * Restaurant-level table cards.
@@ -50,6 +52,9 @@ export function RestaurantTables({
   }, [signedIn]);
 
   const selected = selectedRestaurant(restaurants, selectedId);
+  const canLink = selected
+    ? hasCapability(restaurantCapabilities(selected), "tables.link")
+    : false;
 
   return (
     <div className="flex flex-col gap-4">
@@ -127,8 +132,8 @@ export function RestaurantTables({
             </select>
           </label>
           <p className="mt-2 text-xs leading-5 text-stone-500">
-            Cards stay attached to this restaurant. Staff can print them; only an owner can claim or
-            change the restaurant link.
+            Cards stay attached to this restaurant. Anyone with table-print access can print them;
+            claiming or changing the restaurant link needs the table-link grant.
           </p>
         </div>
       )}
@@ -139,7 +144,7 @@ export function RestaurantTables({
           context="restaurant"
           restaurantId={selected.id}
           restaurantName={selected.name}
-          isOwner={selected.role === "owner"}
+          isOwner={canLink}
         />
       )}
     </div>

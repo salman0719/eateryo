@@ -25,6 +25,8 @@ import {
   type RestaurantOption,
 } from "@/features/tenancy/client";
 import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
+import { restaurantCapabilities } from "@/features/tenancy/access";
+import { hasCapability } from "@/features/tenancy/permissions";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
@@ -68,7 +70,10 @@ export function RestaurantSettings({
         if (cancelled) return;
         setRestaurants(list);
         const owners = list.filter((r) => r.role === "owner");
-        if (owners.length === 1 && owners[0]) setSelectedId(owners[0].id);
+        // One owner café is the natural default; a staff-only account opens
+        // its only café, which is the one whose team it may read.
+        const initial = owners.length === 1 ? owners[0] : list.length === 1 ? list[0] : undefined;
+        if (initial) setSelectedId(initial.id);
       } catch {
         if (!cancelled) {
           setLoadError("Could not load your restaurants. Check your connection and try again.");
@@ -80,12 +85,17 @@ export function RestaurantSettings({
     };
   }, [signedIn]);
 
-  const owned = restaurants?.filter((r) => r.role === "owner") ?? [];
-  const staffOnly = restaurants !== null && owned.length === 0 && restaurants.length > 0;
-  const selected = selectedRestaurant(owned, selectedId);
+  const allRestaurants = restaurants ?? [];
+  const selected = selectedRestaurant(allRestaurants, selectedId);
+  const selectedCapabilities = selected ? restaurantCapabilities(selected) : [];
+  const canManageSettings = selected
+    ? hasCapability(selectedCapabilities, "settings.manage")
+    : false;
+  const canManageTeam = selected ? hasCapability(selectedCapabilities, "team.manage") : false;
+  const canReadTeam = selected ? hasCapability(selectedCapabilities, "team.read") : false;
 
   async function handleRename(name: string) {
-    if (!selected) return;
+    if (!selected || !canManageSettings) return;
     const previous = selected.name;
     setRestaurants((prev) => (prev ?? []).map((r) => (r.id === selected.id ? { ...r, name } : r)));
     try {
@@ -157,14 +167,14 @@ export function RestaurantSettings({
         </div>
       )}
 
-      {staffOnly && (
-        <p className="rounded-2xl border border-stone-200 bg-white p-5 text-xs leading-5 text-amber-800">
-          You are only a staff member of the restaurants on this account. Only an owner can change
-          settings — ask the owner to do it from their sign-in.
+      {selected && !canManageSettings && (
+        <p className="rounded-2xl border border-stone-200 bg-white p-5 text-xs leading-5 text-stone-600">
+          You can see this café’s team and activity. Changing its name, alerts or team needs the
+          owner — ask them to do it from their sign-in.
         </p>
       )}
 
-      {signedIn && restaurants !== null && owned.length === 0 && !staffOnly && (
+      {signedIn && restaurants !== null && allRestaurants.length === 0 && (
         <GuidanceCard
           title="You don't own a restaurant yet"
           steps={[
@@ -176,7 +186,7 @@ export function RestaurantSettings({
         />
       )}
 
-      {showRestaurantPicker(owned) && (
+      {showRestaurantPicker(allRestaurants) && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
             Restaurant
@@ -188,7 +198,7 @@ export function RestaurantSettings({
               <option value="" disabled>
                 Choose a restaurant…
               </option>
-              {owned.map((restaurant) => (
+              {allRestaurants.map((restaurant) => (
                 <option key={restaurant.id} value={restaurant.id}>
                   {restaurant.name}
                 </option>
@@ -212,49 +222,61 @@ export function RestaurantSettings({
               Shown to your team and on your published menu pages.
             </p>
             <div className="mt-2 max-w-sm">
-              <CommitInput
-                label={`Rename ${selected.name}`}
-                value={selected.name}
-                onCommit={(name) => void handleRename(name)}
-              />
+              {canManageSettings ? (
+                <CommitInput
+                  label={`Rename ${selected.name}`}
+                  value={selected.name}
+                  onCommit={(name) => void handleRename(name)}
+                />
+              ) : (
+                <p className="text-sm font-semibold text-stone-900">{selected.name}</p>
+              )}
             </div>
           </div>
 
-          <TeamCard
-            key={selected.id}
-            restaurantId={selected.id}
-            restaurantName={selected.name}
-            currentUserId={currentUserId}
-            onTeamChanged={() => setTeamVersion((version) => version + 1)}
-          />
+          {canReadTeam && (
+            <>
+              <TeamCard
+                key={selected.id}
+                restaurantId={selected.id}
+                restaurantName={selected.name}
+                currentUserId={currentUserId}
+                canManage={canManageTeam}
+                onTeamChanged={() => setTeamVersion((version) => version + 1)}
+              />
 
-          <TeamActivity
-            key={`activity-${selected.id}`}
-            restaurantId={selected.id}
-            refreshKey={teamVersion}
-          />
+              <TeamActivity
+                key={`activity-${selected.id}`}
+                restaurantId={selected.id}
+                refreshKey={teamVersion}
+              />
+            </>
+          )}
 
           <OrderAlertsCard
             key={`alerts-${selected.id}`}
             restaurantId={selected.id}
             restaurantName={selected.name}
+            canManage={canManageSettings}
           />
 
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-            <h3 className="text-sm font-bold tracking-tight text-red-900">Danger zone</h3>
-            <p className="mt-1 text-xs leading-5 text-red-800">
-              Deleting “{selected.name}” removes its menus, published pages and orders from your
-              account. This cannot be undone.
-            </p>
-            <button
-              type="button"
-              onClick={() => void handleDeleteRestaurant()}
-              disabled={deleting}
-              className="mt-3 rounded-full border border-red-700 px-4 py-1.5 text-sm font-semibold text-red-800 transition-colors hover:bg-red-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-            >
-              {deleting ? "Deleting…" : `Delete ${selected.name}`}
-            </button>
-          </div>
+          {canManageSettings && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
+              <h3 className="text-sm font-bold tracking-tight text-red-900">Danger zone</h3>
+              <p className="mt-1 text-xs leading-5 text-red-800">
+                Deleting “{selected.name}” removes its menus, published pages and orders from your
+                account. This cannot be undone.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleDeleteRestaurant()}
+                disabled={deleting}
+                className="mt-3 rounded-full border border-red-700 px-4 py-1.5 text-sm font-semibold text-red-800 transition-colors hover:bg-red-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              >
+                {deleting ? "Deleting…" : `Delete ${selected.name}`}
+              </button>
+            </div>
+          )}
         </>
       )}
 
@@ -277,12 +299,20 @@ interface TeamCardProps {
   restaurantId: string;
   restaurantName: string;
   currentUserId: string | null;
+  /** True with `team.manage`: the owner's add/role/remove controls. */
+  canManage: boolean;
   /** Called after a change lands, so the audit trail can reload. */
   onTeamChanged: () => void;
 }
 
 /** The team list plus add/role/remove controls, scoped to one restaurant. */
-function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }: TeamCardProps) {
+function TeamCard({
+  restaurantId,
+  restaurantName,
+  currentUserId,
+  canManage,
+  onTeamChanged,
+}: TeamCardProps) {
   const { confirm, dialog } = useConfirm();
   const [members, setMembers] = useState<MemberOption[] | null>(null);
   const [pending, setPending] = useState<PendingInvitation[] | null>(null);
@@ -304,20 +334,21 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
         if (!cancelled) setError("Could not load the team. Check your connection and try again.");
       }
     })();
-    // Pending invitations are optional chrome: if this fails, the member
-    // list still renders (and the server still enforces the roles).
-    void (async () => {
-      try {
-        const list = await fetchPendingInvitations(restaurantId);
-        if (!cancelled) setPending(list);
-      } catch {
-        if (!cancelled) setPending([]);
-      }
-    })();
+    // Pending invitations are owner chrome: a reader never asks for them.
+    if (canManage) {
+      void (async () => {
+        try {
+          const list = await fetchPendingInvitations(restaurantId);
+          if (!cancelled) setPending(list);
+        } catch {
+          if (!cancelled) setPending([]);
+        }
+      })();
+    }
     return () => {
       cancelled = true;
     };
-  }, [restaurantId]);
+  }, [restaurantId, canManage]);
 
   async function refreshPending() {
     try {
@@ -447,10 +478,13 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
     <div className="rounded-2xl border border-stone-200 bg-white p-5">
       <h3 className="text-sm font-bold tracking-tight text-stone-900">Team</h3>
       <p className="mt-1 text-xs leading-5 text-stone-500">
-        Owners can change menus, publish and manage the team. Staff see the order board and the
-        menus.
+        {canManage
+          ? "Owners can change menus, publish and manage the team. Staff see the order board and the menus."
+          : "Everyone at this café can see who works here. An owner can change roles or invite someone new."}
       </p>
 
+      {canManage && (
+      <>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
         <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
           Add by email
@@ -489,6 +523,8 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
         If they already have an account they join immediately; otherwise we email them a one-time
         invitation link that accepts on sign-in (expires in 7 days).
       </p>
+      </>
+      )}
 
       {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
       {notice && !error && <p className="mt-2 text-xs text-emerald-800">{notice}</p>}
@@ -527,26 +563,34 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                 </p>
                 <p className="truncate text-xs text-stone-500">{member.email}</p>
               </div>
-              <select
-                value={member.role}
-                onChange={(event) =>
-                  void handleRoleChange(member, event.target.value as "owner" | "staff")
-                }
-                disabled={memberBusy === member.userId}
-                aria-label={`Role for ${member.name}`}
-                className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="owner">Owner</option>
-                <option value="staff">Staff</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void handleRemoveMember(member)}
-                disabled={memberBusy === member.userId}
-                className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-              >
-                Remove
-              </button>
+              {canManage ? (
+                <>
+                  <select
+                    value={member.role}
+                    onChange={(event) =>
+                      void handleRoleChange(member, event.target.value as "owner" | "staff")
+                    }
+                    disabled={memberBusy === member.userId}
+                    aria-label={`Role for ${member.name}`}
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="owner">Owner</option>
+                    <option value="staff">Staff</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveMember(member)}
+                    disabled={memberBusy === member.userId}
+                    className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  >
+                    Remove
+                  </button>
+                </>
+              ) : (
+                <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-medium text-stone-600">
+                  {member.role === "owner" ? "Owner" : "Staff"}
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -570,22 +614,26 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                     {new Date(invitation.expiresAt).toLocaleDateString()}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleResend(invitation)}
-                  disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                >
-                  Resend
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleRevoke(invitation)}
-                  disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                >
-                  Revoke
-                </button>
+                {canManage && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void handleResend(invitation)}
+                      disabled={pendingBusy === invitation.id}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    >
+                      Resend
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRevoke(invitation)}
+                      disabled={pendingBusy === invitation.id}
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    >
+                      Revoke
+                    </button>
+                  </>
+                )}
               </li>
             ))}
           </ul>

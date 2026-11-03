@@ -110,8 +110,10 @@ import {
   accessCan,
   accessIsStaff,
   menuAccessById,
+  restaurantCapabilities,
   type MenuAccess,
 } from "@/features/tenancy/access";
+import type { Capability } from "@/features/tenancy/permissions";
 import {
   createRestaurant,
   fetchRestaurants,
@@ -446,6 +448,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const menuAccessRef = useRef<ReadonlyMap<string, MenuAccess>>(new Map());
   const [menuAccess, setMenuAccess] = useState<ReadonlyMap<string, MenuAccess>>(new Map());
+  /** Every restaurant the caller belongs to, with the server's capabilities. */
+  const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
   /** Restaurants the caller owns: the targets for moving menus to the account. */
   const [ownedRestaurants, setOwnedRestaurants] = useState<RestaurantOption[]>([]);
   /** Which account the list belongs to; a mismatch means it is still loading. */
@@ -579,6 +583,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         const list = await fetchRestaurants();
         if (cancelled) return;
+        setRestaurants(list);
         setOwnedRestaurants(list.filter((r) => r.role === "owner"));
         setOwnedRestaurantsFor(accountKey);
         setRestaurantCount(list.length);
@@ -590,6 +595,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         // caller may not make. Settle the loading state so the wizard can
         // still offer the form (the request will surface the real error).
         if (!cancelled) {
+          setRestaurants([]);
           setOwnedRestaurants([]);
           setOwnedRestaurantsFor(accountKey);
           // Unknown, not zero: `restaurantCountFor` stays for the old account
@@ -765,6 +771,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       }
       replaceServerIds(new Set());
       replaceMenuAccess(new Map());
+      setRestaurants(null);
       // The ids and the read that produced them reset together (001): a stale
       // "settled" marker over an empty id set would let the next sign-in paint
       // the same false chip.
@@ -2402,6 +2409,38 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // A list cached from another account is never offered as a move target.
   const ownedRestaurantsForAccount = ownedRestaurantsFor === accountKey ? ownedRestaurants : [];
   const restaurantsLoading = signedIn && ownedRestaurantsFor !== accountKey;
+  /**
+   * Capability answer for the shell. `null` while the restaurant read is in
+   * flight: a tab is never shown on a guess, and never hidden on one either
+   * (the nav simply waits). A failed read settles as an empty list, and an
+   * account with no café yet keeps every tab so a brand-new owner can start.
+   */
+  const restaurantList: RestaurantOption[] | null = !signedIn
+    ? []
+    : restaurantCountFor === accountKey
+      ? (restaurants ?? [])
+      : restaurantReadFailedFor === accountKey
+        ? []
+        : null;
+  const accountAccessPending = signedIn && restaurantList === null;
+  const accountCapabilities = new Set<string>();
+  for (const restaurant of restaurantList ?? []) {
+    for (const capability of restaurantCapabilities(restaurant)) {
+      accountCapabilities.add(capability);
+    }
+  }
+  // Menus can carry a capability the restaurant list has not been read for
+  // yet (or a filtered list omitted): union them, never replace.
+  for (const access of menuAccess.values()) {
+    if (access === "local" || access === "none") continue;
+    for (const capability of access.capabilities) accountCapabilities.add(capability);
+  }
+  const accountIsNew = restaurantList !== null && restaurantList.length === 0;
+  function accountCan(capability: Capability): boolean {
+    if (!signedIn || restaurantList === null) return false;
+    if (accountIsNew) return true;
+    return accountCapabilities.has(capability);
+  }
   // A name for the first-run "Name your restaurant" field, guessed from the
   // titles of the menus the move would copy (null when they say nothing).
   const suggestedRestaurantName = suggestRestaurantName(localOnly.map((menu) => menu.title));
@@ -2523,6 +2562,48 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // their writes anyway; the UI must not offer the controls at all).
   const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
 
+  // Shell surfaces follow the same answer as the rows and the editor.
+  const canOrders = accountCan("orders.read");
+  const canTables = accountCan("tables.print") || accountCan("tables.link");
+  const canSettings = accountCan("settings.read");
+  const canAssistant = accountCan("assistant.use");
+  const canMenus = accountCan("menus.read") || visibleMenus.length > 0;
+  const showMyMenus = signedIn ? canMenus : visibleMenus.length > 0;
+  const phoneTabList = (signedIn
+    ? phoneTabs()
+    : phoneTabs().filter((tab) => tab.id === "capture" || tab.id === "library")
+  ).filter((tab) =>
+    tab.id === "orders" ? canOrders : tab.id === "library" ? showMyMenus : true
+  );
+  const moreRows = moreSheetRows({
+    signedIn,
+    assistantEnabled: featureFlags.assistant && canAssistant,
+  }).filter((row) =>
+    row.id === "tables" ? canTables : row.id === "settings" ? canSettings : canAssistant
+  );
+  const canGetStarted = signedIn && accountCan("settings.manage");
+
+  // A typed URL or old bookmark for a surface this account cannot use lands
+  // on the first one it can. Unknown access is not a refusal: the guard waits.
+  useEffect(() => {
+    if (!signedIn || accountAccessPending) return;
+    const guarded = routeRef.current.screen;
+    if (guarded === "assistant" && featureFlagsLoading) return;
+    const allowed =
+      guarded === "orders"
+        ? canOrders
+        : guarded === "tables"
+          ? canTables
+          : guarded === "settings"
+            ? canSettings
+            : guarded === "assistant"
+              ? canAssistant && featureFlags.assistant
+              : true;
+    if (!allowed) {
+      navigateTo({ screen: canOrders ? "orders" : canMenus ? "library" : "capture" }, true);
+    }
+  });
+
   return (
     <OrderMonitorProvider userId={session?.user?.id ?? null}>
     <div className="flex min-h-full flex-1 flex-col">
@@ -2557,7 +2638,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 // My menus signed out is the anonymous working set: only
                 // worth a tab when there are drafts to continue (the outer
                 // gate already waited for the library to settle).
-                ...(signedIn || visibleMenus.length > 0
+                ...(showMyMenus
                   ? [
                       {
                         id: "library" as const,
@@ -2571,12 +2652,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 // gates signed-in accounts).
                 ...(signedIn
                   ? [
-                      { id: "orders" as const, label: "Orders" },
-                      ...(featureFlags.assistant
+                      ...(canOrders ? [{ id: "orders" as const, label: "Orders" }] : []),
+                      ...(featureFlags.assistant && canAssistant
                         ? [{ id: "assistant" as const, label: "Assistant" }]
                         : []),
-                      { id: "tables" as const, label: "Tables" },
-                      { id: "settings" as const, label: "Settings" },
+                      ...(canTables ? [{ id: "tables" as const, label: "Tables" }] : []),
+                      ...(canSettings ? [{ id: "settings" as const, label: "Settings" }] : []),
                     ]
                   : []),
               ] as const
@@ -3195,13 +3276,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         className="sticky bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur-sm sm:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div
-          className={`grid px-2 pt-1 ${signedIn ? "grid-cols-4" : "grid-cols-2"}`}
-        >
-          {(signedIn
-            ? phoneTabs()
-            : phoneTabs().filter((tab) => tab.id === "capture" || tab.id === "library")
-          ).map((tab) => (
+        <div className="flex px-2 pt-1">
+          {phoneTabList.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -3210,7 +3286,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 navigateTo({ screen: tab.id });
               }}
               aria-current={screen === tab.id ? "page" : undefined}
-              className={`relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
+              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
                 screen === tab.id ? "text-amber-800" : "text-stone-500"
               }`}
             >
@@ -3221,7 +3297,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               {tab.label}
             </button>
           ))}
-          {signedIn && (
+          {signedIn && (moreRows.length > 0 || canGetStarted) && (
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
@@ -3262,7 +3338,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-stone-200 bg-white px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
           >
             <div aria-hidden="true" className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-stone-200" />
-            {moreSheetRows({ signedIn, assistantEnabled: featureFlags.assistant }).map((row) => (
+            {moreRows.map((row) => (
               <button
                 key={row.id}
                 type="button"
@@ -3276,15 +3352,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 <span className="text-xs font-normal text-stone-500">{row.why}</span>
               </button>
             ))}
-            <a
-              href="/launch"
-              className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-            >
-              <span className="text-sm font-semibold text-stone-900">Get started</span>
-              <span className="text-xs font-normal text-stone-500">
-                The launch checklist and offer
-              </span>
-            </a>
+            {canGetStarted && (
+              <a
+                href="/launch"
+                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              >
+                <span className="text-sm font-semibold text-stone-900">Get started</span>
+                <span className="text-xs font-normal text-stone-500">
+                  The launch checklist and offer
+                </span>
+              </a>
+            )}
           </div>
         </div>
       )}

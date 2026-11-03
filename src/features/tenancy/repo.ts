@@ -4,7 +4,12 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { restaurant, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole, RestaurantWithRole } from "@/lib/db/schema";
 import { recordAuditEvent } from "./audit";
-import { can, getMembershipAccess } from "./policy";
+import {
+  accessFromMembership,
+  can,
+  getMembershipAccess,
+  type MembershipAccess,
+} from "./policy";
 
 /**
  * Tenancy repository — every function is scoped by `userId` so a signed-in
@@ -28,18 +33,36 @@ const restaurantColumns = {
 } as const;
 const membershipSelect = (db: TenancyDb) =>
   db
-    .select({ ...restaurantColumns, role: restaurantMembership.role })
+    .select({
+      ...restaurantColumns,
+      role: restaurantMembership.role,
+      permissions: restaurantMembership.permissions,
+    })
     .from(restaurant)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, restaurant.id));
+
+/** A restaurant row plus the caller's resolved capabilities in it. */
+export type RestaurantWithAccess = RestaurantWithRole & { access: MembershipAccess };
+
+function withAccess(
+  row: RestaurantWithRole & { permissions: readonly string[] | null }
+): RestaurantWithAccess {
+  const { permissions, ...rest } = row;
+  return {
+    ...rest,
+    access: accessFromMembership({ role: row.role, permissions }),
+  };
+}
 
 /** All restaurants the user is owner or staff of, oldest first. */
 export async function listRestaurantsForUser(
   db: TenancyDb,
   userId: string
-): Promise<RestaurantWithRole[]> {
-  return membershipSelect(db)
+): Promise<RestaurantWithAccess[]> {
+  const rows = await membershipSelect(db)
     .where(eq(restaurantMembership.userId, userId))
     .orderBy(asc(restaurant.createdAt));
+  return rows.map(withAccess);
 }
 
 /** One restaurant the user belongs to, or null (no leak of other tenants). */
@@ -47,11 +70,11 @@ export async function getRestaurantForUser(
   db: TenancyDb,
   userId: string,
   restaurantId: string
-): Promise<RestaurantWithRole | null> {
+): Promise<RestaurantWithAccess | null> {
   const rows = await membershipSelect(db).where(
     and(eq(restaurantMembership.userId, userId), eq(restaurant.id, restaurantId))
   );
-  return rows[0] ?? null;
+  return rows[0] ? withAccess(rows[0]) : null;
 }
 
 /**
@@ -66,11 +89,11 @@ export async function getRestaurantForUser(
 export async function getOwnedRestaurantForUser(
   db: TenancyDb,
   userId: string
-): Promise<RestaurantWithRole | null> {
+): Promise<RestaurantWithAccess | null> {
   const rows = await membershipSelect(db).where(
     and(eq(restaurantMembership.userId, userId), eq(restaurantMembership.role, "owner"))
   );
-  return rows[0] ?? null;
+  return rows[0] ? withAccess(rows[0]) : null;
 }
 
 /**
@@ -115,7 +138,7 @@ export async function renameRestaurantForOwner(
   userId: string,
   restaurantId: string,
   name: string
-): Promise<RestaurantWithRole | null> {
+): Promise<RestaurantWithAccess | null> {
   const access = await getMembershipAccess(db, userId, restaurantId);
   if (!can(access, "settings.manage")) return null;
   const updated = await db
@@ -124,7 +147,7 @@ export async function renameRestaurantForOwner(
     .where(eq(restaurant.id, restaurantId))
     .returning(restaurantColumns);
   const row = updated[0];
-  return row ? { ...row, role: access.role } : null;
+  return row ? { ...row, role: access.role, access } : null;
 }
 
 /** Owner-only delete (memberships cascade). False when not allowed / unknown. */

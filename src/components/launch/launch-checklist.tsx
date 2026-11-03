@@ -23,6 +23,7 @@ const CARDS_PRINTED_KEY = "eateryo:launch:cards-printed";
 type State =
   | { kind: "loading" }
   | { kind: "signed_out" }
+  | { kind: "owner_only" }
   | { kind: "error"; message: string }
   | { kind: "ready"; status: LaunchStatus };
 
@@ -66,6 +67,10 @@ export function LaunchChecklist() {
   const fail = useCallback((error: unknown) => {
     if (error instanceof SyncError && error.code === "unauthorized") {
       setState({ kind: "signed_out" });
+      return;
+    }
+    if (error instanceof SyncError && error.code === "forbidden") {
+      setState({ kind: "owner_only" });
       return;
     }
     setState({
@@ -152,6 +157,24 @@ export function LaunchChecklist() {
           </Link>{" "}
           — nothing leaves this browser and no account is needed.
         </p>
+      </div>
+    );
+  }
+
+  if (state.kind === "owner_only") {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-stone-900">This checklist is the owner’s</h2>
+        <p className="mt-1 text-sm leading-6 text-stone-600">
+          Signing in to help at a café gives you its menus, tables and orders — not its launch
+          steps. The café owner sees this checklist on their own sign-in.
+        </p>
+        <Link
+          href="/"
+          className="mt-3 inline-flex text-sm font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+        >
+          Go to your workspace
+        </Link>
       </div>
     );
   }

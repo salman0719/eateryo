@@ -11,8 +11,8 @@ import { launchSteps, verifiedProgress } from "@/features/launch/steps";
 import { placeOrderFromSlug } from "@/features/orders/repo";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { setRestaurantSlugForUser } from "@/features/tables/repo";
-import { createRestaurant } from "@/features/tenancy/repo";
-import { publishedMenu } from "@/lib/db/schema";
+import { createRestaurant, listRestaurantsForUser } from "@/features/tenancy/repo";
+import { publishedMenu, restaurantMembership } from "@/lib/db/schema";
 import type { TestDb } from "./helpers/pg-test-db";
 
 const holder: { db: TestDb | null; userId: string | null } = { db: null, userId: null };
@@ -203,5 +203,22 @@ describe("GET /api/launch", () => {
     const { GET } = await import("@/app/api/launch/route");
     const response = await GET();
     expect(response.status).toBe(401);
+  });
+
+  it("answers 403 for a staff account: the checklist is the owner's", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const staff = await seedUser(holder.db!, "launch-staff@cafe.test", "Staff");
+    const [place] = await listRestaurantsForUser(holder.db!, holder.userId!);
+    await holder.db!.insert(restaurantMembership).values({
+      restaurantId: place.id,
+      userId: staff,
+      role: "staff",
+    });
+    holder.userId = staff;
+
+    const { GET } = await import("@/app/api/launch/route");
+    const response = await GET();
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe("forbidden");
   });
 });

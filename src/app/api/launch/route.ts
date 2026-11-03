@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { getAssistantSpendSummary } from "@/features/assistant/repo";
 import { getLaunchSnapshot } from "@/features/launch/repo";
+import { listRestaurantsForUser } from "@/features/tenancy/repo";
+import { hasCapability } from "@/features/tenancy/permissions";
 import { getMonthlyUsageSummary } from "@/features/usage/repo";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
@@ -38,6 +40,25 @@ export async function GET(): Promise<NextResponse> {
 
   try {
     const db = getDb();
+    // The checklist is the owner's onboarding: extract, review, publish,
+    // print. A staff member cannot do those things, so the merged account
+    // snapshot would only hand them a list of steps they must not take.
+    const memberships = await listRestaurantsForUser(db, userId);
+    if (
+      !memberships.some((membership) =>
+        hasCapability(membership.access.capabilities, "settings.manage")
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error: {
+            code: "forbidden",
+            message: "The launch checklist belongs to the café owner.",
+          },
+        },
+        { status: 403 }
+      );
+    }
     const [snapshot, usage, assistant] = await Promise.all([
       getLaunchSnapshot(db, userId),
       getMonthlyUsageSummary(db, userId),
