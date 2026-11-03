@@ -73,7 +73,24 @@ export function createDevLinkStore(now: () => number = Date.now): DevLinkStore {
   };
 }
 
-const store = createDevLinkStore();
+/**
+ * Where the parked link actually lives.
+ *
+ * Not a module variable: Next gives every route entrypoint its own module
+ * instance, so `/api/auth/[...all]` (which parks the link) and
+ * `/api/dev/magic-link` (which reads it) would each get a different empty
+ * store, and every dev sign-in would report an expired link. The process
+ * object is shared across those bundles, and survives a dev HMR reload too.
+ */
+const DEV_LINK_STORE_KEY = "__eateryoDevLinkStore";
+
+export function getDevLinkStore(): DevLinkStore {
+  const scope = globalThis as unknown as Record<string, DevLinkStore | undefined>;
+  if (!scope[DEV_LINK_STORE_KEY]) {
+    scope[DEV_LINK_STORE_KEY] = createDevLinkStore();
+  }
+  return scope[DEV_LINK_STORE_KEY];
+}
 
 /**
  * `sendMagicLink` replacement used only when the bypass is on: it delivers
@@ -90,11 +107,11 @@ export async function captureDevSignInLink({
     // Unreachable through the auth config, and never a silent success.
     throw new Error("Dev sign-in bypass is not enabled");
   }
-  store.remember(email, url);
+  getDevLinkStore().remember(email, url);
 }
 
 /** The pending link for this address, consumed on read; null when unavailable. */
 export function takeDevSignInLink(email: string): string | null {
   if (!isDevSignInEnabled()) return null;
-  return store.take(email);
+  return getDevLinkStore().take(email);
 }

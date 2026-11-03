@@ -110,9 +110,15 @@ export function MagicLinkForm({
 
   // Dev bypass: the server parked the link instead of emailing it. Read it
   // back once; state only changes from the promise callbacks, never inline.
+  // One read per address: the link is single-use, and React's development
+  // double-mount would otherwise spend it on the first call and then report an
+  // expiry that never happened.
+  const devReadRef = useRef<string | null>(null);
   useEffect(() => {
     if (!devSignIn || status.kind !== "sent") return;
     const email = status.email;
+    if (devReadRef.current === email) return;
+    devReadRef.current = email;
     let cancelled = false;
     fetch(`/api/dev/magic-link?email=${encodeURIComponent(email)}`, { cache: "no-store" })
       .then(async (response) =>
@@ -143,6 +149,9 @@ export function MagicLinkForm({
       return;
     }
     const sent = { email, sentAt: Date.now() };
+    // A fresh request earns a fresh read: the previous link is spent.
+    devReadRef.current = null;
+    setDevLink(null);
     setStatus({ kind: "sent", ...sent });
     onSent?.(sent);
   }
@@ -150,6 +159,8 @@ export function MagicLinkForm({
   function resetToIdle() {
     onSentCleared?.();
     setLinkError(false);
+    devReadRef.current = null;
+    setDevLink(null);
     setStatus({ kind: "idle" });
   }
 

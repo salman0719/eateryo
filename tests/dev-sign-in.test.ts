@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createDevLinkStore, isDevSignInEnabled } from "@/lib/auth/dev-sign-in";
 
@@ -55,5 +55,36 @@ describe("createDevLinkStore", () => {
     store.remember("owner@cafe.test", url);
     store.clear();
     expect(store.take("owner@cafe.test")).toBeNull();
+  });
+});
+
+describe("the parked link is process-wide", () => {
+  const url = "http://localhost:3200/api/auth/magic-link/verify?token=shared";
+
+  /**
+   * Next gives every route entrypoint its own module instance, so the auth
+   * route that parks the link and `/api/dev/magic-link` that reads it do not
+   * share module state. Reloading the module is that split in miniature: the
+   * link must still be there, or every local sign-in reports an expired one.
+   */
+  it("survives a module reload, so the reading route finds the link", async () => {
+    const previous = process.env.DEV_SIGN_IN_BYPASS;
+    process.env.DEV_SIGN_IN_BYPASS = "1";
+    try {
+      const parking = await import("@/lib/auth/dev-sign-in");
+      await parking.captureDevSignInLink({ email: "owner@cafe.test", url });
+
+      vi.resetModules();
+      const reading = await import("@/lib/auth/dev-sign-in");
+
+      expect(reading.takeDevSignInLink("owner@cafe.test")).toBe(url);
+      // Still a one-time credential: the second read finds nothing.
+      expect(reading.takeDevSignInLink("owner@cafe.test")).toBeNull();
+    } finally {
+      const cleanup = await import("@/lib/auth/dev-sign-in");
+      cleanup.getDevLinkStore().clear();
+      if (previous === undefined) delete process.env.DEV_SIGN_IN_BYPASS;
+      else process.env.DEV_SIGN_IN_BYPASS = previous;
+    }
   });
 });

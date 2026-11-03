@@ -122,8 +122,10 @@ errors, or add lint/type suppressions just to make checks pass.
   explicit button, so the browser still walks the real verification route.
   Off in production whatever the variable says (the flag check returns false
   for `NODE_ENV=production`), never a direct session insert, one read per
-  link for the address that asked, five-minute window. Tests:
-  `tests/dev-sign-in.test.ts`
+  link for the address that asked, five-minute window. The store sits on
+  `globalThis` because each route entrypoint is its own module instance: a
+  module-level one is empty in the route that reads it, which made every dev
+  sign-in report an expired link. Tests: `tests/dev-sign-in.test.ts`
 - `src/features/session/state.ts` — the pure tri-state session read
   (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
   matrix; a page load whose session has not answered is **never** treated as
