@@ -87,8 +87,15 @@ export function decideMenuOpen(input: {
   stampAccountId?: string | null;
   /** The signed-in caller's account id. */
   accountKey: string | null;
+  /**
+   * The server listed this menu for the signed-in caller as a published-only
+   * reader. The cached row may be stamped to the account that wrote the
+   * draft, but the published snapshot is shared content and may be opened.
+   */
+  sharedPublished?: boolean;
 }): MenuOpenDecision {
   if (input.session === "unknown") return { state: "wait" };
+  if (input.session === "signed-in" && input.sharedPublished) return { state: "open" };
   const stamp = input.stampAccountId ?? "";
   if (!stamp) return { state: "open" };
   if (input.session === "signed-out") return { state: "blocked", reason: "signed-out" };

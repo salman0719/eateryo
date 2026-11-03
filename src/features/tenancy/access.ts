@@ -37,6 +37,23 @@ export function accessCan(
 }
 
 /**
+ * A menu the server listed for a published-only reader: it may be read, but
+ * the working draft is not part of the answer. Its cached row may still be
+ * stamped to the account that wrote the draft (a shared device), so the
+ * published snapshot is shared content even across that stamp.
+ */
+export function isPublishedOnlyAccess(access: MenuAccess | undefined): boolean {
+  return (
+    access !== undefined &&
+    access !== "local" &&
+    access !== "none" &&
+    accessCan(access, "menus.read") &&
+    !accessCan(access, "menus.read_draft") &&
+    !accessCan(access, "menus.write")
+  );
+}
+
+/**
  * A restaurant's capabilities. The server sends `access`; a stubbed or older
  * payload without it falls back to the role's defaults, never to "allow".
  */

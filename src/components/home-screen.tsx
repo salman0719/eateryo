@@ -109,6 +109,7 @@ import { useFeatureFlags } from "@/features/flags/client";
 import {
   accessCan,
   accessIsStaff,
+  isPublishedOnlyAccess,
   menuAccessById,
   restaurantCapabilities,
   type MenuAccess,
@@ -675,10 +676,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           // somebody else stays shut. An unanswered session decides nothing
           // here — the effect re-runs when the read settles.
           const origin = await getDraftOrigin(menuId).catch(() => undefined);
+          // The server's own list is the second authority for a shared
+          // browser: a published menu it listed for this account opens even
+          // when the local row is stamped to the owner who wrote the draft.
+          const sharedPublished =
+            accountMenusSettledRef.current === accountKeyRef.current &&
+            isPublishedOnlyAccess(menuAccessRef.current.get(menuId));
           const access = decideMenuOpen({
             session: sessionStateRef.current,
             stampAccountId: origin?.accountId,
             accountKey: accountKeyRef.current,
+            sharedPublished,
           });
           if (access.state === "wait") {
             if (cancelled) return;
@@ -2380,15 +2388,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // sharing a device with staff). The server has already projected the
   // content to the published revision, so the row is safe to show.
   const sharedLiveMenuIds = new Set(
-    [...serverIds].filter((id) => {
-      const access = menuAccess.get(id);
-      if (access === undefined || access === "local" || access === "none") return false;
-      return (
-        accessCan(access, "menus.read") &&
-        !accessCan(access, "menus.read_draft") &&
-        !accessCan(access, "menus.write")
-      );
-    })
+    [...serverIds].filter((id) => isPublishedOnlyAccess(menuAccess.get(id)))
   );
   const visibleIds = new Set(
     visibleMenuIds(

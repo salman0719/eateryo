@@ -91,6 +91,25 @@ describe("menu access", () => {
     );
   });
 
+  it("opens a published menu the server listed, even under another account's stamp", () => {
+    expect(
+      decideMenuOpen({
+        session: "signed-in",
+        stampAccountId: someoneElse,
+        accountKey: me,
+        sharedPublished: true,
+      })
+    ).toEqual({ state: "open" });
+    expect(
+      decideMenuOpen({
+        session: "signed-in",
+        stampAccountId: someoneElse,
+        accountKey: me,
+        sharedPublished: false,
+      })
+    ).toEqual({ state: "blocked", reason: "other-account" });
+  });
+
   it("keeps a row that belongs to another account on this device shut", () => {
     expect(
       decideMenuOpen({ session: "signed-in", stampAccountId: someoneElse, accountKey: me })
