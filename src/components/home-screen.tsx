@@ -1447,6 +1447,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   async function handleRenameMenu(id: string, title: string) {
+    const access = menuAccessRef.current.get(id);
+    if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
+      setLibraryError("Only someone with menu access can rename this menu.");
+      return;
+    }
     try {
       const renamed = await renameMenu(id, title);
       const renameActor = signedInRef.current ? accountKeyRef.current : null;
@@ -1853,6 +1858,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   async function handleDeleteMenu(id: string) {
+    const access = menuAccessRef.current.get(id);
+    if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
+      setLibraryError("Only someone with menu access can delete this menu.");
+      return;
+    }
     try {
       // Remove it from the account first when it is there, so a failure is
       // reported before the browser copy is gone. The browser delete always
@@ -2369,7 +2379,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const hasHiddenMenus = visibleMenus.length !== menus.length;
   // Library rows carry their account state: menus on the server show as
   // synced; the rest are browser-only until moved (or downloaded).
-  const libraryMenus = visibleMenus.map((menu) => ({ ...menu, onServer: serverIds.has(menu.id) }));
+  const libraryMenus = visibleMenus.map((menu) => ({
+    ...menu,
+    onServer: serverIds.has(menu.id),
+    // The row's verbs follow the same answer as the editor. An unanswered
+    // menu is read-only here too, so no owner control appears on a guess.
+    canWrite: !signedIn || accessCan(menuAccess.get(menu.id), "menus.write"),
+  }));
   /**
    * The chip column may only speak once the account's menu list has been read
    * (001). Before that an empty id set is "not asked yet", so the rows keep

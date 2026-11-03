@@ -18,6 +18,12 @@ import { CommitInput } from "./fields";
  */
 export interface LibraryMenu extends MenuSummary {
   onServer: boolean;
+  /**
+   * False when the server says this caller may not change the menu. A row
+   * without an answer is never offered a write; the shell fills this from
+   * the same capabilities the editor uses.
+   */
+  canWrite?: boolean;
 }
 
 interface LibraryPanelProps {
@@ -215,11 +221,15 @@ export function LibraryPanel({
               ) : (
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <div className="w-full min-w-0 flex-1 sm:w-auto">
-                    <CommitInput
-                      label={`Rename menu “${menu.title}”`}
-                      value={menu.title}
-                      onCommit={(title) => onRename(menu.id, title.trim())}
-                    />
+                    {menu.canWrite === false ? (
+                      <p className="text-sm font-semibold text-stone-900">{menu.title}</p>
+                    ) : (
+                      <CommitInput
+                        label={`Rename menu “${menu.title}”`}
+                        value={menu.title}
+                        onCommit={(title) => onRename(menu.id, title.trim())}
+                      />
+                    )}
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
                       <span>
                         {menu.categoryCount} {menu.categoryCount === 1 ? "category" : "categories"}{" "}
@@ -237,12 +247,17 @@ export function LibraryPanel({
                           {menu.onServer ? "On your account" : "This browser only"}
                         </span>
                       )}
+                      {menu.canWrite === false && (
+                        <span className="whitespace-nowrap rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
+                          View only
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {/* Only a read that proved membership may offer the move:
                         while it is unknown, "not on the account" is a guess. */}
-                    {accountMode && !menu.onServer && moveAvailable && (
+                    {menu.canWrite !== false && accountMode && !menu.onServer && moveAvailable && (
                       <button
                         type="button"
                         onClick={() => startMove(menu.id)}
@@ -259,20 +274,22 @@ export function LibraryPanel({
                     >
                       Open
                     </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
-                          confirmLabel: "Delete menu",
-                          destructive: true,
-                        });
-                        if (ok) onDelete(menu.id);
-                      }}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                    >
-                      Delete
-                    </button>
+                    {menu.canWrite !== false && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
+                            confirmLabel: "Delete menu",
+                            destructive: true,
+                          });
+                          if (ok) onDelete(menu.id);
+                        }}
+                        className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
