@@ -2375,11 +2375,27 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // never render for anyone else (or for nobody signed out); anonymous rows
   // are the shared working set. Hidden rows also stay out of the claim
   // offer, the manual import, the tab count, and the restaurant name guess.
+  // A published-only reader gets the live snapshot even when this browser's
+  // cached row is stamped to the account that wrote the draft (the owner
+  // sharing a device with staff). The server has already projected the
+  // content to the published revision, so the row is safe to show.
+  const sharedLiveMenuIds = new Set(
+    [...serverIds].filter((id) => {
+      const access = menuAccess.get(id);
+      if (access === undefined || access === "local" || access === "none") return false;
+      return (
+        accessCan(access, "menus.read") &&
+        !accessCan(access, "menus.read_draft") &&
+        !accessCan(access, "menus.write")
+      );
+    })
+  );
   const visibleIds = new Set(
     visibleMenuIds(
       menus.map((menu) => menu.id),
       originList,
-      signedIn ? accountKey : null
+      signedIn ? accountKey : null,
+      sharedLiveMenuIds
     )
   );
   const visibleMenus = menus.filter((menu) => visibleIds.has(menu.id));

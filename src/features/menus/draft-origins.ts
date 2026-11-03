@@ -196,10 +196,17 @@ export function decideHeal(inputs: HealInputs): HealDecision {
 export function visibleMenuIds(
   menuIds: string[],
   origins: Pick<DraftOrigin, "menuId" | "accountId">[],
-  accountId: string | null
+  accountId: string | null,
+  /**
+   * Published-only menus the server just listed for this account. Their
+   * cached row may still be stamped to the account that wrote the draft;
+   * the published snapshot is shared content, so it is visible anyway.
+   */
+  sharedMenuIds: ReadonlySet<string> = new Set()
 ): string[] {
   const ownerOf = new Map(origins.map((origin) => [origin.menuId, origin.accountId]));
   return menuIds.filter((id) => {
+    if (sharedMenuIds.has(id)) return true;
     const owner = ownerOf.get(id);
     // Anonymous rows are visible to everyone signed in or out.
     if (!owner) return true;
