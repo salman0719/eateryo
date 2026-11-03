@@ -2582,6 +2582,21 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     row.id === "tables" ? canTables : row.id === "settings" ? canSettings : canAssistant
   );
   const canGetStarted = signedIn && accountCan("settings.manage");
+  /** Why an empty library is empty, when the shell can tell. */
+  const libraryEmpty =
+    signedIn && restaurantList !== null
+      ? restaurantList.length === 0
+        ? {
+            title: "No café on this account yet",
+            body: "If you were invited, open the invitation link from your email, or ask the owner to add this address in Settings → Team. Otherwise, capture a menu to start your own café.",
+          }
+        : !accountCan("menus.write")
+          ? {
+              title: "No menus to show",
+              body: "Staff see published menus only. Ask the owner to publish one; drafts and unpublished menus stay private until then.",
+            }
+          : undefined
+      : undefined;
 
   // A typed URL or old bookmark for a surface this account cannot use lands
   // on the first one it can. Unknown access is not a refusal: the guard waits.
@@ -2804,6 +2819,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               loading={libraryLoading || libraryAccountPending}
               accountMode={libraryAccountMode}
               hasHiddenMenus={hasHiddenMenus}
+              emptyTitle={libraryEmpty?.title}
+              emptyBody={libraryEmpty?.body}
               ownedRestaurants={signedIn ? ownedRestaurantsForAccount : []}
               onMoveToAccount={handleMoveMenuToAccount}
               unavailable={storageDown}

@@ -46,6 +46,9 @@ interface LibraryPanelProps {
    */
   onMoveToAccount?: (menuId: string, restaurantId: string) => Promise<string | null>;
   unavailable: boolean;
+  /** Overrides the empty state when the shell knows why there is nothing. */
+  emptyTitle?: string;
+  emptyBody?: string;
   onOpen: (id: string) => void;
   /** Optional service name from the second-menu chips (Lunch, Dinner…). */
   onNew: (suggestedTitle?: string) => void;
@@ -67,6 +70,8 @@ export function LibraryPanel({
   ownedRestaurants = [],
   onMoveToAccount,
   unavailable,
+  emptyTitle,
+  emptyBody,
   onOpen,
   onNew,
   onRename,
@@ -183,12 +188,20 @@ export function LibraryPanel({
       ) : menus.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
           <p className="font-medium text-stone-900">
-            {hasHiddenMenus ? "Signed out" : "No saved menus yet"}
+            {emptyTitle ??
+              (hasHiddenMenus
+                ? accountMode
+                  ? "No menus for this account"
+                  : "Signed out"
+                : "No saved menus yet")}
           </p>
           <p className="mt-1 text-sm text-stone-600">
-            {hasHiddenMenus
-              ? "Your menus reappear when you sign in."
-              : "Extract a menu or start a blank one — it will appear here and survive refreshes."}
+            {emptyBody ??
+              (hasHiddenMenus
+                ? accountMode
+                  ? "This device holds menus for another account. Sign in as that account to see them."
+                  : "Your menus reappear when you sign in."
+                : "Extract a menu or start a blank one — it will appear here and survive refreshes.")}
           </p>
         </div>
       ) : (
