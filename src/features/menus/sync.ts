@@ -21,6 +21,15 @@ import { z } from "zod";
 
 import { menuAvailabilitySchema } from "@/features/availability/schema";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
+import { CAPABILITIES } from "@/features/tenancy/permissions";
+
+/** The caller's capabilities on the menu's restaurant (server-resolved). */
+export const membershipAccessSchema = z.object({
+  role: z.enum(["owner", "staff"]),
+  capabilities: z.array(z.enum(CAPABILITIES)),
+});
+
+export type MembershipAccess = z.infer<typeof membershipAccessSchema>;
 
 /** Summary shape returned by list endpoints (mirrors the server repo). */
 export const serverMenuSummarySchema = z.object({
@@ -32,6 +41,7 @@ export const serverMenuSummarySchema = z.object({
   availability: menuAvailabilitySchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  access: membershipAccessSchema,
 });
 
 /** A full server menu: summary fields plus the canonical document. */

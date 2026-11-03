@@ -47,6 +47,9 @@ describe("menu repo", () => {
     expect(created.id).toBe("menu-import-1");
     expect(created.restaurantId).toBe(restaurantA);
     expect(created.title).toBe(doc.title);
+    // The access answer rides with the menu, so no second read is needed.
+    expect(created.access.role).toBe("owner");
+    expect(created.access.capabilities).toContain("menus.write");
 
     const fetched = await getMenuForUser(db, ownerA, "menu-import-1");
     // Full fidelity: category/item order, inner ids, variants, options,
@@ -65,6 +68,7 @@ describe("menu repo", () => {
 
     const list = await listMenusForUser(db, ownerA);
     expect(list.map((m) => m.id)).toEqual(["menu-import-1"]);
+    expect(list[0]?.access.role).toBe("owner");
   });
 
   it("refuses to create over an existing id (import skips existing)", async () => {
@@ -105,9 +109,12 @@ describe("menu repo", () => {
       role: "staff",
     });
 
-    // Read works.
+    // Read works, and the payload itself says this caller cannot write.
     const seen = await getMenuForUser(db, staff, "menu-staff-read");
     expect(seen.id).toBe("menu-staff-read");
+    expect(seen.access.role).toBe("staff");
+    expect(seen.access.capabilities).toContain("menus.read");
+    expect(seen.access.capabilities).not.toContain("menus.write");
     // Writes do not.
     await expect(
       updateMenuForUser(db, staff, "menu-staff-read", sampleDoc("menu-staff-read"), seen.updatedAt)

@@ -61,6 +61,13 @@ export interface ServerMenuSummary {
   availability: MenuAvailability;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The caller's capabilities on this menu's restaurant, resolved from the
+   * same membership row the query already joined. Returning it with the menu
+   * means the browser never needs a second read to know whether it may show
+   * an edit control.
+   */
+  access: MembershipAccess;
 }
 
 export interface ServerMenu extends ServerMenuSummary {
@@ -105,7 +112,7 @@ function iso(value: Date): string {
   return value.toISOString();
 }
 
-function toSummary(row: Omit<MenuWithRole, "doc" | "role">): ServerMenuSummary {
+function toSummary(row: Omit<MenuWithRole, "doc">): ServerMenuSummary {
   const availability = menuAvailabilitySchema.safeParse(row.availability);
   if (!availability.success) {
     throw new Error(`stored menu ${row.id} has invalid availability`);
@@ -119,6 +126,7 @@ function toSummary(row: Omit<MenuWithRole, "doc" | "role">): ServerMenuSummary {
     availability: availability.data,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
+    access: accessFromMembership(row),
   };
 }
 

@@ -27,6 +27,7 @@ const serverMenuPayload = {
     availability: [],
     createdAt: "2026-10-18T05:00:00.000Z",
     updatedAt: "2026-10-18T06:00:00.000Z",
+    access: { role: "owner", capabilities: ["menus.read", "menus.write"] },
     doc: createSampleMenuDocument(),
   },
 };
@@ -50,6 +51,7 @@ describe("fetchServerMenus", () => {
     const menus = await fetchServerMenus();
     expect(menus).toHaveLength(1);
     expect(menus[0].id).toBe("menu-1");
+    expect(menus[0].access.capabilities).toContain("menus.write");
     expect(fetchMock).toHaveBeenCalledWith("/api/menus", undefined);
   });
 

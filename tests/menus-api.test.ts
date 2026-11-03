@@ -112,6 +112,9 @@ describe("GET /api/menus", () => {
     expect(payload.menus).toHaveLength(1);
     expect(payload.menus[0].restaurantId).toBe(restaurantId);
     expect(typeof payload.menus[0].title).toBe("string");
+    // The list itself carries the caller's capabilities (commit 4 envelope).
+    expect(payload.menus[0].access.role).toBe("owner");
+    expect(payload.menus[0].access.capabilities).toContain("menus.write");
   });
 });
 
