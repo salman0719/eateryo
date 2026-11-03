@@ -1243,11 +1243,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       const staffOnly = !serverCanWrite;
       const origin = actor ? await getDraftOrigin(localDoc.id).catch(() => undefined) : undefined;
       if (origin && actor && origin.accountId !== actor) {
-        // Another account's cached row on this device: never touch it.
-        removeServerId(localDoc.id);
-        setMenuAccessFor(localDoc.id, "none");
-        setSaveState(savedState("Saved in this browser — not in your account."));
-        return;
+        // Another account's cached row on this device: never touch its
+        // draft. The exception is a published menu the server just listed
+        // for this read-only caller — that is the shared live snapshot, and
+        // the next step replaces the cached draft with it.
+        if (!isPublishedOnlyAccess(serverAccess)) {
+          removeServerId(localDoc.id);
+          setMenuAccessFor(localDoc.id, "none");
+          setSaveState(savedState("Saved in this browser — not in your account."));
+          return;
+        }
       }
       const equal = sameMenuContent(serverMenu.doc, localDoc);
       const localHash = menuContentHash(localDoc);
