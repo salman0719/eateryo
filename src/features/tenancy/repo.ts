@@ -4,6 +4,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { restaurant, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole, RestaurantWithRole } from "@/lib/db/schema";
 import { recordAuditEvent } from "./audit";
+import { can, getMembershipAccess } from "./policy";
 
 /**
  * Tenancy repository — every function is scoped by `userId` so a signed-in
@@ -115,15 +116,15 @@ export async function renameRestaurantForOwner(
   restaurantId: string,
   name: string
 ): Promise<RestaurantWithRole | null> {
-  const role = await ownerRoleOf(db, userId, restaurantId);
-  if (role !== "owner") return null;
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return null;
   const updated = await db
     .update(restaurant)
     .set({ name })
     .where(eq(restaurant.id, restaurantId))
     .returning(restaurantColumns);
   const row = updated[0];
-  return row ? { ...row, role } : null;
+  return row ? { ...row, role: access.role } : null;
 }
 
 /** Owner-only delete (memberships cascade). False when not allowed / unknown. */
@@ -132,8 +133,8 @@ export async function deleteRestaurantForOwner(
   userId: string,
   restaurantId: string
 ): Promise<boolean> {
-  const role = await ownerRoleOf(db, userId, restaurantId);
-  if (role !== "owner") return false;
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return false;
   const deleted = await db
     .delete(restaurant)
     .where(eq(restaurant.id, restaurantId))
@@ -190,13 +191,12 @@ async function requireOwner(
   db: TenancyDb,
   userId: string,
   restaurantId: string
-): Promise<"owner"> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) throw new TenancyRepoError("not_found", "That restaurant does not exist.");
-  if (role !== "owner") {
+): Promise<void> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) throw new TenancyRepoError("not_found", "That restaurant does not exist.");
+  if (!can(access, "team.manage")) {
     throw new TenancyRepoError("forbidden", "Only the restaurant owner can manage members.");
   }
-  return "owner";
 }
 
 /**
@@ -395,30 +395,4 @@ async function getMember(
     )
   );
   return rows[0] ?? null;
-}
-
-/** The caller's role in the restaurant, or null if they are not a member. */
-async function roleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<RestaurantRole | null> {
-  const rows = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.userId, userId),
-        eq(restaurantMembership.restaurantId, restaurantId)
-      )
-    );
-  return rows[0]?.role ?? null;
-}
-
-async function ownerRoleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<"owner" | null> {
-  return (await roleOf(db, userId, restaurantId)) === "owner" ? "owner" : null;
 }

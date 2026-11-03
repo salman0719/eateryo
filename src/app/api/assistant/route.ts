@@ -20,7 +20,7 @@ import {
   type ServerMenu,
 } from "@/features/menus/repo";
 import { listRestaurantsForUser, type TenancyDb } from "@/features/tenancy/repo";
-import type { RestaurantRole } from "@/lib/db/schema";
+import { can, type MembershipAccess } from "@/features/tenancy/policy";
 import {
   AssistantProviderError,
   completeAssistantChat,
@@ -149,7 +149,7 @@ async function loadMenu(
   userId: string,
   menuId: string,
   requestId: string
-): Promise<{ menu: ServerMenu; role: RestaurantRole } | NextResponse> {
+): Promise<{ menu: ServerMenu; access: MembershipAccess } | NextResponse> {
   try {
     return await getMenuWithRoleForUser(db, userId, menuId);
   } catch (error) {
@@ -275,10 +275,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   let targetMenu: ServerMenu | null = null;
   if (parsed.data.menuId) {
     const loaded = await loadMenu(db, userId, parsed.data.menuId, requestId);
-    if (loaded instanceof NextResponse) return loaded;
-    // Staff are read-only for menus by design, so they only get the help
-    // surface even when the browser sends a menu id.
-    targetMenu = loaded.role === "owner" ? loaded.menu : null;
+    if (loaded instanceof NextResponse) return loaded;    // A member without menu write access only gets the help surface even
+    // when the browser sends a menu id.
+    targetMenu = can(loaded.access, "menus.write") ? loaded.menu : null;
   }
 
   let restaurants: AssistantContextRestaurant[];

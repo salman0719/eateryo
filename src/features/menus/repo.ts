@@ -3,6 +3,12 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { menu, restaurant, restaurantMembership } from "@/lib/db/schema";
 import type { RestaurantRole } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import {
+  accessFromMembership,
+  can,
+  getMembershipAccess,
+  type MembershipAccess,
+} from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { menuAvailabilitySchema, type MenuAvailability } from "@/features/availability/schema";
 
@@ -73,6 +79,7 @@ type MenuWithRole = {
   createdAt: Date;
   updatedAt: Date;
   role: RestaurantRole;
+  permissions: string[] | null;
 };
 
 const menuJoin = (db: TenancyDb) =>
@@ -88,6 +95,7 @@ const menuJoin = (db: TenancyDb) =>
       createdAt: menu.createdAt,
       updatedAt: menu.updatedAt,
       role: restaurantMembership.role,
+      permissions: restaurantMembership.permissions,
     })
     .from(menu)
     .innerJoin(restaurant, eq(menu.restaurantId, restaurant.id))
@@ -166,13 +174,13 @@ export async function createMenuForUser(
   restaurantId: string,
   input: MenuDocument
 ): Promise<ServerMenu> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) {
     // No membership: the restaurant must not be distinguishable from a
     // nonexistent one.
     throw new MenuRepoError("not_found", "That restaurant does not exist.");
   }
-  if (role !== "owner") {
+  if (!can(access, "menus.write")) {
     throw new MenuRepoError("forbidden", "Only the restaurant owner can add menus.");
   }
   const { doc, updatedAt } = prepareDoc(input);
@@ -219,13 +227,13 @@ export async function getMenuWithRoleForUser(
   db: TenancyDb,
   userId: string,
   menuId: string
-): Promise<{ menu: ServerMenu; role: RestaurantRole }> {
+): Promise<{ menu: ServerMenu; access: MembershipAccess }> {
   const rows = await menuJoin(db).where(
     and(eq(menu.id, menuId), eq(restaurantMembership.userId, userId))
   );
   const row = rows[0];
   if (!row) throw new MenuRepoError("not_found", "That menu does not exist.");
-  return { menu: toMenu(row), role: row.role };
+  return { menu: toMenu(row), access: accessFromMembership(row) };
 }
 
 /**
@@ -246,7 +254,7 @@ export async function updateMenuForUser(
   );
   const existing = rows[0];
   if (!existing) throw new MenuRepoError("not_found", "That menu does not exist.");
-  if (existing.role !== "owner") {
+  if (!can(accessFromMembership(existing), "menus.write")) {
     throw new MenuRepoError("forbidden", "Only the restaurant owner can change menus.");
   }
 
@@ -302,7 +310,7 @@ export async function deleteMenuForUser(
   );
   const existing = rows[0];
   if (!existing) return false;
-  if (existing.role !== "owner") {
+  if (!can(accessFromMembership(existing), "menus.write")) {
     throw new MenuRepoError("forbidden", "Only the restaurant owner can delete menus.");
   }
   const deleted = await db.delete(menu).where(eq(menu.id, menuId)).returning({ id: menu.id });
@@ -312,21 +320,4 @@ export async function deleteMenuForUser(
 async function menuExists(db: TenancyDb, menuId: string): Promise<boolean> {
   const rows = await db.select({ id: menu.id }).from(menu).where(eq(menu.id, menuId));
   return rows.length > 0;
-}
-
-async function roleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<RestaurantRole | null> {
-  const rows = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.userId, userId),
-        eq(restaurantMembership.restaurantId, restaurantId)
-      )
-    );
-  return rows[0]?.role ?? null;
 }

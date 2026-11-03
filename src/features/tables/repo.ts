@@ -8,6 +8,11 @@ import {
   restaurantMembership,
 } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import {
+  accessFromMembership,
+  can,
+  getMembershipAccess,
+} from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { menuSlugSchema } from "@/features/publishing/schema";
 import { isSlug, slugCandidates, slugifyMenuTitle } from "@/features/publishing/slug";
@@ -118,13 +123,14 @@ export async function setMenuAvailabilityForUser(
       id: menu.id,
       restaurantId: menu.restaurantId,
       role: restaurantMembership.role,
+      permissions: restaurantMembership.permissions,
     })
     .from(menu)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
     .where(and(eq(menu.id, menuId), eq(restaurantMembership.userId, userId)));
   const row = rows[0];
   if (!row) throw new TableRepoError("not_found", "That menu does not exist.");
-  if (row.role !== "owner") {
+  if (!can(accessFromMembership(row), "menus.write")) {
     throw new TableRepoError("forbidden", "Only the restaurant owner can set opening times.");
   }
   const parsed = menuAvailabilitySchema.safeParse(windows);
@@ -171,9 +177,9 @@ export async function setRestaurantSlugForUser(
   restaurantId: string,
   slug: string
 ): Promise<{ id: string; name: string; slug: string }> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) throw new TableRepoError("not_found", "That restaurant does not exist.");
-  if (role !== "owner") {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) throw new TableRepoError("not_found", "That restaurant does not exist.");
+  if (!can(access, "tables.link")) {
     throw new TableRepoError("forbidden", "Only the restaurant owner can change its link.");
   }
   const parsed = menuSlugSchema.safeParse(slug);
@@ -255,9 +261,9 @@ export async function ensureRestaurantSlugForUser(
   userId: string,
   restaurantId: string
 ): Promise<{ id: string; name: string; slug: string }> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) throw new TableRepoError("not_found", "That restaurant does not exist.");
-  if (role !== "owner") {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) throw new TableRepoError("not_found", "That restaurant does not exist.");
+  if (!can(access, "tables.link")) {
     throw new TableRepoError("forbidden", "Only the restaurant owner can change its link.");
   }
   return ensureRestaurantSlug(db, restaurantId);
@@ -273,23 +279,6 @@ async function restaurantSlugTakenByAnother(
     .from(restaurant)
     .where(eq(restaurant.slug, slug));
   return rows.some((row) => row.id !== restaurantId);
-}
-
-async function roleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<"owner" | "staff" | null> {
-  const rows = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.userId, userId),
-        eq(restaurantMembership.restaurantId, restaurantId)
-      )
-    );
-  return rows[0]?.role ?? null;
 }
 
 /** Public: a restaurant by its `/r/<slug>` address, or null. */
