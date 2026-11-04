@@ -75,7 +75,7 @@ export function OrderAlertsCard({
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5">
+    <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Order alerts</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         One email per new order for {restaurantName}, from the verified Eateryo sender. A rush

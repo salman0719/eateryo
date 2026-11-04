@@ -108,7 +108,7 @@ export function ExtractionProgress({
         </div>
 
         <ol aria-label="Extraction steps" className="mt-4 flex flex-wrap gap-1.5">
-          <li className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-medium text-amber-900">
+          <li className="inline-flex items-center gap-1.5 rounded-full bg-surface-base/70 px-2.5 py-1 text-[11px] font-medium text-amber-900">
             {photosReady ? (
               <span aria-hidden="true">✓</span>
             ) : (
@@ -127,10 +127,10 @@ export function ExtractionProgress({
             aria-current="step"
             className="inline-flex items-center gap-1.5 rounded-full bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white"
           >
-            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-white" />
+            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-surface-base" />
             Read &amp; draft
           </li>
-          <li className="inline-flex items-center gap-1.5 rounded-full bg-white/50 px-2.5 py-1 text-[11px] font-medium text-amber-800/70">
+          <li className="inline-flex items-center gap-1.5 rounded-full bg-surface-base/50 px-2.5 py-1 text-[11px] font-medium text-amber-800/70">
             <span aria-hidden="true" className="h-2 w-2 rounded-full border border-amber-700/40" />
             Save
           </li>
@@ -141,7 +141,7 @@ export function ExtractionProgress({
         </p>
       </div>
 
-      <aside className="rounded-2xl border border-stone-200 bg-white p-5">
+      <aside className="rounded-2xl border border-stone-200 bg-surface-base p-5">
         <p className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase">
           While you wait
         </p>

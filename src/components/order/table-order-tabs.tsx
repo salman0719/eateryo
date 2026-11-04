@@ -288,7 +288,7 @@ export function TableOrderTabs({
     }
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
 
   /**
    * What sits under the cart's total — one node for the phone sheet and the
@@ -556,7 +556,7 @@ export function TableOrderTabs({
           >
             <div
               role="tooltip"
-              className="w-max max-w-[16rem] rounded-xl bg-stone-900 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg"
+              className="w-max max-w-[16rem] rounded-xl bg-surface-900 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg"
             >
               <span className="font-semibold">{menuLabel(infoMenu)}</span> is closed right now. Open{" "}
               {formatAvailability(infoMenu.availability).join("; ")}.
@@ -591,7 +591,7 @@ function TabButton({
       onClick={onClick}
       className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
-          ? "bg-stone-900 text-white"
+          ? "bg-surface-900 text-white"
           : "border border-stone-300 text-ink-700 hover:border-amber-700 hover:text-amber-900"
       }`}
     >
@@ -643,8 +643,8 @@ function ClosedTabButton({
       }}
       className={`shrink-0 cursor-not-allowed rounded-full border border-dashed px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         show
-          ? "border-stone-400 bg-white text-ink-600"
-          : "border-stone-300 bg-stone-50 text-ink-400"
+          ? "border-stone-400 bg-surface-base text-ink-600"
+          : "border-stone-300 bg-surface-50 text-ink-400"
       }`}
     >
       {label}

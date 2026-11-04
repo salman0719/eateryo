@@ -49,7 +49,7 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700",
         dragging
           ? "border-amber-700 bg-amber-50"
-          : "border-stone-300 bg-white hover:border-amber-600 hover:bg-amber-50/50",
+          : "border-stone-300 bg-surface-base hover:border-amber-600 hover:bg-amber-50/50",
         disabled ? "cursor-not-allowed opacity-60" : "",
       ].join(" ")}
     >

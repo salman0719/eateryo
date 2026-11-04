@@ -126,7 +126,7 @@ function PriceField({
           }}
           aria-label="Proposed price"
           aria-invalid={error !== null}
-          className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-ink-900 focus:border-amber-700 focus:outline-none disabled:bg-stone-100 ${
+          className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-ink-900 focus:border-amber-700 focus:outline-none disabled:bg-surface-100 ${
             error ? "border-danger-500" : "border-stone-300"
           }`}
         />
@@ -171,7 +171,7 @@ export function ProposalReview({
     <section
       aria-labelledby="proposal-heading"
       aria-busy={busy}
-      className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"
+      className="rounded-2xl border border-amber-200 bg-surface-base p-4 shadow-sm"
     >
       <div className="flex flex-wrap items-center gap-2">
         <h2 id="proposal-heading" className="text-sm font-semibold text-ink-900">
@@ -202,7 +202,7 @@ export function ProposalReview({
           return (
             <li
               key={`${operation.op}-${index}`}
-              className="rounded-xl border border-stone-200 bg-stone-50 p-3"
+              className="rounded-xl border border-stone-200 bg-surface-50 p-3"
             >
               <p className="text-sm font-medium text-ink-900">
                 {preview?.summary ?? operation.op.replaceAll("_", " ")}
@@ -271,7 +271,7 @@ export function ProposalReview({
           type="button"
           onClick={onApprove}
           disabled={approveDisabled}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-stone-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-surface-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           {busy ? "Saving…" : "Approve and save"}
         </button>
@@ -279,7 +279,7 @@ export function ProposalReview({
           type="button"
           onClick={onDiscard}
           disabled={busy}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-stone-400 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-stone-400 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           Discard
         </button>

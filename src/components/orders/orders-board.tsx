@@ -50,7 +50,7 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   new: "bg-amber-100 text-amber-900",
   preparing: "bg-info-100 text-info-900",
   served: "bg-green-100 text-green-900",
-  cancelled: "bg-stone-200 text-ink-600",
+  cancelled: "bg-surface-200 text-ink-600",
 };
 
 function formatTime(iso: string): string {
@@ -219,7 +219,7 @@ function LocalOrdersBoard() {
             const total = orderTotal(order.lines);
             const canAdvance = nextOrderStatus(order.status) !== order.status;
             return (
-              <li key={order.id} className="rounded-2xl border border-stone-200 bg-white p-4">
+              <li key={order.id} className="rounded-2xl border border-stone-200 bg-surface-base p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">

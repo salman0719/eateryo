@@ -34,7 +34,7 @@ export function MonitorToasts({
         <div
           key={id}
           role="alert"
-          className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-stone-900 py-3 pr-2 pl-4 text-white shadow-xl"
+          className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-surface-900 py-3 pr-2 pl-4 text-white shadow-xl"
         >
           <button
             type="button"

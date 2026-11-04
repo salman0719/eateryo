@@ -28,7 +28,7 @@ interface CommitInputProps {
 }
 
 const baseInput =
-  "w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 " +
+  "w-full rounded-lg border border-stone-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
   // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
   "resize-none focus:border-amber-700 focus:outline-none sm:resize-y";
 
@@ -123,7 +123,7 @@ function KeyHint({ glyph, children }: { glyph: string; children: string }) {
       <span className="font-semibold text-ink-700">{children}</span>
       <kbd
         aria-hidden="true"
-        className="rounded border border-stone-300 bg-white px-1 py-px font-sans text-[10px] leading-none text-ink-500"
+        className="rounded border border-stone-300 bg-surface-base px-1 py-px font-sans text-[10px] leading-none text-ink-500"
       >
         {glyph}
       </kbd>
@@ -169,7 +169,7 @@ export function CommitTags({
           bold key names from reading as more of the field's name. */}
       <span className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
         <span className="font-medium text-ink-700">{label}</span>
-        <span aria-hidden="true" className="h-3 w-px self-center bg-stone-300" />
+        <span aria-hidden="true" className="h-3 w-px self-center bg-surface-300" />
         <span className="inline-flex flex-wrap items-center gap-x-1 text-[11px] text-ink-500">
           <span>Press</span>
           <KeyHint glyph="⏎">Enter</KeyHint>

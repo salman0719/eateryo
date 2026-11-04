@@ -22,7 +22,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
   const atPageLimit = pages.length >= MAX_MENU_PAGES;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-surface-base">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-900">
@@ -51,7 +51,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
             key={`${page.file.name}-${index}`}
             className="overflow-hidden rounded-xl border border-stone-200"
           >
-            <div className="flex items-center justify-center bg-stone-100 p-3">
+            <div className="flex items-center justify-center bg-surface-100 p-3">
               {/* Plain img keeps EXIF orientation handling simple for the prototype. */}
               <img
                 src={page.previewUrl}
@@ -61,7 +61,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
             </div>
             <div className="px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <span className="shrink-0 rounded-full bg-stone-900 px-2 py-0.5 text-[11px] font-semibold text-white">
+                <span className="shrink-0 rounded-full bg-surface-900 px-2 py-0.5 text-[11px] font-semibold text-white">
                   Page {index + 1}
                 </span>
                 <p className="min-w-0 flex-1 truncate text-xs font-medium text-ink-900">

@@ -67,7 +67,7 @@ export function OrderPagePreview({
     []
   );
 
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
   const search = searchMenu(doc, query);
   const searching = query.trim().length > 0;
   const tableName = `${restaurantName?.trim() || "Your café"} · ${formatTableLabel(

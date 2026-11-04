@@ -78,7 +78,7 @@ export function DataControls() {
   }
 
   return (
-    <section id="data" className="rounded-2xl border border-stone-200 bg-white p-5">
+    <section id="data" className="rounded-2xl border border-stone-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Data & privacy</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Download everything as JSON, or delete the account and the restaurants it created.
@@ -89,7 +89,7 @@ export function DataControls() {
           type="button"
           onClick={() => void handleExport()}
           disabled={busy !== null}
-          className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           {busy === "export" ? "Preparing…" : "Export my data"}
         </button>
@@ -121,7 +121,7 @@ export function DataControls() {
               value={confirmText}
               onChange={(event) => setConfirmText(event.target.value)}
               autoComplete="off"
-              className="mt-1 w-full rounded-lg border border-danger-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
+              className="mt-1 w-full rounded-lg border border-danger-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
             />
           </label>
           <div className="mt-2 flex items-center gap-2">

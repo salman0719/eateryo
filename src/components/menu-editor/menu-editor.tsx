@@ -619,7 +619,7 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <h2 className="text-base font-semibold text-ink-900">Reorder items</h2>
             <p className="text-xs text-ink-500">
@@ -638,7 +638,7 @@ export function MenuEditor({
                   key={category.id}
                   className="overflow-hidden rounded-xl border border-stone-200"
                 >
-                  <div className="flex items-center gap-1.5 border-b border-stone-100 bg-stone-50 px-3 py-2">
+                  <div className="flex items-center gap-1.5 border-b border-stone-100 bg-surface-50 px-3 py-2">
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
                       {category.name || "Untitled category"}
                       <span className="ml-2 font-normal text-ink-500">
@@ -695,7 +695,7 @@ export function MenuEditor({
                             {item.reviewNotes.length > 0 && (
                               <span
                                 title={item.reviewNotes.join("\n")}
-                                className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
+                                className="shrink-0 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
                               >
                                 {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
@@ -743,7 +743,7 @@ export function MenuEditor({
                                     event.target.value = "";
                                   }
                                 }}
-                                className="shrink-0 rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+                                className="shrink-0 rounded-full border border-stone-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
                               >
                                 <option value="">Move to…</option>
                                 {doc.categories
@@ -772,7 +772,7 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-ink-600">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base px-4 py-3 text-xs leading-5 text-ink-600">
         {onStartPublish && accountCheckFailed ? (
           <p>
             We couldn&apos;t check your account just now, so publishing is paused.{" "}
@@ -827,7 +827,7 @@ export function MenuEditor({
         )}
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
             <CommitInput
               label="Menu title"
@@ -870,7 +870,7 @@ export function MenuEditor({
                 )}
                 {canManage && (
                   <label
-                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-2 text-center transition-colors hover:border-amber-700 hover:bg-amber-50 focus-within:border-amber-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
+                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-stone-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-amber-700 hover:bg-amber-50 focus-within:border-amber-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
                   >
                     <span
                       aria-hidden="true"
@@ -929,7 +929,7 @@ export function MenuEditor({
           </p>
           <ul className="mt-3 space-y-3">
             {duplicateGroups.map((group) => (
-              <li key={group.key} className="rounded-xl border border-amber-200 bg-white p-3">
+              <li key={group.key} className="rounded-xl border border-amber-200 bg-surface-base p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-ink-900">
                     “{group.displayName}” appears {group.occurrences.length} times
@@ -973,7 +973,7 @@ export function MenuEditor({
           </ul>
         </section>
       )}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-surface-base p-3">
         <label htmlFor="menu-search" className="sr-only">
           Search the menu
         </label>
@@ -986,7 +986,7 @@ export function MenuEditor({
             if (event.key === "Escape" && query) setQuery("");
           }}
           placeholder="Search items, descriptions, or categories…"
-          className="min-w-[200px] flex-1 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-700 focus:outline-none"
+          className="min-w-[200px] flex-1 rounded-full border border-stone-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-700 focus:outline-none"
         />
         {isFiltering && (
           <button type="button" onClick={() => setQuery("")} className={smallButton}>
@@ -1028,7 +1028,7 @@ export function MenuEditor({
               aria-label="Category to move selected items to"
               value={bulkTarget}
               onChange={(event) => setBulkTarget(event.target.value)}
-              className="rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+              className="rounded-full border border-stone-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
             >
               <option value="">Category…</option>
               {doc.categories.map((category) => (
@@ -1069,7 +1069,7 @@ export function MenuEditor({
               type="button"
               onClick={() => stepCategory(-1)}
               aria-label="Previous category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-white text-lg font-bold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               ‹
             </button>
@@ -1078,7 +1078,7 @@ export function MenuEditor({
               <select
                 value={activeMatch.category.id}
                 onChange={(event) => setActiveCategoryId(event.target.value)}
-                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-xl border border-stone-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-amber-700 focus:outline-none"
               >
                 {search.categories.map(({ category, items }) => (
                   <option key={category.id} value={category.id}>
@@ -1091,7 +1091,7 @@ export function MenuEditor({
               type="button"
               onClick={() => stepCategory(1)}
               aria-label="Next category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-white text-lg font-bold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               ›
             </button>
@@ -1102,12 +1102,12 @@ export function MenuEditor({
         </div>
       )}
       {doc.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">No categories yet</p>
           <p className="mt-1 text-sm text-ink-600">Add a category below, then add items to it.</p>
         </div>
       ) : search.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-stone-300 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
           <p className="mt-1 text-sm text-ink-600">
             {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
@@ -1131,12 +1131,12 @@ export function MenuEditor({
             <section
               key={category.id}
               aria-label={`Category ${category.name}`}
-              className={`${phoneOnly}overflow-hidden rounded-2xl border border-stone-200 bg-white`}
+              className={`${phoneOnly}overflow-hidden rounded-2xl border border-stone-200 bg-surface-base`}
             >
               {/* The band says what the section is and how much is in it, and
                   holds its own actions — so a collapsed section is still
                   legible and still manageable. */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-stone-200 bg-stone-100 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-stone-200 bg-surface-100 px-3 py-2">
                 <button
                   type="button"
                   onClick={() => applyFold(toggleCategory(foldState, category.id))}
@@ -1150,7 +1150,7 @@ export function MenuEditor({
                         ? "Collapse this section"
                         : "Expand this section"
                   }
-                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
                 >
                   {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </button>
@@ -1159,7 +1159,7 @@ export function MenuEditor({
                     label={`Category ${index + 1}`}
                     value={category.name}
                     hideLabel
-                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-stone-300 focus:border-amber-700 focus:bg-white"
+                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-stone-300 focus:border-amber-700 focus:bg-surface-base"
                     onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
                   />
                 </div>
@@ -1207,7 +1207,7 @@ export function MenuEditor({
               <Collapse open={categoryOpen}>
                 <div id={categoryPanelId} className="p-4">
                   {items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-ink-500">
+                    <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
                       No items — add the first one below.
                     </p>
                   ) : (
@@ -1248,11 +1248,11 @@ export function MenuEditor({
       <button
         type="button"
         onClick={handleAddCategory}
-        className="rounded-2xl border-2 border-dashed border-stone-300 bg-white px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="rounded-2xl border-2 border-dashed border-stone-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
       >
         + Add category
       </button>
-      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-surface-base p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">Menu</span>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onExportJson} className={smallButton}>

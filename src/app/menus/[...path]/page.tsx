@@ -39,14 +39,14 @@ function MenuPathLoading() {
             <Skeleton className="h-4 w-40" />
           </div>
           <div className="grid items-start gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-stone-200 bg-white p-5">
+            <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
               <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
                 <Skeleton className="h-9" />
                 <Skeleton className="h-9" />
               </div>
               <Skeleton className="mt-3 h-28" />
             </div>
-            <div className="rounded-2xl border border-stone-200 bg-white p-4">
+            <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="mt-2 h-3 w-3/5" />
               <Skeleton className="mt-4 h-9" />

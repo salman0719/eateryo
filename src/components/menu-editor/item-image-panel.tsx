@@ -72,7 +72,7 @@ export function ItemImagePanel({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-2.5">
+    <div className="rounded-lg border border-stone-200 bg-surface-base p-2.5">
       <div className="flex items-center gap-3">
         {copy ? (
           // Straight from the CDN at the size we stored — no optimizer runs
@@ -89,7 +89,7 @@ export function ItemImagePanel({
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 text-lg text-ink-400"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-stone-300 bg-surface-50 text-lg text-ink-400"
           >
             ▢
           </span>

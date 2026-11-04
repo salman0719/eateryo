@@ -49,7 +49,7 @@ export function QrCode({
       <div
         role="status"
         aria-label="Generating the QR code"
-        className="animate-pulse rounded-lg bg-stone-100"
+        className="animate-pulse rounded-lg bg-surface-100"
         style={{ width: size, height: size }}
       />
     );

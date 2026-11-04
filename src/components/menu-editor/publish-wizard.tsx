@@ -58,7 +58,7 @@ function WizardSkeleton() {
       <span className="sr-only">Preparing your tables…</span>
       <Skeleton className="h-8 w-64" />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
           <Skeleton className="h-5 w-40" />
           <Skeleton className="mt-3 h-9 w-full" />
           <Skeleton className="mt-2 h-9 w-full" />
@@ -249,8 +249,8 @@ export function PublishWizard({
         </div>
 
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
-            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+          <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-stone-200 bg-surface-base p-5">
+            <div className="rounded-xl border border-stone-200 bg-surface-50 p-4">
               <h2 className="text-sm font-semibold text-ink-900">Next: print a table card</h2>
               <p className="mt-1 text-xs leading-5 text-ink-600">
                 One QR per table — each card orders for its table across every open menu. They
@@ -268,14 +268,14 @@ export function PublishWizard({
                   type="button"
                   onClick={() => setShowHours((value) => !value)}
                   aria-expanded={showHours}
-                  className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-stone-300 bg-surface-base px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   {showHours ? "Hide opening hours" : "Set your opening hours"}
                 </button>
                 <button
                   type="button"
                   onClick={onOpenEditor}
-                  className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-stone-300 bg-surface-base px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   Keep editing
                 </button>
@@ -334,7 +334,7 @@ export function PublishWizard({
       {continuesJourney && <JourneySteps current={PUBLISH_STEP_INDEX} />}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
+        <section className="flex flex-col gap-4 rounded-2xl border border-stone-200 bg-surface-base p-5">
           {!signedIn ? (
             <>
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
@@ -376,21 +376,21 @@ export function PublishWizard({
                       </span>
                     </label>
                   ) : (
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-stone-50 px-3 py-2">
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-surface-50 px-3 py-2">
                       <p className="text-sm text-ink-800">
                         Publishing under <span className="font-medium">{confirmedName}</span>
                       </p>
                       <button
                         type="button"
                         onClick={() => setNameEditing(true)}
-                        className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-full border border-stone-300 bg-surface-base px-2.5 py-0.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                       >
                         Change
                       </button>
                     </div>
                   )
                 ) : ownedRestaurants.length === 1 && ownedRestaurants[0] ? (
-                  <p className="mt-1 rounded-lg bg-stone-50 px-3 py-2 text-sm text-ink-800">
+                  <p className="mt-1 rounded-lg bg-surface-50 px-3 py-2 text-sm text-ink-800">
                     Publishing under <span className="font-medium">{ownedRestaurants[0].name}</span>
                   </p>
                 ) : (
@@ -399,7 +399,7 @@ export function PublishWizard({
                     <select
                       value={form.restaurantId}
                       onChange={(event) => update({ restaurantId: event.target.value })}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-stone-300 bg-surface-base px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…

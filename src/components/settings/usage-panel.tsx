@@ -96,7 +96,7 @@ export function UsagePanel() {
       <div
         role="status"
         aria-busy="true"
-        className="rounded-2xl border border-stone-200 bg-white p-5"
+        className="rounded-2xl border border-stone-200 bg-surface-base p-5"
       >
         <span className="sr-only">Checking your usage…</span>
         <Skeleton className="h-4 w-24" />
@@ -115,7 +115,7 @@ export function UsagePanel() {
         <button
           type="button"
           onClick={() => void retry()}
-          className="mt-3 rounded-lg border border-danger-300 bg-white px-3 py-1.5 text-xs font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
+          className="mt-3 rounded-lg border border-danger-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
         >
           Try again
         </button>
@@ -130,7 +130,7 @@ export function UsagePanel() {
   const percent = Math.min(100, Math.round((used / usage.cap) * 100));
 
   return (
-    <section className="rounded-2xl border border-stone-200 bg-white p-5">
+    <section className="rounded-2xl border border-stone-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Usage</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Free allowances for this account — extraction photos and assistant messages reset each UTC
@@ -143,8 +143,8 @@ export function UsagePanel() {
       <p className="mt-1 text-sm text-ink-600">
         {used} of {usage.cap} free extractions used · {usage.remaining} left
       </p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-100">
-        <div className="h-full rounded-full bg-stone-500" style={{ width: `${percent}%` }} />
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-100">
+        <div className="h-full rounded-full bg-surface-500" style={{ width: `${percent}%` }} />
       </div>
 
       {nudge ? (

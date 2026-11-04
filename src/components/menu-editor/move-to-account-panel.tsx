@@ -185,7 +185,7 @@ export function MoveToAccountPanel({
   }
 
   return (
-    <section className="bg-white p-4 sm:p-5">
+    <section className="bg-surface-base p-4 sm:p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">
         Menus saved in this browser
       </h3>
@@ -257,7 +257,7 @@ export function MoveToAccountPanel({
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -340,7 +340,7 @@ export function MoveToAccountPanel({
       {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
 
       {report && (
-        <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
+        <div className="mt-3 rounded-xl border border-stone-200 bg-surface-50 p-3">
           <p className="text-sm font-medium text-ink-900">
             Added {report.imported.length} · already there {report.skipped.length} · failed{" "}
             {report.failed.length}

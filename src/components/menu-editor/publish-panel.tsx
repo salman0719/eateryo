@@ -74,7 +74,7 @@ const pill = "rounded-full px-2.5 py-0.5 text-[11px] font-semibold";
 
 function StatusPill({ status }: { status: PublicationStatus | null }) {
   if (!status) {
-    return <span className={`${pill} bg-stone-100 text-ink-600`}>Not published</span>;
+    return <span className={`${pill} bg-surface-100 text-ink-600`}>Not published</span>;
   }
   if (!status.isLive) {
     return <span className={`${pill} bg-amber-100 text-amber-900`}>Ordering paused</span>;
@@ -201,7 +201,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (!signedIn) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <StatusPill status={null} />
@@ -232,10 +232,10 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (inAccount === null && accountCheckFailed) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
-          <span className={`${pill} bg-stone-100 text-ink-600`}>Not checked</span>
+          <span className={`${pill} bg-surface-100 text-ink-600`}>Not checked</span>
         </div>
         <p className="mt-2 text-xs leading-5 text-ink-600">
           We couldn&apos;t check your account just now, so we can&apos;t tell whether this menu is
@@ -256,7 +256,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (inAccount === null) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <Skeleton className="h-5 w-16 rounded-full" />
@@ -274,7 +274,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (!inAccount) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <StatusPill status={status} />
@@ -302,7 +302,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4">
+    <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
         <StatusPill status={status} />

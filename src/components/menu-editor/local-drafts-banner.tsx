@@ -68,7 +68,7 @@ export function LocalDraftsOffer({
                 <select
                   value={target?.id ?? ""}
                   onChange={(event) => setTargetId(event.target.value)}
-                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-lg border border-amber-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   {restaurants.map((restaurant) => (
                     <option key={restaurant.id} value={restaurant.id}>
@@ -92,7 +92,7 @@ export function LocalDraftsOffer({
               type="button"
               onClick={onDismiss}
               disabled={busy}
-              className="rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:border-amber-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-amber-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:border-amber-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               Not now
             </button>
@@ -144,7 +144,7 @@ export function LocalDraftsNotice({
             <button
               type="button"
               onClick={onOpenLibrary}
-              className="rounded-full border border-success-300 bg-white px-3 py-1.5 text-xs font-medium text-success-900 transition-colors hover:border-success-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
+              className="rounded-full border border-success-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-success-900 transition-colors hover:border-success-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
             >
               Open My menus
             </button>

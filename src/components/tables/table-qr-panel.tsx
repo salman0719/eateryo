@@ -390,7 +390,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           </p>
           <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-ink-600">
             Table cards point at your restaurant link —{" "}
-            <code className="rounded bg-white px-1.5 py-0.5">/r/…/t/3</code> — where diners see
+            <code className="rounded bg-surface-base px-1.5 py-0.5">/r/…/t/3</code> — where diners see
             every menu that is open right now. Claim it once, then print the cards below.
           </p>
           {linkState.isOwner && canManage ? (
@@ -448,7 +448,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
         <>
           <div
             data-print-hide
-            className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4"
+            className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-surface-base p-4"
           >
             <label className="text-xs font-semibold text-ink-600">
               Tables
@@ -498,7 +498,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
               <select
                 value={focusedLabel ?? ""}
                 onChange={(event) => setFocusLabel(event.target.value)}
-                className="mt-1 block w-40 rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none"
+                className="mt-1 block w-40 rounded-xl border border-stone-300 bg-surface-base px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none"
               >
                 <option value="">All tables</option>
                 {labels.map((label) => (
@@ -579,7 +579,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           <div
             data-qr-sheet
             data-qr-single={focusedLabel ? "" : undefined}
-            className={`grid gap-3 rounded-2xl border border-stone-200 bg-white p-4 ${
+            className={`grid gap-3 rounded-2xl border border-stone-200 bg-surface-base p-4 ${
               focusedLabel ? "mx-auto w-full max-w-sm grid-cols-1" : "sm:grid-cols-2"
             }`}
           >
@@ -612,8 +612,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     // (not a border) so the swap never moves the card layout.
                     className={
                       focusedLabel
-                        ? "rounded-sm bg-white p-0 text-center text-3xl font-bold text-ink-900 outline-2 outline-amber-700 outline-offset-2"
-                        : "rounded-sm bg-white p-0 text-center text-xl font-bold text-ink-900 outline-2 outline-amber-700 outline-offset-2"
+                        ? "rounded-sm bg-surface-base p-0 text-center text-3xl font-bold text-ink-900 outline-2 outline-amber-700 outline-offset-2"
+                        : "rounded-sm bg-surface-base p-0 text-center text-xl font-bold text-ink-900 outline-2 outline-amber-700 outline-offset-2"
                     }
                   />
                 ) : (

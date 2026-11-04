@@ -151,7 +151,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     }
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
 
   if (state === "invalid_link") {
     return (

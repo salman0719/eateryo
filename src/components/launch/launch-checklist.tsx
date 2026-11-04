@@ -116,7 +116,7 @@ export function LaunchChecklist() {
 
   if (state.kind === "loading") {
     return (
-      <div role="status" aria-busy="true" className="rounded-2xl border border-stone-200 bg-white p-5">
+      <div role="status" aria-busy="true" className="rounded-2xl border border-stone-200 bg-surface-base p-5">
         <span className="sr-only">Checking your account…</span>
         <Skeleton className="h-5 w-48" />
         <div className="mt-4 flex flex-col gap-3">
@@ -164,7 +164,7 @@ export function LaunchChecklist() {
         <button
           type="button"
           onClick={() => void retry()}
-          className="mt-3 rounded-lg border border-danger-300 bg-white px-3 py-1.5 text-sm font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
+          className="mt-3 rounded-lg border border-danger-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
         >
           Try again
         </button>
@@ -181,7 +181,7 @@ export function LaunchChecklist() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-stone-200 bg-white p-5">
+      <section className="rounded-2xl border border-stone-200 bg-surface-base p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-ink-900">Your launch checklist</h2>
           <p className="text-xs text-ink-500">
@@ -190,7 +190,7 @@ export function LaunchChecklist() {
           </p>
         </div>
         <div
-          className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100"
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-100"
           role="img"
           aria-label={`${progress.done} of ${progress.total} verifiable steps complete`}
         >
@@ -209,7 +209,7 @@ export function LaunchChecklist() {
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                   (step.done
                     ? "border-amber-700 bg-amber-700 text-white"
-                    : "border-stone-300 bg-white text-ink-400")
+                    : "border-stone-300 bg-surface-base text-ink-400")
                 }
               >
                 {step.done ? "✓" : index + 1}

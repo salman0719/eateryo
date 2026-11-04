@@ -63,7 +63,7 @@ export function RestaurantTables({
       </div>
 
       {!signedIn && !sessionPending && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
           <p className="text-sm font-medium text-ink-900">Sign in to print table cards</p>
           <p className="mt-1 text-xs leading-5 text-ink-500">
             Table cards point at your restaurant link, which lives in your account.
@@ -82,7 +82,7 @@ export function RestaurantTables({
       {(sessionPending || signedIn) && restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">
           <span className="sr-only">Loading your restaurants…</span>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="mt-2 h-9 w-full max-w-sm" />
             <Skeleton className="mt-3 h-3 w-3/5" />
@@ -107,13 +107,13 @@ export function RestaurantTables({
       )}
 
       {signedIn && showRestaurantPicker(restaurants) && restaurants !== null && (
-        <div data-print-hide className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div data-print-hide className="rounded-2xl border border-stone-200 bg-surface-base p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
             Restaurant
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="max-w-sm rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="max-w-sm rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…

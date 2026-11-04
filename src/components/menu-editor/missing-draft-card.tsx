@@ -29,7 +29,7 @@ export function MissingDraftCard({
         <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">{MISSING_PUBLISH_DRAFT_MESSAGE}</p>
       </div>
 
-      <ol className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5">
+      <ol className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-surface-base p-5">
         <li className="flex items-start gap-2.5">
           <span
             aria-hidden="true"

@@ -33,7 +33,7 @@ export function OrderSkeleton({ label }: { label: string }) {
     <div
       role="status"
       aria-busy="true"
-      className="rounded-2xl border border-stone-200 bg-white p-6"
+      className="rounded-2xl border border-stone-200 bg-surface-base p-6"
     >
       <span className="sr-only">{label}</span>
       <Skeleton className="h-6 w-1/2" />
@@ -141,9 +141,9 @@ export function OrderMenuSection({
   return (
     <section
       aria-label={category.name}
-      className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+      className="overflow-hidden rounded-2xl border border-stone-200 bg-surface-base"
     >
-      <h2 className="border-b border-stone-100 bg-stone-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
+      <h2 className="border-b border-stone-100 bg-surface-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
         {category.name}
       </h2>
       <ul className="divide-y divide-stone-100">
@@ -168,7 +168,7 @@ export function OrderMenuSection({
                   <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>
                     {soldOut && (
-                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
+                      <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                         Sold out
                       </span>
                     )}
@@ -203,7 +203,7 @@ export function OrderMenuSection({
                     <select
                       value={variant?.name ?? ""}
                       onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+                      className="rounded-full border border-stone-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
                     >
                       {item.variants.map((option) => (
                         <option key={option.name} value={option.name}>
@@ -233,7 +233,7 @@ export function OrderMenuSection({
                       onAdd(item);
                       bumpFlash(item.id);
                     }}
-                    className="rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-stone-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {inCart > 0 ? `Add · ${inCart}` : "Add"}
                   </button>
@@ -312,7 +312,7 @@ export function StickyCartBar({
   if (contained) {
     return (
       <div
-        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur"
+        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-stone-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {inner}
@@ -324,7 +324,7 @@ export function StickyCartBar({
     <>
       <div aria-hidden="true" className="h-16" />
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-full max-w-4xl">{inner}</div>

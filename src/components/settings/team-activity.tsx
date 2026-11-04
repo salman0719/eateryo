@@ -40,7 +40,7 @@ export function TeamActivity({
   }, [restaurantId, refreshKey]);
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5">
+    <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Team activity</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Who invited, changed roles for, or removed someone — most recent first.

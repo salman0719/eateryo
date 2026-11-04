@@ -40,7 +40,7 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   new: "bg-amber-100 text-amber-900",
   preparing: "bg-info-100 text-info-900",
   served: "bg-green-100 text-green-900",
-  cancelled: "bg-stone-200 text-ink-600",
+  cancelled: "bg-surface-200 text-ink-600",
 };
 
 /**
@@ -53,7 +53,7 @@ export function OrdersSkeleton() {
       <span className="sr-only">Loading orders…</span>
       <ul className="space-y-3">
         {[0, 1, 2].map((row) => (
-          <li key={row} className="rounded-2xl border border-stone-200 bg-white p-4">
+          <li key={row} className="rounded-2xl border border-stone-200 bg-surface-base p-4">
             <div className="flex flex-wrap items-center gap-2">
               <Skeleton className="h-6 w-20" />
               <Skeleton className="h-5 w-16 rounded-full" />
@@ -232,7 +232,7 @@ export function ServerOrdersBoard() {
             return (
               <li
                 key={order.id}
-                className="rounded-2xl border border-stone-200 bg-white p-4"
+                className="rounded-2xl border border-stone-200 bg-surface-base p-4"
                 aria-busy={busyId === order.id}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -335,7 +335,7 @@ function ConnectionPill({
       ? "bg-success-50 text-success-800"
       : connection === "reconnecting"
         ? "bg-amber-100 text-amber-900"
-        : "bg-stone-100 text-ink-600";
+        : "bg-surface-100 text-ink-600";
   return (
     <span
       role="status"
@@ -348,7 +348,7 @@ function ConnectionPill({
             ? "bg-success-600"
             : connection === "reconnecting"
               ? "animate-pulse bg-amber-600"
-              : "bg-stone-400"
+              : "bg-surface-400"
         }`}
       />
       {label}

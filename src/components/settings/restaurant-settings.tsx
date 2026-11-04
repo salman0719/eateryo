@@ -126,7 +126,7 @@ export function RestaurantSettings({
       <h2 className="text-xl font-bold text-ink-900">Restaurant settings</h2>
 
       {!signedIn && !sessionPending && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
           <p className="text-sm font-medium text-ink-900">Sign in to manage your restaurants</p>
           <p className="mt-1 text-xs leading-5 text-ink-500">
             Restaurant names, team members and deletion live in your account.
@@ -145,7 +145,7 @@ export function RestaurantSettings({
       {(sessionPending || signedIn) && restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">
           <span className="sr-only">Loading your restaurants…</span>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="mt-3 h-9 w-full max-w-sm" />
             <Skeleton className="mt-3 h-3 w-2/5" />
@@ -158,7 +158,7 @@ export function RestaurantSettings({
       )}
 
       {staffOnly && (
-        <p className="rounded-2xl border border-stone-200 bg-white p-5 text-xs leading-5 text-amber-800">
+        <p className="rounded-2xl border border-stone-200 bg-surface-base p-5 text-xs leading-5 text-amber-800">
           You are only a staff member of the restaurants on this account. Only an owner can change
           settings — ask the owner to do it from their sign-in.
         </p>
@@ -177,13 +177,13 @@ export function RestaurantSettings({
       )}
 
       {showRestaurantPicker(owned) && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
             Restaurant
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -206,7 +206,7 @@ export function RestaurantSettings({
 
       {selected && (
         <>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
             <h3 className="text-sm font-bold tracking-tight text-ink-900">Name</h3>
             <p className="mt-1 text-xs leading-5 text-ink-500">
               Shown to your team and on your published menu pages.
@@ -444,7 +444,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5">
+    <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Team</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Owners can change menus, publish and manage the team. Staff see the order board and the
@@ -470,7 +470,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           <select
             value={addRole}
             onChange={(event) => setAddRole(event.target.value as "owner" | "staff")}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
             <option value="staff">Staff</option>
             <option value="owner">Owner</option>
@@ -534,7 +534,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                 }
                 disabled={memberBusy === member.userId}
                 aria-label={`Role for ${member.name}`}
-                className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-stone-300 bg-surface-base px-2 py-1 text-xs text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="owner">Owner</option>
                 <option value="staff">Staff</option>
@@ -574,7 +574,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                   type="button"
                   onClick={() => void handleResend(invitation)}
                   disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-stone-300 bg-surface-base px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   Resend
                 </button>
@@ -582,7 +582,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                   type="button"
                   onClick={() => void handleRevoke(invitation)}
                   disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                  className="rounded-full border border-stone-300 bg-surface-base px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                 >
                   Revoke
                 </button>

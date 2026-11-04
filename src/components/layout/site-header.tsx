@@ -14,7 +14,7 @@ export function SiteHeader() {
   const user = data?.user ?? null;
 
   return (
-    <header data-print-hide className="border-b border-stone-200 bg-white">
+    <header data-print-hide className="border-b border-stone-200 bg-surface-base">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2.5">
           <span
@@ -57,7 +57,7 @@ export function SiteHeader() {
               <button
                 type="button"
                 onClick={() => void authClient.signOut()}
-                className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-stone-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               >
                 Sign out
               </button>
@@ -65,7 +65,7 @@ export function SiteHeader() {
           ) : (
             <a
               href="/sign-in"
-              className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-stone-50 hover:text-ink-900"
+              className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-surface-50 hover:text-ink-900"
             >
               Sign in
             </a>

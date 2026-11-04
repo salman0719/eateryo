@@ -115,7 +115,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
     return (
       <section
         aria-label="Opening times"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-stone-200 bg-surface-base p-4"
       >
         <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
         <p className="mt-1 text-xs leading-5 text-ink-600">
@@ -131,7 +131,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
       <section
         aria-label="Opening times"
         aria-busy="true"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-stone-200 bg-surface-base p-4"
       >
         <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
         <div role="status" className="mt-2 flex flex-col gap-2">
@@ -147,7 +147,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
     return (
       <section
         aria-label="Opening times"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-stone-200 bg-surface-base p-4"
       >
         <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
         <p role="alert" className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
@@ -185,7 +185,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
     return (
       <section
         aria-label="Opening times"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-stone-200 bg-surface-base p-4"
       >
         <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
         <p className="mt-1 text-xs text-ink-500">Times are in {timeZone ?? "UTC"}.</p>
@@ -234,7 +234,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
   return (
     <section
       aria-label="Opening times"
-      className="rounded-2xl border border-stone-200 bg-white p-4"
+      className="rounded-2xl border border-stone-200 bg-surface-base p-4"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="text-sm font-bold text-ink-900">Opening times</h2>

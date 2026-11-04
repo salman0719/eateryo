@@ -99,7 +99,7 @@ export function OrderCartLines({
                     )}
                   </span>
                   {showMenuBadges && line.menuTitle && (
-                    <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
+                    <span className="mt-0.5 inline-block rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                       {line.menuTitle.trim() || "Menu"}
                     </span>
                   )}
@@ -198,7 +198,7 @@ export function OrderCartPanel({
   return (
     <aside
       aria-label="Your order"
-      className="h-fit rounded-2xl border border-stone-200 bg-white p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+      className="h-fit rounded-2xl border border-stone-200 bg-surface-base p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-lg font-bold text-ink-900">Your order</h2>

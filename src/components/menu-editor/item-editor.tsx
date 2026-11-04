@@ -105,7 +105,7 @@ export const ItemEditor = memo(function ItemEditor({
   return (
     <li
       id={`menu-item-${item.id}`}
-      className={`rounded-xl border bg-white ${isRouteTarget ? "border-amber-600 ring-2 ring-amber-200" : "border-stone-200"}`}
+      className={`rounded-xl border bg-surface-base ${isRouteTarget ? "border-amber-600 ring-2 ring-amber-200" : "border-stone-200"}`}
     >
       {/* The row is the dish: name, price, and the flags that need attention,
           so nothing important is hidden behind the collapse. */}
@@ -221,7 +221,7 @@ export const ItemEditor = memo(function ItemEditor({
                   const v = event.target.value;
                   patch({ available: v === "unknown" ? null : v === "yes" });
                 }}
-                className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-lg border border-stone-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 focus:border-amber-700 focus:outline-none"
               >
                 <option value="unknown">Unknown</option>
                 <option value="yes">Available</option>
@@ -249,7 +249,7 @@ export const ItemEditor = memo(function ItemEditor({
             />
           </div>
 
-          <div className="mt-3 rounded-lg bg-stone-50 p-3">
+          <div className="mt-3 rounded-lg bg-surface-50 p-3">
             <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Variants / sizes
             </p>
@@ -313,7 +313,7 @@ export const ItemEditor = memo(function ItemEditor({
               capture UI comes back intact once table ordering supports choices
               (local/issues/020); re-enable by dropping `hidden` here and
               restoring the row's option count in `shape` above. */}
-          <div className="mt-3 hidden rounded-lg bg-stone-50 p-3">
+          <div className="mt-3 hidden rounded-lg bg-surface-50 p-3">
             <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Options / add-ons
             </p>
@@ -326,7 +326,7 @@ export const ItemEditor = memo(function ItemEditor({
               {item.options.map((option, oIndex) => (
                 <li
                   key={`${option.name}-${oIndex}`}
-                  className="rounded-lg border border-stone-200 bg-white p-2.5"
+                  className="rounded-lg border border-stone-200 bg-surface-base p-2.5"
                 >
                   <div className="grid grid-cols-[1fr_auto] items-end gap-2">
                     <CommitInput
@@ -492,7 +492,7 @@ export const ItemEditor = memo(function ItemEditor({
                         event.target.value = "";
                       }
                     }}
-                    className="w-full rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none sm:w-auto"
+                    className="w-full rounded-full border border-stone-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none sm:w-auto"
                   >
                     <option value="">Category…</option>
                     {categories

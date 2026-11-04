@@ -154,7 +154,7 @@ function ReviewPriceInput({
             (event.target as HTMLInputElement).blur();
           }
         }}
-        className="w-28 rounded-lg border border-amber-300 bg-white px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-400 focus:border-amber-700 focus:outline-none"
+        className="w-28 rounded-lg border border-amber-300 bg-surface-base px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-400 focus:border-amber-700 focus:outline-none"
       />
     </label>
   );
@@ -239,9 +239,9 @@ export function ExtractionResult({
     return (
       <div
         key={categoryName}
-        className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+        className="overflow-hidden rounded-2xl border border-stone-200 bg-surface-base"
       >
-        <h3 className="border-b border-stone-100 bg-stone-50 px-5 py-3 text-sm font-bold tracking-wide text-ink-800 uppercase">
+        <h3 className="border-b border-stone-100 bg-surface-50 px-5 py-3 text-sm font-bold tracking-wide text-ink-800 uppercase">
           {categoryName}
         </h3>
         <ul className="divide-y divide-stone-100">
@@ -261,7 +261,7 @@ export function ExtractionResult({
                   <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>
                     {item.available === false && (
-                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
+                      <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
                         Unavailable
                       </span>
                     )}
@@ -359,7 +359,7 @@ export function ExtractionResult({
   // exactly as before.
   const draftDetails =
     data.categories.length === 0 ? (
-      <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base p-8 text-center">
         <p className="font-medium text-ink-900">No menu content detected</p>
         <p className="mt-1 text-sm text-ink-600">
           The image may not show a menu, or the text was unreadable. Try a clearer photo.
@@ -372,7 +372,7 @@ export function ExtractionResult({
     ) : (
       <div className="flex flex-col gap-3">
         {!onlyFlagged && (
-          <section aria-label="Ready items" className="rounded-2xl border border-stone-200 bg-white p-5">
+          <section aria-label="Ready items" className="rounded-2xl border border-stone-200 bg-surface-base p-5">
             <h3 className="text-sm font-semibold text-ink-900">
               ✓ Ready ({readyItems.length})
             </h3>
@@ -449,7 +449,7 @@ export function ExtractionResult({
         active={allClear}
         pulse={false}
         scrollBlock="start"
-        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-5 scroll-mt-4"
+        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-surface-base p-5 scroll-mt-4"
       >
         <div>
           <div className="flex flex-wrap items-center gap-2">

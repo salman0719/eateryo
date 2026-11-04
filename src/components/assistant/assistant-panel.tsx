@@ -297,7 +297,7 @@ export function AssistantPanel({
 
   if (sessionPending) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-6" role="status">
+      <div className="rounded-2xl border border-stone-200 bg-surface-base p-6" role="status">
         <span className="sr-only">Loading the assistant…</span>
         <Skeleton className="h-5 w-40" />
         <Skeleton className="mt-4 h-24 w-full" />
@@ -308,7 +308,7 @@ export function AssistantPanel({
 
   if (!signedIn) {
     return (
-      <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
+      <div className="rounded-2xl border border-dashed border-stone-300 bg-surface-base p-8 text-center">
         <p className="font-medium text-ink-900">Sign in to use the assistant</p>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
           The assistant answers questions about Eateryo using your own restaurant and menu names. It
@@ -361,7 +361,7 @@ export function AssistantPanel({
       </div>
 
       {proposalsEnabled ? (
-        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
           <label htmlFor="assistant-menu" className="text-xs font-semibold text-ink-600">
             Menu to edit <span className="font-normal text-ink-500">(optional)</span>
           </label>
@@ -370,7 +370,7 @@ export function AssistantPanel({
             value={selectedMenuId}
             onChange={(event) => chooseMenu(event.target.value)}
             disabled={sending || proposalBusy || menusLoading}
-            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-100"
+            className="mt-1 w-full rounded-xl border border-stone-300 bg-surface-base px-3 py-2 text-sm text-ink-900 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-surface-100"
           >
             <option value="">Help only — no menu changes</option>
             {menuUnavailable && <option value={selectedMenuId}>Unavailable menu</option>}
@@ -393,7 +393,7 @@ export function AssistantPanel({
           </p>
         </div>
       ) : (
-        <p className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-ink-600">
+        <p className="rounded-xl border border-stone-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
           Menu changes are being tested with selected accounts. You can still ask how-to questions
           here.
         </p>
@@ -418,7 +418,7 @@ export function AssistantPanel({
       {!configured && (
         <p
           role="alert"
-          className="rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm text-ink-800"
+          className="rounded-xl border border-stone-300 bg-surface-100 px-4 py-3 text-sm text-ink-800"
         >
           The assistant isn’t configured on this deployment yet. Ask an operator to finish the
           Workers AI setup; the rest of Eateryo works as usual.
@@ -430,7 +430,7 @@ export function AssistantPanel({
         role="log"
         aria-live="polite"
         aria-label="Assistant conversation"
-        className="flex max-h-[28rem] min-h-48 flex-col gap-3 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-4"
+        className="flex max-h-[28rem] min-h-48 flex-col gap-3 overflow-y-auto rounded-2xl border border-stone-200 bg-surface-base p-4"
       >
         {turns.length === 0 && !sending ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
@@ -446,7 +446,7 @@ export function AssistantPanel({
                     key={prompt}
                     type="button"
                     onClick={() => void ask(prompt)}
-                    className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="rounded-full bg-surface-100 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-surface-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                   >
                     {prompt}
                   </button>
@@ -460,8 +460,8 @@ export function AssistantPanel({
               key={turn.id}
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-6 ${
                 turn.role === "user"
-                  ? "self-end bg-stone-900 text-white"
-                  : "self-start bg-stone-100 text-ink-800"
+                  ? "self-end bg-surface-900 text-white"
+                  : "self-start bg-surface-100 text-ink-800"
               }`}
             >
               <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wide opacity-60">
@@ -474,7 +474,7 @@ export function AssistantPanel({
         {sending && (
           <p
             role="status"
-            className="self-start rounded-2xl bg-stone-100 px-4 py-2.5 text-sm text-ink-600"
+            className="self-start rounded-2xl bg-surface-100 px-4 py-2.5 text-sm text-ink-600"
           >
             {progressLabel}
           </p>
@@ -573,12 +573,12 @@ export function AssistantPanel({
                     ? `Ask for a change to ${selectedMenu.title}…`
                     : "Ask a question…"
             }
-            className="min-h-14 flex-1 resize-none rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-100 sm:resize-y"
+            className="min-h-14 flex-1 resize-none rounded-xl border border-stone-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-surface-100 sm:resize-y"
           />
           <button
             type="submit"
             disabled={disabled || draft.trim().length === 0}
-            className="rounded-full bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+            className="rounded-full bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-surface-300"
           >
             {sending ? "Sending…" : proposalBusy ? "Saving…" : "Send"}
           </button>

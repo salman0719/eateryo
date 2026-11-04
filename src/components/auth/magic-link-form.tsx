@@ -169,10 +169,10 @@ export function MagicLinkForm({
       const settling = devLink?.email !== status.email;
       const url = settling ? null : devLink.url;
       return (
-        <div className="rounded-xl border border-dashed border-stone-400 bg-stone-50 p-4 text-sm text-ink-700">
+        <div className="rounded-xl border border-dashed border-stone-400 bg-surface-50 p-4 text-sm text-ink-700">
           <p className="font-medium">Development sign-in — no email was sent</p>
           <p className="mt-1">
-            <code className="rounded bg-stone-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
+            <code className="rounded bg-surface-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
             is on, so the one-time link for <span className="font-medium">{status.email}</span> is
             shown here instead of being emailed. It expires in 5 minutes.
           </p>
@@ -181,7 +181,7 @@ export function MagicLinkForm({
           ) : url ? (
             <a
               href={url}
-              className="mt-3 inline-block rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
+              className="mt-3 inline-block rounded-lg bg-surface-900 px-4 py-2 text-sm font-semibold text-white hover:bg-surface-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
             >
               Open the sign-in link
             </a>
