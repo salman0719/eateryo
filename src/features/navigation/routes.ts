@@ -14,6 +14,11 @@ export type AppRoute =
   | { screen: "editor"; menuId: string; mode: EditorMode }
   | { screen: "item"; menuId: string; itemId: string };
 
+/** The menu a route names: the editor's menu, or the one an item belongs to. */
+export function routeMenuId(route: AppRoute): string | null {
+  return route.screen === "editor" || route.screen === "item" ? route.menuId : null;
+}
+
 /** Decode a menu URL into its menu id plus optional mode or item id. */
 export function menuSelectionFromPathname(
   pathname: string

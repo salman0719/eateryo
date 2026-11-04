@@ -99,6 +99,7 @@ import {
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
+  routeMenuId,
   signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
@@ -148,6 +149,7 @@ import {
   membershipFlag,
   type MenuMembership,
 } from "@/features/menus/membership";
+import { docForRoutedMenu } from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -164,10 +166,6 @@ function savedState(detail: string): SaveState {
 /** Content equality ignoring the save stamp (same rule the sync uses). */
 function sameMenuContent(a: MenuDocument, b: MenuDocument): boolean {
   return JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
-}
-
-function routeMenuId(route: AppRoute): string | null {
-  return route.screen === "editor" || route.screen === "item" ? route.menuId : null;
 }
 
 function stepIndex(phase: Phase, hasResult: boolean): number {
@@ -2417,7 +2415,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * the previous menu's rows — which could even be edited into the wrong
    * record.
    */
-  const routedDoc = activeDoc && activeDoc.id === routeMenuId(route) ? activeDoc : null;
+  const routedDoc = docForRoutedMenu(activeDoc, route);
   // Publish state is only ever shown for the menu it was loaded for; a stale
   // answer for a previously opened menu is never displayed.
   const activePublicationMenuId = routedDoc?.id ?? null;
