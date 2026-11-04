@@ -412,7 +412,7 @@ export function ExtractionResult({
         )}
         <div
           ref={checkThisRef}
-          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-[#faf8f5]/95 py-2 scroll-mt-4"
+          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-background/95 py-2 scroll-mt-4"
         >
           <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
             ⚠ Check this ({reviewCount})

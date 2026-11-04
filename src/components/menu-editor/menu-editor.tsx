@@ -1060,7 +1060,7 @@ export function MenuEditor({
       )}
       {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
         <div
-          className={`z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
+          className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
             selected.length === 0 ? "sticky top-0" : ""
           }`}
         >

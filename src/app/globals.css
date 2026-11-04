@@ -1,24 +1,14 @@
 @import "tailwindcss";
+@import "./theme.css";
 
 /* Light-only theme: every component hardcodes the warm light palette, so the
    page must not flip to dark when the OS prefers dark — that produced
-   near-black headings on a black body. Revisit if a real dark theme lands. */
-:root {
-  --background: #faf8f5;
-  --foreground: #1c1917;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+   near-black headings on a black body. Revisit if a real dark theme lands.
+   Colours and font families live in `theme.css`. */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
 }
 
 /* Diner order list: the "Added" confirmation that pops above the Add
@@ -122,7 +112,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
 }
 
 ::selection {
-  background: #fcd9a8;
+  background: var(--color-selection);
 }
 
 /* Phone-preview scrollbar (src/components/ui/phone-frame.tsx): the frame's
