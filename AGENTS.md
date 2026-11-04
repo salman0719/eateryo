@@ -53,6 +53,15 @@ errors, or add lint/type suppressions just to make checks pass.
 ## Stack rules
 
 - Next.js App Router + TypeScript strict + Tailwind CSS.
+- Colour usage: components name the role tokens in `src/app/theme.css` —
+  `ink` (text), `surface` (backgrounds), `line` (borders, dividers, rings),
+  `accent` (brand actions), `warning`, `danger`, `success`, `info`,
+  `on-accent`, `scrim`. Never add raw palette utilities (`text-stone-600`,
+  `bg-white`, `border-amber-300`) in new or edited code; the palette ramps in
+  that file exist only until the migration finishes. A colour that genuinely
+  cannot belong to a role is allowed on the bespoke component alone, with a
+  comment saying why no category applies. Token values change in `theme.css`
+  only — never inline in a component.
 - Zod for AI output, stored records, and imported files.
 - Image extraction vendors (Gemini, Groq) only via the server-side route
   (`src/app/api/extract-menu/route.ts`). Keys live in `GEMINI_API_KEY` /
@@ -88,6 +97,9 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
+  plus the role ramps components use; the Theme Studio edits this file. Colour
+  and font decisions belong here, never inline in a component.
 - `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
   the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
   shared by capture and the publish wizard. Signing in is a gate inside
