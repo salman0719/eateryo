@@ -135,14 +135,14 @@ export function ServerTableOrder({
           <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
             Order received
           </p>
-          <p className="mt-3 text-2xl font-bold text-stone-900">
+          <p className="mt-3 text-2xl font-bold text-ink-900">
             #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
           </p>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-ink-600">
             {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
             {formatOrderTotal(placed.currency, orderTotal(placed.lines))}
           </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-stone-500">
+          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
             The kitchen sees this on their board right away. The total is confirmed when your order
             is prepared.
           </p>
@@ -167,8 +167,8 @@ export function ServerTableOrder({
   const orderFooter = (
     <>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-600">Total</p>
-        <p className="text-lg font-bold tabular-nums text-stone-900">
+        <p className="text-sm font-medium text-ink-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-ink-900">
           {formatOrderTotal(doc.currency, total)}
         </p>
       </div>
@@ -203,10 +203,10 @@ export function ServerTableOrder({
             <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
               {restaurantName} · {formatTableLabel(tableLabel)}
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-stone-900">
+            <h1 className="mt-1 text-2xl font-bold text-ink-900">
               {doc.title.trim() || "Untitled menu"}
             </h1>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-ink-600">
               Tap a dish to add it. No account or app needed.
             </p>
           </div>

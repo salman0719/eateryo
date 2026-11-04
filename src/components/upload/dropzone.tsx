@@ -70,10 +70,10 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
         />
       </svg>
       <div>
-        <p className="text-base font-semibold text-stone-900">
+        <p className="text-base font-semibold text-ink-900">
           Drag &amp; drop your menu images here
         </p>
-        <p className="mt-1 text-sm text-stone-600">
+        <p className="mt-1 text-sm text-ink-600">
           or <span className="font-medium text-amber-800 underline">browse files</span> — JPEG, PNG,
           WebP, AVIF, or HEIC, up to 4&nbsp;MB each (max 4 pages, merged into one menu)
         </p>

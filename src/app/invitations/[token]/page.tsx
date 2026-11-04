@@ -22,7 +22,7 @@ export default function InvitationPage({ params }: { params: Promise<{ token: st
     <Suspense
       fallback={
         <main className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
-          <h1 className="text-2xl font-bold tracking-tight text-stone-900">Team invitation</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-ink-900">Team invitation</h1>
           <InvitationSkeleton />
         </main>
       }

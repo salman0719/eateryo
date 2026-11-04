@@ -23,7 +23,7 @@ import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
  */
 
 const smallButton =
-  "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors " +
+  "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 " +
   "disabled:cursor-not-allowed disabled:opacity-40";
 
@@ -89,14 +89,14 @@ export function ItemImagePanel({
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 text-lg text-stone-400"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-stone-300 bg-stone-50 text-lg text-ink-400"
           >
             ▢
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">Dish photo</p>
-          <p className="mt-0.5 text-[11px] leading-4 text-stone-500">
+          <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">Dish photo</p>
+          <p className="mt-0.5 text-[11px] leading-4 text-ink-500">
             {copy
               ? "Shown beside this dish on the order page."
               : canUpload
@@ -142,7 +142,7 @@ export function ItemImagePanel({
       </div>
 
       {working && (
-        <p role="status" className="mt-2 text-xs text-stone-500">
+        <p role="status" className="mt-2 text-xs text-ink-500">
           <span
             aria-hidden="true"
             className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-stone-400 border-t-transparent align-[-2px]"

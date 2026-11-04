@@ -123,12 +123,12 @@ export function RestaurantSettings({
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-stone-900">Restaurant settings</h2>
+      <h2 className="text-xl font-bold text-ink-900">Restaurant settings</h2>
 
       {!signedIn && !sessionPending && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-sm font-medium text-stone-900">Sign in to manage your restaurants</p>
-          <p className="mt-1 text-xs leading-5 text-stone-500">
+          <p className="text-sm font-medium text-ink-900">Sign in to manage your restaurants</p>
+          <p className="mt-1 text-xs leading-5 text-ink-500">
             Restaurant names, team members and deletion live in your account.
           </p>
           <a
@@ -178,12 +178,12 @@ export function RestaurantSettings({
 
       {showRestaurantPicker(owned) && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
             Restaurant
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -207,8 +207,8 @@ export function RestaurantSettings({
       {selected && (
         <>
           <div className="rounded-2xl border border-stone-200 bg-white p-5">
-            <h3 className="text-sm font-bold tracking-tight text-stone-900">Name</h3>
-            <p className="mt-1 text-xs leading-5 text-stone-500">
+            <h3 className="text-sm font-bold tracking-tight text-ink-900">Name</h3>
+            <p className="mt-1 text-xs leading-5 text-ink-500">
               Shown to your team and on your published menu pages.
             </p>
             <div className="mt-2 max-w-sm">
@@ -445,14 +445,14 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h3 className="text-sm font-bold tracking-tight text-stone-900">Team</h3>
-      <p className="mt-1 text-xs leading-5 text-stone-500">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">Team</h3>
+      <p className="mt-1 text-xs leading-5 text-ink-500">
         Owners can change menus, publish and manage the team. Staff see the order board and the
         menus.
       </p>
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
           Add by email
           <input
             type="email"
@@ -462,15 +462,15 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
               if (event.key === "Enter") void handleAddMember();
             }}
             placeholder="teammate@cafe.com"
-            className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
           Role
           <select
             value={addRole}
             onChange={(event) => setAddRole(event.target.value as "owner" | "staff")}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
             <option value="staff">Staff</option>
             <option value="owner">Owner</option>
@@ -485,7 +485,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           {adding ? "Adding…" : "Add member"}
         </button>
       </div>
-      <p className="mt-1 text-[11px] leading-4 text-stone-400">
+      <p className="mt-1 text-[11px] leading-4 text-ink-400">
         If they already have an account they join immediately; otherwise we email them a one-time
         invitation link that accepts on sign-in (expires in 7 days).
       </p>
@@ -519,13 +519,13 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
               className="flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 px-3 py-2"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-stone-900">
+                <p className="text-sm font-medium text-ink-900">
                   {member.name.trim() ? member.name : member.email}
                   {member.userId === currentUserId && (
-                    <span className="ml-1 text-xs font-normal text-stone-400">(you)</span>
+                    <span className="ml-1 text-xs font-normal text-ink-400">(you)</span>
                   )}
                 </p>
-                <p className="truncate text-xs text-stone-500">{member.email}</p>
+                <p className="truncate text-xs text-ink-500">{member.email}</p>
               </div>
               <select
                 value={member.role}
@@ -534,7 +534,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                 }
                 disabled={memberBusy === member.userId}
                 aria-label={`Role for ${member.name}`}
-                className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="owner">Owner</option>
                 <option value="staff">Staff</option>
@@ -543,7 +543,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                 type="button"
                 onClick={() => void handleRemoveMember(member)}
                 disabled={memberBusy === member.userId}
-                className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
               >
                 Remove
               </button>
@@ -561,10 +561,10 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
             {pending.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-stone-900">
+                  <p className="truncate text-sm font-medium text-ink-900">
                     {invitation.email}
                   </p>
-                  <p className="text-[11px] leading-4 text-stone-500">
+                  <p className="text-[11px] leading-4 text-ink-500">
                     {invitation.role === "owner" ? "Owner" : "Staff"} · invited by{" "}
                     {invitation.invitedByName.trim() || "a teammate"} · expires{" "}
                     {new Date(invitation.expiresAt).toLocaleDateString()}
@@ -574,7 +574,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                   type="button"
                   onClick={() => void handleResend(invitation)}
                   disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   Resend
                 </button>
@@ -582,7 +582,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                   type="button"
                   onClick={() => void handleRevoke(invitation)}
                   disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                 >
                   Revoke
                 </button>

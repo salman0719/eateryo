@@ -297,8 +297,8 @@ export function TableOrderTabs({
   const orderFooter = (
     <>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-600">Total</p>
-        <p className="text-lg font-bold tabular-nums text-stone-900">
+        <p className="text-sm font-medium text-ink-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-ink-900">
           {formatOrderTotal(cartCurrency, total)}
         </p>
       </div>
@@ -332,14 +332,14 @@ export function TableOrderTabs({
           <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
             Order received
           </p>
-          <p className="mt-3 text-2xl font-bold text-stone-900">
+          <p className="mt-3 text-2xl font-bold text-ink-900">
             #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
           </p>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-ink-600">
             {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
             {formatOrderTotal(placed.currency, orderTotal(placed.lines))}
           </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-stone-500">
+          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
             The kitchen sees this on their board right away. The total is confirmed when your order
             is prepared.
           </p>
@@ -396,10 +396,10 @@ export function TableOrderTabs({
             )}
             {onlyClosedMenu ? (
               <div>
-                <p className="text-sm font-semibold text-stone-900">
+                <p className="text-sm font-semibold text-ink-900">
                   {menuLabel(onlyClosedMenu)} is closed right now
                 </p>
-                <p className="mt-1 text-sm leading-6 text-stone-600">
+                <p className="mt-1 text-sm leading-6 text-ink-600">
                   Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
                 </p>
               </div>
@@ -420,7 +420,7 @@ export function TableOrderTabs({
                   />
                 </label>
                 {searching && (
-                  <p className="mt-2 text-xs text-stone-500" role="status">
+                  <p className="mt-2 text-xs text-ink-500" role="status">
                     {visibleCount === 0
                       ? `No dishes match “${query.trim()}”.`
                       : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
@@ -428,7 +428,7 @@ export function TableOrderTabs({
                 )}
               </>
             ) : (
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-ink-500">
                 Nothing to order at the moment — tap a menu to see when it opens.
               </p>
             )}
@@ -436,8 +436,8 @@ export function TableOrderTabs({
 
           {menus.length === 0 ? (
             <div className={`${frame} p-8 text-center`}>
-              <p className="text-lg font-semibold text-stone-900">Nothing is open right now</p>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              <p className="text-lg font-semibold text-ink-900">Nothing is open right now</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 {singleMenu
                   ? "The kitchen is between services — opening hours are shown above."
                   : "Every menu is between services — tap one above to see when it opens."}
@@ -445,8 +445,8 @@ export function TableOrderTabs({
             </div>
           ) : visibleCount === 0 ? (
             <div className={`${frame} p-8 text-center`}>
-              <p className="text-lg font-semibold text-stone-900">No dishes match</p>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              <p className="text-lg font-semibold text-ink-900">No dishes match</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 Nothing on {activeTab === ALL_TAB ? "these menus" : "this menu"} matches “
                 {query.trim()}”. Try a shorter search,{" "}
                 {singleMenu ? "or clear it to browse the whole menu." : "or browse the tabs above."}
@@ -457,7 +457,7 @@ export function TableOrderTabs({
               result.categories.length === 0 ? null : (
                 <div key={menu.menuId} className="flex flex-col gap-4">
                   {activeTab === ALL_TAB && menus.length > 1 && (
-                    <h2 className="px-1 text-sm font-bold tracking-wider text-stone-500 uppercase">
+                    <h2 className="px-1 text-sm font-bold tracking-wider text-ink-500 uppercase">
                       {menuLabel(menu)}
                     </h2>
                   )}
@@ -592,7 +592,7 @@ function TabButton({
       className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
           ? "bg-stone-900 text-white"
-          : "border border-stone-300 text-stone-700 hover:border-amber-700 hover:text-amber-900"
+          : "border border-stone-300 text-ink-700 hover:border-amber-700 hover:text-amber-900"
       }`}
     >
       {label}
@@ -643,8 +643,8 @@ function ClosedTabButton({
       }}
       className={`shrink-0 cursor-not-allowed rounded-full border border-dashed px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         show
-          ? "border-stone-400 bg-white text-stone-600"
-          : "border-stone-300 bg-stone-50 text-stone-400"
+          ? "border-stone-400 bg-white text-ink-600"
+          : "border-stone-300 bg-stone-50 text-ink-400"
       }`}
     >
       {label}

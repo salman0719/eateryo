@@ -228,10 +228,10 @@ export function PublishWizard({
             <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
               {submitResult?.created.menu ? "First menu published" : "Published for ordering"}
             </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
               Your menu is live for your tables
             </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">
               {submitResult?.created.restaurant
                 ? `We created “${submitResult.restaurant.name}” for you — rename it in Settings whenever you like. `
                 : ""}
@@ -242,7 +242,7 @@ export function PublishWizard({
           <button
             type="button"
             onClick={onBack}
-            className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
             ← Back to editing
           </button>
@@ -251,8 +251,8 @@ export function PublishWizard({
         <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
-              <h2 className="text-sm font-semibold text-stone-900">Next: print a table card</h2>
-              <p className="mt-1 text-xs leading-5 text-stone-600">
+              <h2 className="text-sm font-semibold text-ink-900">Next: print a table card</h2>
+              <p className="mt-1 text-xs leading-5 text-ink-600">
                 One QR per table — each card orders for its table across every open menu. They
                 print from the Tables tab.
               </p>
@@ -268,14 +268,14 @@ export function PublishWizard({
                   type="button"
                   onClick={() => setShowHours((value) => !value)}
                   aria-expanded={showHours}
-                  className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   {showHours ? "Hide opening hours" : "Set your opening hours"}
                 </button>
                 <button
                   type="button"
                   onClick={onOpenEditor}
-                  className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   Keep editing
                 </button>
@@ -287,7 +287,7 @@ export function PublishWizard({
               )}
             </div>
 
-            <p className="text-xs leading-5 text-stone-500">
+            <p className="text-xs leading-5 text-ink-500">
               Edits made in the editor stay off your tables until you press “Publish changes” —
               diners always see the last published version.
             </p>
@@ -297,7 +297,7 @@ export function PublishWizard({
             <PhoneFrame label="Diner page at a table">
               <OrderPagePreview doc={doc} restaurantName={restaurantName} />
             </PhoneFrame>
-            <p className="text-center text-xs text-stone-500">
+            <p className="text-center text-xs text-ink-500">
               Ordering is off in this preview; a real table card turns it on.
             </p>
           </aside>
@@ -313,10 +313,10 @@ export function PublishWizard({
           <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
             Publish your menu
           </p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
             {signedIn ? "One short form, then you can take orders" : "Sign in to publish your menu"}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">
             {signedIn
               ? "We will create your café only if you don’t have one yet, attach this draft, and make it orderable at your tables. Nothing else is required."
               : "Publishing needs an account — it’s the only thing we ask for. Your draft is saved in this browser, so it will be waiting when you come back; the emailed link returns you to this same screen."}
@@ -325,7 +325,7 @@ export function PublishWizard({
         <button
           type="button"
           onClick={onBack}
-          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           ← Back to editing
         </button>
@@ -347,14 +347,14 @@ export function PublishWizard({
                 onSent={(sent) => saveWizardLinkSent(doc.id, sent)}
                 onSentCleared={() => clearWizardLinkSent(doc.id)}
               />
-              <p className="text-xs leading-5 text-stone-500">
+              <p className="text-xs leading-5 text-ink-500">
                 No password, no card — signing in is just how the menu becomes yours.
               </p>
             </>
           ) : (
             <>
               <div>
-                <p className="text-sm font-semibold text-stone-900">Your café</p>
+                <p className="text-sm font-semibold text-ink-900">Your café</p>
                 {restaurantsLoading ? (
                   <div role="status" aria-busy="true" className="mt-2">
                     <span className="sr-only">Loading your restaurants…</span>
@@ -362,44 +362,44 @@ export function PublishWizard({
                   </div>
                 ) : ownedRestaurants.length === 0 ? (
                   nameFieldVisible ? (
-                    <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-stone-600">
+                    <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-ink-600">
                       Name your restaurant
                       <input
                         type="text"
                         value={form.restaurantName}
                         onChange={(event) => update({ restaurantName: event.target.value })}
                         placeholder="e.g. Sunny Side Café"
-                        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                       />
-                      <span className="text-xs font-normal text-stone-500">
+                      <span className="text-xs font-normal text-ink-500">
                         You can rename it later in Settings.
                       </span>
                     </label>
                   ) : (
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-stone-50 px-3 py-2">
-                      <p className="text-sm text-stone-800">
+                      <p className="text-sm text-ink-800">
                         Publishing under <span className="font-medium">{confirmedName}</span>
                       </p>
                       <button
                         type="button"
                         onClick={() => setNameEditing(true)}
-                        className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                       >
                         Change
                       </button>
                     </div>
                   )
                 ) : ownedRestaurants.length === 1 && ownedRestaurants[0] ? (
-                  <p className="mt-1 rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-800">
+                  <p className="mt-1 rounded-lg bg-stone-50 px-3 py-2 text-sm text-ink-800">
                     Publishing under <span className="font-medium">{ownedRestaurants[0].name}</span>
                   </p>
                 ) : (
-                  <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-stone-600">
+                  <label className="mt-2 flex flex-col gap-1 text-xs font-medium text-ink-600">
                     Publishing under
                     <select
                       value={form.restaurantId}
                       onChange={(event) => update({ restaurantId: event.target.value })}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…
@@ -443,7 +443,7 @@ export function PublishWizard({
                 >
                   {busy ? "Publishing…" : "Publish my menu"}
                 </button>
-                <p className="mt-2 text-xs text-stone-500">
+                <p className="mt-2 text-xs text-ink-500">
                   Free while the promotion lasts. The draft is saved before anything is sent.
                 </p>
               </div>
@@ -458,7 +458,7 @@ export function PublishWizard({
               restaurantName={choice.kind === "existing" || choice.kind === "create" ? choice.name : null}
             />
           </PhoneFrame>
-          <p className="text-center text-xs text-stone-500">
+          <p className="text-center text-xs text-ink-500">
             Ordering is off in this preview; a real table card turns it on.
           </p>
         </aside>

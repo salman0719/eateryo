@@ -45,7 +45,7 @@ export function MonitorToasts({
               🔔 New order · {formatTableLabel(order.tableLabel)}{" "}
               <span className="font-medium text-amber-300">#{orderCode(order.id)}</span>
             </p>
-            <p className="truncate text-xs text-stone-300">
+            <p className="truncate text-xs text-ink-300">
               {order.lines
                 .slice(0, 2)
                 .map((line) => `${line.quantity}× ${line.name}`)
@@ -57,7 +57,7 @@ export function MonitorToasts({
             type="button"
             onClick={() => onDismiss(id)}
             aria-label="Dismiss"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-lg text-stone-300 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-lg text-ink-300 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
           >
             ×
           </button>

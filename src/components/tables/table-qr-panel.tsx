@@ -385,10 +385,10 @@ export function TableQrPanel(props: TableQrPanelProps) {
     <div className="flex flex-col gap-4">
       {linkState.status === "unclaimed" ? (
         <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-5 text-center">
-          <p className="text-base font-bold text-stone-900">
+          <p className="text-base font-bold text-ink-900">
             One link for every table at {linkState.restaurantName}
           </p>
-          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-stone-600">
+          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-ink-600">
             Table cards point at your restaurant link —{" "}
             <code className="rounded bg-white px-1.5 py-0.5">/r/…/t/3</code> — where diners see
             every menu that is open right now. Claim it once, then print the cards below.
@@ -413,7 +413,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
               )}
             </>
           ) : (
-            <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-stone-600">
+            <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-ink-600">
               The link isn&apos;t claimed yet — ask the restaurant owner to claim it from their
               sign-in, then the cards can be printed.
             </p>
@@ -426,7 +426,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           className={
             linkState.status === "unavailable"
               ? "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
-              : "text-xs text-stone-500"
+              : "text-xs text-ink-500"
           }
         >
           {linkState.status === "loading"
@@ -450,7 +450,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
             data-print-hide
             className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4"
           >
-            <label className="text-xs font-semibold text-stone-600">
+            <label className="text-xs font-semibold text-ink-600">
               Tables
               <input
                 type="number"
@@ -468,7 +468,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 className="mt-1 block w-24 rounded-xl border border-stone-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
               />
             </label>
-            <label className="text-xs font-semibold text-stone-600">
+            <label className="text-xs font-semibold text-ink-600">
               Label prefix
               <input
                 type="text"
@@ -488,12 +488,12 @@ export function TableQrPanel(props: TableQrPanelProps) {
               <button
                 type="button"
                 onClick={resetNames}
-                className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-800"
+                className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-800"
               >
                 Reset names
               </button>
             )}
-            <label className="text-xs font-semibold text-stone-600">
+            <label className="text-xs font-semibold text-ink-600">
               Show
               <select
                 value={focusedLabel ?? ""}
@@ -524,7 +524,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
             </button>
           </div>
 
-          <p data-print-hide className="text-xs leading-5 text-stone-500">
+          <p data-print-hide className="text-xs leading-5 text-ink-500">
             Showing one table makes a single large card for demos — only that card prints.{" "}
             {resolvingLink ? (
               <>Finding your restaurant link…</>
@@ -589,7 +589,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 data-qr-card
                 className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 p-4 text-center"
               >
-                <p className="text-xs font-semibold tracking-widest text-stone-500 uppercase">
+                <p className="text-xs font-semibold tracking-widest text-ink-500 uppercase">
                   {cardEyebrow.trim() || "Untitled menu"}
                 </p>
                 {editingLabel === code.label ? (
@@ -612,8 +612,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     // (not a border) so the swap never moves the card layout.
                     className={
                       focusedLabel
-                        ? "rounded-sm bg-white p-0 text-center text-3xl font-bold text-stone-900 outline-2 outline-amber-700 outline-offset-2"
-                        : "rounded-sm bg-white p-0 text-center text-xl font-bold text-stone-900 outline-2 outline-amber-700 outline-offset-2"
+                        ? "rounded-sm bg-white p-0 text-center text-3xl font-bold text-ink-900 outline-2 outline-amber-700 outline-offset-2"
+                        : "rounded-sm bg-white p-0 text-center text-xl font-bold text-ink-900 outline-2 outline-amber-700 outline-offset-2"
                     }
                   />
                 ) : (
@@ -626,8 +626,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     // since printed pages never match :hover.
                     className={
                       focusedLabel
-                        ? "cursor-text text-3xl font-bold text-stone-900 hover:underline hover:decoration-dotted hover:decoration-amber-600 hover:underline-offset-8"
-                        : "cursor-text text-xl font-bold text-stone-900 hover:underline hover:decoration-dotted hover:decoration-amber-600 hover:underline-offset-4"
+                        ? "cursor-text text-3xl font-bold text-ink-900 hover:underline hover:decoration-dotted hover:decoration-amber-600 hover:underline-offset-8"
+                        : "cursor-text text-xl font-bold text-ink-900 hover:underline hover:decoration-dotted hover:decoration-amber-600 hover:underline-offset-4"
                     }
                   >
                     {formatTableLabel(code.label)}
@@ -641,9 +641,9 @@ export function TableQrPanel(props: TableQrPanelProps) {
                   height={200}
                   className={focusedLabel ? "h-64 w-64" : "h-44 w-44"}
                 />
-                <p className="text-[10px] leading-4 text-stone-400">Scan to order</p>
+                <p className="text-[10px] leading-4 text-ink-400">Scan to order</p>
                 {(tableSlug || publicSlug) && (
-                  <p className="text-[10px] font-medium leading-4 break-all text-stone-600">
+                  <p className="text-[10px] font-medium leading-4 break-all text-ink-600">
                     {displayTableUrl(code.url)}
                   </p>
                 )}

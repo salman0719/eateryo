@@ -186,10 +186,10 @@ export function MoveToAccountPanel({
 
   return (
     <section className="bg-white p-4 sm:p-5">
-      <h3 className="text-sm font-bold tracking-tight text-stone-900">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">
         Menus saved in this browser
       </h3>
-      <p className="mt-1 text-xs leading-5 text-stone-500">
+      <p className="mt-1 text-xs leading-5 text-ink-500">
         Adds your {menuCount === 1 ? "saved menu" : `${menuCount} saved menus`} to your account so
         other devices see {menuCount === 1 ? "it" : "them"} too. This browser keeps its copies —
         nothing is deleted.
@@ -223,14 +223,14 @@ export function MoveToAccountPanel({
               `items-end` an extra label line would drag the button down
               past the input's bottom edge and out of alignment. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+            <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
               Name your restaurant
               <input
                 type="text"
                 value={newName}
                 onChange={(event) => setNameDraft(event.target.value)}
                 placeholder="e.g. Sunny Side Café"
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               />
             </label>
             <button
@@ -243,7 +243,7 @@ export function MoveToAccountPanel({
             </button>
           </div>
           {suggestedName && nameDraft === null && (
-            <p className="mt-1 text-xs font-normal text-stone-400">
+            <p className="mt-1 text-xs font-normal text-ink-400">
               Suggested from your menu titles — change it if you like.
             </p>
           )}
@@ -252,12 +252,12 @@ export function MoveToAccountPanel({
 
       {owned.length > 0 && !report && (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
             Add to
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -303,7 +303,7 @@ export function MoveToAccountPanel({
 
       {owned.length > 0 && !report && selected && renaming && (
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
             Rename “{selected.name}”
             <input
               type="text"
@@ -313,7 +313,7 @@ export function MoveToAccountPanel({
                 if (event.key === "Enter") void handleRename();
                 if (event.key === "Escape") setRenaming(false);
               }}
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             />
           </label>
           <div className="flex gap-2">
@@ -329,7 +329,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => setRenaming(false)}
               disabled={mutating}
-              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-stone-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               Cancel
             </button>
@@ -341,7 +341,7 @@ export function MoveToAccountPanel({
 
       {report && (
         <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-          <p className="text-sm font-medium text-stone-900">
+          <p className="text-sm font-medium text-ink-900">
             Added {report.imported.length} · already there {report.skipped.length} · failed{" "}
             {report.failed.length}
           </p>

@@ -20,8 +20,8 @@ function Section({
 }) {
   return (
     <section className="mt-7">
-      <h2 className="text-base font-semibold text-stone-900">{title}</h2>
-      <div className="mt-2 space-y-2 text-sm leading-relaxed text-stone-600">{children}</div>
+      <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+      <div className="mt-2 space-y-2 text-sm leading-relaxed text-ink-600">{children}</div>
     </section>
   );
 }
@@ -33,9 +33,9 @@ export default function PrivacyPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">Privacy</h1>
-        <p className="mt-2 text-sm text-stone-500">Last updated {LEGAL_UPDATED}.</p>
-        <p className="mt-4 text-sm leading-relaxed text-stone-600">
+        <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">Privacy</h1>
+        <p className="mt-2 text-sm text-ink-500">Last updated {LEGAL_UPDATED}.</p>
+        <p className="mt-4 text-sm leading-relaxed text-ink-600">
           This page describes exactly what {SITE_NAME} does with data, in the same words the code
           uses. If something here does not match what you experience, that is a bug — tell us.
         </p>
@@ -50,37 +50,37 @@ export default function PrivacyPage() {
         <Section title="What we store">
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <strong className="font-medium text-stone-800">Your account:</strong> the email
+              <strong className="font-medium text-ink-800">Your account:</strong> the email
               address you sign in with, sent once as a one-time sign-in link. There is no password.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Your menu:</strong> the restaurant
+              <strong className="font-medium text-ink-800">Your menu:</strong> the restaurant
               name, menu text, prices, and the themes you publish.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Dish photos:</strong> only the photos
+              <strong className="font-medium text-ink-800">Dish photos:</strong> only the photos
               you choose to attach to a dish. They are stored by our file host, UploadThing, and
               served from its CDN to the diners looking at your menu. Removing a photo from a dish
               stops it being shown; the stored file is kept so that diners still being served your
               last published menu keep seeing the picture that was published.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Table orders:</strong> the table label,
+              <strong className="font-medium text-ink-800">Table orders:</strong> the table label,
               the items and prices at the time of ordering, an optional free-text note from the
               diner, the status, and timestamps.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Extraction usage:</strong> how many
+              <strong className="font-medium text-ink-800">Extraction usage:</strong> how many
               pages and tokens each AI extraction used, so we can see the cost and apply the free
               allowance. This row records no image and no menu content.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Abuse protection:</strong> a truncated
+              <strong className="font-medium text-ink-800">Abuse protection:</strong> a truncated
               one-way hash of the caller&apos;s address for rate limiting. The address itself is
               never stored, and the hash cannot be reversed into an address.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Page views:</strong> a plain counter
+              <strong className="font-medium text-ink-800">Page views:</strong> a plain counter
               per published menu. No cookie, no fingerprint, no per-visitor record.
             </li>
           </ul>
@@ -89,21 +89,21 @@ export default function PrivacyPage() {
         <Section title="What we never store">
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <strong className="font-medium text-stone-800">Menu photos you scan.</strong> The
+              <strong className="font-medium text-ink-800">Menu photos you scan.</strong> The
               pictures you photograph to extract a menu are read in memory and discarded; they are
               not written to disk or to object storage. (Dish photos you deliberately attach are a
               different case — those are listed above.)
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Diner identities.</strong> No name, no
+              <strong className="font-medium text-ink-800">Diner identities.</strong> No name, no
               email, no phone, no account, no device identifier.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Payment data.</strong> Nothing is
+              <strong className="font-medium text-ink-800">Payment data.</strong> Nothing is
               charged during the launch promotion, so we never see a card number.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">Advertising profiles.</strong> There
+              <strong className="font-medium text-ink-800">Advertising profiles.</strong> There
               are no ad networks, no tracking pixels, and no analytics cookies.
             </li>
           </ul>
@@ -164,7 +164,7 @@ export default function PrivacyPage() {
           )}
         </Section>
 
-        <p className="mt-8 text-sm text-stone-500">
+        <p className="mt-8 text-sm text-ink-500">
           See also the{" "}
           <Link href="/terms" className="font-medium text-amber-800 underline underline-offset-2">
             terms of use

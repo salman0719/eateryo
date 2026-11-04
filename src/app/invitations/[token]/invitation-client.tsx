@@ -130,11 +130,11 @@ export function InvitationClient({ token }: { token: string }) {
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Team invitation</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink-900">Team invitation</h1>
         {invitation && (
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-ink-600">
             You&apos;ve been invited to join{" "}
-            <span className="font-medium text-stone-900">{invitation.restaurantName}</span> as{" "}
+            <span className="font-medium text-ink-900">{invitation.restaurantName}</span> as{" "}
             {invitation.role === "owner" ? "an owner" : "staff"}.
           </p>
         )}
@@ -149,11 +149,11 @@ export function InvitationClient({ token }: { token: string }) {
       {!invitation && !loadError && <InvitationSkeleton />}
 
       {invitation && (
-        <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-700">
+        <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-ink-700">
           <p>
-            Invited email: <span className="font-medium text-stone-900">{invitation.email}</span>
+            Invited email: <span className="font-medium text-ink-900">{invitation.email}</span>
           </p>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-ink-500">
             The link expires {new Date(invitation.expiresAt).toLocaleString()}.
           </p>
         </div>
@@ -220,7 +220,7 @@ export function InvitationClient({ token }: { token: string }) {
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-stone-600">
+                  <p className="text-sm text-ink-600">
                     Sign in with <span className="font-medium">{invitation.email}</span> to accept.
                     We&apos;ll email a one-time link — no password.
                   </p>
@@ -279,8 +279,8 @@ export function InvitationClient({ token }: { token: string }) {
         </>
       )}
 
-      <p className="text-sm text-stone-500">
-        <Link href="/" className="underline underline-offset-2 hover:text-stone-800">
+      <p className="text-sm text-ink-500">
+        <Link href="/" className="underline underline-offset-2 hover:text-ink-800">
           Back to the editor
         </Link>
       </p>

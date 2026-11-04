@@ -145,7 +145,7 @@ export function ExtractionProgress({
         <p className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase">
           While you wait
         </p>
-        <h2 className="mt-1 text-base font-bold text-stone-900">What happens next</h2>
+        <h2 className="mt-1 text-base font-bold text-ink-900">What happens next</h2>
         <ol className="mt-3 space-y-3">
           {NEXT_STEPS.map((step, index) => (
             <li key={step.title} className="flex items-start gap-2.5">
@@ -156,8 +156,8 @@ export function ExtractionProgress({
                 {index + 1}
               </span>
               <div>
-                <p className="text-sm font-semibold text-stone-900">{step.title}</p>
-                <p className="text-xs leading-5 text-stone-600">{step.body}</p>
+                <p className="text-sm font-semibold text-ink-900">{step.title}</p>
+                <p className="text-xs leading-5 text-ink-600">{step.body}</p>
               </div>
             </li>
           ))}

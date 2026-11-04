@@ -89,8 +89,8 @@ async function TableLandingContent({
     return (
       <OrderShell>
         <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
-          <p className="text-lg font-semibold text-stone-900">This table link is incomplete</p>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
+          <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
+          <p className="mt-2 text-sm leading-6 text-ink-600">
             A table link includes the table number, like{" "}
             <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs">
               /r/{landing.restaurantSlug}/t/3
@@ -111,12 +111,12 @@ async function TableLandingContent({
           <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
             {landing.restaurantName} · {formatTableLabel(tableLabel)}
           </p>
-          <h1 className="mt-1 text-2xl font-bold text-stone-900">Order from your table</h1>
-          <p className="mt-1 text-sm text-stone-600">Ask staff what’s being served right now.</p>
+          <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
+          <p className="mt-1 text-sm text-ink-600">Ask staff what’s being served right now.</p>
         </div>
         <div className={`${frame} p-8 text-center`}>
-          <p className="text-lg font-semibold text-stone-900">Nothing being served right now</p>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+          <p className="text-lg font-semibold text-ink-900">Nothing being served right now</p>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
             {landing.restaurantName} has no menu open at the moment — the kitchen may be between
             services. Ask staff what’s on, or try again a little later.
           </p>
@@ -131,8 +131,8 @@ async function TableLandingContent({
         <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
           {landing.restaurantName} · {formatTableLabel(tableLabel)}
         </p>
-        <h1 className="mt-1 text-2xl font-bold text-stone-900">Order from your table</h1>
-        <p className="mt-1 text-sm text-stone-600">
+        <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
+        <p className="mt-1 text-sm text-ink-600">
           {landing.menus.length === 0
             ? landing.closedMenus.length === 1
               ? "Nothing is being served right now — opening hours are below."

@@ -74,7 +74,7 @@ const pill = "rounded-full px-2.5 py-0.5 text-[11px] font-semibold";
 
 function StatusPill({ status }: { status: PublicationStatus | null }) {
   if (!status) {
-    return <span className={`${pill} bg-stone-100 text-stone-600`}>Not published</span>;
+    return <span className={`${pill} bg-stone-100 text-ink-600`}>Not published</span>;
   }
   if (!status.isLive) {
     return <span className={`${pill} bg-amber-100 text-amber-900`}>Ordering paused</span>;
@@ -120,7 +120,7 @@ function ChangeList({
 
   if (state === "error") {
     return (
-      <p className="mt-2 text-xs leading-5 text-stone-600">
+      <p className="mt-2 text-xs leading-5 text-ink-600">
         Could not compare this with what diners see right now. The warning above still applies.
       </p>
     );
@@ -133,7 +133,7 @@ function ChangeList({
     // availability, descriptions, labels and ordering — not every stored
     // detail. Claiming diners "see nothing different" would be a guess.
     return (
-      <p className="mt-2 text-xs leading-5 text-stone-600">
+      <p className="mt-2 text-xs leading-5 text-ink-600">
         Nothing diners would notice changed since the last publish — the save only touched details
         this summary does not compare, like review notes or import metadata.
       </p>
@@ -146,7 +146,7 @@ function ChangeList({
 
   return (
     <div className="mt-2">
-      <p className="text-xs font-semibold text-stone-700">
+      <p className="text-xs font-semibold text-ink-700">
         Since you last published: {counts.join(" · ")}
       </p>
       <details className="mt-1">
@@ -159,8 +159,8 @@ function ChangeList({
               key={`${row.kind}:${row.name}:${index}`}
               className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 py-1.5 text-xs"
             >
-              <span className="min-w-0 font-medium text-stone-900">{row.name}</span>
-              <span className="text-right text-stone-500">
+              <span className="min-w-0 font-medium text-ink-900">{row.name}</span>
+              <span className="text-right text-ink-500">
                 {row.detail
                   ? `${MENU_CHANGE_LABEL[row.kind]} · ${row.detail}`
                   : MENU_CHANGE_LABEL[row.kind]}
@@ -203,10 +203,10 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
+          <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <StatusPill status={null} />
         </div>
-        <p className="mt-2 text-xs leading-5 text-stone-600">
+        <p className="mt-2 text-xs leading-5 text-ink-600">
           Publishing puts this menu on your tables: diners scan a table card, pick items, and the
           order lands on your board. Sign in inside the flow and your draft stays in this browser.
         </p>
@@ -234,10 +234,10 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
-          <span className={`${pill} bg-stone-100 text-stone-600`}>Not checked</span>
+          <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
+          <span className={`${pill} bg-stone-100 text-ink-600`}>Not checked</span>
         </div>
-        <p className="mt-2 text-xs leading-5 text-stone-600">
+        <p className="mt-2 text-xs leading-5 text-ink-600">
           We couldn&apos;t check your account just now, so we can&apos;t tell whether this menu is
           already there. Nothing here changed — try again in a moment.
         </p>
@@ -245,7 +245,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onRetryAccountCheck}
-            className="mt-3 rounded-full border border-stone-300 px-4 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 rounded-full border border-stone-300 px-4 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
             Try again
           </button>
@@ -258,7 +258,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
+          <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <Skeleton className="h-5 w-16 rounded-full" />
         </div>
         <div role="status" aria-busy="true" className="mt-3 flex flex-col gap-2">
@@ -276,10 +276,10 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
+          <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <StatusPill status={status} />
         </div>
-        <p className="mt-2 text-xs leading-5 text-stone-600">
+        <p className="mt-2 text-xs leading-5 text-ink-600">
           This menu is still only in this browser. One step adds it to your account and makes it
           orderable at your tables — we create your café if you don&apos;t have one yet.
         </p>
@@ -304,7 +304,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold text-stone-900">Table ordering</h3>
+        <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
         <StatusPill status={status} />
         <span className="flex-1" />
         {loaded && (
@@ -328,7 +328,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
       )}
 
       {loaded && !status && (
-        <p className="mt-2 text-xs leading-5 text-stone-600">
+        <p className="mt-2 text-xs leading-5 text-ink-600">
           This menu has never been published. Publishing makes it orderable at your tables — print a
           table card from the Tables tab and diners can order from it.
         </p>
@@ -337,14 +337,14 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
       {status && (
         <div className="mt-2 flex flex-col gap-2">
           {!status.isLive && (
-            <p className="text-xs leading-5 text-stone-600">
+            <p className="text-xs leading-5 text-ink-600">
               This menu is not being served right now, so table cards skip it. Publishing again puts
               it back on your tables.
             </p>
           )}
 
           {status.isLive && status.publishedAt && (
-            <p className="text-xs text-stone-500">Published {formatDate(status.publishedAt)}</p>
+            <p className="text-xs text-ink-500">Published {formatDate(status.publishedAt)}</p>
           )}
 
           {needsPublish && (
@@ -373,7 +373,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
                 if (ok) onUnpublish();
               }}
               disabled={busy}
-              className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               {busy ? "Working…" : "Unpublish"}
             </button>

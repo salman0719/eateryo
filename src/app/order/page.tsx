@@ -35,7 +35,7 @@ async function OrderLink({
 function OrderShellPlaceholder() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4 px-4 py-6">
-      <p className="text-sm text-stone-500" role="status">
+      <p className="text-sm text-ink-500" role="status">
         Loading the table…
       </p>
     </div>

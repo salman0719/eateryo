@@ -121,7 +121,7 @@ function ConfirmDialog({
         aria-labelledby={titleId}
         className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
       >
-        <p id={titleId} className="text-sm text-stone-800">
+        <p id={titleId} className="text-sm text-ink-800">
           {message}
         </p>
         <div className="mt-5 flex justify-end gap-2">
@@ -129,7 +129,7 @@ function ConfirmDialog({
             ref={cancelRef}
             type="button"
             onClick={() => onAnswer(false)}
-            className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-stone-500"
+            className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-stone-500"
           >
             {cancelLabel}
           </button>

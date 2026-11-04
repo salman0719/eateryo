@@ -54,8 +54,8 @@ export function RestaurantTables({
   return (
     <div className="flex flex-col gap-4">
       <div data-print-hide>
-        <h2 className="text-xl font-bold text-stone-900">Table QR codes</h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">
+        <h2 className="text-xl font-bold text-ink-900">Table QR codes</h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">
           One code per table, for the whole restaurant. Each card opens that table&apos;s page with
           every menu that is open right now — so adding a lunch menu, republishing, or renaming a
           menu never makes a printed card out of date.
@@ -64,8 +64,8 @@ export function RestaurantTables({
 
       {!signedIn && !sessionPending && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-sm font-medium text-stone-900">Sign in to print table cards</p>
-          <p className="mt-1 text-xs leading-5 text-stone-500">
+          <p className="text-sm font-medium text-ink-900">Sign in to print table cards</p>
+          <p className="mt-1 text-xs leading-5 text-ink-500">
             Table cards point at your restaurant link, which lives in your account.
           </p>
           <a
@@ -108,12 +108,12 @@ export function RestaurantTables({
 
       {signedIn && showRestaurantPicker(restaurants) && restaurants !== null && (
         <div data-print-hide className="rounded-2xl border border-stone-200 bg-white p-5">
-          <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
             Restaurant
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="max-w-sm rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="max-w-sm rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -126,7 +126,7 @@ export function RestaurantTables({
               ))}
             </select>
           </label>
-          <p className="mt-2 text-xs leading-5 text-stone-500">
+          <p className="mt-2 text-xs leading-5 text-ink-500">
             Cards stay attached to this restaurant. Staff can print them; only an owner can claim or
             change the restaurant link.
           </p>

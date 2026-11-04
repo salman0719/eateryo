@@ -23,10 +23,10 @@ export function MissingDraftCard({
         <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
           Link opened in the wrong place
         </p>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
           Your draft isn&apos;t in this browser.
         </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-stone-600">{MISSING_PUBLISH_DRAFT_MESSAGE}</p>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">{MISSING_PUBLISH_DRAFT_MESSAGE}</p>
       </div>
 
       <ol className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-5">
@@ -37,7 +37,7 @@ export function MissingDraftCard({
           >
             1
           </span>
-          <p className="text-sm leading-6 text-stone-700">
+          <p className="text-sm leading-6 text-ink-700">
             Go back to the browser where you photographed the menu — your draft is still there,
             exactly as you left it.
           </p>
@@ -49,7 +49,7 @@ export function MissingDraftCard({
           >
             2
           </span>
-          <p className="text-sm leading-6 text-stone-700">
+          <p className="text-sm leading-6 text-ink-700">
             Open the sign-in email there and tap the link. Your draft and the link step will be
             waiting.
           </p>
@@ -67,7 +67,7 @@ export function MissingDraftCard({
         <button
           type="button"
           onClick={onStartFresh}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           Start a new menu
         </button>

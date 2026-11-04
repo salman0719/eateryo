@@ -2492,7 +2492,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
                   screen === tab.id
                     ? "bg-stone-900 text-white"
-                    : "bg-white text-stone-600 ring-1 ring-stone-200 hover:text-stone-900"
+                    : "bg-white text-ink-600 ring-1 ring-stone-200 hover:text-ink-900"
                 }`}
               >
                 {tab.label}
@@ -2542,7 +2542,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {/* A failed account read is no longer silent: the gate settles, the
             server paths stay off, and this says so once. */}
         {signedIn && claimGate.incomplete && screen !== "editor" && (
-          <p className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-stone-600">
+          <p className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-ink-600">
             We couldn&apos;t check your account just now, so nothing was imported from this
             browser. Reload when you&apos;re back online and it will try again.
           </p>
@@ -2639,9 +2639,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 import is retried. */}
             {signedIn && libraryAccountMode && localOnlyCount > 0 && (
               <details className="rounded-2xl border border-stone-200 bg-white">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-700 marker:text-stone-400">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-700 marker:text-ink-400">
                   Import from this browser
-                  <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
+                  <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                     {localOnlyCount}
                   </span>
                 </summary>
@@ -2702,8 +2702,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             null
           ) : (
             <section className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-              <h1 className="font-medium text-stone-900">Assistant isn’t available</h1>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              <h1 className="font-medium text-ink-900">Assistant isn’t available</h1>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 The assistant isn’t released to this account yet. Everything else in Eateryo works
                 as usual.
               </p>
@@ -2813,15 +2813,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {screen === "capture" && (
           <>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+              <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
                 Turn your photo into a menu
               </h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600 sm:text-base">
+              <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
                 Upload a photo or scan of a menu, extract it into categories and items with AI, then
                 review and correct the draft. AI output is never guaranteed — you stay in charge.
               </p>
               {!signedIn && !sessionPending && (
-                <p className="mt-1.5 max-w-xl text-xs leading-5 text-stone-500">
+                <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
                   You can upload and review first. Publishing needs an account — we’ll email you a
                   sign-in link, and your draft stays in this browser.
                 </p>
@@ -2841,7 +2841,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                     {fileError}
                   </p>
                 )}
-                <p className="text-center text-sm text-stone-500">
+                <p className="text-center text-sm text-ink-500">
                   No menu handy?{" "}
                   <button
                     type="button"
@@ -2911,7 +2911,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                       ? "Extracting… this can take up to a minute"
                       : "Extract menu"}
                   </button>
-                  <p className="mt-2 text-xs text-stone-500">
+                  <p className="mt-2 text-xs text-ink-500">
                     Calls the AI once, only when you press this. Accuracy depends on image quality.
                   </p>
                 </div>
@@ -2994,8 +2994,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         )}
         {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
           <section className="rounded-2xl border border-stone-200 bg-white p-6 text-center">
-            <h1 className="font-medium text-stone-900">Checking your session…</h1>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+            <h1 className="font-medium text-ink-900">Checking your session…</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
               We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft
               is still saved in this browser — nothing is lost.
             </p>
@@ -3013,7 +3013,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <button
                 type="button"
                 onClick={() => navigateTo({ screen: "library" })}
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               >
                 Back to My menus
               </button>
@@ -3080,7 +3080,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               }}
               aria-current={screen === tab.id ? "page" : undefined}
               className={`relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
-                screen === tab.id ? "text-amber-800" : "text-stone-500"
+                screen === tab.id ? "text-amber-800" : "text-ink-500"
               }`}
             >
               {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
@@ -3106,7 +3106,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               screen === "assistant" ||
               screen === "settings"
                 ? "text-amber-800"
-                : "text-stone-500"
+                : "text-ink-500"
             }`}
           >
             <span aria-hidden="true" className="text-lg leading-none">
@@ -3141,16 +3141,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 }}
                 className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               >
-                <span className="text-sm font-semibold text-stone-900">{row.label}</span>
-                <span className="text-xs font-normal text-stone-500">{row.why}</span>
+                <span className="text-sm font-semibold text-ink-900">{row.label}</span>
+                <span className="text-xs font-normal text-ink-500">{row.why}</span>
               </button>
             ))}
             <a
               href="/launch"
               className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
-              <span className="text-sm font-semibold text-stone-900">Get started</span>
-              <span className="text-xs font-normal text-stone-500">
+              <span className="text-sm font-semibold text-ink-900">Get started</span>
+              <span className="text-xs font-normal text-ink-500">
                 The launch checklist and offer
               </span>
             </a>

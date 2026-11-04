@@ -61,7 +61,7 @@ export function PhoneFrame({
           <div ref={setLayer} className="pointer-events-none absolute inset-0 z-30" />
         </div>
       </div>
-      <figcaption className="mt-2 text-center text-[11px] text-stone-500">{label}</figcaption>
+      <figcaption className="mt-2 text-center text-[11px] text-ink-500">{label}</figcaption>
     </figure>
   );
 }

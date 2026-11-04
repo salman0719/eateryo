@@ -309,8 +309,8 @@ export function AssistantPanel({
   if (!signedIn) {
     return (
       <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-        <p className="font-medium text-stone-900">Sign in to use the assistant</p>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+        <p className="font-medium text-ink-900">Sign in to use the assistant</p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
           The assistant answers questions about Eateryo using your own restaurant and menu names. It
           needs an account so answers stay scoped to your data and the cost stays capped.
         </p>
@@ -335,10 +335,10 @@ export function AssistantPanel({
       {dialog}
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 id="assistant-heading" className="text-xl font-semibold text-stone-900">
+          <h1 id="assistant-heading" className="text-xl font-semibold text-ink-900">
             Assistant
           </h1>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-ink-600">
             {proposalsEnabled && selectedMenu ? (
               <>
                 Ask about Eateryo or request a change to{" "}
@@ -353,7 +353,7 @@ export function AssistantPanel({
           </p>
         </div>
         {usage && (
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-ink-500">
             {usage.remaining} of {usage.cap} messages left
             {resetLabel ? ` · resets ${resetLabel}` : ""}
           </p>
@@ -362,15 +362,15 @@ export function AssistantPanel({
 
       {proposalsEnabled ? (
         <div className="rounded-2xl border border-stone-200 bg-white p-4">
-          <label htmlFor="assistant-menu" className="text-xs font-semibold text-stone-600">
-            Menu to edit <span className="font-normal text-stone-500">(optional)</span>
+          <label htmlFor="assistant-menu" className="text-xs font-semibold text-ink-600">
+            Menu to edit <span className="font-normal text-ink-500">(optional)</span>
           </label>
           <select
             id="assistant-menu"
             value={selectedMenuId}
             onChange={(event) => chooseMenu(event.target.value)}
             disabled={sending || proposalBusy || menusLoading}
-            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-100"
+            className="mt-1 w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-100"
           >
             <option value="">Help only — no menu changes</option>
             {menuUnavailable && <option value={selectedMenuId}>Unavailable menu</option>}
@@ -380,7 +380,7 @@ export function AssistantPanel({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs leading-5 text-stone-500">
+          <p className="mt-1 text-xs leading-5 text-ink-500">
             {menusLoading
               ? "Loading your account menus…"
               : menuUnavailable
@@ -393,7 +393,7 @@ export function AssistantPanel({
           </p>
         </div>
       ) : (
-        <p className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-stone-600">
+        <p className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-ink-600">
           Menu changes are being tested with selected accounts. You can still ask how-to questions
           here.
         </p>
@@ -418,7 +418,7 @@ export function AssistantPanel({
       {!configured && (
         <p
           role="alert"
-          className="rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm text-stone-800"
+          className="rounded-xl border border-stone-300 bg-stone-100 px-4 py-3 text-sm text-ink-800"
         >
           The assistant isn’t configured on this deployment yet. Ask an operator to finish the
           Workers AI setup; the rest of Eateryo works as usual.
@@ -434,7 +434,7 @@ export function AssistantPanel({
       >
         {turns.length === 0 && !sending ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-            <p className="text-sm text-stone-600">
+            <p className="text-sm text-ink-600">
               {proposalsEnabled && selectedMenu
                 ? "Ask for a change — for example “add a lemonade for 3.50”. The assistant will ask which category if it is unclear, and you will see the exact diff before approving."
                 : "Ask how to do something in Eateryo — publishing, table QR codes, opening hours, team access."}
@@ -446,7 +446,7 @@ export function AssistantPanel({
                     key={prompt}
                     type="button"
                     onClick={() => void ask(prompt)}
-                    className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-stone-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                   >
                     {prompt}
                   </button>
@@ -461,7 +461,7 @@ export function AssistantPanel({
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-6 ${
                 turn.role === "user"
                   ? "self-end bg-stone-900 text-white"
-                  : "self-start bg-stone-100 text-stone-800"
+                  : "self-start bg-stone-100 text-ink-800"
               }`}
             >
               <p className="mb-0.5 text-[10px] font-bold uppercase tracking-wide opacity-60">
@@ -474,7 +474,7 @@ export function AssistantPanel({
         {sending && (
           <p
             role="status"
-            className="self-start rounded-2xl bg-stone-100 px-4 py-2.5 text-sm text-stone-600"
+            className="self-start rounded-2xl bg-stone-100 px-4 py-2.5 text-sm text-ink-600"
           >
             {progressLabel}
           </p>
@@ -573,7 +573,7 @@ export function AssistantPanel({
                     ? `Ask for a change to ${selectedMenu.title}…`
                     : "Ask a question…"
             }
-            className="min-h-14 flex-1 resize-none rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-100 sm:resize-y"
+            className="min-h-14 flex-1 resize-none rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-stone-100 sm:resize-y"
           />
           <button
             type="submit"
@@ -583,7 +583,7 @@ export function AssistantPanel({
             {sending ? "Sending…" : proposalBusy ? "Saving…" : "Send"}
           </button>
         </div>
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-ink-500">
           Enter sends · Shift + Enter adds a line · {draft.length}/{ASSISTANT_MAX_MESSAGE_CHARS}
         </p>
       </form>

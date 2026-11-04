@@ -36,7 +36,7 @@ export function ClampedDescription({ text, name }: { text: string; name: string 
       <p
         ref={paragraph}
         id={descriptionId}
-        className={`mt-0.5 text-sm break-words text-stone-600 ${
+        className={`mt-0.5 text-sm break-words text-ink-600 ${
           toggle.expanded ? "" : DESCRIPTION_CLAMP_CLASS
         }`}
       >

@@ -89,22 +89,22 @@ export function OrderCartLines({
           {lines.map((line, index) => (
             <li key={orderLineKey(line)} className="py-3">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="min-w-0 text-sm font-medium text-stone-900">
+                <p className="min-w-0 text-sm font-medium text-ink-900">
                   <span className="block truncate">
                     {line.name}
                     {line.variantName && (
-                      <span className="ml-1 text-xs font-normal text-stone-500">
+                      <span className="ml-1 text-xs font-normal text-ink-500">
                         {line.variantName}
                       </span>
                     )}
                   </span>
                   {showMenuBadges && line.menuTitle && (
-                    <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
+                    <span className="mt-0.5 inline-block rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                       {line.menuTitle.trim() || "Menu"}
                     </span>
                   )}
                 </p>
-                <p className="shrink-0 text-sm tabular-nums text-stone-800">
+                <p className="shrink-0 text-sm tabular-nums text-ink-800">
                   {line.unitPrice === null
                     ? "—"
                     : formatPreviewPrice(line.unitPrice * line.quantity, null, currency)}
@@ -115,7 +115,7 @@ export function OrderCartLines({
                   type="button"
                   aria-label={`Decrease ${line.name}`}
                   onClick={() => onQuantityChange(index, line.quantity - 1)}
-                  className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
+                  className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
                 >
                   −
                 </button>
@@ -124,7 +124,7 @@ export function OrderCartLines({
                   type="button"
                   aria-label={`Increase ${line.name}`}
                   onClick={() => onQuantityChange(index, line.quantity + 1)}
-                  className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-stone-700 hover:border-amber-700"
+                  className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
                 >
                   +
                 </button>
@@ -132,7 +132,7 @@ export function OrderCartLines({
                 <button
                   type="button"
                   onClick={() => onQuantityChange(index, 0)}
-                  className="text-xs font-medium text-stone-500 underline hover:text-danger-800"
+                  className="text-xs font-medium text-ink-500 underline hover:text-danger-800"
                 >
                   Remove
                 </button>
@@ -142,7 +142,7 @@ export function OrderCartLines({
         </ul>
       )}
 
-      <label htmlFor={noteId} className="mt-3 block text-xs font-semibold text-stone-600">
+      <label htmlFor={noteId} className="mt-3 block text-xs font-semibold text-ink-600">
         Note for the kitchen (optional)
       </label>
       <textarea
@@ -201,15 +201,15 @@ export function OrderCartPanel({
       className="h-fit rounded-2xl border border-stone-200 bg-white p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
     >
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-lg font-bold text-stone-900">Your order</h2>
-        <span className="shrink-0 text-xs font-medium text-stone-500">
+        <h2 className="text-lg font-bold text-ink-900">Your order</h2>
+        <span className="shrink-0 text-xs font-medium text-ink-500">
           {itemCount} {itemCount === 1 ? "item" : "items"}
         </span>
       </div>
-      {subtitle && <p className="mt-0.5 truncate text-xs text-stone-500">{subtitle}</p>}
+      {subtitle && <p className="mt-0.5 truncate text-xs text-ink-500">{subtitle}</p>}
 
       {lines.length === 0 && (
-        <p className="mt-3 rounded-xl border border-dashed border-stone-300 p-4 text-center text-sm text-stone-500">
+        <p className="mt-3 rounded-xl border border-dashed border-stone-300 p-4 text-center text-sm text-ink-500">
           Nothing added yet.
         </p>
       )}

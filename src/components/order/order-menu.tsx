@@ -71,8 +71,8 @@ export function OrderShell({
             E
           </span>
           <div>
-            <p className="text-sm font-bold tracking-tight text-stone-900">Eateryo</p>
-            <p className="text-xs text-stone-500">Order from your table</p>
+            <p className="text-sm font-bold tracking-tight text-ink-900">Eateryo</p>
+            <p className="text-xs text-ink-500">Order from your table</p>
           </div>
         </div>
         {tableLabel && (
@@ -143,7 +143,7 @@ export function OrderMenuSection({
       aria-label={category.name}
       className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
     >
-      <h2 className="border-b border-stone-100 bg-stone-50 px-5 py-2.5 text-sm font-bold tracking-wide text-stone-800 uppercase">
+      <h2 className="border-b border-stone-100 bg-stone-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
         {category.name}
       </h2>
       <ul className="divide-y divide-stone-100">
@@ -165,10 +165,10 @@ export function OrderMenuSection({
               <div className="flex items-start justify-between gap-3">
                 <MenuItemPhoto item={item} />
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 font-medium text-stone-900">
+                  <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>
                     {soldOut && (
-                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
+                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                         Sold out
                       </span>
                     )}
@@ -191,19 +191,19 @@ export function OrderMenuSection({
                     </div>
                   )}
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-stone-900">
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
                   {formatPreviewPrice(price, null, currency)}
                 </p>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {item.variants.length > 0 && (
-                  <label className="text-xs text-stone-600">
+                  <label className="text-xs text-ink-600">
                     <span className="sr-only">Size for {item.name}</span>
                     <select
                       value={variant?.name ?? ""}
                       onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none"
+                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
                     >
                       {item.variants.map((option) => (
                         <option key={option.name} value={option.name}>
@@ -292,8 +292,8 @@ export function StickyCartBar({
 
   const inner = (
     <div className="mx-auto flex w-full items-center gap-3">
-      <p className="min-w-0 flex-1 truncate text-sm text-stone-700">
-        <span className="font-bold text-stone-900">
+      <p className="min-w-0 flex-1 truncate text-sm text-ink-700">
+        <span className="font-bold text-ink-900">
           {itemCount} {itemCount === 1 ? "item" : "items"}
         </span>{" "}
         · {formatOrderTotal(currency, total)}

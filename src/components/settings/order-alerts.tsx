@@ -76,19 +76,19 @@ export function OrderAlertsCard({
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h3 className="text-sm font-bold tracking-tight text-stone-900">Order alerts</h3>
-      <p className="mt-1 text-xs leading-5 text-stone-500">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">Order alerts</h3>
+      <p className="mt-1 text-xs leading-5 text-ink-500">
         One email per new order for {restaurantName}, from the verified Eateryo sender. A rush
         never spams the inbox — past a few emails in ten minutes only the board catches the rest.
       </p>
 
       {loading ? (
-        <p role="status" className="mt-3 text-xs text-stone-500">
+        <p role="status" className="mt-3 text-xs text-ink-500">
           Loading the alert settings…
         </p>
       ) : (
         <div className="mt-3 flex flex-col gap-3">
-          <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-sm font-medium text-stone-900">
+          <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-sm font-medium text-ink-900">
             <input
               type="checkbox"
               checked={enabled}
@@ -97,7 +97,7 @@ export function OrderAlertsCard({
             />
             Email me on every new order
           </label>
-          <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
             Send to
             <input
               type="email"
@@ -105,10 +105,10 @@ export function OrderAlertsCard({
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Blank means every owner"
               autoComplete="email"
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             />
           </label>
-          <p className="-mt-1 text-[11px] leading-4 text-stone-400">
+          <p className="-mt-1 text-[11px] leading-4 text-ink-400">
             Blank sends to every owner&apos;s account email — fill it to route orders to one
             address instead (the till, a manager…).
           </p>

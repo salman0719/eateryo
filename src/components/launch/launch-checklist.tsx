@@ -183,8 +183,8 @@ export function LaunchChecklist() {
     <div className="space-y-4">
       <section className="rounded-2xl border border-stone-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-stone-900">Your launch checklist</h2>
-          <p className="text-xs text-stone-500">
+          <h2 className="text-base font-semibold text-ink-900">Your launch checklist</h2>
+          <p className="text-xs text-ink-500">
             {progress.done} of {progress.total} steps we can verify
             {cardsPrinted ? " · table cards ticked" : ""}
           </p>
@@ -209,7 +209,7 @@ export function LaunchChecklist() {
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                   (step.done
                     ? "border-amber-700 bg-amber-700 text-white"
-                    : "border-stone-300 bg-white text-stone-400")
+                    : "border-stone-300 bg-white text-ink-400")
                 }
               >
                 {step.done ? "✓" : index + 1}
@@ -217,13 +217,13 @@ export function LaunchChecklist() {
               <div className="min-w-0">
                 <p
                   className={
-                    "text-sm font-medium " + (step.done ? "text-stone-500 line-through" : "text-stone-900")
+                    "text-sm font-medium " + (step.done ? "text-ink-500 line-through" : "text-ink-900")
                   }
                 >
                   {step.title}
                 </p>
-                <p className="mt-0.5 text-xs text-stone-600">{step.guidance}</p>
-                <p className="mt-1 text-xs text-stone-500">{step.detail}</p>
+                <p className="mt-0.5 text-xs text-ink-600">{step.guidance}</p>
+                <p className="mt-1 text-xs text-ink-500">{step.detail}</p>
                 {/* Manual steps keep their control after being ticked,
                     otherwise a mis-click could never be undone. */}
                 {!step.done || step.manual ? (
@@ -235,7 +235,7 @@ export function LaunchChecklist() {
                       {stepActionLabel(step)}
                     </Link>
                     {step.manual ? (
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600">
+                      <label className="flex items-center gap-1.5 text-xs text-ink-600">
                         <input
                           type="checkbox"
                           checked={cardsPrinted}

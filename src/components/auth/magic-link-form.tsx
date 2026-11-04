@@ -169,7 +169,7 @@ export function MagicLinkForm({
       const settling = devLink?.email !== status.email;
       const url = settling ? null : devLink.url;
       return (
-        <div className="rounded-xl border border-dashed border-stone-400 bg-stone-50 p-4 text-sm text-stone-700">
+        <div className="rounded-xl border border-dashed border-stone-400 bg-stone-50 p-4 text-sm text-ink-700">
           <p className="font-medium">Development sign-in — no email was sent</p>
           <p className="mt-1">
             <code className="rounded bg-stone-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
@@ -177,7 +177,7 @@ export function MagicLinkForm({
             shown here instead of being emailed. It expires in 5 minutes.
           </p>
           {settling ? (
-            <p className="mt-3 text-stone-500">Preparing the link…</p>
+            <p className="mt-3 text-ink-500">Preparing the link…</p>
           ) : url ? (
             <a
               href={url}
@@ -195,7 +195,7 @@ export function MagicLinkForm({
           )}
           <button
             type="button"
-            className="mt-3 block text-xs text-stone-600 underline underline-offset-2 hover:text-stone-900"
+            className="mt-3 block text-xs text-ink-600 underline underline-offset-2 hover:text-ink-900"
             onClick={resetToIdle}
           >
             Use a different email
@@ -236,7 +236,7 @@ export function MagicLinkForm({
           yourself a fresh one below.
         </p>
       ) : null}
-      <label htmlFor={inputId} className="text-sm font-medium text-stone-700">
+      <label htmlFor={inputId} className="text-sm font-medium text-ink-700">
         Email address
       </label>
       <input
@@ -247,7 +247,7 @@ export function MagicLinkForm({
         placeholder="you@cafe.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
       />
       {status.kind === "error" ? (
         <p

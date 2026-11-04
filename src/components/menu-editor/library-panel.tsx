@@ -114,7 +114,7 @@ export function LibraryPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-stone-900">My menus</h2>
+        <h2 className="text-xl font-bold text-ink-900">My menus</h2>
         <button
           type="button"
           onClick={() => onNew()}
@@ -127,7 +127,7 @@ export function LibraryPanel({
 
       {secondMenuSuggestions.length > 0 && (
         <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
-          <p className="text-sm text-stone-700">
+          <p className="text-sm text-ink-700">
             Adding another? <span className="font-medium">Is it for a different time or service?</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -137,7 +137,7 @@ export function LibraryPanel({
                 type="button"
                 onClick={() => onNew(name)}
                 disabled={unavailable}
-                className="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               >
                 {name}
               </button>
@@ -176,10 +176,10 @@ export function LibraryPanel({
         </div>
       ) : menus.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-          <p className="font-medium text-stone-900">
+          <p className="font-medium text-ink-900">
             {hasHiddenMenus ? "Signed out" : "No saved menus yet"}
           </p>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-ink-600">
             {hasHiddenMenus
               ? "Your menus reappear when you sign in."
               : "Extract a menu or start a blank one — it will appear here and survive refreshes."}
@@ -192,8 +192,8 @@ export function LibraryPanel({
               {menu.corrupt ? (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="font-medium text-stone-900">Unreadable record</p>
-                    <p className="text-xs text-stone-500">
+                    <p className="font-medium text-ink-900">Unreadable record</p>
+                    <p className="text-xs text-ink-500">
                       Damaged or from an incompatible version — it can only be deleted.
                     </p>
                   </div>
@@ -207,7 +207,7 @@ export function LibraryPanel({
                       });
                       if (ok) onDelete(menu.id);
                     }}
-                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Delete
                   </button>
@@ -220,7 +220,7 @@ export function LibraryPanel({
                       value={menu.title}
                       onCommit={(title) => onRename(menu.id, title.trim())}
                     />
-                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-500">
                       <span>
                         {menu.categoryCount} {menu.categoryCount === 1 ? "category" : "categories"}{" "}
                         · {menu.itemCount} {menu.itemCount === 1 ? "item" : "items"} · updated{" "}
@@ -269,7 +269,7 @@ export function LibraryPanel({
                         });
                         if (ok) onDelete(menu.id);
                       }}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                     >
                       Delete
                     </button>
@@ -278,12 +278,12 @@ export function LibraryPanel({
               )}
               {pickerMenuId === menu.id && (
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:flex-row sm:items-end">
-                  <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+                  <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
                     Add “{menu.title}” to
                     <select
                       value={targetId}
                       onChange={(event) => setTargetId(event.target.value)}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…
@@ -308,7 +308,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => setPickerMenuId(null)}
                       disabled={movingId !== null}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-stone-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                     >
                       Cancel
                     </button>

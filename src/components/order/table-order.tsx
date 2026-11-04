@@ -157,8 +157,8 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     return (
       <Shell>
         <div className={`${frame} p-8 text-center`}>
-          <p className="text-lg font-semibold text-stone-900">This table link is incomplete</p>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
+          <p className="mt-2 text-sm text-ink-600">
             A table link looks like <code>/order?menu=…&amp;table=3</code>. Ask staff for a fresh QR
             code.
           </p>
@@ -179,10 +179,10 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     return (
       <Shell>
         <div className={`${frame} p-8`}>
-          <p className="text-lg font-semibold text-stone-900">
+          <p className="text-lg font-semibold text-ink-900">
             This menu isn&apos;t on this device
           </p>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
+          <p className="mt-2 text-sm leading-6 text-ink-600">
             Menus are stored in the browser that created them. This link points at a menu saved
             somewhere else — table links work on the device holding the menu, or anywhere the same
             browser storage is available.
@@ -197,7 +197,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             </button>
             <Link
               href="/"
-              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
             >
               Back to the app
             </Link>
@@ -216,14 +216,14 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
           <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
             Order received
           </p>
-          <p className="mt-3 text-2xl font-bold text-stone-900">
+          <p className="mt-3 text-2xl font-bold text-ink-900">
             #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
           </p>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-ink-600">
             {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
             {formatTotal(placed.currency, orderTotal(placed.lines))}
           </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-stone-500">
+          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
             Saved in this browser for staff to pick up. Nothing has been sent to a server.
           </p>
           <button
@@ -245,8 +245,8 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
   const orderFooter = (
     <>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-600">Total</p>
-        <p className="text-lg font-bold tabular-nums text-stone-900">
+        <p className="text-sm font-medium text-ink-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-ink-900">
           {formatTotal(menu.currency, total)}
         </p>
       </div>
@@ -281,10 +281,10 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
               {formatTableLabel(tableLabel)}
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-stone-900">
+            <h1 className="mt-1 text-2xl font-bold text-ink-900">
               {menu.title.trim() || "Untitled menu"}
             </h1>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-ink-600">
               Tap a dish to add it to your order. Prices are exactly what the menu shows.
             </p>
             {isDemo && (

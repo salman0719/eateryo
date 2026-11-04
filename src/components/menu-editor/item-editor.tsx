@@ -62,7 +62,7 @@ export interface ItemActions {
 }
 
 const smallButton =
-  "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors " +
+  "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
 
 export const ItemEditor = memo(function ItemEditor({
@@ -144,7 +144,7 @@ export const ItemEditor = memo(function ItemEditor({
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="truncate text-sm font-semibold text-stone-900">
+              <span className="truncate text-sm font-semibold text-ink-900">
                 {item.name || "Untitled item"}
               </span>
               {needsReview && (
@@ -159,16 +159,16 @@ export const ItemEditor = memo(function ItemEditor({
               )}
             </span>
             {!open && rowSummary && (
-              <span className="mt-0.5 block truncate text-xs text-stone-500">{rowSummary}</span>
+              <span className="mt-0.5 block truncate text-xs text-ink-500">{rowSummary}</span>
             )}
           </span>
-          <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-stone-600">
+          <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-ink-600">
             {formatItemPrice(item, doc.currency)}
           </span>
           {open ? (
-            <ChevronUpIcon className="shrink-0 text-stone-400" />
+            <ChevronUpIcon className="shrink-0 text-ink-400" />
           ) : (
-            <ChevronDownIcon className="shrink-0 text-stone-400" />
+            <ChevronDownIcon className="shrink-0 text-ink-400" />
           )}
         </button>
       </div>
@@ -213,7 +213,7 @@ export const ItemEditor = memo(function ItemEditor({
               }
             />
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-stone-500">Availability</span>
+              <span className="mb-1 block text-xs font-medium text-ink-500">Availability</span>
               <select
                 aria-label={`Availability of ${item.name}`}
                 value={item.available === null ? "unknown" : item.available ? "yes" : "no"}
@@ -221,7 +221,7 @@ export const ItemEditor = memo(function ItemEditor({
                   const v = event.target.value;
                   patch({ available: v === "unknown" ? null : v === "yes" });
                 }}
-                className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-ink-900 focus:border-amber-700 focus:outline-none"
               >
                 <option value="unknown">Unknown</option>
                 <option value="yes">Available</option>
@@ -250,11 +250,11 @@ export const ItemEditor = memo(function ItemEditor({
           </div>
 
           <div className="mt-3 rounded-lg bg-stone-50 p-3">
-            <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">
+            <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Variants / sizes
             </p>
             {item.variants.length === 0 && (
-              <p className="mt-1 text-xs text-stone-500">None — add one if the menu shows sizes.</p>
+              <p className="mt-1 text-xs text-ink-500">None — add one if the menu shows sizes.</p>
             )}
             <ul className="mt-2 space-y-2">
               {item.variants.map((variant, vIndex) => (
@@ -314,11 +314,11 @@ export const ItemEditor = memo(function ItemEditor({
               (local/issues/020); re-enable by dropping `hidden` here and
               restoring the row's option count in `shape` above. */}
           <div className="mt-3 hidden rounded-lg bg-stone-50 p-3">
-            <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">
+            <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Options / add-ons
             </p>
             {item.options.length === 0 && (
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-xs text-ink-500">
                 None — add a group if the menu shows choices.
               </p>
             )}
@@ -479,7 +479,7 @@ export const ItemEditor = memo(function ItemEditor({
           <div className="mt-3 flex flex-col gap-2 border-t border-stone-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
             {categories.length > 1 && (
               <div className="sm:contents">
-                <label className="flex w-full flex-col gap-1 text-xs text-stone-500 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
+                <label className="flex w-full flex-col gap-1 text-xs text-ink-500 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
                   Move to
                   <select
                     aria-label={`Move ${item.name} to another category`}
@@ -492,7 +492,7 @@ export const ItemEditor = memo(function ItemEditor({
                         event.target.value = "";
                       }
                     }}
-                    className="w-full rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none sm:w-auto"
+                    className="w-full rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none sm:w-auto"
                   >
                     <option value="">Category…</option>
                     {categories
@@ -530,7 +530,7 @@ export const ItemEditor = memo(function ItemEditor({
               <button
                 type="button"
                 onClick={() => actions.delete(categoryId, item.id)}
-                className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:flex-none"
+                className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:flex-none"
               >
                 Delete
               </button>

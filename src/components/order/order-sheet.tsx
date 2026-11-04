@@ -119,18 +119,18 @@ export function OrderSheet({
       >
         <div className="flex items-start justify-between gap-3 px-4 pt-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-stone-900">Your order</h2>
-            {subtitle && <p className="mt-0.5 truncate text-xs text-stone-500">{subtitle}</p>}
+            <h2 className="text-lg font-bold text-ink-900">Your order</h2>
+            {subtitle && <p className="mt-0.5 truncate text-xs text-ink-500">{subtitle}</p>}
           </div>
           <div className="flex shrink-0 items-center gap-3">
-            <span className="text-xs font-medium text-stone-500">
+            <span className="text-xs font-medium text-ink-500">
               {itemCount} {itemCount === 1 ? "item" : "items"}
             </span>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close your order"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 text-base font-semibold text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 text-base font-semibold text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900"
             >
               ×
             </button>

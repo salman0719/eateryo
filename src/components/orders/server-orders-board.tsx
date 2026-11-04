@@ -40,7 +40,7 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
   new: "bg-amber-100 text-amber-900",
   preparing: "bg-info-100 text-info-900",
   served: "bg-green-100 text-green-900",
-  cancelled: "bg-stone-200 text-stone-600",
+  cancelled: "bg-stone-200 text-ink-600",
 };
 
 /**
@@ -160,8 +160,8 @@ export function ServerOrdersBoard() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-stone-900">Orders</h2>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-stone-600">
+          <h2 className="text-xl font-bold text-ink-900">Orders</h2>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-600">
             {orders.length === 0
               ? "Orders placed from public table links appear here."
               : `${activeCount} active · ${openCount} new`}
@@ -174,14 +174,14 @@ export function ServerOrdersBoard() {
             onClick={() => setSoundOn(!soundOn)}
             aria-pressed={soundOn}
             title={soundOn ? "New orders play a chime" : "Turn on a chime for new orders"}
-            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
           >
             {soundOn ? "🔔 Sound on" : "🔕 Sound off"}
           </button>
           <button
             type="button"
             onClick={() => refresh()}
-            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
           >
             Refresh
           </button>
@@ -201,7 +201,7 @@ export function ServerOrdersBoard() {
         </button>
       )}
       {notificationsAvailable && notificationPermission === "granted" && (
-        <p className="text-xs text-stone-500">
+        <p className="text-xs text-ink-500">
           Browser notifications are on — new orders alert you even from another tab.
         </p>
       )}
@@ -238,7 +238,7 @@ export function ServerOrdersBoard() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-bold text-stone-900">
+                      <p className="text-lg font-bold text-ink-900">
                         {formatTableLabel(order.tableLabel)}
                       </p>
                       <span
@@ -246,13 +246,13 @@ export function ServerOrdersBoard() {
                       >
                         {orderStatusLabel(order.status)}
                       </span>
-                      <span className="text-xs font-medium text-stone-400">
+                      <span className="text-xs font-medium text-ink-400">
                         #{orderCode(order.id)} · {formatTime(order.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs text-stone-500">{order.menuTitle}</p>
+                    <p className="mt-0.5 text-xs text-ink-500">{order.menuTitle}</p>
                   </div>
-                  <p className="text-sm font-semibold tabular-nums text-stone-900">
+                  <p className="text-sm font-semibold tabular-nums text-ink-900">
                     {formatPreviewPrice(total, null, order.currency)}
                   </p>
                 </div>
@@ -261,16 +261,16 @@ export function ServerOrdersBoard() {
                   {order.lines.map((line, index) => (
                     <li
                       key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
-                      className="flex items-baseline justify-between gap-3 text-sm text-stone-700"
+                      className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
                     >
                       <span>
-                        <span className="font-medium text-stone-900">{line.quantity}×</span>{" "}
+                        <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
                         {line.name}
                         {line.variantName && (
-                          <span className="ml-1 text-xs text-stone-500">{line.variantName}</span>
+                          <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
                         )}
                       </span>
-                      <span className="shrink-0 text-xs tabular-nums text-stone-500">
+                      <span className="shrink-0 text-xs tabular-nums text-ink-500">
                         {line.unitPrice === null
                           ? "no price"
                           : formatPreviewPrice(line.unitPrice * line.quantity, null, order.currency)}
@@ -301,7 +301,7 @@ export function ServerOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => cancel(order)}
-                      className="rounded-full border border-stone-300 px-3.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
+                      className="rounded-full border border-stone-300 px-3.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -335,7 +335,7 @@ function ConnectionPill({
       ? "bg-success-50 text-success-800"
       : connection === "reconnecting"
         ? "bg-amber-100 text-amber-900"
-        : "bg-stone-100 text-stone-600";
+        : "bg-stone-100 text-ink-600";
   return (
     <span
       role="status"

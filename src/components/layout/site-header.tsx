@@ -24,8 +24,8 @@ export function SiteHeader() {
             E
           </span>
           <div>
-            <p className="text-sm font-bold tracking-tight text-stone-900">Eateryo</p>
-            <p className="text-xs text-stone-500">Menus, tables, and orders in one place</p>
+            <p className="text-sm font-bold tracking-tight text-ink-900">Eateryo</p>
+            <p className="text-xs text-ink-500">Menus, tables, and orders in one place</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -51,13 +51,13 @@ export function SiteHeader() {
               >
                 {(user.name ?? user.email ?? "?").trim().charAt(0).toUpperCase() || "?"}
               </span>
-              <span className="hidden text-[11px] text-stone-500 sm:inline" title="Signed in as">
+              <span className="hidden text-[11px] text-ink-500 sm:inline" title="Signed in as">
                 {user.email}
               </span>
               <button
                 type="button"
                 onClick={() => void authClient.signOut()}
-                className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-stone-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               >
                 Sign out
               </button>
@@ -65,7 +65,7 @@ export function SiteHeader() {
           ) : (
             <a
               href="/sign-in"
-              className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-stone-600 hover:bg-stone-50 hover:text-stone-900"
+              className="rounded-lg border border-stone-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-stone-50 hover:text-ink-900"
             >
               Sign in
             </a>
