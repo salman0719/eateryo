@@ -2409,15 +2409,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     signedIn,
   ]);
 
+  /**
+   * The menu the URL names. Leaving the editor for the library keeps the
+   * document in memory on purpose (mode changes and returns skip the read),
+   * but that copy is never a stand-in for a *different* menu: entering
+   * another one must show its own loading state until its copy arrives, not
+   * the previous menu's rows — which could even be edited into the wrong
+   * record.
+   */
+  const routedDoc = activeDoc && activeDoc.id === routeMenuId(route) ? activeDoc : null;
   // Publish state is only ever shown for the menu it was loaded for; a stale
   // answer for a previously opened menu is never displayed.
-  const activePublicationMenuId = activeDoc?.id ?? null;
+  const activePublicationMenuId = routedDoc?.id ?? null;
   const activePublication = publicationMenuId === activePublicationMenuId ? publication : null;
   const activePublicationLoaded =
     publicationMenuId === activePublicationMenuId && publicationLoaded;
   // Staff on the menu's restaurant get a view-only editor (the server refuses
   // their writes anyway; the UI must not offer the controls at all).
-  const activeMenuIsStaff = activeDoc ? staffMenus.has(activeDoc.id) : false;
+  const activeMenuIsStaff = routedDoc ? staffMenus.has(routedDoc.id) : false;
 
   return (
     <OrderMonitorProvider userId={session?.user?.id ?? null}>
@@ -2722,7 +2731,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           />
         )}
 
-        {screen === "editor" && activeDoc && (
+        {screen === "editor" && routedDoc && (
           <>
             {conflict && (
               <ConflictBanner
@@ -2740,27 +2749,27 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             )}
             {editorMode === "publish" && !activeMenuIsStaff ? (
               <PublishWizard
-                key={activeDoc.id}
-                doc={activeDoc}
+                key={routedDoc.id}
+                doc={routedDoc}
                 signedIn={signedIn}
                 sessionPending={sessionPending}
                 accountKey={accountKey}
                 ownedRestaurants={ownedRestaurantsForAccount}
                 restaurantsLoading={restaurantsLoading}
                 onPublished={handleWizardPublished}
-                onBack={() => navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "edit" })}
+                onBack={() => navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })}
                 onOpenTables={() => navigateTo({ screen: "tables" })}
                 onOpenEditor={() =>
-                  navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "edit" })
+                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
                 }
               />
             ) : (
               <MenuEditor
-                doc={activeDoc}
+                doc={routedDoc}
                 selectedItemId={selectedItemId}
                 mode={activeMenuIsStaff ? "preview" : editorMode}
                 onModeChange={(mode) =>
-                  navigateTo({ screen: "editor", menuId: activeDoc.id, mode })
+                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
                 }
                 onChange={handleDocChange}
                 saveState={saveState}
@@ -2775,14 +2784,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   )?.name ?? null
                 }
                 onStartPublish={() =>
-                  navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "publish" })
+                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
                 }
                 imageUrl={editorImageUrl}
                 onExportJson={handleExportJson}
                 onExportCsv={handleExportCsv}
                 onImportFile={(f) => void handleImportFile(f)}
                 importError={importError}
-                onDeleteMenu={() => void handleDeleteMenu(activeDoc.id)}
+                onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
                 onBack={() => void handleBackToLibrary()}
                 publishing={{
                   status: activePublication,
@@ -2792,14 +2801,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   inAccount: activeMenuOnServer,
                   accountCheckFailed: activeMenuAccountCheckFailed,
                   onRetryAccountCheck: handleRetryAccountCheck,
-                  liveDoc: liveDocMenuId === activeDoc.id ? liveDoc : null,
-                  liveDocState: liveDocMenuId === activeDoc.id ? liveDocState : "idle",
+                  liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
+                  liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
                   onPublish: () => void handlePublish(),
                   onUnpublish: () => void handleUnpublish(),
                 }}
-                onPreviewOpen={() => {
-                  if (docRef.current) void refreshPublication(docRef.current.id);
-                }}
+                onPreviewOpen={() => void refreshPublication(routedDoc.id)}
               />
             )}
           </>
@@ -2981,13 +2988,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             )}
           </>
         )}
-        {screen === "editor" && !activeDoc && missingPublishMenuId && (
+        {screen === "editor" && !routedDoc && missingPublishMenuId && (
           <MissingDraftCard
             onOpenLibrary={() => navigateTo({ screen: "library" })}
             onStartFresh={() => navigateTo({ screen: "capture" })}
           />
         )}
-        {screen === "editor" && !activeDoc && !missingPublishMenuId && sessionCheckGaveUp && (
+        {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
           <section className="rounded-2xl border border-stone-200 bg-white p-6 text-center">
             <h1 className="font-medium text-stone-900">Checking your session…</h1>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
@@ -3016,7 +3023,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           </section>
         )}
         {screen === "editor" &&
-          !activeDoc &&
+          !routedDoc &&
           !missingPublishMenuId &&
           !sessionCheckGaveUp && (
           <div role="status" aria-busy="true" className="flex flex-col gap-4">
