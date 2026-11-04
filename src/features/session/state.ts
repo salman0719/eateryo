@@ -93,10 +93,24 @@ export function decideMenuOpen(input: {
    * draft, but the published snapshot is shared content and may be opened.
    */
   sharedPublished?: boolean;
+  /**
+   * The account's menu list has not answered yet. A row stamped to somebody
+   * else may still be on that list as a shared published menu, so refusing it
+   * now would bounce a direct URL to the library before the list arrives.
+   */
+  accountReadPending?: boolean;
 }): MenuOpenDecision {
   if (input.session === "unknown") return { state: "wait" };
   if (input.session === "signed-in" && input.sharedPublished) return { state: "open" };
   const stamp = input.stampAccountId ?? "";
+  if (
+    input.session === "signed-in" &&
+    input.accountReadPending &&
+    stamp !== "" &&
+    stamp !== input.accountKey
+  ) {
+    return { state: "wait" };
+  }
   if (!stamp) return { state: "open" };
   if (input.session === "signed-out") return { state: "blocked", reason: "signed-out" };
   return stamp === input.accountKey

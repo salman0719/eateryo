@@ -687,6 +687,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             stampAccountId: origin?.accountId,
             accountKey: accountKeyRef.current,
             sharedPublished,
+            accountReadPending:
+              signedIn && serverMenusReadFor !== accountKey,
           });
           if (access.state === "wait") {
             if (cancelled) return;
@@ -734,7 +736,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       cancelled = true;
       if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
     };
-  }, [route, sessionState, signedIn]);
+  }, [route, sessionState, signedIn, accountKey, serverMenusReadFor]);
 
   useEffect(() => {
     const wasSignedIn = wasSignedInRef.current;
