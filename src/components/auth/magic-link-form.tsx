@@ -188,7 +188,7 @@ export function MagicLinkForm({
           ) : (
             <p
               role="alert"
-              className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800"
+              className="mt-3 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-danger-800"
             >
               Couldn&apos;t read the link back — it may have expired. Send a fresh one.
             </p>
@@ -206,7 +206,7 @@ export function MagicLinkForm({
 
     const expiry = linkExpiryCopy(status.sentAt, now ?? status.sentAt);
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+      <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm text-success-900">
         <p className="font-medium">Check your email</p>
         <p className="mt-1">
           We sent a one-time sign-in link to <span className="font-medium">{status.email}</span>.{" "}
@@ -216,7 +216,7 @@ export function MagicLinkForm({
         </p>
         <button
           type="button"
-          className="mt-3 font-medium underline underline-offset-2 hover:text-emerald-950"
+          className="mt-3 font-medium underline underline-offset-2 hover:text-success-950"
           onClick={resetToIdle}
         >
           {expiry.expired ? "Send a fresh link" : "Use a different email"}
@@ -230,7 +230,7 @@ export function MagicLinkForm({
       {linkError ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800"
         >
           That sign-in link didn&apos;t work — it may have expired or been used already. Send
           yourself a fresh one below.
@@ -252,7 +252,7 @@ export function MagicLinkForm({
       {status.kind === "error" ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800"
         >
           {status.message}
         </p>

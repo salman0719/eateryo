@@ -48,7 +48,7 @@ export function OrdersBoard() {
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
   new: "bg-amber-100 text-amber-900",
-  preparing: "bg-sky-100 text-sky-900",
+  preparing: "bg-info-100 text-info-900",
   served: "bg-green-100 text-green-900",
   cancelled: "bg-stone-200 text-stone-600",
 };
@@ -190,7 +190,7 @@ function LocalOrdersBoard() {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800">
           {error}
         </p>
       )}
@@ -286,7 +286,7 @@ function LocalOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => void cancel(order)}
-                      className="rounded-full border border-stone-300 px-3.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:opacity-50"
+                      className="rounded-full border border-stone-300 px-3.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -296,7 +296,7 @@ function LocalOrdersBoard() {
                     type="button"
                     disabled={busyId === order.id}
                     onClick={() => void remove(order)}
-                    className="text-xs font-medium text-stone-500 underline hover:text-red-800 disabled:opacity-50"
+                    className="text-xs font-medium text-stone-500 underline hover:text-danger-800 disabled:opacity-50"
                   >
                     Delete
                   </button>

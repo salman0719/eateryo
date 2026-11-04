@@ -530,7 +530,7 @@ export const ItemEditor = memo(function ItemEditor({
               <button
                 type="button"
                 onClick={() => actions.delete(categoryId, item.id)}
-                className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:flex-none"
+                className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:flex-none"
               >
                 Delete
               </button>

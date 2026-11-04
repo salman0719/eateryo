@@ -542,7 +542,7 @@ export function MenuEditor({
       <div
         role="status"
         title={saveState.detail}
-        className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
+        className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-danger-700" : "text-stone-500"}`}
       >
         {saveState.kind === "saving" ? (
           <span>
@@ -846,7 +846,7 @@ export function MenuEditor({
           </div>
           {sourceLabel &&
             (doc.source?.provider === "demo" ? (
-              <p className="mt-2 inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              <p className="mt-2 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
                 Demo data
               </p>
             ) : (
@@ -961,7 +961,7 @@ export function MenuEditor({
                       <button
                         type="button"
                         onClick={() => removeItem(occurrence.categoryId, occurrence.item)}
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                       >
                         Delete this copy
                       </button>
@@ -1049,7 +1049,7 @@ export function MenuEditor({
           <button
             type="button"
             onClick={() => void handleBulkDelete()}
-            className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
           >
             Delete selected
           </button>
@@ -1199,7 +1199,7 @@ export function MenuEditor({
                 <button
                   type="button"
                   onClick={() => handleDeleteCategory(category, index)}
-                  className={`${tinyButton} hover:border-red-700 hover:text-red-800`}
+                  className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
                 >
                   Delete
                 </button>
@@ -1288,7 +1288,7 @@ export function MenuEditor({
             });
             if (ok) onDeleteMenu();
           }}
-          className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:self-auto"
+          className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:self-auto"
         >
           Delete menu
         </button>
@@ -1296,7 +1296,7 @@ export function MenuEditor({
       {importError && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           {importError}
         </p>
@@ -1322,7 +1322,7 @@ export function MenuEditor({
       {addPages.status === "error" && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           {addPages.message}
         </p>

@@ -140,7 +140,7 @@ export function RestaurantSettings({
         </div>
       )}
 
-      {signedIn && loadError && <p className="text-xs text-red-700">{loadError}</p>}
+      {signedIn && loadError && <p className="text-xs text-danger-700">{loadError}</p>}
 
       {(sessionPending || signedIn) && restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">
@@ -199,7 +199,7 @@ export function RestaurantSettings({
       )}
 
       {error && (
-        <p role="alert" className="text-xs text-red-700">
+        <p role="alert" className="text-xs text-danger-700">
           {error}
         </p>
       )}
@@ -240,9 +240,9 @@ export function RestaurantSettings({
             restaurantName={selected.name}
           />
 
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-            <h3 className="text-sm font-bold tracking-tight text-red-900">Danger zone</h3>
-            <p className="mt-1 text-xs leading-5 text-red-800">
+          <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
+            <h3 className="text-sm font-bold tracking-tight text-danger-900">Danger zone</h3>
+            <p className="mt-1 text-xs leading-5 text-danger-800">
               Deleting “{selected.name}” removes its menus, published pages and orders from your
               account. This cannot be undone.
             </p>
@@ -250,7 +250,7 @@ export function RestaurantSettings({
               type="button"
               onClick={() => void handleDeleteRestaurant()}
               disabled={deleting}
-              className="mt-3 rounded-full border border-red-700 px-4 py-1.5 text-sm font-semibold text-red-800 transition-colors hover:bg-red-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="mt-3 rounded-full border border-danger-700 px-4 py-1.5 text-sm font-semibold text-danger-800 transition-colors hover:bg-danger-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
             >
               {deleting ? "Deleting…" : `Delete ${selected.name}`}
             </button>
@@ -490,8 +490,8 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
         invitation link that accepts on sign-in (expires in 7 days).
       </p>
 
-      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
-      {notice && !error && <p className="mt-2 text-xs text-emerald-800">{notice}</p>}
+      {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
+      {notice && !error && <p className="mt-2 text-xs text-success-800">{notice}</p>}
 
       {members === null && !error && (
         <div role="status" aria-busy="true" className="mt-3 flex flex-col gap-2">
@@ -543,7 +543,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                 type="button"
                 onClick={() => void handleRemoveMember(member)}
                 disabled={memberBusy === member.userId}
-                className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
               >
                 Remove
               </button>
@@ -582,7 +582,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                   type="button"
                   onClick={() => void handleRevoke(invitation)}
                   disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                 >
                   Revoke
                 </button>

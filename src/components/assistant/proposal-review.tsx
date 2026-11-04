@@ -127,13 +127,13 @@ function PriceField({
           aria-label="Proposed price"
           aria-invalid={error !== null}
           className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-stone-900 focus:border-amber-700 focus:outline-none disabled:bg-stone-100 ${
-            error ? "border-red-500" : "border-stone-300"
+            error ? "border-danger-500" : "border-stone-300"
           }`}
         />
         {currency && <span className="font-normal text-stone-500">{currency}</span>}
       </span>
       {error && (
-        <span role="alert" className="font-normal text-red-700">
+        <span role="alert" className="font-normal text-danger-700">
           {error}
         </span>
       )}
@@ -261,7 +261,7 @@ export function ProposalReview({
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}

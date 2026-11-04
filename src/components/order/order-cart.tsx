@@ -132,7 +132,7 @@ export function OrderCartLines({
                 <button
                   type="button"
                   onClick={() => onQuantityChange(index, 0)}
-                  className="text-xs font-medium text-stone-500 underline hover:text-red-800"
+                  className="text-xs font-medium text-stone-500 underline hover:text-danger-800"
                 >
                   Remove
                 </button>

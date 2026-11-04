@@ -428,7 +428,7 @@ export function PublishWizard({
               {error && (
                 <p
                   role="alert"
-                  className="rounded-xl bg-red-50 px-3 py-2 text-xs leading-5 text-red-800"
+                  className="rounded-xl bg-danger-50 px-3 py-2 text-xs leading-5 text-danger-800"
                 >
                   {error}
                 </p>

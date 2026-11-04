@@ -484,7 +484,7 @@ export function AssistantPanel({
       {error && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           {error}
         </p>
@@ -493,24 +493,24 @@ export function AssistantPanel({
       {applied && (
         <div
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+          className="rounded-2xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-900"
         >
           <p className="font-medium">Change saved to “{applied.title}”.</p>
-          <p className="mt-1 text-xs leading-5 text-emerald-800">
+          <p className="mt-1 text-xs leading-5 text-success-800">
             The draft is updated. Diners keep seeing the published version until you publish
             changes.
           </p>
           <div className="mt-2 flex flex-wrap gap-3 text-xs font-medium">
             <a
               href={`/menus/${encodeURIComponent(applied.menuId)}`}
-              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
+              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-800"
             >
               Open in editor
             </a>
             <button
               type="button"
               onClick={() => setApplied(null)}
-              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
+              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-800"
             >
               Dismiss
             </button>

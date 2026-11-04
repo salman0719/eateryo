@@ -35,7 +35,7 @@ export function ConflictBanner({
         A newer version was saved after the one you have open. Your edits are safe in this browser —
         choose which version wins.
       </p>
-      {error && <p className="mt-2 text-sm text-red-800">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger-800">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"

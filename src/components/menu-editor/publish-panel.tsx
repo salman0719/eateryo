@@ -79,7 +79,7 @@ function StatusPill({ status }: { status: PublicationStatus | null }) {
   if (!status.isLive) {
     return <span className={`${pill} bg-amber-100 text-amber-900`}>Ordering paused</span>;
   }
-  return <span className={`${pill} bg-emerald-100 text-emerald-900`}>Ordering open</span>;
+  return <span className={`${pill} bg-success-100 text-success-900`}>Ordering open</span>;
 }
 
 function formatDate(iso: string | null): string {
@@ -293,7 +293,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           </button>
         )}
         {error && (
-          <p role="alert" className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+          <p role="alert" className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
             {error}
           </p>
         )}
@@ -373,7 +373,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
                 if (ok) onUnpublish();
               }}
               disabled={busy}
-              className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-300 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               {busy ? "Working…" : "Unpublish"}
             </button>
@@ -382,7 +382,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
       )}
 
       {error && (
-        <p role="alert" className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}

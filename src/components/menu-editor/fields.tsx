@@ -88,7 +88,7 @@ export function CommitInput({
         (event.target as HTMLElement).blur();
       }
     },
-    className: [baseInput, error ? "border-red-500" : "", inputClassName ?? ""].join(" "),
+    className: [baseInput, error ? "border-danger-500" : "", inputClassName ?? ""].join(" "),
   };
 
   return (
@@ -97,7 +97,7 @@ export function CommitInput({
         {label}
       </span>
       {multiline ? <textarea rows={2} {...shared} /> : <input type="text" {...shared} />}
-      {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
+      {error && <span className="mt-0.5 block text-xs text-danger-700">{error}</span>}
     </label>
   );
 }
@@ -339,9 +339,9 @@ export function CommitNumber({
             (event.target as HTMLElement).blur();
           }
         }}
-        className={[baseInput, error ? "border-red-500" : "", inputClassName ?? ""].join(" ")}
+        className={[baseInput, error ? "border-danger-500" : "", inputClassName ?? ""].join(" ")}
       />
-      {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
+      {error && <span className="mt-0.5 block text-xs text-danger-700">{error}</span>}
     </label>
   );
 }

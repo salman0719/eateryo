@@ -119,16 +119,16 @@ export function LocalDraftsNotice({
       <section
         role="status"
         aria-label="Menus from this browser"
-        className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+        className="rounded-2xl border border-success-200 bg-success-50 px-4 py-3"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-emerald-950">
+            <p className="text-sm font-semibold text-success-950">
               {nothingImported
                 ? "Those browser menus are already on your account"
                 : `Added ${menuCountLabel(notice.imported)} from this browser`}
             </p>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-900">
+            <p className="mt-1 max-w-xl text-xs leading-5 text-success-900">
               {nothingImported
                 ? `“${notice.restaurantName}” already holds them. This browser keeps a synced copy for offline use too.`
                 : `They're now on your account under “${notice.restaurantName}” and work on your other devices. This browser keeps a synced copy for offline use.`}
@@ -144,14 +144,14 @@ export function LocalDraftsNotice({
             <button
               type="button"
               onClick={onOpenLibrary}
-              className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 transition-colors hover:border-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              className="rounded-full border border-success-300 bg-white px-3 py-1.5 text-xs font-medium text-success-900 transition-colors hover:border-success-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
             >
               Open My menus
             </button>
             <button
               type="button"
               onClick={onDismiss}
-              className="text-xs font-medium text-emerald-900 underline underline-offset-2 hover:text-emerald-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              className="text-xs font-medium text-success-900 underline underline-offset-2 hover:text-success-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
             >
               Dismiss
             </button>

@@ -195,7 +195,7 @@ export function MoveToAccountPanel({
         nothing is deleted.
       </p>
 
-      {loadError && <p className="mt-2 text-xs text-red-700">{loadError}</p>}
+      {loadError && <p className="mt-2 text-xs text-danger-700">{loadError}</p>}
 
       {restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="mt-3">
@@ -294,7 +294,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={() => void handleDelete()}
             disabled={mutating}
-            className="text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="text-xs font-medium text-danger-700 underline underline-offset-2 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
           >
             Delete…
           </button>
@@ -337,7 +337,7 @@ export function MoveToAccountPanel({
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
 
       {report && (
         <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
@@ -348,7 +348,7 @@ export function MoveToAccountPanel({
           {report.failed.length > 0 && (
             <ul className="mt-2 space-y-1">
               {report.failed.map((failure) => (
-                <li key={failure.id} className="text-xs text-red-800">
+                <li key={failure.id} className="text-xs text-danger-800">
                   “{failure.title}”: {failure.reason}
                 </li>
               ))}

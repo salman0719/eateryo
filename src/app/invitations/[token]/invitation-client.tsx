@@ -141,7 +141,7 @@ export function InvitationClient({ token }: { token: string }) {
       </div>
 
       {loadError && (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
           {loadError}
         </p>
       )}
@@ -178,7 +178,7 @@ export function InvitationClient({ token }: { token: string }) {
       )}
 
       {accepted && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <div className="rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-900">
           <p className="font-medium">You&apos;re in</p>
           <p className="mt-1">
             You joined {accepted.name} as {accepted.role === "owner" ? "an owner" : "staff"}.
@@ -186,13 +186,13 @@ export function InvitationClient({ token }: { token: string }) {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Link
               href={accepted.role === "staff" ? "/orders" : "/menus"}
-              className="inline-block rounded-full bg-emerald-800 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-900"
+              className="inline-block rounded-full bg-success-800 px-4 py-1.5 text-sm font-semibold text-white hover:bg-success-900"
             >
               {accepted.role === "staff" ? "Open the order board" : "Go to My menus"}
             </Link>
             <Link
               href={accepted.role === "staff" ? "/menus" : "/orders"}
-              className="text-xs font-medium underline underline-offset-2 hover:text-emerald-950"
+              className="text-xs font-medium underline underline-offset-2 hover:text-success-950"
             >
               {accepted.role === "staff" ? "Go to My menus" : "Open the order board"}
             </Link>
@@ -201,7 +201,7 @@ export function InvitationClient({ token }: { token: string }) {
       )}
 
       {acceptError && (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
           {acceptError}
         </p>
       )}
@@ -211,7 +211,7 @@ export function InvitationClient({ token }: { token: string }) {
           {!signedEmail && (
             <div className="flex flex-col gap-3">
               {signIn.kind === "sent" ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                <div className="rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-900">
                   <p className="font-medium">Check your email</p>
                   <p className="mt-1">
                     We sent a one-time sign-in link to {invitation.email}. Open it on this device,
@@ -235,7 +235,7 @@ export function InvitationClient({ token }: { token: string }) {
                 </>
               )}
               {signIn.kind === "error" && (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-danger-800">
                   {signIn.message}
                 </p>
               )}

@@ -257,7 +257,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}
@@ -288,7 +288,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
               Tap a dish to add it to your order. Prices are exactly what the menu shows.
             </p>
             {isDemo && (
-              <p className="mt-3 inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              <p className="mt-3 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
                 Demo menu — not a real restaurant
               </p>
             )}

@@ -109,13 +109,13 @@ export function UsagePanel() {
   if (state.kind === "signed_out") return null;
   if (state.kind === "error") {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-        <h3 className="text-sm font-bold tracking-tight text-red-900">Usage</h3>
-        <p className="mt-1 text-xs text-red-800">{state.message}</p>
+      <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
+        <h3 className="text-sm font-bold tracking-tight text-danger-900">Usage</h3>
+        <p className="mt-1 text-xs text-danger-800">{state.message}</p>
         <button
           type="button"
           onClick={() => void retry()}
-          className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+          className="mt-3 rounded-lg border border-danger-300 bg-white px-3 py-1.5 text-xs font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
         >
           Try again
         </button>

@@ -181,13 +181,13 @@ function NewOrdersBadge({ tone }: { tone: "bar" | "pill" }) {
   const label = newCount > 9 ? "9+" : String(newCount);
   if (tone === "pill") {
     return (
-      <span className="ml-1.5 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">
+      <span className="ml-1.5 rounded-full bg-danger-600 px-1.5 py-0.5 text-xs font-bold text-white">
         {label}
       </span>
     );
   }
   return (
-    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
+    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-danger-600 px-1 text-[11px] font-bold text-white">
       {label}
     </span>
   );
@@ -2524,14 +2524,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {signedIn && claimError && (
           <div
             role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p>{claimError}</p>
               <button
                 type="button"
                 onClick={() => setClaimError(null)}
-                className="text-xs font-medium underline underline-offset-2 hover:text-red-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="text-xs font-medium underline underline-offset-2 hover:text-danger-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
               >
                 Dismiss
               </button>
@@ -2608,13 +2608,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             {visibleLibraryError && (
               <p
                 role="alert"
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
               >
                 {visibleLibraryError}{" "}
                 {isSessionGateMessage(visibleLibraryError) && (
                   <a
                     href="/sign-in"
-                    className="font-semibold text-red-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
+                    className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
                   >
                     Sign in
                   </a>
@@ -2836,7 +2836,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 {fileError && (
                   <p
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
                   >
                     {fileError}
                   </p>
@@ -2895,7 +2895,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 {fileError && (
                   <p
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
                   >
                     {fileError}
                   </p>
@@ -2934,14 +2934,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             </Attention>
 
             {extractError && phase !== "extracting" && (
-              <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
-                <p className="font-medium text-red-900">Extraction failed</p>
-                <p className="mt-1 text-sm text-red-800">{extractError.message}</p>
+              <div role="alert" className="rounded-2xl border border-danger-200 bg-danger-50 px-5 py-4">
+                <p className="font-medium text-danger-900">Extraction failed</p>
+                <p className="mt-1 text-sm text-danger-800">{extractError.message}</p>
                 {extractError.code === "missing_api_key" && (
                   <button
                     type="button"
                     onClick={handleDemo}
-                    className="mt-3 rounded-full bg-red-800 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Preview with demo data instead
                   </button>

@@ -77,7 +77,7 @@ export function RestaurantTables({
         </div>
       )}
 
-      {signedIn && loadError && <p className="text-xs text-red-700">{loadError}</p>}
+      {signedIn && loadError && <p className="text-xs text-danger-700">{loadError}</p>}
 
       {(sessionPending || signedIn) && restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">

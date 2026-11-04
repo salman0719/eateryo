@@ -85,7 +85,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
                 <button
                   type="button"
                   onClick={() => onRemove(index)}
-                  className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                  className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                 >
                   Remove
                 </button>

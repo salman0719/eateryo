@@ -149,7 +149,7 @@ export function LibraryPanel({
       {unavailable && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           Browser storage isn&apos;t available, so menus can&apos;t be saved here. You can still
           extract and export, but everything will be lost on refresh.
@@ -207,7 +207,7 @@ export function LibraryPanel({
                       });
                       if (ok) onDelete(menu.id);
                     }}
-                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Delete
                   </button>
@@ -230,7 +230,7 @@ export function LibraryPanel({
                         <span
                           className={
                             menu.onServer
-                              ? "whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-900"
+                              ? "whitespace-nowrap rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-semibold text-success-900"
                               : "whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900"
                           }
                         >
@@ -269,7 +269,7 @@ export function LibraryPanel({
                         });
                         if (ok) onDelete(menu.id);
                       }}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                     >
                       Delete
                     </button>
@@ -316,7 +316,7 @@ export function LibraryPanel({
                 </div>
               )}
               {moveError?.id === menu.id && (
-                <p role="alert" className="mt-2 text-xs text-red-700">
+                <p role="alert" className="mt-2 text-xs text-danger-700">
                   {moveError.message}
                 </p>
               )}

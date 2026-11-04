@@ -138,7 +138,7 @@ function ConfirmDialog({
             onClick={() => onAnswer(true)}
             className={
               destructive
-                ? "rounded-full bg-red-800 px-4 py-2 text-sm font-medium text-white hover:bg-red-900"
+                ? "rounded-full bg-danger-800 px-4 py-2 text-sm font-medium text-white hover:bg-danger-900"
                 : "rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
             }
           >

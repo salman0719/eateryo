@@ -476,7 +476,7 @@ export function ExtractionResult({
                 {reviewCount > 0 ? `AI draft — ${reviewCount} to check` : "AI draft"}
               </span>
             ) : (
-              <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              <span className="rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
                 Demo data
               </span>
             )}

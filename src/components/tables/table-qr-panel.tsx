@@ -406,7 +406,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
               {claimError && (
                 <p
                   role="alert"
-                  className="mx-auto mt-2 max-w-md rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800"
+                  className="mx-auto mt-2 max-w-md rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800"
                 >
                   {claimError}
                 </p>
@@ -571,7 +571,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           </p>
 
           {error && (
-            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
+            <p role="alert" className="rounded-xl bg-danger-50 px-3 py-2 text-sm text-danger-800">
               {error}
             </p>
           )}

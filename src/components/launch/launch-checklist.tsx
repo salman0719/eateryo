@@ -158,13 +158,13 @@ export function LaunchChecklist() {
 
   if (state.kind === "error") {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-        <h2 className="text-base font-semibold text-red-900">The checklist could not load</h2>
-        <p className="mt-1 text-sm text-red-800">{state.message}</p>
+      <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
+        <h2 className="text-base font-semibold text-danger-900">The checklist could not load</h2>
+        <p className="mt-1 text-sm text-danger-800">{state.message}</p>
         <button
           type="button"
           onClick={() => void retry()}
-          className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+          className="mt-3 rounded-lg border border-danger-300 bg-white px-3 py-1.5 text-sm font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
         >
           Try again
         </button>
@@ -253,7 +253,7 @@ export function LaunchChecklist() {
         </ol>
 
         {allDone ? (
-          <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          <p className="mt-4 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-900">
             That is the whole launch. New orders appear on the Orders tab, and the public page keeps
             showing your latest published menu.
           </p>

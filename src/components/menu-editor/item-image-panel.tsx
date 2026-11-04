@@ -151,7 +151,7 @@ export function ItemImagePanel({
         </p>
       )}
       {state.status === "error" && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-danger-700">
           {state.message}
         </p>
       )}

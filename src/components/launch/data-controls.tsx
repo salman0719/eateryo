@@ -101,7 +101,7 @@ export function DataControls() {
               setError(null);
               setMessage(null);
             }}
-            className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+            className="rounded-lg border border-danger-200 px-3 py-1.5 text-sm font-medium text-danger-700 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
           >
             Delete my account
           </button>
@@ -109,19 +109,19 @@ export function DataControls() {
       </div>
 
       {confirming ? (
-        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3">
-          <p className="text-sm font-medium text-red-900">
+        <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 p-3">
+          <p className="text-sm font-medium text-danger-900">
             This deletes the account, its restaurants, menus, published pages, and order history.
             Export first if you want a copy. There is no undo.
           </p>
-          <label className="mt-2 block text-xs font-medium text-red-900">
+          <label className="mt-2 block text-xs font-medium text-danger-900">
             Type “{CONFIRM_PHRASE}” to confirm
             <input
               type="text"
               value={confirmText}
               onChange={(event) => setConfirmText(event.target.value)}
               autoComplete="off"
-              className="mt-1 w-full rounded-lg border border-red-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+              className="mt-1 w-full rounded-lg border border-danger-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
             />
           </label>
           <div className="mt-2 flex items-center gap-2">
@@ -129,7 +129,7 @@ export function DataControls() {
               type="button"
               onClick={() => void handleDelete()}
               disabled={busy !== null || confirmText.trim().toLowerCase() !== CONFIRM_PHRASE}
-              className="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+              className="rounded-lg bg-danger-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
             >
               {busy === "delete" ? "Deleting…" : "Delete permanently"}
             </button>
@@ -148,12 +148,12 @@ export function DataControls() {
       ) : null}
 
       {message ? (
-        <p role="status" className="mt-3 text-sm text-emerald-800">
+        <p role="status" className="mt-3 text-sm text-success-800">
           {message}
         </p>
       ) : null}
       {error ? (
-        <p role="alert" className="mt-3 text-sm text-red-700">
+        <p role="alert" className="mt-3 text-sm text-danger-700">
           {error}
         </p>
       ) : null}

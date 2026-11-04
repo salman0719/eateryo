@@ -122,8 +122,8 @@ export function OrderAlertsCard({
               {saving ? "Saving…" : "Save alerts"}
             </button>
           </div>
-          {notice && !error && <p className="text-xs text-emerald-800">{notice}</p>}
-          {error && <p className="text-xs text-red-700">{error}</p>}
+          {notice && !error && <p className="text-xs text-success-800">{notice}</p>}
+          {error && <p className="text-xs text-danger-700">{error}</p>}
         </div>
       )}
     </div>
