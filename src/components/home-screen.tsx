@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
 import { Attention } from "@/components/ui/attention";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
@@ -23,6 +23,7 @@ import { RestaurantSettings } from "@/components/settings/restaurant-settings";
 import { RestaurantTables } from "@/components/tables/restaurant-tables";
 import { OrdersBoard } from "@/components/orders/orders-board";
 import { MonitorToasts } from "@/components/orders/monitor-toasts";
+import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
 import { OrderMonitorProvider, useOrderMonitor } from "@/features/orders/monitor";
 import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
@@ -96,10 +97,12 @@ import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-cons
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
 import {
   appRouteHref,
+  appSections,
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
   routeMenuId,
+  sectionForScreen,
   signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
@@ -174,25 +177,6 @@ function stepIndex(phase: Phase, hasResult: boolean): number {
   return 0;
 }
 
-/** Badge for unseen `new` orders; null when there is nothing to shout about. */
-function NewOrdersBadge({ tone }: { tone: "bar" | "pill" }) {
-  const { newCount } = useOrderMonitor();
-  if (newCount === 0) return null;
-  const label = newCount > 9 ? "9+" : String(newCount);
-  if (tone === "pill") {
-    return (
-      <span className="ml-1.5 rounded-full bg-danger-600 px-1.5 py-0.5 text-xs font-bold text-on-accent">
-        {label}
-      </span>
-    );
-  }
-  return (
-    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-danger-600 px-1 text-[11px] font-bold text-on-accent">
-      {label}
-    </span>
-  );
-}
-
 /** Tells the monitor whether the board is open (opening it counts as seeing). */
 function ViewingTracker({ viewing }: { viewing: boolean }) {
   const { setViewingBoard } = useOrderMonitor();
@@ -223,13 +207,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const selectedItemId = route.screen === "item" ? route.itemId : null;
   /** R0 phone nav: the More sheet (Tables · Assistant · Settings · Get started). */
   const [moreOpen, setMoreOpen] = useState(false);
-  /** Desktop pills: keep the active tab scrolled into view on narrow windows. */
-  const pillsRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    pillsRef.current
-      ?.querySelector('[aria-current="page"]')
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [screen]);
   // Which editor surface the URL asks for (edit, reorder, preview);
   // an item deep link is always the edit workspace.
   const editorMode: EditorMode = route.screen === "editor" ? route.mode : "edit";
@@ -2426,82 +2403,61 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // their writes anyway; the UI must not offer the controls at all).
   const activeMenuIsStaff = routedDoc ? staffMenus.has(routedDoc.id) : false;
 
+  /**
+   * The sidebar's contextual half: the open menu's sections, only while the
+   * edit workspace is showing. Reorder and preview have their own shape, and
+   * a publish wizard has no sections to jump between.
+   */
+  const sidebarOutline =
+    screen === "editor" && editorMode === "edit" && routedDoc
+      ? routedDoc.categories.map((category) => ({
+          id: category.id,
+          name: category.name.trim() || "Untitled category",
+          itemCount: category.items.length,
+        }))
+      : null;
+  const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
+
+  /** Jump the editor list to the section chosen in the sidebar. */
+  function scrollToMenuSection(categoryId: string) {
+    document.getElementById(`menu-section-${categoryId}`)?.scrollIntoView({ block: "start" });
+  }
+
   return (
     <OrderMonitorProvider userId={session?.user?.id ?? null}>
     <div className="flex min-h-full flex-1 flex-col">
       {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
-      <SiteHeader />
-      <main
-        className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 ${
-          // The editor is a dense working surface: give it a wider canvas on
-          // large screens. Capture and library stay at a readable measure.
-          screen === "editor" ? "max-w-6xl" : "max-w-3xl"
-        }`}
-      >
-        {/* Desktop pill row. Phones use the bottom tab bar below. Signed out
-            with no drafts the row hides entirely — capture needs no tabs.
-            While the session or library is still loading the row stays
-            hidden: showing a provisional My menus tab that vanishes on a
-            fresh profile reads as a flicker. Draft owners get both tabs in
-            one appearance after the load settles. */}
-        {screen !== "editor" &&
-          !sessionPending &&
-          (signedIn || (!libraryLoading && visibleMenus.length > 0)) && (
-          <nav
-            data-print-hide
-            aria-label="Sections"
-            ref={pillsRef}
-            className="hidden gap-2 overflow-x-auto pb-1 sm:flex"
+      <div className="flex w-full flex-1 items-start">
+        <AppSidebar
+          sections={
+            sessionPending
+              ? []
+              : appSections({
+                  signedIn,
+                  assistantEnabled: featureFlags.assistant,
+                  menuCount: visibleMenus.length,
+                })
+          }
+          activeSection={sectionForScreen(screen)}
+          sessionPending={sessionPending}
+          signedIn={signedIn}
+          email={session?.user?.email ?? null}
+          onNavigate={(section) => navigateTo({ screen: section })}
+          onSignOut={() => void authClient.signOut()}
+          outline={sidebarOutline}
+          outlineKey={sidebarOutlineKey}
+          onOutlineSelect={scrollToMenuSection}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main
+            className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 ${
+              // The editor is a dense working surface; the other app screens
+              // share the remaining width beside the sidebar instead of
+              // keeping the marketing measure they had under a top bar.
+              screen === "editor" ? "max-w-6xl" : "max-w-5xl"
+            }`}
           >
-            {(
-              [
-                { id: "capture", label: "Capture" },
-                // My menus signed out is the anonymous working set: only
-                // worth a tab when there are drafts to continue (the outer
-                // gate already waited for the library to settle).
-                ...(signedIn || visibleMenus.length > 0
-                  ? [
-                      {
-                        id: "library" as const,
-                        label: `My menus${visibleMenus.length ? ` (${visibleMenus.length})` : ""}`,
-                      },
-                    ]
-                  : []),
-                // Orders/Tables/Settings need an account — signed out is
-                // capture-only (plus the working set above). The assistant
-                // is never offered signed out (its kill switch, A4, only
-                // gates signed-in accounts).
-                ...(signedIn
-                  ? [
-                      { id: "orders" as const, label: "Orders" },
-                      ...(featureFlags.assistant
-                        ? [{ id: "assistant" as const, label: "Assistant" }]
-                        : []),
-                      { id: "tables" as const, label: "Tables" },
-                      { id: "settings" as const, label: "Settings" },
-                    ]
-                  : []),
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => navigateTo({ screen: tab.id })}
-                aria-current={screen === tab.id ? "page" : undefined}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                  screen === tab.id
-                    ? "bg-surface-900 text-on-accent"
-                    : "bg-surface-base text-ink-600 ring-1 ring-line-200 hover:text-ink-900"
-                }`}
-              >
-                {tab.label}
-                {tab.id === "orders" && <NewOrdersBadge tone="pill" />}
-              </button>
-            ))}
-          </nav>
-        )}
-
         {signedIn && claimNotice && screen !== "editor" && (
           <LocalDraftsNotice
             notice={claimNotice}
@@ -3046,8 +3002,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             </div>
           </div>
         )}
-      </main>
-      <SiteFooter />
+          </main>
+          <SiteFooter />
+        </div>
+      </div>
       {/*
         Phone nav: signed in, the tab bar pins Capture · My menus · Orders ·
         More (Orders keeps its home for the R0.3 monitor badge; the rest
@@ -3145,6 +3103,23 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 <span className="text-xs font-normal text-ink-500">{row.why}</span>
               </button>
             ))}
+            {/* The app has no top bar on a phone, so the account lives here:
+                one place to see who is signed in and to end the session. */}
+            <div className="mt-1 border-t border-line-200 pt-1">
+              <p className="truncate px-2 py-1 text-[11px] text-ink-500">
+                {session?.user?.email}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setMoreOpen(false);
+                  void authClient.signOut();
+                }}
+                className="flex min-h-[44px] w-full items-center rounded-xl px-2 text-left text-sm font-medium text-ink-700 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                Sign out
+              </button>
+            </div>
             <a
               href="/launch"
               className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
