@@ -61,7 +61,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
             </div>
             <div className="px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <span className="shrink-0 rounded-full bg-surface-900 px-2 py-0.5 text-[11px] font-semibold text-white">
+                <span className="shrink-0 rounded-full bg-surface-900 px-2 py-0.5 text-[11px] font-semibold text-on-accent">
                   Page {index + 1}
                 </span>
                 <p className="min-w-0 flex-1 truncate text-xs font-medium text-ink-900">

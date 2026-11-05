@@ -119,7 +119,7 @@ export function LibraryPanel({
           type="button"
           onClick={() => onNew()}
           disabled={unavailable}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           + New menu
         </button>
@@ -247,7 +247,7 @@ export function LibraryPanel({
                         type="button"
                         onClick={() => startMove(menu.id)}
                         disabled={movingId !== null}
-                        className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-semibold text-accent-800 transition-colors hover:bg-accent-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                        className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-semibold text-accent-800 transition-colors hover:bg-accent-700 hover:text-on-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         {movingId === menu.id ? "Adding…" : "Add to account"}
                       </button>
@@ -255,7 +255,7 @@ export function LibraryPanel({
                     <button
                       type="button"
                       onClick={() => onOpen(menu.id)}
-                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Open
                     </button>
@@ -300,7 +300,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => void runMove(menu.id, targetId)}
                       disabled={!targetId || movingId !== null}
-                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       {movingId === menu.id ? "Adding…" : "Add"}
                     </button>

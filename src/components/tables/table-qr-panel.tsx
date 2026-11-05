@@ -399,7 +399,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 type="button"
                 onClick={() => void handleClaim(linkState.restaurantId, linkState.restaurantName)}
                 disabled={claiming}
-                className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {claiming ? "Claiming…" : "Claim your restaurant link"}
               </button>
@@ -518,7 +518,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                   ? "Finish typing the table name first — click anywhere else, then print."
                   : undefined
               }
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {focusedLabel ? "Print this card" : "Print cards"}
             </button>

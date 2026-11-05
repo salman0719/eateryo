@@ -131,7 +131,7 @@ export function HeightRevealDemo() {
               title={`${speed.base} ms base duration`}
               className={`rounded-full px-2.5 py-1 text-xs font-medium tabular-nums transition-colors ${
                 baseDuration === speed.base
-                  ? "bg-surface-900 text-white"
+                  ? "bg-surface-900 text-on-accent"
                   : "text-ink-600 hover:bg-surface-100"
               }`}
               onClick={() => setBaseDuration(speed.base)}

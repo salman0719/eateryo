@@ -181,7 +181,7 @@ export function MagicLinkForm({
           ) : url ? (
             <a
               href={url}
-              className="mt-3 inline-block rounded-lg bg-surface-900 px-4 py-2 text-sm font-semibold text-white hover:bg-surface-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-900"
+              className="mt-3 inline-block rounded-lg bg-surface-900 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-surface-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-900"
             >
               Open the sign-in link
             </a>
@@ -260,7 +260,7 @@ export function MagicLinkForm({
       <button
         type="submit"
         disabled={status.kind === "sending"}
-        className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+        className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         {status.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
       </button>

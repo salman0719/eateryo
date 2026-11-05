@@ -316,7 +316,7 @@ export function AssistantPanel({
         </p>
         <a
           href="/sign-in"
-          className="mt-4 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          className="mt-4 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Sign in
         </a>
@@ -460,7 +460,7 @@ export function AssistantPanel({
               key={turn.id}
               className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-6 ${
                 turn.role === "user"
-                  ? "self-end bg-surface-900 text-white"
+                  ? "self-end bg-surface-900 text-on-accent"
                   : "self-start bg-surface-100 text-ink-800"
               }`}
             >
@@ -578,7 +578,7 @@ export function AssistantPanel({
           <button
             type="submit"
             disabled={disabled || draft.trim().length === 0}
-            className="rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:bg-surface-300"
+            className="rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:bg-surface-300"
           >
             {sending ? "Sending…" : proposalBusy ? "Saving…" : "Send"}
           </button>

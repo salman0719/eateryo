@@ -117,7 +117,7 @@ export function OrderAlertsCard({
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {saving ? "Saving…" : "Save alerts"}
             </button>

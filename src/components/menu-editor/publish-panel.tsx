@@ -214,7 +214,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onStartWizard}
-            className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Set up table ordering
           </button>
@@ -287,7 +287,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onStartWizard}
-            className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Set up table ordering
           </button>
@@ -312,7 +312,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
             type="button"
             onClick={onPublish}
             disabled={busy}
-            className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             {busy ? "Publishing…" : publishLabel}
           </button>

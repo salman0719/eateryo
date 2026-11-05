@@ -246,7 +246,7 @@ export function ProposalReview({
             <button
               type="button"
               onClick={onReviewAgain}
-              className="rounded-full bg-accent-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
+              className="rounded-full bg-accent-800 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
             >
               Review again
             </button>
@@ -271,7 +271,7 @@ export function ProposalReview({
           type="button"
           onClick={onApprove}
           disabled={approveDisabled}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:bg-surface-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:bg-surface-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {busy ? "Saving…" : "Approve and save"}
         </button>

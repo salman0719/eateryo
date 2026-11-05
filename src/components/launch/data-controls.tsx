@@ -129,7 +129,7 @@ export function DataControls() {
               type="button"
               onClick={() => void handleDelete()}
               disabled={busy !== null || confirmText.trim().toLowerCase() !== CONFIRM_PHRASE}
-              className="rounded-lg bg-danger-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+              className="rounded-lg bg-danger-700 px-3 py-1.5 text-sm font-semibold text-on-accent hover:bg-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
             >
               {busy === "delete" ? "Deleting…" : "Delete permanently"}
             </button>

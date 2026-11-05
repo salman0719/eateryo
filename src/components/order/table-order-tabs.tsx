@@ -318,7 +318,7 @@ export function TableOrderTabs({
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void sendOrder()}
-        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order to the kitchen"}
       </button>
@@ -346,7 +346,7 @@ export function TableOrderTabs({
           <button
             type="button"
             onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
+            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
           >
             Order something else
           </button>
@@ -556,7 +556,7 @@ export function TableOrderTabs({
           >
             <div
               role="tooltip"
-              className="w-max max-w-[16rem] rounded-xl bg-surface-900 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg"
+              className="w-max max-w-[16rem] rounded-xl bg-surface-900 px-3 py-2 text-left text-xs leading-5 text-on-accent shadow-lg"
             >
               <span className="font-semibold">{menuLabel(infoMenu)}</span> is closed right now. Open{" "}
               {formatAvailability(infoMenu.availability).join("; ")}.
@@ -591,7 +591,7 @@ function TabButton({
       onClick={onClick}
       className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
-          ? "bg-surface-900 text-white"
+          ? "bg-surface-900 text-on-accent"
           : "border border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
       }`}
     >

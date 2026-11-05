@@ -66,7 +66,7 @@ export function OrderShell({
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-on-accent"
           >
             E
           </span>
@@ -221,7 +221,7 @@ export function OrderMenuSection({
                     <span
                       key={tick}
                       aria-hidden="true"
-                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-green-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-white shadow"
+                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-green-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
                     >
                       Added ✓
                     </span>
@@ -233,7 +233,7 @@ export function OrderMenuSection({
                       onAdd(item);
                       bumpFlash(item.id);
                     }}
-                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {inCart > 0 ? `Add · ${inCart}` : "Add"}
                   </button>
@@ -302,7 +302,7 @@ export function StickyCartBar({
         ref={buttonRef}
         type="button"
         onClick={onViewOrder}
-        className="shrink-0 rounded-full bg-accent-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-800 active:scale-95"
+        className="shrink-0 rounded-full bg-accent-700 px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 active:scale-95"
       >
         View order
       </button>

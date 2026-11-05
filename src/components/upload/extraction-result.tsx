@@ -508,7 +508,7 @@ export function ExtractionResult({
               <button
                 type="button"
                 onClick={handleContinue}
-                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 {reviewCount > 0
                   ? `Continue → check prices (${reviewCount})`
@@ -523,7 +523,7 @@ export function ExtractionResult({
               className={
                 onPublish
                   ? "rounded-full px-4 py-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                  : "rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  : "rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               }
             >
               {onPublish ? "Fine-tune in the editor" : editLabel}

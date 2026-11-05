@@ -141,7 +141,7 @@ export function LaunchChecklist() {
         </p>
         <Link
           href="/sign-in"
-          className="mt-4 inline-flex rounded-lg bg-accent-800 px-3.5 py-2 text-sm font-semibold text-white hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          className="mt-4 inline-flex rounded-lg bg-accent-800 px-3.5 py-2 text-sm font-semibold text-on-accent hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Sign in with an email link
         </Link>
@@ -208,7 +208,7 @@ export function LaunchChecklist() {
                 className={
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                   (step.done
-                    ? "border-accent-700 bg-accent-700 text-white"
+                    ? "border-accent-700 bg-accent-700 text-on-accent"
                     : "border-line-300 bg-surface-base text-ink-400")
                 }
               >

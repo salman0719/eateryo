@@ -181,13 +181,13 @@ function NewOrdersBadge({ tone }: { tone: "bar" | "pill" }) {
   const label = newCount > 9 ? "9+" : String(newCount);
   if (tone === "pill") {
     return (
-      <span className="ml-1.5 rounded-full bg-danger-600 px-1.5 py-0.5 text-xs font-bold text-white">
+      <span className="ml-1.5 rounded-full bg-danger-600 px-1.5 py-0.5 text-xs font-bold text-on-accent">
         {label}
       </span>
     );
   }
   return (
-    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-danger-600 px-1 text-[11px] font-bold text-white">
+    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-danger-600 px-1 text-[11px] font-bold text-on-accent">
       {label}
     </span>
   );
@@ -2491,7 +2491,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 aria-current={screen === tab.id ? "page" : undefined}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                   screen === tab.id
-                    ? "bg-surface-900 text-white"
+                    ? "bg-surface-900 text-on-accent"
                     : "bg-surface-base text-ink-600 ring-1 ring-line-200 hover:text-ink-900"
                 }`}
               >
@@ -2586,7 +2586,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                       onClick={() =>
                         navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
                       }
-                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Continue →
                     </button>
@@ -2710,7 +2710,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <button
                 type="button"
                 onClick={() => navigateTo({ screen: "capture" })}
-                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Back to capture
               </button>
@@ -2905,7 +2905,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                     type="button"
                     onClick={handleExtract}
                     disabled={phase === "extracting"}
-                    className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
+                    className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
                   >
                     {phase === "extracting"
                       ? "Extracting… this can take up to a minute"
@@ -2941,7 +2941,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   <button
                     type="button"
                     onClick={handleDemo}
-                    className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                    className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Preview with demo data instead
                   </button>
@@ -3006,7 +3006,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   setSessionRetries(0);
                   void refetchSession?.();
                 }}
-                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>
@@ -3123,7 +3123,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           <div
             aria-hidden="true"
             onClick={() => setMoreOpen(false)}
-            className="fixed inset-0 z-40 bg-black/35"
+            className="fixed inset-0 z-40 bg-scrim"
           />
           <div
             role="dialog"

@@ -34,7 +34,7 @@ export function MonitorToasts({
         <div
           key={id}
           role="alert"
-          className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-surface-900 py-3 pr-2 pl-4 text-white shadow-xl"
+          className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-surface-900 py-3 pr-2 pl-4 text-on-accent shadow-xl"
         >
           <button
             type="button"
@@ -57,7 +57,7 @@ export function MonitorToasts({
             type="button"
             onClick={() => onDismiss(id)}
             aria-label="Dismiss"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-lg text-ink-300 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-lg text-ink-300 hover:text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
           >
             ×
           </button>

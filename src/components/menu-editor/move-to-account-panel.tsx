@@ -237,7 +237,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => void handleCreate()}
               disabled={creating || newName.trim().length === 0}
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {creating ? "Creating…" : "Create restaurant"}
             </button>
@@ -273,7 +273,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={() => void handleMove()}
             disabled={busy || !selectedId}
-            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             {busy ? "Adding…" : `Add ${menuCount === 1 ? "1 menu" : `${menuCount} menus`}`}
           </button>
@@ -321,7 +321,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => void handleRename()}
               disabled={mutating || renameDraft.trim().length === 0}
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {mutating ? "Saving…" : "Save name"}
             </button>

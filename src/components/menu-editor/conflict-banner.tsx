@@ -40,7 +40,7 @@ export function ConflictBanner({
         <button
           type="button"
           onClick={onReloadServer}
-          className="rounded-full bg-accent-800 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
+          className="rounded-full bg-accent-800 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
         >
           Load the newest version
         </button>

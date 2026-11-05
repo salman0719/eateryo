@@ -138,8 +138,8 @@ function ConfirmDialog({
             onClick={() => onAnswer(true)}
             className={
               destructive
-                ? "rounded-full bg-danger-800 px-4 py-2 text-sm font-medium text-white hover:bg-danger-900"
-                : "rounded-full bg-surface-900 px-4 py-2 text-sm font-medium text-white hover:bg-surface-700"
+                ? "rounded-full bg-danger-800 px-4 py-2 text-sm font-medium text-on-accent hover:bg-danger-900"
+                : "rounded-full bg-surface-900 px-4 py-2 text-sm font-medium text-on-accent hover:bg-surface-700"
             }
           >
             {confirmLabel}

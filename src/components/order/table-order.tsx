@@ -191,7 +191,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             <button
               type="button"
               onClick={loadDemo}
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
             >
               Try the demo menu
             </button>
@@ -229,7 +229,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
           <button
             type="button"
             onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
+            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
           >
             Order something else
           </button>
@@ -266,7 +266,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void placeOrder()}
-        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order"}
       </button>

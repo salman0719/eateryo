@@ -186,7 +186,7 @@ export function InvitationClient({ token }: { token: string }) {
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Link
               href={accepted.role === "staff" ? "/orders" : "/menus"}
-              className="inline-block rounded-full bg-success-800 px-4 py-1.5 text-sm font-semibold text-white hover:bg-success-900"
+              className="inline-block rounded-full bg-success-800 px-4 py-1.5 text-sm font-semibold text-on-accent hover:bg-success-900"
             >
               {accepted.role === "staff" ? "Open the order board" : "Go to My menus"}
             </Link>
@@ -228,7 +228,7 @@ export function InvitationClient({ token }: { token: string }) {
                     type="button"
                     disabled={signIn.kind === "sending"}
                     onClick={() => void sendSignInLink(invitation.email)}
-                    className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {signIn.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
                   </button>
@@ -247,7 +247,7 @@ export function InvitationClient({ token }: { token: string }) {
               type="button"
               disabled={accepting}
               onClick={() => void handleAccept()}
-              className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {accepting ? "Accepting…" : "Accept invitation"}
             </button>

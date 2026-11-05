@@ -84,7 +84,7 @@ export function LocalDraftsOffer({
                 if (target) onAdd(target.id);
               }}
               disabled={busy || !target}
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {busy ? "Adding…" : count === 1 ? "Add to account" : `Add all ${count} to account`}
             </button>

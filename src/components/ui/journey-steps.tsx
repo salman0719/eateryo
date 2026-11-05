@@ -37,7 +37,7 @@ export function JourneySteps({
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs",
                 status === "upcoming"
                   ? "border border-line-300 bg-surface-base text-ink-600"
-                  : "bg-accent-700 text-white",
+                  : "bg-accent-700 text-on-accent",
               ].join(" ")}
             >
               {status === "done" ? (

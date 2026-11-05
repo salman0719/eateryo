@@ -70,7 +70,7 @@ export function RestaurantTables({
           </p>
           <a
             href="/sign-in"
-            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in
           </a>

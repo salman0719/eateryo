@@ -133,7 +133,7 @@ export function RestaurantSettings({
           </p>
           <a
             href="/sign-in"
-            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in
           </a>
@@ -250,7 +250,7 @@ export function RestaurantSettings({
               type="button"
               onClick={() => void handleDeleteRestaurant()}
               disabled={deleting}
-              className="mt-3 rounded-full border border-danger-700 px-4 py-1.5 text-sm font-semibold text-danger-800 transition-colors hover:bg-danger-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+              className="mt-3 rounded-full border border-danger-700 px-4 py-1.5 text-sm font-semibold text-danger-800 transition-colors hover:bg-danger-700 hover:text-on-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
             >
               {deleting ? "Deleting…" : `Delete ${selected.name}`}
             </button>
@@ -480,7 +480,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           type="button"
           onClick={() => void handleAddMember()}
           disabled={adding || addEmail.trim().length === 0}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {adding ? "Adding…" : "Add member"}
         </button>

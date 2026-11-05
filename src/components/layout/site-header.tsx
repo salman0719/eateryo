@@ -19,7 +19,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-on-accent"
           >
             E
           </span>
@@ -47,7 +47,7 @@ export function SiteHeader() {
               <span
                 aria-hidden="true"
                 title={user.email}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-700 text-xs font-bold text-white sm:hidden"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-700 text-xs font-bold text-on-accent sm:hidden"
               >
                 {(user.name ?? user.email ?? "?").trim().charAt(0).toUpperCase() || "?"}
               </span>

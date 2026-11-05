@@ -57,7 +57,8 @@ errors, or add lint/type suppressions just to make checks pass.
   `ink` (text), `surface` (backgrounds), `line` (borders, dividers, rings),
   `accent` (brand actions, focus rings, links), `warning` (caution and
   draft/paused/review states, never a primary action), `danger`, `success`, `info`,
-  `on-accent`, `scrim`. Never add raw palette utilities (`text-stone-600`,
+  `on-accent` (text on a filled control), `scrim` (the overlay behind a sheet).
+  Never add raw palette utilities (`text-stone-600`,
   `bg-white`, `border-amber-300`) in new or edited code; the palette ramps in
   that file exist only until the migration finishes. A colour that genuinely
   cannot belong to a role is allowed on the bespoke component alone, with a

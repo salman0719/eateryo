@@ -300,7 +300,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                       }}
                       className={`h-8 w-8 rounded-full text-xs font-semibold transition-colors ${
                         on
-                          ? "bg-accent-800 text-white"
+                          ? "bg-accent-800 text-on-accent"
                           : "border border-line-300 text-ink-500 hover:border-accent-700 hover:text-accent-900"
                       }`}
                     >
@@ -395,7 +395,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
           type="button"
           onClick={() => void handleSave()}
           disabled={!dirty || !validation.success || saving}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save hours"}
         </button>

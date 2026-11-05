@@ -276,7 +276,7 @@ function LocalOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => void advance(order)}
-                      className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 disabled:opacity-50"
+                      className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:opacity-50"
                     >
                       Mark {orderStatusLabel(nextOrderStatus(order.status)).toLowerCase()}
                     </button>

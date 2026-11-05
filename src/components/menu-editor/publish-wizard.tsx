@@ -260,7 +260,7 @@ export function PublishWizard({
                 <button
                   type="button"
                   onClick={onOpenTables}
-                  className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   Add tables &amp; print QR codes
                 </button>
@@ -439,7 +439,7 @@ export function PublishWizard({
                   type="button"
                   onClick={() => void handlePublish()}
                   disabled={!canSubmit}
-                  className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
+                  className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
                 >
                   {busy ? "Publishing…" : "Publish my menu"}
                 </button>

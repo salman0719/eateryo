@@ -260,7 +260,7 @@ export function OrderPagePreview({
               <button
                 type="button"
                 onClick={sendToKitchen}
-                className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
+                className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
               >
                 Send order to the kitchen
               </button>
