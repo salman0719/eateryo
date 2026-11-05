@@ -1312,7 +1312,7 @@ export function MenuEditor({
       {addPages.status === "added" && (
         <p
           role="status"
-          className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800"
         >
           Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in {addPages.categories}{" "}
           {addPages.categories === 1 ? "category" : "categories"} from the new pages. Repeats with

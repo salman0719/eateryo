@@ -184,7 +184,7 @@ export function CommitTags({
         <ul className="mb-1.5 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
             <li key={tag}>
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-green-900">
+              <span className="inline-flex items-center gap-1 rounded-full bg-success-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-success-900">
                 {tag}
                 <button
                   type="button"
@@ -195,7 +195,7 @@ export function CommitTags({
                     event.preventDefault();
                     commit(tags.filter((candidate) => candidate !== tag));
                   }}
-                  className="rounded-full px-1 leading-none text-green-900/70 hover:text-green-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-700"
+                  className="rounded-full px-1 leading-none text-success-900/70 hover:text-success-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-700"
                 >
                   ✕
                 </button>

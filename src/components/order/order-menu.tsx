@@ -183,7 +183,7 @@ export function OrderMenuSection({
                       {dietaryLabels.map((label) => (
                         <span
                           key={label}
-                          className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
+                          className="rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-medium text-success-900"
                         >
                           {label}
                         </span>
@@ -221,7 +221,7 @@ export function OrderMenuSection({
                     <span
                       key={tick}
                       aria-hidden="true"
-                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-green-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
+                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-success-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
                     >
                       Added ✓
                     </span>

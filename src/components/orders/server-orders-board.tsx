@@ -39,7 +39,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 const STATUS_STYLES: Record<OrderStatus, string> = {
   new: "bg-warning-100 text-warning-900",
   preparing: "bg-info-100 text-info-900",
-  served: "bg-green-100 text-green-900",
+  served: "bg-success-100 text-success-900",
   cancelled: "bg-surface-200 text-ink-600",
 };
 

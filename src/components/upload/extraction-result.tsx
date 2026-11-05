@@ -306,7 +306,7 @@ export function ExtractionResult({
                   {dedupeDietaryLabels(item.dietaryLabels).map((label) => (
                     <span
                       key={label}
-                      className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
+                      className="rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-medium text-success-900"
                     >
                       {label}
                     </span>
@@ -330,7 +330,7 @@ export function ExtractionResult({
                       <button
                         type="button"
                         onClick={() => onResolveItem?.(loc, "looks-good")}
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-success-700 hover:text-success-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
                       >
                         ✓ Looks good
                       </button>
@@ -339,7 +339,7 @@ export function ExtractionResult({
                         type="button"
                         onClick={() => onResolveItem?.(loc, "leave-unpriced")}
                         title="Keeps the price blank — totals stay honestly blank for this item."
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-success-700 hover:text-success-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
                       >
                         ✓ Leave unpriced
                       </button>
@@ -419,7 +419,7 @@ export function ExtractionResult({
           </h3>
           <div className="flex items-center gap-3">
             {checkedCount > 0 && (
-              <span className="text-xs font-medium text-green-800">
+              <span className="text-xs font-medium text-success-800">
                 ✓ {checkedCount} of {peak} checked
               </span>
             )}
@@ -496,7 +496,7 @@ export function ExtractionResult({
             </p>
           )}
           {savedNotice && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-900">
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success-100 px-2.5 py-0.5 text-xs font-semibold text-success-900">
               <span aria-hidden="true">✓</span>
               {savedNotice}
             </p>

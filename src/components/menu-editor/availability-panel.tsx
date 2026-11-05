@@ -387,7 +387,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
         )}
         <span className="flex-1" />
         {savedTick && !dirty && (
-          <span role="status" className="text-xs font-medium text-green-800">
+          <span role="status" className="text-xs font-medium text-success-800">
             Saved
           </span>
         )}

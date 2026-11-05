@@ -153,7 +153,7 @@ export const ItemEditor = memo(function ItemEditor({
                 </span>
               )}
               {duplicate && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-900">
+                <span className="rounded-full bg-danger-100 px-2 py-0.5 text-[11px] font-medium text-danger-900">
                   Possible duplicate
                 </span>
               )}
@@ -457,7 +457,7 @@ export const ItemEditor = memo(function ItemEditor({
                 <button
                   type="button"
                   onClick={() => patch({ reviewNotes: [] })}
-                  className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+                  className={`${smallButton} border-success-300 text-success-800 hover:border-success-700 hover:text-success-900`}
                 >
                   ✓ Looks good
                 </button>
@@ -466,7 +466,7 @@ export const ItemEditor = memo(function ItemEditor({
                   type="button"
                   onClick={() => patch({ reviewNotes: [], unpricedAccepted: true })}
                   title="Keeps the price blank — totals stay honestly blank for this item."
-                  className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+                  className={`${smallButton} border-success-300 text-success-800 hover:border-success-700 hover:text-success-900`}
                 >
                   ✓ Leave unpriced
                 </button>
@@ -513,7 +513,7 @@ export const ItemEditor = memo(function ItemEditor({
                 </span>
               )}
               {duplicate && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-900">
+                <span className="rounded-full bg-danger-100 px-2 py-0.5 text-[11px] font-medium text-danger-900">
                   Possible duplicate
                 </span>
               )}

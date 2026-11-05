@@ -329,7 +329,7 @@ export function TableOrderTabs({
     return (
       <OrderShell tableLabel={tableLabel}>
         <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-success-800 uppercase">
             Order received
           </p>
           <p className="mt-3 text-2xl font-bold text-ink-900">
