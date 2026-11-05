@@ -121,6 +121,13 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/components/layout/app-sidebar.tsx`, `sidebar-preference.ts` — the app's
+  left column: destinations from `appSections` (signed-out gating included),
+  the open menu's outline in the edit workspace, the account, and a
+  rail/expanded toggle whose choice is remembered. Widths are CSS driven by
+  `data-sidebar` on `<html>`, set before paint by the boot script in
+  `layout.tsx` so a saved choice never flashes. The app shell has no global
+  header; `site-header.tsx` stays for content pages (launch, legal, dev).
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.
