@@ -136,7 +136,7 @@ function ReviewPriceInput({
   }
   return (
     <label className="flex shrink-0 items-center gap-1.5">
-      {currency && <span className="text-xs text-stone-500">{currency}</span>}
+      {currency && <span className="text-xs text-ink-500">{currency}</span>}
       <input
         key={fallback}
         type="number"
@@ -154,7 +154,7 @@ function ReviewPriceInput({
             (event.target as HTMLInputElement).blur();
           }
         }}
-        className="w-28 rounded-lg border border-amber-300 bg-white px-2 py-1 text-sm font-semibold text-stone-900 tabular-nums placeholder:font-normal placeholder:text-stone-400 focus:border-amber-700 focus:outline-none"
+        className="w-28 rounded-lg border border-warning-300 bg-surface-base px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
       />
     </label>
   );
@@ -239,12 +239,12 @@ export function ExtractionResult({
     return (
       <div
         key={categoryName}
-        className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+        className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
       >
-        <h3 className="border-b border-stone-100 bg-stone-50 px-5 py-3 text-sm font-bold tracking-wide text-stone-800 uppercase">
+        <h3 className="border-b border-line-100 bg-surface-50 px-5 py-3 text-sm font-bold tracking-wide text-ink-800 uppercase">
           {categoryName}
         </h3>
-        <ul className="divide-y divide-stone-100">
+        <ul className="divide-y divide-line-100">
           {items.map((item, rowIndex) => {
             const needsReview = isFlagged(item);
             const loc = locator?.(rowIndex) ?? null;
@@ -258,10 +258,10 @@ export function ExtractionResult({
             return (
               <li key={`${categoryName}-${item.name}-${rowIndex}`} className="px-5 py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="flex items-center gap-2 font-medium text-stone-900">
+                  <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>
                     {item.available === false && (
-                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
+                      <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
                         Unavailable
                       </span>
                     )}
@@ -277,8 +277,8 @@ export function ExtractionResult({
                     <p
                       className={
                         item.price === null
-                          ? "shrink-0 text-sm font-semibold text-amber-800"
-                          : "shrink-0 text-sm font-semibold text-stone-900"
+                          ? "shrink-0 text-sm font-semibold text-warning-800"
+                          : "shrink-0 text-sm font-semibold text-ink-900"
                       }
                     >
                       {formatPrice(item, data.currency)}
@@ -286,14 +286,14 @@ export function ExtractionResult({
                   )}
                 </div>
                 {item.description && (
-                  <p className="mt-0.5 text-sm text-stone-600">{item.description}</p>
+                  <p className="mt-0.5 text-sm text-ink-600">{item.description}</p>
                 )}
                 {item.variants.length > 0 && (
-                  <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600">
+                  <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-600">
                     {item.variants.map((variant, index) => (
                       <li key={`${variant.name}-${index}`} className="tabular-nums">
                         {variant.name}
-                        <span className="ml-1.5 font-medium text-stone-800">
+                        <span className="ml-1.5 font-medium text-ink-800">
                           {variant.price === null
                             ? "—"
                             : `${item.currency ?? data.currency ?? ""}${item.currency || data.currency ? " " : ""}${variant.price.toFixed(2)}`}
@@ -306,19 +306,19 @@ export function ExtractionResult({
                   {dedupeDietaryLabels(item.dietaryLabels).map((label) => (
                     <span
                       key={label}
-                      className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
+                      className="rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-medium text-success-900"
                     >
                       {label}
                     </span>
                   ))}
                   {needsReview && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                    <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                       {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                     </span>
                   )}
                 </div>
                 {item.reviewNotes.length > 0 && (
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-800">
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-warning-800">
                     {item.reviewNotes.map((note) => (
                       <li key={note}>{note}</li>
                     ))}
@@ -330,7 +330,7 @@ export function ExtractionResult({
                       <button
                         type="button"
                         onClick={() => onResolveItem?.(loc, "looks-good")}
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-success-700 hover:text-success-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
                       >
                         ✓ Looks good
                       </button>
@@ -339,7 +339,7 @@ export function ExtractionResult({
                         type="button"
                         onClick={() => onResolveItem?.(loc, "leave-unpriced")}
                         title="Keeps the price blank — totals stay honestly blank for this item."
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-success-700 hover:text-success-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
                       >
                         ✓ Leave unpriced
                       </button>
@@ -359,9 +359,9 @@ export function ExtractionResult({
   // exactly as before.
   const draftDetails =
     data.categories.length === 0 ? (
-      <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
-        <p className="font-medium text-stone-900">No menu content detected</p>
-        <p className="mt-1 text-sm text-stone-600">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
+        <p className="font-medium text-ink-900">No menu content detected</p>
+        <p className="mt-1 text-sm text-ink-600">
           The image may not show a menu, or the text was unreadable. Try a clearer photo.
         </p>
       </div>
@@ -372,24 +372,24 @@ export function ExtractionResult({
     ) : (
       <div className="flex flex-col gap-3">
         {!onlyFlagged && (
-          <section aria-label="Ready items" className="rounded-2xl border border-stone-200 bg-white p-5">
-            <h3 className="text-sm font-semibold text-stone-900">
+          <section aria-label="Ready items" className="rounded-2xl border border-line-200 bg-surface-base p-5">
+            <h3 className="text-sm font-semibold text-ink-900">
               ✓ Ready ({readyItems.length})
             </h3>
             {readyItems.length === 0 ? (
-              <p className="mt-1 text-sm text-stone-600">
+              <p className="mt-1 text-sm text-ink-600">
                 Every item needs a look — start below.
               </p>
             ) : (
               <>
-                <ul className="mt-2 divide-y divide-stone-100">
+                <ul className="mt-2 divide-y divide-line-100">
                   {visibleReady.map((item) => (
                     <li
                       key={`ready-${item.name}`}
                       className="flex items-baseline justify-between gap-3 py-1.5"
                     >
-                      <span className="min-w-0 truncate text-sm text-stone-800">{item.name}</span>
-                      <span className="shrink-0 text-sm font-medium text-stone-800 tabular-nums">
+                      <span className="min-w-0 truncate text-sm text-ink-800">{item.name}</span>
+                      <span className="shrink-0 text-sm font-medium text-ink-800 tabular-nums">
                         {formatPrice(item, data.currency)}
                       </span>
                     </li>
@@ -399,12 +399,12 @@ export function ExtractionResult({
                   <button
                     type="button"
                     onClick={() => setShowAllReady(true)}
-                    className="mt-2 text-xs font-medium text-stone-500 underline underline-offset-2 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="mt-2 text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     …and {readyItems.length - visibleReady.length} more — no action needed
                   </button>
                 ) : (
-                  <p className="mt-2 text-xs text-stone-500">No badges, no action needed.</p>
+                  <p className="mt-2 text-xs text-ink-500">No badges, no action needed.</p>
                 )}
               </>
             )}
@@ -412,14 +412,14 @@ export function ExtractionResult({
         )}
         <div
           ref={checkThisRef}
-          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-[#faf8f5]/95 py-2 scroll-mt-4"
+          className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-background/95 py-2 scroll-mt-4"
         >
-          <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
+          <h3 className="text-xs font-semibold tracking-[0.18em] text-warning-800 uppercase">
             ⚠ Check this ({reviewCount})
           </h3>
           <div className="flex items-center gap-3">
             {checkedCount > 0 && (
-              <span className="text-xs font-medium text-green-800">
+              <span className="text-xs font-medium text-success-800">
                 ✓ {checkedCount} of {peak} checked
               </span>
             )}
@@ -428,7 +428,7 @@ export function ExtractionResult({
                 type="button"
                 onClick={onResolveAll}
                 title="Confirms every flagged item as shown — prices stay as they are, unpriced items keep honestly blank totals."
-                className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 transition-colors hover:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-accent-900 transition-colors hover:border-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Accept all as shown
               </button>
@@ -449,7 +449,7 @@ export function ExtractionResult({
         active={allClear}
         pulse={false}
         scrollBlock="start"
-        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-white p-5 scroll-mt-4"
+        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-line-200 bg-surface-base p-5 scroll-mt-4"
       >
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -464,39 +464,39 @@ export function ExtractionResult({
                   }}
                   inputClassName="text-xl font-bold"
                 />
-                <p className="mt-0.5 text-xs text-stone-500">
+                <p className="mt-0.5 text-xs text-ink-500">
                   Guests see this at the top — fix it if the photo missed it.
                 </p>
               </div>
             ) : (
-              <h2 className="text-xl font-bold text-stone-900">{data.title ?? "Untitled menu"}</h2>
+              <h2 className="text-xl font-bold text-ink-900">{data.title ?? "Untitled menu"}</h2>
             )}
             {source === "ai" ? (
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+              <span className="rounded-full bg-warning-100 px-2.5 py-0.5 text-xs font-semibold text-warning-900">
                 {reviewCount > 0 ? `AI draft — ${reviewCount} to check` : "AI draft"}
               </span>
             ) : (
-              <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              <span className="rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
                 Demo data
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-ink-600">
             {data.categories.length} {data.categories.length === 1 ? "category" : "categories"} ·{" "}
             {itemCount} {itemCount === 1 ? "item" : "items"}
             {reviewCount > 0 && (
-              <span className="font-medium text-amber-800">
+              <span className="font-medium text-warning-800">
                 {" "}· {reviewCount} to check
               </span>
             )}
           </p>
           {source === "ai" && (
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-ink-500">
               Prices and names are a best-effort draft. Check anything marked before using it.
             </p>
           )}
           {savedNotice && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-900">
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success-100 px-2.5 py-0.5 text-xs font-semibold text-success-900">
               <span aria-hidden="true">✓</span>
               {savedNotice}
             </p>
@@ -508,7 +508,7 @@ export function ExtractionResult({
               <button
                 type="button"
                 onClick={handleContinue}
-                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 {reviewCount > 0
                   ? `Continue → check prices (${reviewCount})`
@@ -522,8 +522,8 @@ export function ExtractionResult({
               onClick={onEdit}
               className={
                 onPublish
-                  ? "rounded-full px-4 py-1.5 text-sm font-medium text-stone-500 transition-colors hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                  : "rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  ? "rounded-full px-4 py-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  : "rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               }
             >
               {onPublish ? "Fine-tune in the editor" : editLabel}
@@ -532,7 +532,7 @@ export function ExtractionResult({
           <button
             type="button"
             onClick={onStartOver}
-            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Start over
           </button>
@@ -549,32 +549,32 @@ export function ExtractionResult({
 
           <div className="flex flex-col gap-4">
             <div>
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase">
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-warning-800 uppercase">
                 First look
               </p>
-              <h3 className="mt-1 text-lg font-bold text-stone-900">
+              <h3 className="mt-1 text-lg font-bold text-ink-900">
                 This is what diners will order from
               </h3>
-              <p className="mt-1 text-sm leading-6 text-stone-600">
+              <p className="mt-1 text-sm leading-6 text-ink-600">
                 Nothing is live yet, and ordering is off in this preview. Check anything marked,
                 then publish it when it looks right.
               </p>
             </div>
 
             <div className="flex items-baseline justify-between gap-3">
-              <h3 className="text-xs font-semibold tracking-[0.18em] text-stone-500 uppercase">
+              <h3 className="text-xs font-semibold tracking-[0.18em] text-ink-500 uppercase">
                 {onlyFlagged ? "Items to check" : "Full draft"}
               </h3>
               <div className="flex items-baseline gap-3">
                 {reviewCount > 0 && (
-                  <span className="text-xs text-amber-800">{reviewCount} to check</span>
+                  <span className="text-xs text-warning-800">{reviewCount} to check</span>
                 )}
                 {reviewCount > 0 && (
                   <button
                     type="button"
                     onClick={() => setOnlyFlagged((value) => !value)}
                     aria-pressed={onlyFlagged}
-                    className="text-xs font-medium text-stone-500 underline underline-offset-2 hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     {onlyFlagged ? "Show everything" : "Show only items to check"}
                   </button>

@@ -25,7 +25,7 @@ export function MenuItemPhoto({ item }: { item: MenuItem }) {
       height={copy.height}
       loading="lazy"
       decoding="async"
-      className="h-16 w-16 shrink-0 rounded-lg border border-stone-200 object-cover"
+      className="h-16 w-16 shrink-0 rounded-lg border border-line-200 object-cover"
     />
   );
 }

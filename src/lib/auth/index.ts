@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { schema } from "@/lib/db/schema";
 
 import { sendMagicLinkEmail } from "./email";
+import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
 
 /** Magic links are single-use and expire fast (PHASE-2.md §3.6). */
 const MAGIC_LINK_EXPIRES_IN_SECONDS = 5 * 60;
@@ -47,7 +48,12 @@ export function createAuth(options: CreateAuthOptions) {
     },
     plugins: [
       magicLink({
-        sendMagicLink: options.sendMagicLink ?? sendMagicLinkEmail,
+        // DEV_SIGN_IN_BYPASS=1 in a local `.env.local` parks the link for the
+        // dev route to show instead of emailing it; `isDevSignInEnabled()` is
+        // false in production, so deployed builds always use the real sender.
+        sendMagicLink:
+          options.sendMagicLink ??
+          (isDevSignInEnabled() ? captureDevSignInLink : sendMagicLinkEmail),
         expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
       }),
       // Must stay last: re-applies Set-Cookie headers in the Next.js handler.

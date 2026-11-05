@@ -35,14 +35,14 @@ function navigateInApp(event: MouseEvent<HTMLAnchorElement>, href: string) {
 
 export function GuidanceCard({ title, steps, action }: GuidanceCardProps) {
   return (
-    <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-      <p className="font-medium text-stone-900">{title}</p>
+    <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+      <p className="font-medium text-ink-900">{title}</p>
       <ol className="mx-auto mt-3 max-w-md space-y-2 text-left">
         {steps.map((step, index) => (
-          <li key={step} className="flex items-start gap-2.5 text-sm leading-6 text-stone-600">
+          <li key={step} className="flex items-start gap-2.5 text-sm leading-6 text-ink-600">
             <span
               aria-hidden="true"
-              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 bg-white text-[11px] font-bold text-stone-400"
+              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-300 bg-surface-base text-[11px] font-bold text-ink-400"
             >
               {index + 1}
             </span>
@@ -53,7 +53,7 @@ export function GuidanceCard({ title, steps, action }: GuidanceCardProps) {
       <a
         href={action.href}
         onClick={(event) => navigateInApp(event, action.href)}
-        className="mt-4 inline-block rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="mt-4 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         {action.label}
       </a>

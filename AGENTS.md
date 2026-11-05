@@ -3,6 +3,14 @@
 This file is the single source of truth for automated contributors.
 Read it before making any change.
 
+## Local, per-machine notes
+
+If `local/MEMORY.md` exists in this checkout, read it before starting work and
+follow it. It holds per-machine preferences — commit wording, tool habits,
+workflow notes — and lives in the gitignored `local/` sandbox, so **its absence
+is normal, not an error**. It may add personal preference on top of this file;
+it never relaxes the security, scope, or tenancy rules below.
+
 ## Project
 
 Eateryo — see `PLAN.md` for mission, stack, and the Phase 1
@@ -22,9 +30,6 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 
 ## Critical commit rules
 
-- NEVER add "Co-authored-by", "Co-Authored-By", "Generated with", "Generated-by",
-  or any AI attribution trailer or line to any commit message, PR description,
-  or code comment. This is a hard rule with no exceptions.
 - Keep commits small, focused, and easy to review.
 - Do not commit secrets. Never commit `.env.local` or any real API key.
 
@@ -37,6 +42,23 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 - Match existing conventions (App Router, TypeScript strict, Tailwind).
 - Do NOT add shadcn/ui (user decision). Use Tailwind + small local primitives.
 - Do not add dependencies unless they materially reduce effort or improve reliability.
+
+## Local workspace (`local/`)
+
+`local/` is the research and experiment sandbox. `local/README.md` is the only
+tracked file there; read it before starting research, a spike, a prototype, or
+a one-off investigation.
+
+- Look for an existing topic folder first and reuse the one whose purpose fits.
+- Create a kebab-case folder only when none fits, and add it to the README's
+  folder index in the same change.
+- Keep the root of `local/` for the README and genuinely cross-topic files;
+  put one-off scripts and outputs in a topic folder.
+- Deliverables are HTML, not Markdown-only. Markdown is for source notes and
+  folder READMEs.
+- A serious finding may live there, but anything that changes a product or
+  roadmap decision must also be promoted into tracked repo docs or the issue
+  log. Nothing under `local/` except its README is committed.
 
 ## Quality gates (run before finishing)
 
@@ -53,6 +75,17 @@ errors, or add lint/type suppressions just to make checks pass.
 ## Stack rules
 
 - Next.js App Router + TypeScript strict + Tailwind CSS.
+- Colour usage: components name the role tokens in `src/app/theme.css` —
+  `ink` (text), `surface` (backgrounds), `line` (borders, dividers, rings),
+  `accent` (brand actions, focus rings, links), `warning` (caution and
+  draft/paused/review states, never a primary action), `danger`, `success`, `info`,
+  `on-accent` (text on a filled control), `scrim` (the overlay behind a sheet).
+  Never add raw palette utilities (`text-stone-<shade>`,
+  `bg-white`, `border-amber-<shade>`) in new or edited code; name a role token
+  instead. A colour that genuinely
+  cannot belong to a role is allowed on the bespoke component alone, with a
+  comment saying why no category applies. Token values change in `theme.css`
+  only — never inline in a component.
 - Zod for AI output, stored records, and imported files.
 - Image extraction vendors (Gemini, Groq) only via the server-side route
   (`src/app/api/extract-menu/route.ts`). Keys live in `GEMINI_API_KEY` /
@@ -88,6 +121,9 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
+  plus the role ramps components use; the Theme Studio edits this file. Colour
+  and font decisions belong here, never inline in a component.
 - `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
   the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
   shared by capture and the publish wizard. Signing in is a gate inside
@@ -95,6 +131,15 @@ errors, or add lint/type suppressions just to make checks pass.
   wizard continues it only when the flow came through review
   (`rememberPublishJourney`), so a plain library deep link gets a heading
   instead of a tracker with a false "3 done".
+- `src/components/ui/icons.tsx` — the hand-drawn icon set (no icon
+  dependency): stroked 24-grid glyphs that inherit `currentColor` and are
+  `aria-hidden`, so the control around them carries the label. Starts with
+  `ChevronUpIcon`/`ChevronDownIcon` for the editor's disclosures.
+- `src/components/ui/collapse.tsx` — the disclosure animation: a one-row CSS
+  grid whose track goes 0fr ↔ 1fr, so both directions animate, a mid-flight
+  toggle retargets instead of jumping, and nothing is measured; content stays
+  mounted and `inert` while shut, and reduced motion snaps. The wrapper must
+  stay layout-neutral — padding and borders belong on the content inside.
 - `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
   reusable height-reveal animation: measures the rendered content and
   animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then
@@ -107,6 +152,16 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
   session guard, sign-in page
+- `src/lib/auth/dev-sign-in.ts`, `src/app/api/dev/magic-link/` — the
+  `DEV_SIGN_IN_BYPASS=1` local shortcut: the auth instance parks the freshly
+  minted link instead of emailing it and the sign-in page offers it as an
+  explicit button, so the browser still walks the real verification route.
+  Off in production whatever the variable says (the flag check returns false
+  for `NODE_ENV=production`), never a direct session insert, one read per
+  link for the address that asked, five-minute window. The store sits on
+  `globalThis` because each route entrypoint is its own module instance: a
+  module-level one is empty in the route that reads it, which made every dev
+  sign-in report an expired link. Tests: `tests/dev-sign-in.test.ts`
 - `src/features/session/state.ts` — the pure tri-state session read
   (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
   matrix; a page load whose session has not answered is **never** treated as
@@ -157,7 +212,7 @@ errors, or add lint/type suppressions just to make checks pass.
   surfaces (save status, publish hint, Table ordering card, storage footnote)
   render placeholders with the wait announced only to screen readers, so no
   sentence is printed and then retracted. `unreachable` is the read that
-  settled by *failing*: those surfaces say the account couldn't be checked and
+  settled by _failing_: those surfaces say the account couldn't be checked and
   offer **Try again**, the save status never claims browser-only, and the
   café-creating flow stays off because it would mint tenancy on a guess (016).
   Tests: `tests/menu-membership.test.ts`, `tests/editor-membership.test.ts`.

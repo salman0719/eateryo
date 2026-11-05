@@ -151,14 +151,14 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     }
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   if (state === "invalid_link") {
     return (
       <Shell>
         <div className={`${frame} p-8 text-center`}>
-          <p className="text-lg font-semibold text-stone-900">This table link is incomplete</p>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
+          <p className="mt-2 text-sm text-ink-600">
             A table link looks like <code>/order?menu=…&amp;table=3</code>. Ask staff for a fresh QR
             code.
           </p>
@@ -179,10 +179,10 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     return (
       <Shell>
         <div className={`${frame} p-8`}>
-          <p className="text-lg font-semibold text-stone-900">
+          <p className="text-lg font-semibold text-ink-900">
             This menu isn&apos;t on this device
           </p>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
+          <p className="mt-2 text-sm leading-6 text-ink-600">
             Menus are stored in the browser that created them. This link points at a menu saved
             somewhere else — table links work on the device holding the menu, or anywhere the same
             browser storage is available.
@@ -191,13 +191,13 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             <button
               type="button"
               onClick={loadDemo}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
             >
               Try the demo menu
             </button>
             <Link
               href="/"
-              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
             >
               Back to the app
             </Link>
@@ -213,23 +213,23 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     return (
       <Shell tableLabel={tableLabel}>
         <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-success-800 uppercase">
             Order received
           </p>
-          <p className="mt-3 text-2xl font-bold text-stone-900">
+          <p className="mt-3 text-2xl font-bold text-ink-900">
             #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
           </p>
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-ink-600">
             {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
             {formatTotal(placed.currency, orderTotal(placed.lines))}
           </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-stone-500">
+          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
             Saved in this browser for staff to pick up. Nothing has been sent to a server.
           </p>
           <button
             type="button"
             onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
           >
             Order something else
           </button>
@@ -245,19 +245,19 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
   const orderFooter = (
     <>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-600">Total</p>
-        <p className="text-lg font-bold tabular-nums text-stone-900">
+        <p className="text-sm font-medium text-ink-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-ink-900">
           {formatTotal(menu.currency, total)}
         </p>
       </div>
       {lines.length > 0 && total === null && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-warning-800">
           Some items have no price on the menu, so no total is shown.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}
@@ -266,7 +266,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void placeOrder()}
-        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order"}
       </button>
@@ -278,17 +278,17 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+            <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
               {formatTableLabel(tableLabel)}
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-stone-900">
+            <h1 className="mt-1 text-2xl font-bold text-ink-900">
               {menu.title.trim() || "Untitled menu"}
             </h1>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-ink-600">
               Tap a dish to add it to your order. Prices are exactly what the menu shows.
             </p>
             {isDemo && (
-              <p className="mt-3 inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              <p className="mt-3 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
                 Demo menu — not a real restaurant
               </p>
             )}

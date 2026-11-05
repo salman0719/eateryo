@@ -185,17 +185,17 @@ export function MoveToAccountPanel({
   }
 
   return (
-    <section className="bg-white p-4 sm:p-5">
-      <h3 className="text-sm font-bold tracking-tight text-stone-900">
+    <section className="bg-surface-base p-4 sm:p-5">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">
         Menus saved in this browser
       </h3>
-      <p className="mt-1 text-xs leading-5 text-stone-500">
+      <p className="mt-1 text-xs leading-5 text-ink-500">
         Adds your {menuCount === 1 ? "saved menu" : `${menuCount} saved menus`} to your account so
         other devices see {menuCount === 1 ? "it" : "them"} too. This browser keeps its copies —
         nothing is deleted.
       </p>
 
-      {loadError && <p className="mt-2 text-xs text-red-700">{loadError}</p>}
+      {loadError && <p className="mt-2 text-xs text-danger-700">{loadError}</p>}
 
       {restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="mt-3">
@@ -211,7 +211,7 @@ export function MoveToAccountPanel({
       )}
 
       {staffOnly && (
-        <p className="mt-2 text-xs text-amber-800">
+        <p className="mt-2 text-xs text-warning-800">
           You are only a staff member of the restaurants on this account. Only an owner can add
           menus — ask the owner to run this from their sign-in.
         </p>
@@ -223,27 +223,27 @@ export function MoveToAccountPanel({
               `items-end` an extra label line would drag the button down
               past the input's bottom edge and out of alignment. */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+            <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
               Name your restaurant
               <input
                 type="text"
                 value={newName}
                 onChange={(event) => setNameDraft(event.target.value)}
                 placeholder="e.g. Sunny Side Café"
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               />
             </label>
             <button
               type="button"
               onClick={() => void handleCreate()}
               disabled={creating || newName.trim().length === 0}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {creating ? "Creating…" : "Create restaurant"}
             </button>
           </div>
           {suggestedName && nameDraft === null && (
-            <p className="mt-1 text-xs font-normal text-stone-400">
+            <p className="mt-1 text-xs font-normal text-ink-400">
               Suggested from your menu titles — change it if you like.
             </p>
           )}
@@ -252,12 +252,12 @@ export function MoveToAccountPanel({
 
       {owned.length > 0 && !report && (
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
             Add to
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -273,7 +273,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={() => void handleMove()}
             disabled={busy || !selectedId}
-            className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             {busy ? "Adding…" : `Add ${menuCount === 1 ? "1 menu" : `${menuCount} menus`}`}
           </button>
@@ -286,7 +286,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={startRename}
             disabled={mutating}
-            className="text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Rename “{selected.name}”
           </button>
@@ -294,7 +294,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={() => void handleDelete()}
             disabled={mutating}
-            className="text-xs font-medium text-red-700 underline underline-offset-2 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="text-xs font-medium text-danger-700 underline underline-offset-2 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
           >
             Delete…
           </button>
@@ -303,7 +303,7 @@ export function MoveToAccountPanel({
 
       {owned.length > 0 && !report && selected && renaming && (
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
             Rename “{selected.name}”
             <input
               type="text"
@@ -313,7 +313,7 @@ export function MoveToAccountPanel({
                 if (event.key === "Enter") void handleRename();
                 if (event.key === "Escape") setRenaming(false);
               }}
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             />
           </label>
           <div className="flex gap-2">
@@ -321,7 +321,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => void handleRename()}
               disabled={mutating || renameDraft.trim().length === 0}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {mutating ? "Saving…" : "Save name"}
             </button>
@@ -329,7 +329,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => setRenaming(false)}
               disabled={mutating}
-              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Cancel
             </button>
@@ -337,18 +337,18 @@ export function MoveToAccountPanel({
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+      {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
 
       {report && (
-        <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-          <p className="text-sm font-medium text-stone-900">
+        <div className="mt-3 rounded-xl border border-line-200 bg-surface-50 p-3">
+          <p className="text-sm font-medium text-ink-900">
             Added {report.imported.length} · already there {report.skipped.length} · failed{" "}
             {report.failed.length}
           </p>
           {report.failed.length > 0 && (
             <ul className="mt-2 space-y-1">
               {report.failed.map((failure) => (
-                <li key={failure.id} className="text-xs text-red-800">
+                <li key={failure.id} className="text-xs text-danger-800">
                   “{failure.title}”: {failure.reason}
                 </li>
               ))}
@@ -357,7 +357,7 @@ export function MoveToAccountPanel({
           <button
             type="button"
             onClick={() => setReport(null)}
-            className="mt-2 text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900"
+            className="mt-2 text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900"
           >
             Dismiss
           </button>

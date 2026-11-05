@@ -46,10 +46,10 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
       }}
       className={[
         "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors",
-        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700",
         dragging
-          ? "border-amber-700 bg-amber-50"
-          : "border-stone-300 bg-white hover:border-amber-600 hover:bg-amber-50/50",
+          ? "border-accent-700 bg-warning-50"
+          : "border-line-300 bg-surface-base hover:border-accent-600 hover:bg-accent-50/50",
         disabled ? "cursor-not-allowed opacity-60" : "",
       ].join(" ")}
     >
@@ -61,7 +61,7 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
         stroke="currentColor"
         strokeWidth="1.5"
         aria-hidden="true"
-        className="text-amber-800"
+        className="text-warning-800"
       >
         <path
           strokeLinecap="round"
@@ -70,11 +70,11 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
         />
       </svg>
       <div>
-        <p className="text-base font-semibold text-stone-900">
+        <p className="text-base font-semibold text-ink-900">
           Drag &amp; drop your menu images here
         </p>
-        <p className="mt-1 text-sm text-stone-600">
-          or <span className="font-medium text-amber-800 underline">browse files</span> — JPEG, PNG,
+        <p className="mt-1 text-sm text-ink-600">
+          or <span className="font-medium text-accent-800 underline">browse files</span> — JPEG, PNG,
           WebP, AVIF, or HEIC, up to 4&nbsp;MB each (max 4 pages, merged into one menu)
         </p>
       </div>

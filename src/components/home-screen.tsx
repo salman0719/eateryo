@@ -100,6 +100,7 @@ import {
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
+  routeMenuId,
   signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
@@ -164,6 +165,7 @@ import {
   membershipFlag,
   type MenuMembership,
 } from "@/features/menus/membership";
+import { docForRoutedMenu } from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -182,10 +184,6 @@ function sameMenuContent(a: MenuDocument, b: MenuDocument): boolean {
   return JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
 }
 
-function routeMenuId(route: AppRoute): string | null {
-  return route.screen === "editor" || route.screen === "item" ? route.menuId : null;
-}
-
 function stepIndex(phase: Phase, hasResult: boolean): number {
   if (hasResult || phase === "done") return 2;
   if (phase === "ready" || phase === "extracting") return 1;
@@ -199,13 +197,13 @@ function NewOrdersBadge({ tone }: { tone: "bar" | "pill" }) {
   const label = newCount > 9 ? "9+" : String(newCount);
   if (tone === "pill") {
     return (
-      <span className="ml-1.5 rounded-full bg-red-600 px-1.5 py-0.5 text-xs font-bold text-white">
+      <span className="ml-1.5 rounded-full bg-danger-600 px-1.5 py-0.5 text-xs font-bold text-on-accent">
         {label}
       </span>
     );
   }
   return (
-    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold text-white">
+    <span className="absolute top-1 right-[calc(50%-22px)] flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-danger-600 px-1 text-[11px] font-bold text-on-accent">
       {label}
     </span>
   );
@@ -2617,9 +2615,18 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     signedIn,
   ]);
 
+  /**
+   * The menu the URL names. Leaving the editor for the library keeps the
+   * document in memory on purpose (mode changes and returns skip the read),
+   * but that copy is never a stand-in for a *different* menu: entering
+   * another one must show its own loading state until its copy arrives, not
+   * the previous menu's rows — which could even be edited into the wrong
+   * record.
+   */
+  const routedDoc = docForRoutedMenu(activeDoc, route);
   // Publish state is only ever shown for the menu it was loaded for; a stale
   // answer for a previously opened menu is never displayed.
-  const activePublicationMenuId = activeDoc?.id ?? null;
+  const activePublicationMenuId = routedDoc?.id ?? null;
   const activePublication = publicationMenuId === activePublicationMenuId ? publication : null;
   const activePublicationLoaded =
     publicationMenuId === activePublicationMenuId && publicationLoaded;
@@ -2763,10 +2770,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 type="button"
                 onClick={() => navigateTo({ screen: tab.id })}
                 aria-current={screen === tab.id ? "page" : undefined}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                   screen === tab.id
-                    ? "bg-stone-900 text-white"
-                    : "bg-white text-stone-600 ring-1 ring-stone-200 hover:text-stone-900"
+                    ? "bg-surface-900 text-on-accent"
+                    : "bg-surface-base text-ink-600 ring-1 ring-line-200 hover:text-ink-900"
                 }`}
               >
                 {tab.label}
@@ -2798,14 +2805,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {signedIn && claimError && (
           <div
             role="alert"
-            className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+            className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p>{claimError}</p>
               <button
                 type="button"
                 onClick={() => setClaimError(null)}
-                className="text-xs font-medium underline underline-offset-2 hover:text-red-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="text-xs font-medium underline underline-offset-2 hover:text-danger-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
               >
                 Dismiss
               </button>
@@ -2816,7 +2823,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {/* A failed account read is no longer silent: the gate settles, the
             server paths stay off, and this says so once. */}
         {signedIn && claimGate.incomplete && screen !== "editor" && (
-          <p className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-5 text-stone-600">
+          <p className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
             We couldn&apos;t check your account just now, so nothing was imported from this
             browser. Reload when you&apos;re back online and it will try again.
           </p>
@@ -2843,12 +2850,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             if (!resumable) return null;
             return (
               <HeightReveal>
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-amber-950">
+                    <p className="text-sm font-semibold text-warning-950">
                       📍 Finish publishing your menu →
                     </p>
-                    <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
+                    <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
                       {localOnlyCount === 1
                         ? `“${resumable.title}” is saved in this browser, not published yet.`
                         : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
@@ -2860,14 +2867,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                       onClick={() =>
                         navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
                       }
-                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Continue →
                     </button>
                     <button
                       type="button"
                       onClick={() => setResumeDismissed(true)}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:text-accent-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Dismiss
                     </button>
@@ -2882,13 +2889,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             {visibleLibraryError && (
               <p
                 role="alert"
-                className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
               >
                 {visibleLibraryError}{" "}
                 {isSessionGateMessage(visibleLibraryError) && (
                   <a
                     href="/sign-in"
-                    className="font-semibold text-red-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-900"
+                    className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
                   >
                     Sign in
                   </a>
@@ -2914,14 +2921,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 offer handles the common case, and this is where a partial
                 import is retried. */}
             {signedIn && libraryAccountMode && localOnlyCount > 0 && (
-              <details className="rounded-2xl border border-stone-200 bg-white">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-stone-700 marker:text-stone-400">
+              <details className="rounded-2xl border border-line-200 bg-surface-base">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-700 marker:text-ink-400">
                   Import from this browser
-                  <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
+                  <span className="ml-2 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                     {localOnlyCount}
                   </span>
                 </summary>
-                <div className="border-t border-stone-200">
+                <div className="border-t border-line-200">
                   <MoveToAccountPanel
                     menuCount={localOnlyCount}
                     menuIds={localOnly.map((menu) => menu.id)}
@@ -2955,7 +2962,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               role="status"
               aria-busy="true"
               aria-label="Loading the assistant"
-              className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-6"
+              className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
             >
               <span className="sr-only">Loading the assistant…</span>
               <Skeleton className="h-6 w-40" />
@@ -2979,16 +2986,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             // back to capture — so render nothing while the bounce lands.
             null
           ) : (
-            <section className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-              <h1 className="font-medium text-stone-900">Assistant isn’t available</h1>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+            <section className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+              <h1 className="font-medium text-ink-900">Assistant isn’t available</h1>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 The assistant isn’t released to this account yet. Everything else in Eateryo works
                 as usual.
               </p>
               <button
                 type="button"
                 onClick={() => navigateTo({ screen: "capture" })}
-                className="mt-4 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Back to capture
               </button>
@@ -3012,7 +3019,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           />
         )}
 
-        {screen === "editor" && activeDoc && (
+        {screen === "editor" && routedDoc && (
           <>
             {conflict && (
               <ConflictBanner
@@ -3023,16 +3030,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               />
             )}
             {activeMenuAccessDenied ? (
-              <section className="rounded-2xl border border-stone-200 bg-white p-6">
-                <h1 className="font-medium text-stone-900">This menu isn’t available</h1>
-                <p className="mt-2 max-w-md text-sm leading-6 text-stone-600">
+              <section className="rounded-2xl border border-line-200 bg-surface-base p-6">
+                <h1 className="font-medium text-ink-900">This menu isn’t available</h1>
+                <p className="mt-2 max-w-md text-sm leading-6 text-ink-600">
                   Your account can’t open this menu. Ask the restaurant owner if you think that’s a
                   mistake.
                 </p>
                 <button
                   type="button"
                   onClick={() => void handleBackToLibrary()}
-                  className="mt-4 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   Back to my menus
                 </button>
@@ -3042,7 +3049,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 role="status"
                 aria-busy="true"
                 aria-label="Checking access"
-                className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-6"
+                className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
               >
                 <span className="sr-only">Checking your access to this menu…</span>
                 <Skeleton className="h-6 w-48" />
@@ -3051,34 +3058,34 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             ) : (
               <>
                 {activeMenuIsStaff && (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
                     You have staff access to this restaurant — menus are view-only for staff. Ask an
                     owner to make changes.
                   </p>
                 )}
                 {editorMode === "publish" && activeMenuCanPublish ? (
               <PublishWizard
-                key={activeDoc.id}
-                doc={activeDoc}
+                key={routedDoc.id}
+                doc={routedDoc}
                 signedIn={signedIn}
                 sessionPending={sessionPending}
                 accountKey={accountKey}
                 ownedRestaurants={ownedRestaurantsForAccount}
                 restaurantsLoading={restaurantsLoading}
                 onPublished={handleWizardPublished}
-                onBack={() => navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "edit" })}
+                onBack={() => navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })}
                 onOpenTables={() => navigateTo({ screen: "tables" })}
                 onOpenEditor={() =>
-                  navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "edit" })
+                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
                 }
               />
             ) : (
               <MenuEditor
-                doc={activeDoc}
+                doc={routedDoc}
                 selectedItemId={selectedItemId}
                 mode={activeMenuCanWrite ? editorMode : "preview"}
                 onModeChange={(mode) =>
-                  navigateTo({ screen: "editor", menuId: activeDoc.id, mode })
+                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
                 }
                 onChange={handleDocChange}
                 saveState={saveState}
@@ -3093,14 +3100,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   )?.name ?? null
                 }
                 onStartPublish={() =>
-                  navigateTo({ screen: "editor", menuId: activeDoc.id, mode: "publish" })
+                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
                 }
                 imageUrl={editorImageUrl}
                 onExportJson={handleExportJson}
                 onExportCsv={handleExportCsv}
                 onImportFile={(f) => void handleImportFile(f)}
                 importError={importError}
-                onDeleteMenu={() => void handleDeleteMenu(activeDoc.id)}
+                onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
                 onBack={() => void handleBackToLibrary()}
                 publishing={{
                   status: activePublication,
@@ -3110,14 +3117,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   inAccount: activeMenuOnServer,
                   accountCheckFailed: activeMenuAccountCheckFailed,
                   onRetryAccountCheck: handleRetryAccountCheck,
-                  liveDoc: liveDocMenuId === activeDoc.id ? liveDoc : null,
-                  liveDocState: liveDocMenuId === activeDoc.id ? liveDocState : "idle",
+                  liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
+                  liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
                   onPublish: () => void handlePublish(),
                   onUnpublish: () => void handleUnpublish(),
                 }}
-                onPreviewOpen={() => {
-                  if (docRef.current) void refreshPublication(docRef.current.id);
-                }}
+                onPreviewOpen={() => void refreshPublication(routedDoc.id)}
               />
                 )}
               </>
@@ -3128,15 +3133,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {screen === "capture" && (
           <>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+              <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
                 Turn your photo into a menu
               </h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-stone-600 sm:text-base">
+              <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
                 Upload a photo or scan of a menu, extract it into categories and items with AI, then
                 review and correct the draft. AI output is never guaranteed — you stay in charge.
               </p>
               {!signedIn && !sessionPending && (
-                <p className="mt-1.5 max-w-xl text-xs leading-5 text-stone-500">
+                <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
                   You can upload and review first. Publishing needs an account — we’ll email you a
                   sign-in link, and your draft stays in this browser.
                 </p>
@@ -3151,17 +3156,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 {fileError && (
                   <p
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
                   >
                     {fileError}
                   </p>
                 )}
-                <p className="text-center text-sm text-stone-500">
+                <p className="text-center text-sm text-ink-500">
                   No menu handy?{" "}
                   <button
                     type="button"
                     onClick={handleDemo}
-                    className="font-medium text-amber-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     Preview with demo data
                   </button>
@@ -3210,7 +3215,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 {fileError && (
                   <p
                     role="alert"
-                    className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
                   >
                     {fileError}
                   </p>
@@ -3220,13 +3225,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                     type="button"
                     onClick={handleExtract}
                     disabled={phase === "extracting"}
-                    className="w-full rounded-full bg-amber-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 sm:w-auto"
+                    className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
                   >
                     {phase === "extracting"
                       ? "Extracting… this can take up to a minute"
                       : "Extract menu"}
                   </button>
-                  <p className="mt-2 text-xs text-stone-500">
+                  <p className="mt-2 text-xs text-ink-500">
                     Calls the AI once, only when you press this. Accuracy depends on image quality.
                   </p>
                 </div>
@@ -3249,14 +3254,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             </Attention>
 
             {extractError && phase !== "extracting" && (
-              <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
-                <p className="font-medium text-red-900">Extraction failed</p>
-                <p className="mt-1 text-sm text-red-800">{extractError.message}</p>
+              <div role="alert" className="rounded-2xl border border-danger-200 bg-danger-50 px-5 py-4">
+                <p className="font-medium text-danger-900">Extraction failed</p>
+                <p className="mt-1 text-sm text-danger-800">{extractError.message}</p>
                 {extractError.code === "missing_api_key" && (
                   <button
                     type="button"
                     onClick={handleDemo}
-                    className="mt-3 rounded-full bg-red-800 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Preview with demo data instead
                   </button>
@@ -3301,16 +3306,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             )}
           </>
         )}
-        {screen === "editor" && !activeDoc && missingPublishMenuId && (
+        {screen === "editor" && !routedDoc && missingPublishMenuId && (
           <MissingDraftCard
             onOpenLibrary={() => navigateTo({ screen: "library" })}
             onStartFresh={() => navigateTo({ screen: "capture" })}
           />
         )}
-        {screen === "editor" && !activeDoc && !missingPublishMenuId && sessionCheckGaveUp && (
-          <section className="rounded-2xl border border-stone-200 bg-white p-6 text-center">
-            <h1 className="font-medium text-stone-900">Checking your session…</h1>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+        {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
+          <section className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
+            <h1 className="font-medium text-ink-900">Checking your session…</h1>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
               We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft
               is still saved in this browser — nothing is lost.
             </p>
@@ -3321,14 +3326,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   setSessionRetries(0);
                   void refetchSession?.();
                 }}
-                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>
               <button
                 type="button"
                 onClick={() => navigateTo({ screen: "library" })}
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Back to My menus
               </button>
@@ -3336,7 +3341,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           </section>
         )}
         {screen === "editor" &&
-          !activeDoc &&
+          !routedDoc &&
           !missingPublishMenuId &&
           !sessionCheckGaveUp && (
           <div role="status" aria-busy="true" className="flex flex-col gap-4">
@@ -3346,14 +3351,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <Skeleton className="h-4 w-40" />
             </div>
             <div className="grid items-start gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-stone-200 bg-white p-5">
+              <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
                 <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
                   <Skeleton className="h-9" />
                   <Skeleton className="h-9" />
                 </div>
                 <Skeleton className="mt-3 h-28" />
               </div>
-              <div className="rounded-2xl border border-stone-200 bg-white p-4">
+              <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
                 <Skeleton className="h-4 w-28" />
                 <Skeleton className="mt-2 h-3 w-3/5" />
                 <Skeleton className="mt-4 h-9" />
@@ -3376,7 +3381,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       <nav
         data-print-hide
         aria-label="Sections"
-        className="sticky bottom-0 z-30 border-t border-stone-200 bg-white/95 backdrop-blur-sm sm:hidden"
+        className="sticky bottom-0 z-30 border-t border-line-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex px-2 pt-1">
@@ -3389,8 +3394,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 navigateTo({ screen: tab.id });
               }}
               aria-current={screen === tab.id ? "page" : undefined}
-              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
-                screen === tab.id ? "text-amber-800" : "text-stone-500"
+              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                screen === tab.id ? "text-warning-800" : "text-ink-500"
               }`}
             >
               {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
@@ -3410,13 +3415,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 ? "page"
                 : undefined
             }
-            className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
+            className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
               moreOpen ||
               screen === "tables" ||
               screen === "assistant" ||
               screen === "settings"
-                ? "text-amber-800"
-                : "text-stone-500"
+                ? "text-warning-800"
+                : "text-ink-500"
             }`}
           >
             <span aria-hidden="true" className="text-lg leading-none">
@@ -3433,14 +3438,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           <div
             aria-hidden="true"
             onClick={() => setMoreOpen(false)}
-            className="fixed inset-0 z-40 bg-black/35"
+            className="fixed inset-0 z-40 bg-scrim"
           />
           <div
             role="dialog"
             aria-label="More"
-            className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-stone-200 bg-white px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+            className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-line-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
           >
-            <div aria-hidden="true" className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-stone-200" />
+            <div aria-hidden="true" className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-surface-200" />
             {moreRows.map((row) => (
               <button
                 key={row.id}
@@ -3449,19 +3454,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   setMoreOpen(false);
                   navigateTo({ screen: row.id });
                 }}
-                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
-                <span className="text-sm font-semibold text-stone-900">{row.label}</span>
-                <span className="text-xs font-normal text-stone-500">{row.why}</span>
+                <span className="text-sm font-semibold text-ink-900">{row.label}</span>
+                <span className="text-xs font-normal text-ink-500">{row.why}</span>
               </button>
             ))}
             {canGetStarted && (
               <a
                 href="/launch"
-                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
-                <span className="text-sm font-semibold text-stone-900">Get started</span>
-                <span className="text-xs font-normal text-stone-500">
+                <span className="text-sm font-semibold text-ink-900">Get started</span>
+                <span className="text-xs font-normal text-ink-500">
                   The launch checklist and offer
                 </span>
               </a>

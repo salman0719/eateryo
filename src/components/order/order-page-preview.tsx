@@ -67,7 +67,7 @@ export function OrderPagePreview({
     []
   );
 
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
   const search = searchMenu(doc, query);
   const searching = query.trim().length > 0;
   const tableName = `${restaurantName?.trim() || "Your café"} · ${formatTableLabel(
@@ -114,15 +114,15 @@ export function OrderPagePreview({
 
   return (
     <OrderShell tableLabel={PREVIEW_TABLE_LABEL}>
-      <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
-        <p className="text-[11px] font-semibold tracking-wide text-amber-900 uppercase">
+      <div className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3">
+        <p className="text-[11px] font-semibold tracking-wide text-warning-900 uppercase">
           Preview · nothing is sent
         </p>
-        <p className="mt-1 text-sm leading-6 text-amber-900">
+        <p className="mt-1 text-sm leading-6 text-warning-900">
           This is the page a table card opens. Try it — nothing reaches the kitchen.
         </p>
         {draftAheadOfLive && (
-          <p className="mt-1 text-xs leading-5 font-semibold text-amber-900">
+          <p className="mt-1 text-xs leading-5 font-semibold text-warning-900">
             You are previewing your draft — diners still see the last published version until you
             press “Publish changes”.
           </p>
@@ -131,13 +131,13 @@ export function OrderPagePreview({
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className={`${frame} p-5`}>
-          <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
             {tableName}
           </p>
-          <h2 className="mt-1 text-2xl font-bold text-stone-900">
+          <h2 className="mt-1 text-2xl font-bold text-ink-900">
             {doc.title.trim() || "Untitled menu"}
           </h2>
-          <p className="mt-1 text-sm text-stone-600">
+          <p className="mt-1 text-sm text-ink-600">
             Here&apos;s what&apos;s on — tap a dish to add it.
           </p>
         </div>
@@ -150,11 +150,11 @@ export function OrderPagePreview({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search dishes…"
-              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
             />
           </label>
           {searching && (
-            <p className="mt-2 text-xs text-stone-500" role="status">
+            <p className="mt-2 text-xs text-ink-500" role="status">
               {search.matchCount === 0
                 ? `No dishes match “${query.trim()}”.`
                 : `${search.matchCount} ${search.matchCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
@@ -164,15 +164,15 @@ export function OrderPagePreview({
 
         {doc.categories.length === 0 ? (
           <div className={`${frame} p-8 text-center`}>
-            <p className="text-lg font-semibold text-stone-900">Nothing on the menu yet</p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+            <p className="text-lg font-semibold text-ink-900">Nothing on the menu yet</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
               Add a category and items in the editor and they appear here.
             </p>
           </div>
         ) : searching && search.matchCount === 0 ? (
           <div className={`${frame} p-8 text-center`}>
-            <p className="text-lg font-semibold text-stone-900">No dishes match</p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+            <p className="text-lg font-semibold text-ink-900">No dishes match</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
               Nothing on this menu matches “{query.trim()}”. Try a shorter search, or clear it to
               browse the whole menu.
             </p>
@@ -200,7 +200,7 @@ export function OrderPagePreview({
         )}
       </div>
 
-      <p className="text-center text-xs leading-5 text-stone-500">
+      <p className="text-center text-xs leading-5 text-ink-500">
         A scanned table card fills in the real table number, and those diners can order. Missing
         prices show as an em dash — we never invent one.
       </p>
@@ -228,13 +228,13 @@ export function OrderPagePreview({
           footer={
             <>
               <div className="flex items-baseline justify-between">
-                <p className="text-sm font-medium text-stone-600">Total</p>
-                <p className="text-lg font-bold tabular-nums text-stone-900">
+                <p className="text-sm font-medium text-ink-600">Total</p>
+                <p className="text-lg font-bold tabular-nums text-ink-900">
                   {formatOrderTotal(doc.currency, total)}
                 </p>
               </div>
               {total === null && (
-                <p className="mt-1 text-xs text-amber-800">
+                <p className="mt-1 text-xs text-warning-800">
                   Some items have no price on the menu, so no total is shown. Staff confirm the
                   price.
                 </p>
@@ -243,14 +243,14 @@ export function OrderPagePreview({
               {notice && (
                 <div
                   role="status"
-                  className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900"
+                  className="mt-3 flex items-start gap-2 rounded-xl border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900"
                 >
                   <span className="min-w-0 flex-1">{notice}</span>
                   <button
                     type="button"
                     onClick={() => setNotice(null)}
                     aria-label="Dismiss preview notice"
-                    className="shrink-0 font-semibold text-amber-900 hover:text-amber-800"
+                    className="shrink-0 font-semibold text-warning-900 hover:text-accent-800"
                   >
                     ×
                   </button>
@@ -260,7 +260,7 @@ export function OrderPagePreview({
               <button
                 type="button"
                 onClick={sendToKitchen}
-                className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+                className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
               >
                 Send order to the kitchen
               </button>

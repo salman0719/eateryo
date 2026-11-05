@@ -121,7 +121,7 @@ export function LaunchChecklist() {
 
   if (state.kind === "loading") {
     return (
-      <div role="status" aria-busy="true" className="rounded-2xl border border-stone-200 bg-white p-5">
+      <div role="status" aria-busy="true" className="rounded-2xl border border-line-200 bg-surface-base p-5">
         <span className="sr-only">Checking your account…</span>
         <Skeleton className="h-5 w-48" />
         <div className="mt-4 flex flex-col gap-3">
@@ -138,19 +138,19 @@ export function LaunchChecklist() {
 
   if (state.kind === "signed_out") {
     return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
-        <h2 className="text-base font-semibold text-amber-950">Sign in to start the checklist</h2>
-        <p className="mt-1 text-sm text-amber-900">
+      <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5">
+        <h2 className="text-base font-semibold text-warning-950">Sign in to start the checklist</h2>
+        <p className="mt-1 text-sm text-warning-900">
           Your menus, publishing, and table orders need an account so a phone at the table can
           reach the same menu your laptop published. It is still free, and there is no card step.
         </p>
         <Link
           href="/sign-in"
-          className="mt-4 inline-flex rounded-lg bg-amber-800 px-3.5 py-2 text-sm font-semibold text-white hover:bg-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="mt-4 inline-flex rounded-lg bg-accent-800 px-3.5 py-2 text-sm font-semibold text-on-accent hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Sign in with an email link
         </Link>
-        <p className="mt-3 text-xs text-amber-900/80">
+        <p className="mt-3 text-xs text-warning-900/80">
           Working offline first?{" "}
           <Link href="/" className="underline underline-offset-2">
             Try the local editor
@@ -163,15 +163,15 @@ export function LaunchChecklist() {
 
   if (state.kind === "owner_only") {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-5">
-        <h2 className="text-base font-semibold text-stone-900">This checklist is the owner’s</h2>
-        <p className="mt-1 text-sm leading-6 text-stone-600">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+        <h2 className="text-base font-semibold text-ink-900">This checklist is the owner’s</h2>
+        <p className="mt-1 text-sm leading-6 text-ink-600">
           Signing in to help at a café gives you its menus, tables and orders — not its launch
           steps. The café owner sees this checklist on their own sign-in.
         </p>
         <Link
           href="/"
-          className="mt-3 inline-flex text-sm font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+          className="mt-3 inline-flex text-sm font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
         >
           Go to your workspace
         </Link>
@@ -181,13 +181,13 @@ export function LaunchChecklist() {
 
   if (state.kind === "error") {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-        <h2 className="text-base font-semibold text-red-900">The checklist could not load</h2>
-        <p className="mt-1 text-sm text-red-800">{state.message}</p>
+      <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
+        <h2 className="text-base font-semibold text-danger-900">The checklist could not load</h2>
+        <p className="mt-1 text-sm text-danger-800">{state.message}</p>
         <button
           type="button"
           onClick={() => void retry()}
-          className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+          className="mt-3 rounded-lg border border-danger-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-danger-800 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
         >
           Try again
         </button>
@@ -204,21 +204,21 @@ export function LaunchChecklist() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-stone-200 bg-white p-5">
+      <section className="rounded-2xl border border-line-200 bg-surface-base p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-stone-900">Your launch checklist</h2>
-          <p className="text-xs text-stone-500">
+          <h2 className="text-base font-semibold text-ink-900">Your launch checklist</h2>
+          <p className="text-xs text-ink-500">
             {progress.done} of {progress.total} steps we can verify
             {cardsPrinted ? " · table cards ticked" : ""}
           </p>
         </div>
         <div
-          className="mt-3 h-1.5 overflow-hidden rounded-full bg-stone-100"
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-100"
           role="img"
           aria-label={`${progress.done} of ${progress.total} verifiable steps complete`}
         >
           <div
-            className="h-full rounded-full bg-amber-700 transition-all"
+            className="h-full rounded-full bg-accent-700 transition-all"
             style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
           />
         </div>
@@ -231,8 +231,8 @@ export function LaunchChecklist() {
                 className={
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                   (step.done
-                    ? "border-amber-700 bg-amber-700 text-white"
-                    : "border-stone-300 bg-white text-stone-400")
+                    ? "border-accent-700 bg-accent-700 text-on-accent"
+                    : "border-line-300 bg-surface-base text-ink-400")
                 }
               >
                 {step.done ? "✓" : index + 1}
@@ -240,30 +240,30 @@ export function LaunchChecklist() {
               <div className="min-w-0">
                 <p
                   className={
-                    "text-sm font-medium " + (step.done ? "text-stone-500 line-through" : "text-stone-900")
+                    "text-sm font-medium " + (step.done ? "text-ink-500 line-through" : "text-ink-900")
                   }
                 >
                   {step.title}
                 </p>
-                <p className="mt-0.5 text-xs text-stone-600">{step.guidance}</p>
-                <p className="mt-1 text-xs text-stone-500">{step.detail}</p>
+                <p className="mt-0.5 text-xs text-ink-600">{step.guidance}</p>
+                <p className="mt-1 text-xs text-ink-500">{step.detail}</p>
                 {/* Manual steps keep their control after being ticked,
                     otherwise a mis-click could never be undone. */}
                 {!step.done || step.manual ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-3">
                     <Link
                       href={stepHref(step)}
-                      className="text-xs font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+                      className="text-xs font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
                     >
                       {stepActionLabel(step)}
                     </Link>
                     {step.manual ? (
-                      <label className="flex items-center gap-1.5 text-xs text-stone-600">
+                      <label className="flex items-center gap-1.5 text-xs text-ink-600">
                         <input
                           type="checkbox"
                           checked={cardsPrinted}
                           onChange={(event) => toggleCardsPrinted(event.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-stone-300 accent-amber-700"
+                          className="h-3.5 w-3.5 rounded border-line-300 accent-accent-700"
                         />
                         {cardsPrinted ? "I printed them (untick to undo)" : "I printed them"}
                       </label>
@@ -276,7 +276,7 @@ export function LaunchChecklist() {
         </ol>
 
         {allDone ? (
-          <p className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          <p className="mt-4 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-900">
             That is the whole launch. New orders appear on the Orders tab, and the public page keeps
             showing your latest published menu.
           </p>

@@ -59,7 +59,7 @@ describe("CommitTags", () => {
   it("separates the field name from the key hint with a divider", () => {
     const markup = render([], []);
     expect(markup).toContain(">Dietary labels</span>");
-    expect(markup).toContain("w-px self-center bg-stone-300");
+    expect(markup).toContain("w-px self-center bg-surface-300");
     expect(markup).toContain("Press");
     expect(markup).toContain("Enter");
     expect(markup).toContain("Tab");

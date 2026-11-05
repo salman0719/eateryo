@@ -157,29 +157,29 @@ export function RestaurantSettings({
 
   return (
     <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-bold text-stone-900">Restaurant settings</h2>
+      <h2 className="text-xl font-bold text-ink-900">Restaurant settings</h2>
 
       {!signedIn && !sessionPending && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <p className="text-sm font-medium text-stone-900">Sign in to manage your restaurants</p>
-          <p className="mt-1 text-xs leading-5 text-stone-500">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+          <p className="text-sm font-medium text-ink-900">Sign in to manage your restaurants</p>
+          <p className="mt-1 text-xs leading-5 text-ink-500">
             Restaurant names, team members and deletion live in your account.
           </p>
           <a
             href="/sign-in"
-            className="mt-3 inline-block rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in
           </a>
         </div>
       )}
 
-      {signedIn && loadError && <p className="text-xs text-red-700">{loadError}</p>}
+      {signedIn && loadError && <p className="text-xs text-danger-700">{loadError}</p>}
 
       {(sessionPending || signedIn) && restaurants === null && !loadError && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">
           <span className="sr-only">Loading your restaurants…</span>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
             <Skeleton className="h-4 w-40" />
             <Skeleton className="mt-3 h-9 w-full max-w-sm" />
             <Skeleton className="mt-3 h-3 w-2/5" />
@@ -192,7 +192,7 @@ export function RestaurantSettings({
       )}
 
       {selected && !canManageSettings && (
-        <p className="rounded-2xl border border-stone-200 bg-white p-5 text-xs leading-5 text-stone-600">
+        <p className="rounded-2xl border border-line-200 bg-surface-base p-5 text-xs leading-5 text-warning-800">
           You can see this café’s team and activity. Changing its name, alerts or team needs the
           owner — ask them to do it from their sign-in.
         </p>
@@ -211,13 +211,13 @@ export function RestaurantSettings({
       )}
 
       {!followsActiveWorkspace && showRestaurantPicker(allRestaurants) && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
-          <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+          <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
             Restaurant
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -233,16 +233,16 @@ export function RestaurantSettings({
       )}
 
       {error && (
-        <p role="alert" className="text-xs text-red-700">
+        <p role="alert" className="text-xs text-danger-700">
           {error}
         </p>
       )}
 
       {selected && (
         <>
-          <div className="rounded-2xl border border-stone-200 bg-white p-5">
-            <h3 className="text-sm font-bold tracking-tight text-stone-900">Name</h3>
-            <p className="mt-1 text-xs leading-5 text-stone-500">
+          <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+            <h3 className="text-sm font-bold tracking-tight text-ink-900">Name</h3>
+            <p className="mt-1 text-xs leading-5 text-ink-500">
               Shown to your team and on your published menu pages.
             </p>
             <div className="mt-2 max-w-sm">
@@ -253,7 +253,7 @@ export function RestaurantSettings({
                   onCommit={(name) => void handleRename(name)}
                 />
               ) : (
-                <p className="text-sm font-semibold text-stone-900">{selected.name}</p>
+                <p className="text-sm font-semibold text-ink-900">{selected.name}</p>
               )}
             </div>
           </div>
@@ -285,9 +285,9 @@ export function RestaurantSettings({
           />
 
           {canManageSettings && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-              <h3 className="text-sm font-bold tracking-tight text-red-900">Danger zone</h3>
-              <p className="mt-1 text-xs leading-5 text-red-800">
+            <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
+              <h3 className="text-sm font-bold tracking-tight text-danger-900">Danger zone</h3>
+              <p className="mt-1 text-xs leading-5 text-danger-800">
                 Deleting “{selected.name}” removes its menus, published pages and orders from your
                 account. This cannot be undone.
               </p>
@@ -295,7 +295,7 @@ export function RestaurantSettings({
                 type="button"
                 onClick={() => void handleDeleteRestaurant()}
                 disabled={deleting}
-                className="mt-3 rounded-full border border-red-700 px-4 py-1.5 text-sm font-semibold text-red-800 transition-colors hover:bg-red-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                className="mt-3 rounded-full border border-danger-700 px-4 py-1.5 text-sm font-semibold text-danger-800 transition-colors hover:bg-danger-700 hover:text-on-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
               >
                 {deleting ? "Deleting…" : `Delete ${selected.name}`}
               </button>
@@ -499,9 +499,9 @@ function TeamCard({
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h3 className="text-sm font-bold tracking-tight text-stone-900">Team</h3>
-      <p className="mt-1 text-xs leading-5 text-stone-500">
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">Team</h3>
+      <p className="mt-1 text-xs leading-5 text-ink-500">
         {canManage
           ? "Owners can change menus, publish and manage the team. Staff see the order board and the menus."
           : "Everyone at this café can see who works here. An owner can change roles or invite someone new."}
@@ -510,7 +510,7 @@ function TeamCard({
       {canManage && (
       <>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
           Add by email
           <input
             type="email"
@@ -520,15 +520,15 @@ function TeamCard({
               if (event.key === "Enter") void handleAddMember();
             }}
             placeholder="teammate@cafe.com"
-            className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
+        <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
           Role
           <select
             value={addRole}
             onChange={(event) => setAddRole(event.target.value as "owner" | "staff")}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             <option value="staff">Staff</option>
             <option value="owner">Owner</option>
@@ -538,20 +538,20 @@ function TeamCard({
           type="button"
           onClick={() => void handleAddMember()}
           disabled={adding || addEmail.trim().length === 0}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {adding ? "Adding…" : "Add member"}
         </button>
       </div>
-      <p className="mt-1 text-[11px] leading-4 text-stone-400">
+      <p className="mt-1 text-[11px] leading-4 text-ink-400">
         If they already have an account they join immediately; otherwise we email them a one-time
         invitation link that accepts on sign-in (expires in 7 days).
       </p>
       </>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
-      {notice && !error && <p className="mt-2 text-xs text-emerald-800">{notice}</p>}
+      {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
+      {notice && !error && <p className="mt-2 text-xs text-success-800">{notice}</p>}
 
       {members === null && !error && (
         <div role="status" aria-busy="true" className="mt-3 flex flex-col gap-2">
@@ -559,7 +559,7 @@ function TeamCard({
           {[0, 1, 2].map((row) => (
             <div
               key={row}
-              className="flex items-center gap-3 rounded-xl border border-stone-200 px-3 py-2"
+              className="flex items-center gap-3 rounded-xl border border-line-200 px-3 py-2"
             >
               <div className="min-w-0 flex-1">
                 <Skeleton className="h-4 w-1/3" />
@@ -576,16 +576,16 @@ function TeamCard({
           {members.map((member) => (
             <li
               key={member.userId}
-              className="flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 px-3 py-2"
+              className="flex flex-wrap items-center gap-3 rounded-xl border border-line-200 px-3 py-2"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-stone-900">
+                <p className="text-sm font-medium text-ink-900">
                   {member.name.trim() ? member.name : member.email}
                   {member.userId === currentUserId && (
-                    <span className="ml-1 text-xs font-normal text-stone-400">(you)</span>
+                    <span className="ml-1 text-xs font-normal text-ink-400">(you)</span>
                   )}
                 </p>
-                <p className="truncate text-xs text-stone-500">{member.email}</p>
+                <p className="truncate text-xs text-ink-500">{member.email}</p>
               </div>
               {canManage ? (
                 <>
@@ -596,7 +596,7 @@ function TeamCard({
                     }
                     disabled={memberBusy === member.userId}
                     aria-label={`Role for ${member.name}`}
-                    className="rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <option value="owner">Owner</option>
                     <option value="staff">Staff</option>
@@ -605,13 +605,13 @@ function TeamCard({
                     type="button"
                     onClick={() => void handleRemoveMember(member)}
                     disabled={memberBusy === member.userId}
-                    className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Remove
                   </button>
                 </>
               ) : (
-                <span className="rounded-full bg-stone-100 px-2 py-1 text-xs font-medium text-stone-600">
+                <span className="rounded-full bg-surface-100 px-2 py-1 text-xs font-medium text-ink-600">
                   {member.role === "owner" ? "Owner" : "Staff"}
                 </span>
               )}
@@ -621,18 +621,18 @@ function TeamCard({
       )}
 
       {pending !== null && pending.length > 0 && (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs font-semibold tracking-wide text-amber-900 uppercase">
+        <div className="mt-4 rounded-xl border border-warning-200 bg-warning-50 p-3">
+          <p className="text-xs font-semibold tracking-wide text-warning-900 uppercase">
             Pending invitations
           </p>
           <ul className="mt-2 space-y-2">
             {pending.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-stone-900">
+                  <p className="truncate text-sm font-medium text-ink-900">
                     {invitation.email}
                   </p>
-                  <p className="text-[11px] leading-4 text-stone-500">
+                  <p className="text-[11px] leading-4 text-ink-500">
                     {invitation.role === "owner" ? "Owner" : "Staff"} · invited by{" "}
                     {invitation.invitedByName.trim() || "a teammate"} · expires{" "}
                     {new Date(invitation.expiresAt).toLocaleDateString()}
@@ -644,7 +644,7 @@ function TeamCard({
                       type="button"
                       onClick={() => void handleResend(invitation)}
                       disabled={pendingBusy === invitation.id}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Resend
                     </button>
@@ -652,7 +652,7 @@ function TeamCard({
                       type="button"
                       onClick={() => void handleRevoke(invitation)}
                       disabled={pendingBusy === invitation.id}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                     >
                       Revoke
                     </button>

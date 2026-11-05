@@ -278,6 +278,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
           width: 320,
           margin: 1,
           errorCorrectionLevel: "M",
+          // The encoder takes literal colours, not CSS variables, so the QR
+          // cannot read a role token: ink and the card base are repeated here.
           color: { dark: "#1c1917", light: "#ffffff" },
         });
         return { label, url, dataUrl };
@@ -384,13 +386,13 @@ export function TableQrPanel(props: TableQrPanelProps) {
   return (
     <div className="flex flex-col gap-4">
       {linkState.status === "unclaimed" ? (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-5 text-center">
-          <p className="text-base font-bold text-stone-900">
+        <div className="rounded-2xl border border-warning-300 bg-warning-50/70 p-5 text-center">
+          <p className="text-base font-bold text-ink-900">
             One link for every table at {linkState.restaurantName}
           </p>
-          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-stone-600">
+          <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-ink-600">
             Table cards point at your restaurant link —{" "}
-            <code className="rounded bg-white px-1.5 py-0.5">/r/…/t/3</code> — where diners see
+            <code className="rounded bg-surface-base px-1.5 py-0.5">/r/…/t/3</code> — where diners see
             every menu that is open right now. Claim it once, then print the cards below.
           </p>
           {linkState.isOwner && canManage ? (
@@ -399,21 +401,21 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 type="button"
                 onClick={() => void handleClaim(linkState.restaurantId, linkState.restaurantName)}
                 disabled={claiming}
-                className="mt-3 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {claiming ? "Claiming…" : "Claim your restaurant link"}
               </button>
               {claimError && (
                 <p
                   role="alert"
-                  className="mx-auto mt-2 max-w-md rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800"
+                  className="mx-auto mt-2 max-w-md rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800"
                 >
                   {claimError}
                 </p>
               )}
             </>
           ) : (
-            <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-stone-600">
+            <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-ink-600">
               The link isn&apos;t claimed yet — ask the restaurant owner to claim it from their
               sign-in, then the cards can be printed.
             </p>
@@ -425,8 +427,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
           role={linkState.status === "unavailable" ? "alert" : "status"}
           className={
             linkState.status === "unavailable"
-              ? "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
-              : "text-xs text-stone-500"
+              ? "rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs leading-5 text-warning-900"
+              : "text-xs text-ink-500"
           }
         >
           {linkState.status === "loading"
@@ -438,7 +440,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
       ) : menuLinksDisabled ? (
         <p
           data-print-hide
-          className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+          className="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs leading-5 text-warning-900"
         >
           <span className="font-bold">Table codes moved.</span> This menu no longer prints
           its own table cards — print them from the Tables tab instead, where one code per
@@ -448,9 +450,9 @@ export function TableQrPanel(props: TableQrPanelProps) {
         <>
           <div
             data-print-hide
-            className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-white p-4"
+            className="flex flex-wrap items-end gap-3 rounded-2xl border border-line-200 bg-surface-base p-4"
           >
-            <label className="text-xs font-semibold text-stone-600">
+            <label className="text-xs font-semibold text-ink-600">
               Tables
               <input
                 type="number"
@@ -465,10 +467,10 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     : undefined
                 }
                 onChange={(event) => changeCount(Number(event.target.value))}
-                className="mt-1 block w-24 rounded-xl border border-stone-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
+                className="mt-1 block w-24 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal focus:border-accent-700 focus:outline-none disabled:opacity-50"
               />
             </label>
-            <label className="text-xs font-semibold text-stone-600">
+            <label className="text-xs font-semibold text-ink-600">
               Label prefix
               <input
                 type="text"
@@ -481,24 +483,24 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 }
                 onChange={(event) => changePrefix(event.target.value)}
                 placeholder="Table"
-                className="mt-1 block w-40 rounded-xl border border-stone-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
+                className="mt-1 block w-40 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal focus:border-accent-700 focus:outline-none disabled:opacity-50"
               />
             </label>
             {custom && (
               <button
                 type="button"
                 onClick={resetNames}
-                className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-800"
+                className="rounded-full border border-line-300 px-4 py-1.5 text-xs font-semibold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-800"
               >
                 Reset names
               </button>
             )}
-            <label className="text-xs font-semibold text-stone-600">
+            <label className="text-xs font-semibold text-ink-600">
               Show
               <select
                 value={focusedLabel ?? ""}
                 onChange={(event) => setFocusLabel(event.target.value)}
-                className="mt-1 block w-40 rounded-xl border border-stone-300 bg-white px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none"
+                className="mt-1 block w-40 rounded-xl border border-line-300 bg-surface-base px-3 py-1.5 text-sm font-normal focus:border-accent-700 focus:outline-none"
               >
                 <option value="">All tables</option>
                 {labels.map((label) => (
@@ -518,13 +520,13 @@ export function TableQrPanel(props: TableQrPanelProps) {
                   ? "Finish typing the table name first — click anywhere else, then print."
                   : undefined
               }
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {focusedLabel ? "Print this card" : "Print cards"}
             </button>
           </div>
 
-          <p data-print-hide className="text-xs leading-5 text-stone-500">
+          <p data-print-hide className="text-xs leading-5 text-ink-500">
             Showing one table makes a single large card for demos — only that card prints.{" "}
             {resolvingLink ? (
               <>Finding your restaurant link…</>
@@ -553,7 +555,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           {linkState.status === "unavailable" && (
             <p
               data-print-hide
-              className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+              className="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs leading-5 text-warning-900"
             >
               {linkState.message} Showing this menu&apos;s own codes below — claim the restaurant
               link when you&apos;re back online for one code per table.
@@ -562,7 +564,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
 
           <p
             data-print-hide
-            className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-900"
+            className="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs leading-5 text-warning-900"
           >
             <span className="font-bold">Name your tables:</span> click any table&apos;s name right
             on its card and type — for example, change “Table 3” to “Patio 2” or “Bar”, then press
@@ -571,7 +573,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           </p>
 
           {error && (
-            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-800">
+            <p role="alert" className="rounded-xl bg-danger-50 px-3 py-2 text-sm text-danger-800">
               {error}
             </p>
           )}
@@ -579,7 +581,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           <div
             data-qr-sheet
             data-qr-single={focusedLabel ? "" : undefined}
-            className={`grid gap-3 rounded-2xl border border-stone-200 bg-white p-4 ${
+            className={`grid gap-3 rounded-2xl border border-line-200 bg-surface-base p-4 ${
               focusedLabel ? "mx-auto w-full max-w-sm grid-cols-1" : "sm:grid-cols-2"
             }`}
           >
@@ -587,9 +589,9 @@ export function TableQrPanel(props: TableQrPanelProps) {
               <article
                 key={code.label}
                 data-qr-card
-                className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 p-4 text-center"
+                className="flex flex-col items-center gap-2 rounded-xl border border-line-200 p-4 text-center"
               >
-                <p className="text-xs font-semibold tracking-widest text-stone-500 uppercase">
+                <p className="text-xs font-semibold tracking-widest text-ink-500 uppercase">
                   {cardEyebrow.trim() || "Untitled menu"}
                 </p>
                 {editingLabel === code.label ? (
@@ -612,8 +614,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     // (not a border) so the swap never moves the card layout.
                     className={
                       focusedLabel
-                        ? "rounded-sm bg-white p-0 text-center text-3xl font-bold text-stone-900 outline-2 outline-amber-700 outline-offset-2"
-                        : "rounded-sm bg-white p-0 text-center text-xl font-bold text-stone-900 outline-2 outline-amber-700 outline-offset-2"
+                        ? "rounded-sm bg-surface-base p-0 text-center text-3xl font-bold text-ink-900 outline-2 outline-accent-700 outline-offset-2"
+                        : "rounded-sm bg-surface-base p-0 text-center text-xl font-bold text-ink-900 outline-2 outline-accent-700 outline-offset-2"
                     }
                   />
                 ) : (
@@ -626,8 +628,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     // since printed pages never match :hover.
                     className={
                       focusedLabel
-                        ? "cursor-text text-3xl font-bold text-stone-900 hover:underline hover:decoration-dotted hover:decoration-amber-600 hover:underline-offset-8"
-                        : "cursor-text text-xl font-bold text-stone-900 hover:underline hover:decoration-dotted hover:decoration-amber-600 hover:underline-offset-4"
+                        ? "cursor-text text-3xl font-bold text-ink-900 hover:underline hover:decoration-dotted hover:decoration-accent-600 hover:underline-offset-8"
+                        : "cursor-text text-xl font-bold text-ink-900 hover:underline hover:decoration-dotted hover:decoration-accent-600 hover:underline-offset-4"
                     }
                   >
                     {formatTableLabel(code.label)}
@@ -641,9 +643,9 @@ export function TableQrPanel(props: TableQrPanelProps) {
                   height={200}
                   className={focusedLabel ? "h-64 w-64" : "h-44 w-44"}
                 />
-                <p className="text-[10px] leading-4 text-stone-400">Scan to order</p>
+                <p className="text-[10px] leading-4 text-ink-400">Scan to order</p>
                 {(tableSlug || publicSlug) && (
-                  <p className="text-[10px] font-medium leading-4 break-all text-stone-600">
+                  <p className="text-[10px] font-medium leading-4 break-all text-ink-600">
                     {displayTableUrl(code.url)}
                   </p>
                 )}
@@ -653,7 +655,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     href={code.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900"
+                    className="text-[11px] font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900"
                   >
                     Open this table&apos;s order page
                   </a>
