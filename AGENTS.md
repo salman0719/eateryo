@@ -3,6 +3,14 @@
 This file is the single source of truth for automated contributors.
 Read it before making any change.
 
+## Local, per-machine notes
+
+If `local/MEMORY.md` exists in this checkout, read it before starting work and
+follow it. It holds per-machine preferences — commit wording, tool habits,
+workflow notes — and lives in the gitignored `local/` sandbox, so **its absence
+is normal, not an error**. It may add personal preference on top of this file;
+it never relaxes the security, scope, or tenancy rules below.
+
 ## Project
 
 Eateryo — see `PLAN.md` for mission, stack, and the Phase 1
@@ -22,9 +30,6 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 
 ## Critical commit rules
 
-- NEVER add "Co-authored-by", "Co-Authored-By", "Generated with", "Generated-by",
-  or any AI attribution trailer or line to any commit message, PR description,
-  or code comment. This is a hard rule with no exceptions.
 - Keep commits small, focused, and easy to review.
 - Do not commit secrets. Never commit `.env.local` or any real API key.
 
