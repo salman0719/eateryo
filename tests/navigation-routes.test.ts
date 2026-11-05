@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   appRouteHref,
+  appSections,
   menuIdFromPathname,
   parseAppRoute,
+  sectionForScreen,
   signOutLandingRoute,
   unresolvableMenuMessage,
 } from "../src/features/navigation/routes";
@@ -80,6 +82,40 @@ describe("application routes", () => {
     expect(signOutLandingRoute({ wasSignedIn: true, signedIn: false })).toEqual({
       screen: "capture",
     });
+  });
+
+  it("gates the app destinations by session and working set", () => {
+    expect(appSections({ signedIn: false, assistantEnabled: false, menuCount: 0 })).toEqual([
+      { id: "capture", label: "Capture" },
+    ]);
+    // Signed out with anonymous drafts: Capture plus the working set, never
+    // Orders/Tables/Settings, and never the assistant whatever the flag says.
+    expect(appSections({ signedIn: false, assistantEnabled: true, menuCount: 2 })).toEqual([
+      { id: "capture", label: "Capture" },
+      { id: "library", label: "My menus", count: 2 },
+    ]);
+    expect(appSections({ signedIn: true, assistantEnabled: false, menuCount: 0 })).toEqual([
+      { id: "capture", label: "Capture" },
+      { id: "library", label: "My menus" },
+      { id: "orders", label: "Orders" },
+      { id: "tables", label: "Tables" },
+      { id: "settings", label: "Settings" },
+    ]);
+    expect(appSections({ signedIn: true, assistantEnabled: true, menuCount: 3 })).toEqual([
+      { id: "capture", label: "Capture" },
+      { id: "library", label: "My menus", count: 3 },
+      { id: "orders", label: "Orders" },
+      { id: "assistant", label: "Assistant" },
+      { id: "tables", label: "Tables" },
+      { id: "settings", label: "Settings" },
+    ]);
+  });
+
+  it("keeps an open menu under My menus in the sidebar", () => {
+    expect(sectionForScreen("capture")).toBe("capture");
+    expect(sectionForScreen("editor")).toBe("library");
+    expect(sectionForScreen("item")).toBe("library");
+    expect(sectionForScreen("settings")).toBe("settings");
   });
 
   it("round-trips every supported route and URL-encodes menu ids", () => {
