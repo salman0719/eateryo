@@ -278,6 +278,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
           width: 320,
           margin: 1,
           errorCorrectionLevel: "M",
+          // The encoder takes literal colours, not CSS variables, so the QR
+          // cannot read a role token: ink and the card base are repeated here.
           color: { dark: "#1c1917", light: "#ffffff" },
         });
         return { label, url, dataUrl };

@@ -29,6 +29,8 @@ export function QrCode({
       width: size * 2,
       margin: 1,
       errorCorrectionLevel: "M",
+      // The encoder takes literal colours, not CSS variables, so the QR cannot
+      // read a role token: ink and the card base are repeated here on purpose.
       color: { dark: "#1c1917", light: "#ffffff" },
     })
       .then((next) => {
