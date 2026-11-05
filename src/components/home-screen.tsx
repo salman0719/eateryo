@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { Attention } from "@/components/ui/attention";
+import { BookIcon, CameraIcon, MoreIcon, ReceiptIcon } from "@/components/ui/icons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { JourneySteps } from "@/components/ui/journey-steps";
@@ -110,6 +111,8 @@ import {
   type EditorMode,
 } from "@/features/navigation/routes";
 import { useFeatureFlags } from "@/features/flags/client";
+import { fetchLaunchStatus } from "@/features/launch/client";
+import { cardsPrintedOnThisDevice, launchProgress } from "@/features/launch/progress";
 import { staffMenuIds } from "@/features/tenancy/access";
 import {
   createRestaurant,
@@ -192,6 +195,18 @@ function MonitorToastStack({ onOpen }: { onOpen: () => void }) {
   return <MonitorToasts toasts={toasts} onOpen={onOpen} onDismiss={dismissToast} />;
 }
 
+/** The phone tab bar's glyphs come from the shared icon set, never emoji. */
+function PhoneTabIcon({ id }: { id: "capture" | "library" | "orders" }) {
+  switch (id) {
+    case "capture":
+      return <CameraIcon size={22} />;
+    case "library":
+      return <BookIcon size={22} />;
+    case "orders":
+      return <ReceiptIcon size={22} />;
+  }
+}
+
 /**
  * The whole signed-in/out app shell (capture → library → editor → …).
  * Every screen URL has its own route file that hands us its parsed route,
@@ -207,6 +222,17 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const selectedItemId = route.screen === "item" ? route.itemId : null;
   /** R0 phone nav: the More sheet (Tables · Assistant · Settings · Get started). */
   const [moreOpen, setMoreOpen] = useState(false);
+  /**
+   * The launch checklist's progress for the sidebar row. `accountKey` travels
+   * with it so a previous account's count can never show for this one before
+   * its own read lands; nothing is shown while the read is pending or failed.
+   */
+  const [launchChecklist, setLaunchChecklist] = useState<{
+    accountKey: string;
+    done: number;
+    total: number;
+    complete: boolean;
+  } | null>(null);
   // Which editor surface the URL asks for (edit, reorder, preview);
   // an item deep link is always the edit workspace.
   const editorMode: EditorMode = route.screen === "editor" ? route.mode : "edit";
@@ -389,6 +415,26 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const { flags: featureFlags, loading: featureFlagsLoading } = useFeatureFlags(
     session?.user?.id ?? null
   );
+
+  // Refresh the sidebar's launch progress when the account or screen changes:
+  // publishing or a first order moves the count, and the next navigation is
+  // when the owner sees it. A failed read hides the row instead of guessing.
+  useEffect(() => {
+    if (!signedIn || !accountKey) return;
+    let cancelled = false;
+    void fetchLaunchStatus()
+      .then((status) => {
+        if (cancelled) return;
+        const progress = launchProgress(status, cardsPrintedOnThisDevice());
+        setLaunchChecklist({ accountKey, ...progress });
+      })
+      .catch(() => {
+        if (!cancelled) setLaunchChecklist(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, accountKey, screen]);
   const signedInRef = useRef(false);
   /** Session state at decision time (a closure may outlive the render). */
   const sessionStateRef = useRef<SessionState>("unknown");
@@ -2417,6 +2463,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }))
       : null;
   const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
+  /** Unfinished checklist for this account only; complete or unknown hides it. */
+  const sidebarLaunch =
+    signedIn && launchChecklist && launchChecklist.accountKey === accountKey && !launchChecklist.complete
+      ? { done: launchChecklist.done, total: launchChecklist.total }
+      : null;
 
   /** Jump the editor list to the section chosen in the sidebar. */
   function scrollToMenuSection(categoryId: string) {
@@ -2451,6 +2502,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           outline={sidebarOutline}
           outlineKey={sidebarOutlineKey}
           onOutlineSelect={scrollToMenuSection}
+          launch={sidebarLaunch}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <main
@@ -3045,8 +3097,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               }`}
             >
               {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
-              <span aria-hidden="true" className="text-lg leading-none">
-                {tab.icon}
+              <span aria-hidden="true" className="flex h-[22px] items-center">
+                <PhoneTabIcon id={tab.id} />
               </span>
               {tab.label}
             </button>
@@ -3070,8 +3122,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 : "text-ink-500"
             }`}
           >
-            <span aria-hidden="true" className="text-lg leading-none">
-              ⋯
+            <span aria-hidden="true" className="flex h-[22px] items-center">
+              <MoreIcon size={22} />
             </span>
             More
           </button>

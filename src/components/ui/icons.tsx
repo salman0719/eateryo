@@ -121,6 +121,28 @@ export function SlidersIcon(props: IconProps) {
   );
 }
 
+/** Launch checklist: a clipboard with one ticked line. */
+export function ChecklistIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="5" y="4.5" width="14" height="15.5" rx="2" />
+      <path d="M9 3.5h6v2.5H9z" />
+      <path d="M8.5 12.2 10.7 14.4 15.5 9.6" />
+    </Glyph>
+  );
+}
+
+/** More: three dots for the phone's overflow sheet. */
+export function MoreIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <circle cx="6" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </Glyph>
+  );
+}
+
 /** Sidebar toggle: a two-pane frame with a pointing chevron. */
 export function PanelLeftIcon(props: IconProps) {
   return (

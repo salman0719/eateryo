@@ -115,22 +115,21 @@ export function parseAppRoute(input: string | URL): AppRoute {
 /**
  * R0 phone nav: the bottom tab bar pins Capture · My menus · Orders, so the
  * R0.3 order monitor keeps a persistent home for its badge. Everything else
- * lives in the More sheet, led by Tables. Desktop keeps pills. Pure data so
- * tests can pin the order without rendering the shell. Signed out the shell
+ * lives in the More sheet, led by Tables. The glyphs come from the shared
+ * icon set in the shell, so this stays pure data tests can pin. Signed out the shell
  * is capture-only (home-screen gates this list: Capture, plus My menus
  * while anonymous drafts exist) — no Orders, no More.
  */
 export interface PhoneTab {
   id: "capture" | "library" | "orders";
   label: string;
-  icon: string;
 }
 
 export function phoneTabs(): PhoneTab[] {
   return [
-    { id: "capture", label: "Capture", icon: "📸" },
-    { id: "library", label: "My menus", icon: "📚" },
-    { id: "orders", label: "Orders", icon: "🧾" },
+    { id: "capture", label: "Capture" },
+    { id: "library", label: "My menus" },
+    { id: "orders", label: "Orders" },
   ];
 }
 

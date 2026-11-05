@@ -6,6 +6,7 @@ import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
 import {
   BookIcon,
   CameraIcon,
+  ChecklistIcon,
   GridIcon,
   PanelLeftIcon,
   ReceiptIcon,
@@ -50,6 +51,12 @@ interface AppSidebarProps {
   /** Stable list identity; the section observer re-attaches only when it changes. */
   outlineKey?: string;
   onOutlineSelect?: (categoryId: string) => void;
+  /**
+   * Launch-checklist progress while it is still unfinished. Null hides the
+   * row: signed out, not read yet, unreadable, or already complete — the
+   * sidebar should not keep advertising a finished checklist.
+   */
+  launch?: { done: number; total: number } | null;
 }
 
 function SectionIcon({ id, size = 18 }: { id: AppSectionId; size?: number }) {
@@ -110,6 +117,7 @@ export function AppSidebar({
   outline,
   outlineKey = "",
   onOutlineSelect,
+  launch,
 }: AppSidebarProps) {
   // The boot script has already applied a saved mode before paint, so the
   // toggle reads the live attribute instead of mirroring it in state. The
@@ -221,6 +229,31 @@ export function AppSidebar({
           );
         })}
 
+        {launch && launch.done < launch.total ? (
+          <a
+            href="/launch"
+            className={`${itemBase} mt-1 min-h-[40px] px-2.5 py-1.5 text-ink-600 hover:bg-surface-50 hover:text-ink-900`}
+          >
+            <span className="flex w-5 shrink-0 items-center justify-center">
+              <ChecklistIcon />
+            </span>
+            <span aria-hidden="true" className="app-sidebar-label min-w-0 flex-1 truncate text-left">
+              Launch checklist
+            </span>
+            <span
+              aria-hidden="true"
+              className="app-sidebar-label rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600"
+            >
+              {launch.done}/{launch.total}
+            </span>
+            {/* The rail hides the visible label; this keeps the progress in
+                the name at every width. */}
+            <span className="sr-only">
+              Launch checklist, {launch.done} of {launch.total} steps done
+            </span>
+          </a>
+        ) : null}
+
         {outline && outline.length > 0 ? (
           <div className="app-sidebar-label mt-3 border-t border-line-200 pt-3">
             <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">
@@ -282,12 +315,17 @@ export function AppSidebar({
             Sign in
           </a>
         )}
-        <a
-          href="/launch"
-          className="mt-2 block rounded-lg px-1 py-1 font-semibold text-warning-800 transition-colors hover:bg-accent-50 hover:text-accent-900"
-        >
-          Get started
-        </a>
+        {/* Signed in, the launch checklist row above replaces this link: a
+            returning owner needs progress, not an invitation. Signed out it
+            stays next to Sign in, where it still is the way in. */}
+        {!signedIn && !sessionPending ? (
+          <a
+            href="/launch"
+            className="mt-2 block rounded-lg px-1 py-1 font-semibold text-warning-800 transition-colors hover:bg-accent-50 hover:text-accent-900"
+          >
+            Get started
+          </a>
+        ) : null}
       </div>
 
       <div className="border-t border-line-200 p-2">
