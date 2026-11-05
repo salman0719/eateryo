@@ -3,6 +3,14 @@
 This file is the single source of truth for automated contributors.
 Read it before making any change.
 
+## Local, per-machine notes
+
+If `local/MEMORY.md` exists in this checkout, read it before starting work and
+follow it. It holds per-machine preferences — commit wording, tool habits,
+workflow notes — and lives in the gitignored `local/` sandbox, so **its absence
+is normal, not an error**. It may add personal preference on top of this file;
+it never relaxes the security, scope, or tenancy rules below.
+
 ## Project
 
 Eateryo — see `PLAN.md` for mission, stack, and the Phase 1
@@ -22,9 +30,6 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 
 ## Critical commit rules
 
-- NEVER add "Co-authored-by", "Co-Authored-By", "Generated with", "Generated-by",
-  or any AI attribution trailer or line to any commit message, PR description,
-  or code comment. This is a hard rule with no exceptions.
 - Keep commits small, focused, and easy to review.
 - Do not commit secrets. Never commit `.env.local` or any real API key.
 
@@ -37,6 +42,23 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 - Match existing conventions (App Router, TypeScript strict, Tailwind).
 - Do NOT add shadcn/ui (user decision). Use Tailwind + small local primitives.
 - Do not add dependencies unless they materially reduce effort or improve reliability.
+
+## Local workspace (`local/`)
+
+`local/` is the research and experiment sandbox. `local/README.md` is the only
+tracked file there; read it before starting research, a spike, a prototype, or
+a one-off investigation.
+
+- Look for an existing topic folder first and reuse the one whose purpose fits.
+- Create a kebab-case folder only when none fits, and add it to the README's
+  folder index in the same change.
+- Keep the root of `local/` for the README and genuinely cross-topic files;
+  put one-off scripts and outputs in a topic folder.
+- Deliverables are HTML, not Markdown-only. Markdown is for source notes and
+  folder READMEs.
+- A serious finding may live there, but anything that changes a product or
+  roadmap decision must also be promoted into tracked repo docs or the issue
+  log. Nothing under `local/` except its README is committed.
 
 ## Quality gates (run before finishing)
 
