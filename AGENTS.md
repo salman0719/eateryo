@@ -43,6 +43,23 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 - Do NOT add shadcn/ui (user decision). Use Tailwind + small local primitives.
 - Do not add dependencies unless they materially reduce effort or improve reliability.
 
+## Local workspace (`local/`)
+
+`local/` is the research and experiment sandbox. `local/README.md` is the only
+tracked file there; read it before starting research, a spike, a prototype, or
+a one-off investigation.
+
+- Look for an existing topic folder first and reuse the one whose purpose fits.
+- Create a kebab-case folder only when none fits, and add it to the README's
+  folder index in the same change.
+- Keep the root of `local/` for the README and genuinely cross-topic files;
+  put one-off scripts and outputs in a topic folder.
+- Deliverables are HTML, not Markdown-only. Markdown is for source notes and
+  folder READMEs.
+- A serious finding may live there, but anything that changes a product or
+  roadmap decision must also be promoted into tracked repo docs or the issue
+  log. Nothing under `local/` except its README is committed.
+
 ## Quality gates (run before finishing)
 
 - `npm run lint`
