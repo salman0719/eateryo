@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { Attention } from "@/components/ui/attention";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
@@ -111,10 +112,17 @@ import {
   accessIsStaff,
   isPublishedOnlyAccess,
   menuAccessById,
-  restaurantCapabilities,
   type MenuAccess,
 } from "@/features/tenancy/access";
 import type { Capability } from "@/features/tenancy/permissions";
+import {
+  browserStorage,
+  readStoredWorkspaceKey,
+  resolveActiveWorkspace,
+  workspaceCan,
+  workspaceList,
+  writeStoredWorkspaceKey,
+} from "@/features/tenancy/workspace";
 import {
   createRestaurant,
   fetchRestaurants,
@@ -465,6 +473,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * the next successful read.
    */
   const [restaurantReadFailedFor, setRestaurantReadFailedFor] = useState<string | null>(null);
+  /**
+   * Which membership the shell acts in (café + role), remembered per account.
+   * Not a permission: it chooses which server-resolved answer to ask for.
+   */
+  const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string | null>(null);
+  /** Which account the remembered choice was read for; null until it settles. */
+  const [workspaceKeyFor, setWorkspaceKeyFor] = useState<string | null>(null);
   /** Which account the server menu ids belong to; null until a merge settles. */
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
   /** Which account's server menu read failed (same third state, menus). */
@@ -609,6 +624,37 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       cancelled = true;
     };
   }, [accountKey, signedIn]);
+
+  // The acting membership is a device preference, not server state: read it
+  // once per account and never reuse another account's choice. Until the read
+  // settles the context is unknown, and nothing acts as a guessed café.
+  useEffect(() => {
+    if (!signedIn || !accountKey) {
+      // Deferred like the other account reads: the effect must not set state
+      // synchronously while rendering the frame that decided to read.
+      void Promise.resolve().then(() => {
+        setActiveWorkspaceKey(null);
+        setWorkspaceKeyFor(null);
+      });
+      return;
+    }
+    const remembered = readStoredWorkspaceKey(browserStorage(), accountKey);
+    void Promise.resolve().then(() => {
+      setActiveWorkspaceKey(remembered);
+      setWorkspaceKeyFor(accountKey);
+    });
+  }, [accountKey, signedIn]);
+
+  /**
+   * Switch the membership the shell acts in. Stored under the account, so a
+   * staff context chosen on a shared device never greets the next person.
+   */
+  function handleSwitchWorkspace(key: string) {
+    if (!accountKey) return;
+    writeStoredWorkspaceKey(browserStorage(), accountKey, key);
+    setActiveWorkspaceKey(key);
+    setWorkspaceKeyFor(accountKey);
+  }
 
   // Display derives from the canonical docs (which carry confirmations),
   // falling back to the raw extraction only for the empty state.
@@ -2445,24 +2491,31 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       : restaurantReadFailedFor === accountKey
         ? []
         : null;
-  const accountAccessPending = signedIn && restaurantList === null;
-  const accountCapabilities = new Set<string>();
-  for (const restaurant of restaurantList ?? []) {
-    for (const capability of restaurantCapabilities(restaurant)) {
-      accountCapabilities.add(capability);
-    }
-  }
-  // Menus can carry a capability the restaurant list has not been read for
-  // yet (or a filtered list omitted): union them, never replace.
-  for (const access of menuAccess.values()) {
-    if (access === "local" || access === "none") continue;
-    for (const capability of access.capabilities) accountCapabilities.add(capability);
-  }
+  /**
+   * The memberships this account can act in, and the one it is acting in.
+   * Both the restaurant list and the remembered choice must have answered:
+   * an unread context is never treated as the first café's, and no
+   * capability is granted on a guess.
+   *
+   * The shell asks the active membership only, not a union across cafés. An
+   * owner of one café who also works a staff shift at another must not carry
+   * the owner's controls into the staff context — that blend is exactly the
+   * confusion this switch exists to end. Each open menu still carries its
+   * own server-resolved answer, so the editor follows the menu it shows.
+   */
+  const workspaces = workspaceList(restaurantList ?? []);
+  const workspacePending =
+    signedIn && (restaurantList === null || workspaceKeyFor !== accountKey);
+  const activeWorkspace =
+    !signedIn || workspacePending
+      ? null
+      : resolveActiveWorkspace(workspaces, activeWorkspaceKey);
+  const accountAccessPending = signedIn && (restaurantList === null || workspacePending);
   const accountIsNew = restaurantList !== null && restaurantList.length === 0;
   function accountCan(capability: Capability): boolean {
-    if (!signedIn || restaurantList === null) return false;
+    if (!signedIn || workspacePending || restaurantList === null) return false;
     if (accountIsNew) return true;
-    return accountCapabilities.has(capability);
+    return workspaceCan(activeWorkspace, capability);
   }
   // A name for the first-run "Name your restaurant" field, guessed from the
   // titles of the menus the move would copy (null when they say nothing).
@@ -2648,6 +2701,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
       <SiteHeader />
+      <WorkspaceSwitcher
+        workspaces={workspaces}
+        active={activeWorkspace}
+        onSwitch={handleSwitchWorkspace}
+      />
       <main
         className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 ${
           // The editor is a dense working surface: give it a wider canvas on
