@@ -45,12 +45,18 @@ interface RestaurantSettingsProps {
   sessionPending?: boolean;
   /** The signed-in user id, to mark their own row in the team list. */
   currentUserId: string | null;
+  /**
+   * The café the shell is acting in. When set, this page follows it rather
+   * than keeping a second restaurant picker: one switch, one context.
+   */
+  focusRestaurantId?: string | null;
 }
 
 export function RestaurantSettings({
   signedIn,
   sessionPending = false,
   currentUserId,
+  focusRestaurantId = null,
 }: RestaurantSettingsProps) {
   const { confirm, dialog } = useConfirm();
   const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
@@ -69,10 +75,15 @@ export function RestaurantSettings({
         const list = await fetchRestaurants();
         if (cancelled) return;
         setRestaurants(list);
+        // The shell's active membership decides which café this page shows.
+        // Without one (not signed in, or the shell has no context yet) fall
+        // back to the café the account owns, then to a lone staff café.
+        const focus = focusRestaurantId
+          ? list.find((restaurant) => restaurant.id === focusRestaurantId)
+          : undefined;
         const owners = list.filter((r) => r.role === "owner");
-        // One owner café is the natural default; a staff-only account opens
-        // its only café, which is the one whose team it may read.
-        const initial = owners.length === 1 ? owners[0] : list.length === 1 ? list[0] : undefined;
+        const initial =
+          focus ?? (owners.length === 1 ? owners[0] : list.length === 1 ? list[0] : undefined);
         if (initial) setSelectedId(initial.id);
       } catch {
         if (!cancelled) {
@@ -83,10 +94,23 @@ export function RestaurantSettings({
     return () => {
       cancelled = true;
     };
-  }, [signedIn]);
+  }, [signedIn, focusRestaurantId]);
 
   const allRestaurants = restaurants ?? [];
-  const selected = selectedRestaurant(allRestaurants, selectedId);
+  /**
+   * Following the shell: the switcher owns the café choice, so this page must
+   * not offer a second one that could disagree with it.
+   */
+  const followsActiveWorkspace =
+    focusRestaurantId != null &&
+    allRestaurants.some((restaurant) => restaurant.id === focusRestaurantId);
+  // The focused café wins straight away, so a switch never shows the
+  // previous café's team for a frame while the list re-reads.
+  const focusedRestaurant =
+    focusRestaurantId != null
+      ? allRestaurants.find((restaurant) => restaurant.id === focusRestaurantId)
+      : undefined;
+  const selected = focusedRestaurant ?? selectedRestaurant(allRestaurants, selectedId);
   const selectedCapabilities = selected ? restaurantCapabilities(selected) : [];
   const canManageSettings = selected
     ? hasCapability(selectedCapabilities, "settings.manage")
@@ -186,7 +210,7 @@ export function RestaurantSettings({
         />
       )}
 
-      {showRestaurantPicker(allRestaurants) && (
+      {!followsActiveWorkspace && showRestaurantPicker(allRestaurants) && (
         <div className="rounded-2xl border border-stone-200 bg-white p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
             Restaurant

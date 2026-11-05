@@ -21,10 +21,13 @@ import { hasCapability } from "@/features/tenancy/permissions";
 export function RestaurantTables({
   signedIn,
   sessionPending = false,
+  focusRestaurantId = null,
 }: {
   signedIn: boolean;
   /** Session still resolving: show the loading shape, never the sign-in card. */
   sessionPending?: boolean;
+  /** The café the shell is acting in; this page follows it when it is set. */
+  focusRestaurantId?: string | null;
 }) {
   const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -38,8 +41,13 @@ export function RestaurantTables({
         const list = await fetchRestaurants();
         if (cancelled) return;
         setRestaurants(list);
-        // One restaurant means no choice to make: open it straight away.
-        if (list.length === 1 && list[0]) setSelectedId(list[0].id);
+        // The shell's active membership names the café; without one, a single
+        // café means no choice to make.
+        const focus = focusRestaurantId
+          ? list.find((restaurant) => restaurant.id === focusRestaurantId)
+          : undefined;
+        if (focus) setSelectedId(focus.id);
+        else if (list.length === 1 && list[0]) setSelectedId(list[0].id);
       } catch {
         if (!cancelled) {
           setLoadError("Could not load your restaurants. Check your connection and try again.");
@@ -49,9 +57,22 @@ export function RestaurantTables({
     return () => {
       cancelled = true;
     };
-  }, [signedIn]);
+  }, [signedIn, focusRestaurantId]);
 
-  const selected = selectedRestaurant(restaurants, selectedId);
+  /**
+   * Following the shell: the switcher owns the café choice, so this page must
+   * not offer a second one that could disagree with it.
+   */
+  const followsActiveWorkspace =
+    focusRestaurantId != null &&
+    (restaurants ?? []).some((restaurant) => restaurant.id === focusRestaurantId);
+  // The focused café wins straight away, so a switch never shows the
+  // previous café's cards for a frame while the list re-reads.
+  const focusedRestaurant =
+    focusRestaurantId != null
+      ? (restaurants ?? []).find((restaurant) => restaurant.id === focusRestaurantId)
+      : undefined;
+  const selected = focusedRestaurant ?? selectedRestaurant(restaurants, selectedId);
   const canLink = selected
     ? hasCapability(restaurantCapabilities(selected), "tables.link")
     : false;
@@ -111,7 +132,10 @@ export function RestaurantTables({
         />
       )}
 
-      {signedIn && showRestaurantPicker(restaurants) && restaurants !== null && (
+      {signedIn &&
+        !followsActiveWorkspace &&
+        showRestaurantPicker(restaurants) &&
+        restaurants !== null && (
         <div data-print-hide className="rounded-2xl border border-stone-200 bg-white p-5">
           <label className="flex flex-col gap-1 text-xs font-medium text-stone-600">
             Restaurant

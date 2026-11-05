@@ -2996,7 +2996,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           ))}
 
         {screen === "tables" && (
-          <RestaurantTables signedIn={signedIn} sessionPending={sessionPending} />
+          <RestaurantTables
+            signedIn={signedIn}
+            sessionPending={sessionPending}
+            focusRestaurantId={activeWorkspace?.restaurantId ?? null}
+          />
         )}
 
         {screen === "settings" && (
@@ -3004,6 +3008,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             signedIn={signedIn}
             sessionPending={sessionPending}
             currentUserId={session?.user?.id ?? null}
+            focusRestaurantId={activeWorkspace?.restaurantId ?? null}
           />
         )}
 
