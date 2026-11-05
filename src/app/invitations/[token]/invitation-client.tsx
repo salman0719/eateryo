@@ -160,7 +160,7 @@ export function InvitationClient({ token }: { token: string }) {
       )}
 
       {invitation && invitation.status !== "pending" && !accepted && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
           {invitation.status === "expired" ? (
             "This invitation has expired — ask the restaurant owner to send a new one."
           ) : (
@@ -168,7 +168,7 @@ export function InvitationClient({ token }: { token: string }) {
               This invitation has already been accepted.{" "}
               <Link
                 href={invitation.role === "staff" ? "/orders" : "/menus"}
-                className="font-medium underline underline-offset-2 hover:text-amber-950"
+                className="font-medium underline underline-offset-2 hover:text-accent-950"
               >
                 {invitation.role === "staff" ? "Open the order board" : "Go to My menus"}
               </Link>
@@ -228,7 +228,7 @@ export function InvitationClient({ token }: { token: string }) {
                     type="button"
                     disabled={signIn.kind === "sending"}
                     onClick={() => void sendSignInLink(invitation.email)}
-                    className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {signIn.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
                   </button>
@@ -247,14 +247,14 @@ export function InvitationClient({ token }: { token: string }) {
               type="button"
               disabled={accepting}
               onClick={() => void handleAccept()}
-              className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-white hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {accepting ? "Accepting…" : "Accept invitation"}
             </button>
           )}
 
           {signedEmail && !emailMatches && (
-            <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="flex flex-col gap-3 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
               <p>
                 You&apos;re signed in as <span className="font-medium">{signedEmail}</span>, but this
                 invitation is for <span className="font-medium">{invitation.email}</span>.
@@ -263,7 +263,7 @@ export function InvitationClient({ token }: { token: string }) {
                 type="button"
                 disabled={signIn.kind === "sending"}
                 onClick={() => void handleSwitchAccount(invitation.email)}
-                className="self-start rounded-full border border-amber-700 px-4 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="self-start rounded-full border border-accent-700 px-4 py-1.5 text-sm font-semibold text-accent-900 hover:bg-accent-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {signIn.kind === "sending"
                   ? "Sending…"

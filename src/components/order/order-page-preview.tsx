@@ -114,15 +114,15 @@ export function OrderPagePreview({
 
   return (
     <OrderShell tableLabel={PREVIEW_TABLE_LABEL}>
-      <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3">
-        <p className="text-[11px] font-semibold tracking-wide text-amber-900 uppercase">
+      <div className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3">
+        <p className="text-[11px] font-semibold tracking-wide text-warning-900 uppercase">
           Preview · nothing is sent
         </p>
-        <p className="mt-1 text-sm leading-6 text-amber-900">
+        <p className="mt-1 text-sm leading-6 text-warning-900">
           This is the page a table card opens. Try it — nothing reaches the kitchen.
         </p>
         {draftAheadOfLive && (
-          <p className="mt-1 text-xs leading-5 font-semibold text-amber-900">
+          <p className="mt-1 text-xs leading-5 font-semibold text-warning-900">
             You are previewing your draft — diners still see the last published version until you
             press “Publish changes”.
           </p>
@@ -131,7 +131,7 @@ export function OrderPagePreview({
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className={`${frame} p-5`}>
-          <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
             {tableName}
           </p>
           <h2 className="mt-1 text-2xl font-bold text-ink-900">
@@ -150,7 +150,7 @@ export function OrderPagePreview({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search dishes…"
-              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
             />
           </label>
           {searching && (
@@ -234,7 +234,7 @@ export function OrderPagePreview({
                 </p>
               </div>
               {total === null && (
-                <p className="mt-1 text-xs text-amber-800">
+                <p className="mt-1 text-xs text-warning-800">
                   Some items have no price on the menu, so no total is shown. Staff confirm the
                   price.
                 </p>
@@ -243,14 +243,14 @@ export function OrderPagePreview({
               {notice && (
                 <div
                   role="status"
-                  className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900"
+                  className="mt-3 flex items-start gap-2 rounded-xl border border-warning-300 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900"
                 >
                   <span className="min-w-0 flex-1">{notice}</span>
                   <button
                     type="button"
                     onClick={() => setNotice(null)}
                     aria-label="Dismiss preview notice"
-                    className="shrink-0 font-semibold text-amber-900 hover:text-amber-800"
+                    className="shrink-0 font-semibold text-warning-900 hover:text-accent-800"
                   >
                     ×
                   </button>
@@ -260,7 +260,7 @@ export function OrderPagePreview({
               <button
                 type="button"
                 onClick={sendToKitchen}
-                className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+                className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
               >
                 Send order to the kitchen
               </button>

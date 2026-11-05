@@ -149,7 +149,7 @@ export function ServerTableOrder({
           <button
             type="button"
             onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
           >
             Order something else
           </button>
@@ -173,7 +173,7 @@ export function ServerTableOrder({
         </p>
       </div>
       {lines.length > 0 && total === null && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-warning-800">
           Some items have no price on the menu, so no total is shown. Staff confirm the price.
         </p>
       )}
@@ -188,7 +188,7 @@ export function ServerTableOrder({
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void sendOrder()}
-        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order to the kitchen"}
       </button>
@@ -200,7 +200,7 @@ export function ServerTableOrder({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+            <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
               {restaurantName} · {formatTableLabel(tableLabel)}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-ink-900">

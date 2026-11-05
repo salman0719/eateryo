@@ -191,13 +191,13 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             <button
               type="button"
               onClick={loadDemo}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
             >
               Try the demo menu
             </button>
             <Link
               href="/"
-              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
             >
               Back to the app
             </Link>
@@ -229,7 +229,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
           <button
             type="button"
             onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
           >
             Order something else
           </button>
@@ -251,7 +251,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
         </p>
       </div>
       {lines.length > 0 && total === null && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-warning-800">
           Some items have no price on the menu, so no total is shown.
         </p>
       )}
@@ -266,7 +266,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void placeOrder()}
-        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order"}
       </button>
@@ -278,7 +278,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+            <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
               {formatTableLabel(tableLabel)}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-ink-900">

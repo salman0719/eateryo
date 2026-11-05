@@ -24,13 +24,13 @@ import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
 
 const smallButton =
   "rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 " +
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 " +
   "disabled:cursor-not-allowed disabled:opacity-40";
 
 /** The label wraps the real file input, so focus lands on the input: ring it there. */
 const fileLabel =
   `${smallButton} cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 ` +
-  "focus-within:outline-amber-700";
+  "focus-within:outline-accent-700";
 
 type UploadState =
   | { status: "idle" }

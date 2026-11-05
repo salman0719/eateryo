@@ -148,11 +148,11 @@ export function UsagePanel() {
       </div>
 
       {nudge ? (
-        <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+        <p className="mt-3 rounded-xl border border-warning-200 bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900">
           {nudge.body}{" "}
           <Link
             href={nudge.href}
-            className="font-semibold underline underline-offset-2 hover:text-amber-950"
+            className="font-semibold underline underline-offset-2 hover:text-accent-950"
           >
             {nudge.label}
           </Link>

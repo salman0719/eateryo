@@ -66,7 +66,7 @@ export function OrderShell({
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-700 text-base font-bold text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-white"
           >
             E
           </span>
@@ -76,7 +76,7 @@ export function OrderShell({
           </div>
         </div>
         {tableLabel && (
-          <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
+          <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
             {formatTableLabel(tableLabel)}
           </span>
         )}
@@ -203,7 +203,7 @@ export function OrderMenuSection({
                     <select
                       value={variant?.name ?? ""}
                       onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
                     >
                       {item.variants.map((option) => (
                         <option key={option.name} value={option.name}>
@@ -302,7 +302,7 @@ export function StickyCartBar({
         ref={buttonRef}
         type="button"
         onClick={onViewOrder}
-        className="shrink-0 rounded-full bg-amber-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:scale-95"
+        className="shrink-0 rounded-full bg-accent-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-800 active:scale-95"
       >
         View order
       </button>

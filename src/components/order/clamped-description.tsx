@@ -49,7 +49,7 @@ export function ClampedDescription({ text, name }: { text: string; name: string 
           aria-expanded={toggle.expanded}
           aria-controls={descriptionId}
           aria-label={`${toggle.label} description for ${name}`}
-          className="mt-0.5 rounded text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="mt-0.5 rounded text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {toggle.label}
         </button>

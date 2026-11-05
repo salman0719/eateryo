@@ -30,7 +30,7 @@ interface CommitInputProps {
 const baseInput =
   "w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
   // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
-  "resize-none focus:border-amber-700 focus:outline-none sm:resize-y";
+  "resize-none focus:border-accent-700 focus:outline-none sm:resize-y";
 
 export function CommitInput({
   label,
@@ -195,7 +195,7 @@ export function CommitTags({
                     event.preventDefault();
                     commit(tags.filter((candidate) => candidate !== tag));
                   }}
-                  className="rounded-full px-1 leading-none text-green-900/70 hover:text-green-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-700"
+                  className="rounded-full px-1 leading-none text-green-900/70 hover:text-green-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-700"
                 >
                   ✕
                 </button>
@@ -261,7 +261,7 @@ export function CommitTags({
               // The click adds it: for the mouse, and for Enter or Space on the
               // focused button, which is what a button is expected to do.
               onClick={() => commit([...tags, candidate])}
-              className="rounded-full border border-dashed border-line-300 px-2 py-0.5 text-[11px] text-ink-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-dashed border-line-300 px-2 py-0.5 text-[11px] text-ink-600 hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               + {candidate}
             </button>

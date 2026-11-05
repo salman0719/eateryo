@@ -43,7 +43,7 @@ export default function LaunchPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <p className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
+        <p className="inline-flex items-center rounded-full bg-warning-100 px-3 py-1 text-xs font-semibold text-warning-900">
           Free while it lasts — no payment step
         </p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
@@ -100,7 +100,7 @@ export default function LaunchPage() {
           </p>
           <Link
             href="/"
-            className="mt-3 inline-flex text-sm font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+            className="mt-3 inline-flex text-sm font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
           >
             Open the editor
           </Link>

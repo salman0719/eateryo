@@ -19,7 +19,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-700 text-base font-bold text-white"
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-white"
           >
             E
           </span>
@@ -31,7 +31,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-3">
           <a
             href="/launch"
-            className="hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-50 hover:text-amber-900 sm:inline"
+            className="hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-warning-800 hover:bg-accent-50 hover:text-accent-900 sm:inline"
           >
             Get started
           </a>
@@ -47,7 +47,7 @@ export function SiteHeader() {
               <span
                 aria-hidden="true"
                 title={user.email}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-700 text-xs font-bold text-white sm:hidden"
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-700 text-xs font-bold text-white sm:hidden"
               >
                 {(user.name ?? user.email ?? "?").trim().charAt(0).toUpperCase() || "?"}
               </span>
@@ -57,7 +57,7 @@ export function SiteHeader() {
               <button
                 type="button"
                 onClick={() => void authClient.signOut()}
-                className="rounded-lg border border-line-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-line-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Sign out
               </button>

@@ -126,7 +126,7 @@ function PriceField({
           }}
           aria-label="Proposed price"
           aria-invalid={error !== null}
-          className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-ink-900 focus:border-amber-700 focus:outline-none disabled:bg-surface-100 ${
+          className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-ink-900 focus:border-accent-700 focus:outline-none disabled:bg-surface-100 ${
             error ? "border-danger-500" : "border-line-300"
           }`}
         />
@@ -171,13 +171,13 @@ export function ProposalReview({
     <section
       aria-labelledby="proposal-heading"
       aria-busy={busy}
-      className="rounded-2xl border border-amber-200 bg-surface-base p-4 shadow-sm"
+      className="rounded-2xl border border-warning-200 bg-surface-base p-4 shadow-sm"
     >
       <div className="flex flex-wrap items-center gap-2">
         <h2 id="proposal-heading" className="text-sm font-semibold text-ink-900">
           Proposed change
         </h2>
-        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
+        <span className="rounded-full bg-warning-100 px-2.5 py-0.5 text-[11px] font-semibold text-warning-900">
           Not saved yet
         </span>
         <span className="flex-1" />
@@ -235,7 +235,7 @@ export function ProposalReview({
       {stale && (
         <div
           role="alert"
-          className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"
+          className="mt-3 rounded-xl border border-warning-300 bg-warning-50 px-3 py-2.5 text-xs leading-5 text-warning-900"
         >
           <p className="font-semibold">This menu changed after the preview</p>
           <p className="mt-0.5">
@@ -246,13 +246,13 @@ export function ProposalReview({
             <button
               type="button"
               onClick={onReviewAgain}
-              className="rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800"
+              className="rounded-full bg-accent-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
             >
               Review again
             </button>
             <a
               href={editorHref}
-              className="rounded-full border border-amber-700 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Open editor
             </a>
@@ -271,7 +271,7 @@ export function ProposalReview({
           type="button"
           onClick={onApprove}
           disabled={approveDisabled}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-surface-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:bg-surface-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {busy ? "Saving…" : "Approve and save"}
         </button>
@@ -279,13 +279,13 @@ export function ProposalReview({
           type="button"
           onClick={onDiscard}
           disabled={busy}
-          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-line-400 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-line-400 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Discard
         </button>
         <a
           href={editorHref}
-          className="text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Edit in editor
         </a>

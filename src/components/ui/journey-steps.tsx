@@ -37,7 +37,7 @@ export function JourneySteps({
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs",
                 status === "upcoming"
                   ? "border border-line-300 bg-surface-base text-ink-600"
-                  : "bg-amber-700 text-white",
+                  : "bg-accent-700 text-white",
               ].join(" ")}
             >
               {status === "done" ? (
@@ -64,7 +64,7 @@ export function JourneySteps({
             {index < JOURNEY_STEPS.length - 1 && (
               <span
                 aria-hidden="true"
-                className={`h-px flex-1 ${index < current ? "bg-amber-300" : "bg-surface-200"}`}
+                className={`h-px flex-1 ${index < current ? "bg-accent-300" : "bg-surface-200"}`}
               />
             )}
           </li>

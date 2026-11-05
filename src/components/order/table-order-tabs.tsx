@@ -303,7 +303,7 @@ export function TableOrderTabs({
         </p>
       </div>
       {lines.length > 0 && total === null && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-warning-800">
           Some items have no price on the menu, so no total is shown. Staff confirm the price.
         </p>
       )}
@@ -318,7 +318,7 @@ export function TableOrderTabs({
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void sendOrder()}
-        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order to the kitchen"}
       </button>
@@ -346,7 +346,7 @@ export function TableOrderTabs({
           <button
             type="button"
             onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
+            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800"
           >
             Order something else
           </button>
@@ -416,7 +416,7 @@ export function TableOrderTabs({
                         ? "Search dishes…"
                         : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
-                    className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+                    className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
                   />
                 </label>
                 {searching && (
@@ -592,7 +592,7 @@ function TabButton({
       className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
           ? "bg-surface-900 text-white"
-          : "border border-line-300 text-ink-700 hover:border-amber-700 hover:text-amber-900"
+          : "border border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
       }`}
     >
       {label}

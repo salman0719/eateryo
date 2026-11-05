@@ -316,7 +316,7 @@ export function AssistantPanel({
         </p>
         <a
           href="/sign-in"
-          className="mt-4 inline-block rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="mt-4 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Sign in
         </a>
@@ -370,7 +370,7 @@ export function AssistantPanel({
             value={selectedMenuId}
             onChange={(event) => chooseMenu(event.target.value)}
             disabled={sending || proposalBusy || menusLoading}
-            className="mt-1 w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-surface-100"
+            className="mt-1 w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 focus:border-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:bg-surface-100"
           >
             <option value="">Help only — no menu changes</option>
             {menuUnavailable && <option value={selectedMenuId}>Unavailable menu</option>}
@@ -400,7 +400,7 @@ export function AssistantPanel({
       )}
 
       {usageError && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
           {usageError}
         </p>
       )}
@@ -408,7 +408,7 @@ export function AssistantPanel({
       {exhausted && (
         <p
           role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900"
         >
           This account has used all {usage?.cap} assistant messages for this month.
           {resetLabel ? ` The allowance resets on ${resetLabel}.` : ""}
@@ -446,7 +446,7 @@ export function AssistantPanel({
                     key={prompt}
                     type="button"
                     onClick={() => void ask(prompt)}
-                    className="rounded-full bg-surface-100 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-surface-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="rounded-full bg-surface-100 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:bg-surface-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     {prompt}
                   </button>
@@ -573,12 +573,12 @@ export function AssistantPanel({
                     ? `Ask for a change to ${selectedMenu.title}…`
                     : "Ask a question…"
             }
-            className="min-h-14 flex-1 resize-none rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-surface-100 sm:resize-y"
+            className="min-h-14 flex-1 resize-none rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:bg-surface-100 sm:resize-y"
           />
           <button
             type="submit"
             disabled={disabled || draft.trim().length === 0}
-            className="rounded-full bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:bg-surface-300"
+            className="rounded-full bg-accent-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:bg-surface-300"
           >
             {sending ? "Sending…" : proposalBusy ? "Saving…" : "Send"}
           </button>

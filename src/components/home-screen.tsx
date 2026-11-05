@@ -2489,7 +2489,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 type="button"
                 onClick={() => navigateTo({ screen: tab.id })}
                 aria-current={screen === tab.id ? "page" : undefined}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                   screen === tab.id
                     ? "bg-surface-900 text-white"
                     : "bg-surface-base text-ink-600 ring-1 ring-line-200 hover:text-ink-900"
@@ -2569,12 +2569,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             if (!resumable) return null;
             return (
               <HeightReveal>
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-amber-950">
+                    <p className="text-sm font-semibold text-warning-950">
                       📍 Finish publishing your menu →
                     </p>
-                    <p className="mt-0.5 max-w-xl text-xs leading-5 text-amber-900">
+                    <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
                       {localOnlyCount === 1
                         ? `“${resumable.title}” is saved in this browser, not published yet.`
                         : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
@@ -2586,14 +2586,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                       onClick={() =>
                         navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
                       }
-                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Continue →
                     </button>
                     <button
                       type="button"
                       onClick={() => setResumeDismissed(true)}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:text-amber-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:text-accent-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Dismiss
                     </button>
@@ -2710,7 +2710,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <button
                 type="button"
                 onClick={() => navigateTo({ screen: "capture" })}
-                className="mt-4 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Back to capture
               </button>
@@ -2740,7 +2740,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               />
             )}
             {activeMenuIsStaff && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
                 You have staff access to this restaurant — menus are view-only for staff. Ask an
                 owner to make changes.
               </p>
@@ -2846,7 +2846,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   <button
                     type="button"
                     onClick={handleDemo}
-                    className="font-medium text-amber-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     Preview with demo data
                   </button>
@@ -2905,7 +2905,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                     type="button"
                     onClick={handleExtract}
                     disabled={phase === "extracting"}
-                    className="w-full rounded-full bg-amber-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 sm:w-auto"
+                    className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
                   >
                     {phase === "extracting"
                       ? "Extracting… this can take up to a minute"
@@ -3006,14 +3006,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   setSessionRetries(0);
                   void refetchSession?.();
                 }}
-                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>
               <button
                 type="button"
                 onClick={() => navigateTo({ screen: "library" })}
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Back to My menus
               </button>
@@ -3079,8 +3079,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 navigateTo({ screen: tab.id });
               }}
               aria-current={screen === tab.id ? "page" : undefined}
-              className={`relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
-                screen === tab.id ? "text-amber-800" : "text-ink-500"
+              className={`relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                screen === tab.id ? "text-warning-800" : "text-ink-500"
               }`}
             >
               {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
@@ -3100,12 +3100,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 ? "page"
                 : undefined
             }
-            className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
+            className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
               moreOpen ||
               screen === "tables" ||
               screen === "assistant" ||
               screen === "settings"
-                ? "text-amber-800"
+                ? "text-warning-800"
                 : "text-ink-500"
             }`}
           >
@@ -3139,7 +3139,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                   setMoreOpen(false);
                   navigateTo({ screen: row.id });
                 }}
-                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 <span className="text-sm font-semibold text-ink-900">{row.label}</span>
                 <span className="text-xs font-normal text-ink-500">{row.why}</span>
@@ -3147,7 +3147,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             ))}
             <a
               href="/launch"
-              className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               <span className="text-sm font-semibold text-ink-900">Get started</span>
               <span className="text-xs font-normal text-ink-500">

@@ -77,7 +77,7 @@ function StatusPill({ status }: { status: PublicationStatus | null }) {
     return <span className={`${pill} bg-surface-100 text-ink-600`}>Not published</span>;
   }
   if (!status.isLive) {
-    return <span className={`${pill} bg-amber-100 text-amber-900`}>Ordering paused</span>;
+    return <span className={`${pill} bg-warning-100 text-warning-900`}>Ordering paused</span>;
   }
   return <span className={`${pill} bg-success-100 text-success-900`}>Ordering open</span>;
 }
@@ -150,7 +150,7 @@ function ChangeList({
         Since you last published: {counts.join(" · ")}
       </p>
       <details className="mt-1">
-        <summary className="cursor-pointer text-xs font-medium text-amber-800 underline hover:text-amber-900">
+        <summary className="cursor-pointer text-xs font-medium text-accent-800 underline hover:text-accent-900">
           Show details
         </summary>
         <ul className="mt-2 max-h-56 divide-y divide-line-100 overflow-y-auto rounded-xl border border-line-200">
@@ -214,14 +214,14 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onStartWizard}
-            className="mt-3 rounded-full bg-amber-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Set up table ordering
           </button>
         ) : (
           <a
             href="/sign-in"
-            className="mt-3 inline-block text-xs font-medium text-amber-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 inline-block text-xs font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in to publish (free while the promotion lasts)
           </a>
@@ -245,7 +245,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onRetryAccountCheck}
-            className="mt-3 rounded-full border border-line-300 px-4 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 rounded-full border border-line-300 px-4 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Try again
           </button>
@@ -287,7 +287,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onStartWizard}
-            className="mt-3 rounded-full bg-amber-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Set up table ordering
           </button>
@@ -312,7 +312,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
             type="button"
             onClick={onPublish}
             disabled={busy}
-            className="rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             {busy ? "Publishing…" : publishLabel}
           </button>
@@ -351,7 +351,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
             <>
               <p
                 role="status"
-                className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900"
+                className="rounded-xl bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900"
               >
                 Draft changes are not on your tables yet — diners still see the last published
                 version until you press “Publish changes”.
@@ -373,7 +373,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
                 if (ok) onUnpublish();
               }}
               disabled={busy}
-              className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {busy ? "Working…" : "Unpublish"}
             </button>

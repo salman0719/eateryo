@@ -225,7 +225,7 @@ export function PublishWizard({
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
+            <p className="text-xs font-semibold tracking-wide text-warning-800 uppercase">
               {submitResult?.created.menu ? "First menu published" : "Published for ordering"}
             </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
@@ -242,7 +242,7 @@ export function PublishWizard({
           <button
             type="button"
             onClick={onBack}
-            className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             ← Back to editing
           </button>
@@ -260,7 +260,7 @@ export function PublishWizard({
                 <button
                   type="button"
                   onClick={onOpenTables}
-                  className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   Add tables &amp; print QR codes
                 </button>
@@ -268,14 +268,14 @@ export function PublishWizard({
                   type="button"
                   onClick={() => setShowHours((value) => !value)}
                   aria-expanded={showHours}
-                  className="rounded-full border border-line-300 bg-surface-base px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-line-300 bg-surface-base px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   {showHours ? "Hide opening hours" : "Set your opening hours"}
                 </button>
                 <button
                   type="button"
                   onClick={onOpenEditor}
-                  className="rounded-full border border-line-300 bg-surface-base px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-line-300 bg-surface-base px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   Keep editing
                 </button>
@@ -310,7 +310,7 @@ export function PublishWizard({
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
+          <p className="text-xs font-semibold tracking-wide text-warning-800 uppercase">
             Publish your menu
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
@@ -325,7 +325,7 @@ export function PublishWizard({
         <button
           type="button"
           onClick={onBack}
-          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           ← Back to editing
         </button>
@@ -337,7 +337,7 @@ export function PublishWizard({
         <section className="flex flex-col gap-4 rounded-2xl border border-line-200 bg-surface-base p-5">
           {!signedIn ? (
             <>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+              <div className="rounded-xl border border-warning-200 bg-warning-50 p-3 text-xs leading-5 text-warning-900">
                 The draft stays exactly as you left it. Use the same browser you uploaded from when
                 you open the emailed link.
               </div>
@@ -369,7 +369,7 @@ export function PublishWizard({
                         value={form.restaurantName}
                         onChange={(event) => update({ restaurantName: event.target.value })}
                         placeholder="e.g. Sunny Side Café"
-                        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       />
                       <span className="text-xs font-normal text-ink-500">
                         You can rename it later in Settings.
@@ -383,7 +383,7 @@ export function PublishWizard({
                       <button
                         type="button"
                         onClick={() => setNameEditing(true)}
-                        className="rounded-full border border-line-300 bg-surface-base px-2.5 py-0.5 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-full border border-line-300 bg-surface-base px-2.5 py-0.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         Change
                       </button>
@@ -399,7 +399,7 @@ export function PublishWizard({
                     <select
                       value={form.restaurantId}
                       onChange={(event) => update({ restaurantId: event.target.value })}
-                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…
@@ -415,12 +415,12 @@ export function PublishWizard({
               </div>
 
               {choice.kind === "choose" && (
-                <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                <p className="rounded-xl bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900">
                   Choose which café this menu belongs to above.
                 </p>
               )}
               {choice.kind === "missing" && (
-                <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                <p className="rounded-xl bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900">
                   Give your café a name above so we can create it.
                 </p>
               )}
@@ -439,7 +439,7 @@ export function PublishWizard({
                   type="button"
                   onClick={() => void handlePublish()}
                   disabled={!canSubmit}
-                  className="w-full rounded-full bg-amber-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 sm:w-auto"
+                  className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
                 >
                   {busy ? "Publishing…" : "Publish my menu"}
                 </button>

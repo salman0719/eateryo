@@ -151,7 +151,7 @@ export default function PrivacyPage() {
           {email ? (
             <p>
               Questions about this policy or your data:{" "}
-              <a className="font-medium text-amber-800 underline underline-offset-2" href={`mailto:${email}`}>
+              <a className="font-medium text-accent-800 underline underline-offset-2" href={`mailto:${email}`}>
                 {email}
               </a>
               .
@@ -166,7 +166,7 @@ export default function PrivacyPage() {
 
         <p className="mt-8 text-sm text-ink-500">
           See also the{" "}
-          <Link href="/terms" className="font-medium text-amber-800 underline underline-offset-2">
+          <Link href="/terms" className="font-medium text-accent-800 underline underline-offset-2">
             terms of use
           </Link>
           .

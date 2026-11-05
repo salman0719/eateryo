@@ -93,7 +93,7 @@ export function OrderAlertsCard({
               type="checkbox"
               checked={enabled}
               onChange={(event) => setEnabled(event.target.checked)}
-              className="h-5 w-5 shrink-0 accent-amber-700"
+              className="h-5 w-5 shrink-0 accent-accent-700"
             />
             Email me on every new order
           </label>
@@ -105,7 +105,7 @@ export function OrderAlertsCard({
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Blank means every owner"
               autoComplete="email"
-              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             />
           </label>
           <p className="-mt-1 text-[11px] leading-4 text-ink-400">
@@ -117,7 +117,7 @@ export function OrderAlertsCard({
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {saving ? "Saving…" : "Save alerts"}
             </button>

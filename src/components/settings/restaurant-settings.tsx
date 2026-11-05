@@ -133,7 +133,7 @@ export function RestaurantSettings({
           </p>
           <a
             href="/sign-in"
-            className="mt-3 inline-block rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in
           </a>
@@ -158,7 +158,7 @@ export function RestaurantSettings({
       )}
 
       {staffOnly && (
-        <p className="rounded-2xl border border-line-200 bg-surface-base p-5 text-xs leading-5 text-amber-800">
+        <p className="rounded-2xl border border-line-200 bg-surface-base p-5 text-xs leading-5 text-warning-800">
           You are only a staff member of the restaurants on this account. Only an owner can change
           settings — ask the owner to do it from their sign-in.
         </p>
@@ -183,7 +183,7 @@ export function RestaurantSettings({
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -462,7 +462,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
               if (event.key === "Enter") void handleAddMember();
             }}
             placeholder="teammate@cafe.com"
-            className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
@@ -470,7 +470,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           <select
             value={addRole}
             onChange={(event) => setAddRole(event.target.value as "owner" | "staff")}
-            className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             <option value="staff">Staff</option>
             <option value="owner">Owner</option>
@@ -480,7 +480,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
           type="button"
           onClick={() => void handleAddMember()}
           disabled={adding || addEmail.trim().length === 0}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {adding ? "Adding…" : "Add member"}
         </button>
@@ -534,7 +534,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                 }
                 disabled={memberBusy === member.userId}
                 aria-label={`Role for ${member.name}`}
-                className="rounded-lg border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="owner">Owner</option>
                 <option value="staff">Staff</option>
@@ -553,8 +553,8 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
       )}
 
       {pending !== null && pending.length > 0 && (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <p className="text-xs font-semibold tracking-wide text-amber-900 uppercase">
+        <div className="mt-4 rounded-xl border border-warning-200 bg-warning-50 p-3">
+          <p className="text-xs font-semibold tracking-wide text-warning-900 uppercase">
             Pending invitations
           </p>
           <ul className="mt-2 space-y-2">
@@ -574,7 +574,7 @@ function TeamCard({ restaurantId, restaurantName, currentUserId, onTeamChanged }
                   type="button"
                   onClick={() => void handleResend(invitation)}
                   disabled={pendingBusy === invitation.id}
-                  className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   Resend
                 </button>

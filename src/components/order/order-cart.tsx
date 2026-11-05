@@ -115,7 +115,7 @@ export function OrderCartLines({
                   type="button"
                   aria-label={`Decrease ${line.name}`}
                   onClick={() => onQuantityChange(index, line.quantity - 1)}
-                  className="h-7 w-7 rounded-full border border-line-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
+                  className="h-7 w-7 rounded-full border border-line-300 text-sm font-semibold text-ink-700 hover:border-accent-700"
                 >
                   −
                 </button>
@@ -124,7 +124,7 @@ export function OrderCartLines({
                   type="button"
                   aria-label={`Increase ${line.name}`}
                   onClick={() => onQuantityChange(index, line.quantity + 1)}
-                  className="h-7 w-7 rounded-full border border-line-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
+                  className="h-7 w-7 rounded-full border border-line-300 text-sm font-semibold text-ink-700 hover:border-accent-700"
                 >
                   +
                 </button>
@@ -152,7 +152,7 @@ export function OrderCartLines({
         rows={2}
         maxLength={280}
         placeholder="Allergies, no onions…"
-        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
       />
     </>
   );

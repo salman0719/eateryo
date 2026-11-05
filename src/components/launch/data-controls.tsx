@@ -89,7 +89,7 @@ export function DataControls() {
           type="button"
           onClick={() => void handleExport()}
           disabled={busy !== null}
-          className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {busy === "export" ? "Preparing…" : "Export my data"}
         </button>

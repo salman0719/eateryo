@@ -37,7 +37,7 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
-  new: "bg-amber-100 text-amber-900",
+  new: "bg-warning-100 text-warning-900",
   preparing: "bg-info-100 text-info-900",
   served: "bg-green-100 text-green-900",
   cancelled: "bg-surface-200 text-ink-600",
@@ -174,14 +174,14 @@ export function ServerOrdersBoard() {
             onClick={() => setSoundOn(!soundOn)}
             aria-pressed={soundOn}
             title={soundOn ? "New orders play a chime" : "Turn on a chime for new orders"}
-            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
           >
             {soundOn ? "🔔 Sound on" : "🔕 Sound off"}
           </button>
           <button
             type="button"
             onClick={() => refresh()}
-            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
           >
             Refresh
           </button>
@@ -192,7 +192,7 @@ export function ServerOrdersBoard() {
         <button
           type="button"
           onClick={() => void requestNotifications()}
-          className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left text-sm text-amber-900 transition-colors hover:border-amber-500"
+          className="rounded-xl border border-warning-300 bg-warning-50 px-4 py-3 text-left text-sm text-accent-900 transition-colors hover:border-accent-500"
         >
           <span className="font-semibold">Notify me even when you&apos;re on another tab.</span>
           <span className="mt-0.5 block text-xs">
@@ -280,7 +280,7 @@ export function ServerOrdersBoard() {
                 </ul>
 
                 {order.note && (
-                  <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <p className="mt-2 rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-900">
                     Note: {order.note}
                   </p>
                 )}
@@ -291,7 +291,7 @@ export function ServerOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => void move(order, next)}
-                      className="rounded-full bg-amber-700 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 disabled:opacity-50"
+                      className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 disabled:opacity-50"
                     >
                       Mark {orderStatusLabel(next).toLowerCase()}
                     </button>
@@ -334,7 +334,7 @@ function ConnectionPill({
     connection === "live"
       ? "bg-success-50 text-success-800"
       : connection === "reconnecting"
-        ? "bg-amber-100 text-amber-900"
+        ? "bg-warning-100 text-warning-900"
         : "bg-surface-100 text-ink-600";
   return (
     <span
@@ -347,7 +347,7 @@ function ConnectionPill({
           connection === "live"
             ? "bg-success-600"
             : connection === "reconnecting"
-              ? "animate-pulse bg-amber-600"
+              ? "animate-pulse bg-accent-600"
               : "bg-surface-400"
         }`}
       />

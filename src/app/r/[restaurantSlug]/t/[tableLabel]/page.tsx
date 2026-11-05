@@ -108,7 +108,7 @@ async function TableLandingContent({
     return (
       <OrderShell tableLabel={tableLabel}>
         <div className={`${frame} p-5`}>
-          <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
             {landing.restaurantName} · {formatTableLabel(tableLabel)}
           </p>
           <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
@@ -128,7 +128,7 @@ async function TableLandingContent({
   return (
     <OrderShell tableLabel={tableLabel}>
       <div className={`${frame} p-5`}>
-        <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+        <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
           {landing.restaurantName} · {formatTableLabel(tableLabel)}
         </p>
         <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>

@@ -130,7 +130,7 @@ export function OrderSheet({
               type="button"
               onClick={onClose}
               aria-label="Close your order"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-line-300 text-base font-semibold text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line-300 text-base font-semibold text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900"
             >
               ×
             </button>

@@ -119,7 +119,7 @@ export function LibraryPanel({
           type="button"
           onClick={() => onNew()}
           disabled={unavailable}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           + New menu
         </button>
@@ -137,7 +137,7 @@ export function LibraryPanel({
                 type="button"
                 onClick={() => onNew(name)}
                 disabled={unavailable}
-                className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 {name}
               </button>
@@ -231,7 +231,7 @@ export function LibraryPanel({
                           className={
                             menu.onServer
                               ? "whitespace-nowrap rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-semibold text-success-900"
-                              : "whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900"
+                              : "whitespace-nowrap rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-semibold text-warning-900"
                           }
                         >
                           {menu.onServer ? "On your account" : "This browser only"}
@@ -247,7 +247,7 @@ export function LibraryPanel({
                         type="button"
                         onClick={() => startMove(menu.id)}
                         disabled={movingId !== null}
-                        className="rounded-full border border-amber-700 px-3 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-semibold text-accent-800 transition-colors hover:bg-accent-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         {movingId === menu.id ? "Adding…" : "Add to account"}
                       </button>
@@ -255,7 +255,7 @@ export function LibraryPanel({
                     <button
                       type="button"
                       onClick={() => onOpen(menu.id)}
-                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Open
                     </button>
@@ -283,7 +283,7 @@ export function LibraryPanel({
                     <select
                       value={targetId}
                       onChange={(event) => setTargetId(event.target.value)}
-                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…
@@ -300,7 +300,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => void runMove(menu.id, targetId)}
                       disabled={!targetId || movingId !== null}
-                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       {movingId === menu.id ? "Adding…" : "Add"}
                     </button>
@@ -308,7 +308,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => setPickerMenuId(null)}
                       disabled={movingId !== null}
-                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Cancel
                     </button>

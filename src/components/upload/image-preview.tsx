@@ -39,7 +39,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
           onClick={onAdd}
           disabled={atPageLimit}
           title={atPageLimit ? `A menu can have up to ${MAX_MENU_PAGES} pages.` : undefined}
-          className="shrink-0 rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="shrink-0 rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           + Add page
         </button>
@@ -78,7 +78,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
                 <button
                   type="button"
                   onClick={() => onReplace(index)}
-                  className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   Replace
                 </button>

@@ -154,7 +154,7 @@ function ReviewPriceInput({
             (event.target as HTMLInputElement).blur();
           }
         }}
-        className="w-28 rounded-lg border border-amber-300 bg-surface-base px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-400 focus:border-amber-700 focus:outline-none"
+        className="w-28 rounded-lg border border-warning-300 bg-surface-base px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
       />
     </label>
   );
@@ -277,7 +277,7 @@ export function ExtractionResult({
                     <p
                       className={
                         item.price === null
-                          ? "shrink-0 text-sm font-semibold text-amber-800"
+                          ? "shrink-0 text-sm font-semibold text-warning-800"
                           : "shrink-0 text-sm font-semibold text-ink-900"
                       }
                     >
@@ -312,13 +312,13 @@ export function ExtractionResult({
                     </span>
                   ))}
                   {needsReview && (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                    <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                       {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                     </span>
                   )}
                 </div>
                 {item.reviewNotes.length > 0 && (
-                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-amber-800">
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-warning-800">
                     {item.reviewNotes.map((note) => (
                       <li key={note}>{note}</li>
                     ))}
@@ -399,7 +399,7 @@ export function ExtractionResult({
                   <button
                     type="button"
                     onClick={() => setShowAllReady(true)}
-                    className="mt-2 text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="mt-2 text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     …and {readyItems.length - visibleReady.length} more — no action needed
                   </button>
@@ -414,7 +414,7 @@ export function ExtractionResult({
           ref={checkThisRef}
           className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 bg-background/95 py-2 scroll-mt-4"
         >
-          <h3 className="text-xs font-semibold tracking-[0.18em] text-amber-800 uppercase">
+          <h3 className="text-xs font-semibold tracking-[0.18em] text-warning-800 uppercase">
             ⚠ Check this ({reviewCount})
           </h3>
           <div className="flex items-center gap-3">
@@ -428,7 +428,7 @@ export function ExtractionResult({
                 type="button"
                 onClick={onResolveAll}
                 title="Confirms every flagged item as shown — prices stay as they are, unpriced items keep honestly blank totals."
-                className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900 transition-colors hover:border-amber-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-accent-900 transition-colors hover:border-accent-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Accept all as shown
               </button>
@@ -472,7 +472,7 @@ export function ExtractionResult({
               <h2 className="text-xl font-bold text-ink-900">{data.title ?? "Untitled menu"}</h2>
             )}
             {source === "ai" ? (
-              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900">
+              <span className="rounded-full bg-warning-100 px-2.5 py-0.5 text-xs font-semibold text-warning-900">
                 {reviewCount > 0 ? `AI draft — ${reviewCount} to check` : "AI draft"}
               </span>
             ) : (
@@ -485,7 +485,7 @@ export function ExtractionResult({
             {data.categories.length} {data.categories.length === 1 ? "category" : "categories"} ·{" "}
             {itemCount} {itemCount === 1 ? "item" : "items"}
             {reviewCount > 0 && (
-              <span className="font-medium text-amber-800">
+              <span className="font-medium text-warning-800">
                 {" "}· {reviewCount} to check
               </span>
             )}
@@ -508,7 +508,7 @@ export function ExtractionResult({
               <button
                 type="button"
                 onClick={handleContinue}
-                className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 {reviewCount > 0
                   ? `Continue → check prices (${reviewCount})`
@@ -522,8 +522,8 @@ export function ExtractionResult({
               onClick={onEdit}
               className={
                 onPublish
-                  ? "rounded-full px-4 py-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-                  : "rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  ? "rounded-full px-4 py-1.5 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  : "rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               }
             >
               {onPublish ? "Fine-tune in the editor" : editLabel}
@@ -532,7 +532,7 @@ export function ExtractionResult({
           <button
             type="button"
             onClick={onStartOver}
-            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Start over
           </button>
@@ -549,7 +549,7 @@ export function ExtractionResult({
 
           <div className="flex flex-col gap-4">
             <div>
-              <p className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase">
+              <p className="text-[11px] font-semibold tracking-[0.18em] text-warning-800 uppercase">
                 First look
               </p>
               <h3 className="mt-1 text-lg font-bold text-ink-900">
@@ -567,14 +567,14 @@ export function ExtractionResult({
               </h3>
               <div className="flex items-baseline gap-3">
                 {reviewCount > 0 && (
-                  <span className="text-xs text-amber-800">{reviewCount} to check</span>
+                  <span className="text-xs text-warning-800">{reviewCount} to check</span>
                 )}
                 {reviewCount > 0 && (
                   <button
                     type="button"
                     onClick={() => setOnlyFlagged((value) => !value)}
                     aria-pressed={onlyFlagged}
-                    className="text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                    className="text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
                     {onlyFlagged ? "Show everything" : "Show only items to check"}
                   </button>

@@ -53,7 +53,7 @@ export function GuidanceCard({ title, steps, action }: GuidanceCardProps) {
       <a
         href={action.href}
         onClick={(event) => navigateInApp(event, action.href)}
-        className="mt-4 inline-block rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="mt-4 inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         {action.label}
       </a>

@@ -130,7 +130,7 @@ export default function TermsPage() {
             <p>
               Questions about these terms:{" "}
               <a
-                className="font-medium text-amber-800 underline underline-offset-2"
+                className="font-medium text-accent-800 underline underline-offset-2"
                 href={`mailto:${email}`}
               >
                 {email}
@@ -147,7 +147,7 @@ export default function TermsPage() {
 
         <p className="mt-8 text-sm text-ink-500">
           See also the{" "}
-          <Link href="/privacy" className="font-medium text-amber-800 underline underline-offset-2">
+          <Link href="/privacy" className="font-medium text-accent-800 underline underline-offset-2">
             privacy policy
           </Link>
           .

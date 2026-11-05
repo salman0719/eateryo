@@ -17,7 +17,7 @@ export default function RestaurantNotFound() {
       <p className="mt-2 text-sm text-ink-500">
         <Link
           href="/"
-          className="font-medium text-amber-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Eateryo
         </Link>{" "}

@@ -173,7 +173,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                 setStatus("error");
               });
           }}
-          className="mt-2 rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900"
+          className="mt-2 rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900"
         >
           Retry
         </button>
@@ -255,7 +255,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
               setSaveError(null);
               setSavedTick(false);
             }}
-            className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+            className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-accent-700 focus:outline-none"
           >
             <option value="UTC">UTC</option>
             {draftTimeZone && !ZONE_CHOICES.includes(draftTimeZone) && (
@@ -300,8 +300,8 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                       }}
                       className={`h-8 w-8 rounded-full text-xs font-semibold transition-colors ${
                         on
-                          ? "bg-amber-800 text-white"
-                          : "border border-line-300 text-ink-500 hover:border-amber-700 hover:text-amber-900"
+                          ? "bg-accent-800 text-white"
+                          : "border border-line-300 text-ink-500 hover:border-accent-700 hover:text-accent-900"
                       }`}
                     >
                       {label[0]}
@@ -330,7 +330,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                     onChange={(event) =>
                       updateWindow(index, { ...window, start: event.target.value })
                     }
-                    className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+                    className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-accent-700 focus:outline-none"
                   />
                 </label>
                 <label className="text-xs text-ink-600">
@@ -341,7 +341,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                     onChange={(event) =>
                       updateWindow(index, { ...window, end: event.target.value })
                     }
-                    className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+                    className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-accent-700 focus:outline-none"
                   />
                 </label>
                 {window.end <= window.start && (
@@ -368,7 +368,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
             setSavedTick(false);
           }}
           disabled={draft.length >= 28}
-          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Add hours
         </button>
@@ -380,7 +380,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
               setSaveError(null);
               setSavedTick(false);
             }}
-            className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+            className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
           >
             Always open
           </button>
@@ -395,7 +395,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
           type="button"
           onClick={() => void handleSave()}
           disabled={!dirty || !validation.success || saving}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save hours"}
         </button>

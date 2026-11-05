@@ -211,7 +211,7 @@ export function MoveToAccountPanel({
       )}
 
       {staffOnly && (
-        <p className="mt-2 text-xs text-amber-800">
+        <p className="mt-2 text-xs text-warning-800">
           You are only a staff member of the restaurants on this account. Only an owner can add
           menus — ask the owner to run this from their sign-in.
         </p>
@@ -230,14 +230,14 @@ export function MoveToAccountPanel({
                 value={newName}
                 onChange={(event) => setNameDraft(event.target.value)}
                 placeholder="e.g. Sunny Side Café"
-                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               />
             </label>
             <button
               type="button"
               onClick={() => void handleCreate()}
               disabled={creating || newName.trim().length === 0}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {creating ? "Creating…" : "Create restaurant"}
             </button>
@@ -257,7 +257,7 @@ export function MoveToAccountPanel({
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -273,7 +273,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={() => void handleMove()}
             disabled={busy || !selectedId}
-            className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             {busy ? "Adding…" : `Add ${menuCount === 1 ? "1 menu" : `${menuCount} menus`}`}
           </button>
@@ -286,7 +286,7 @@ export function MoveToAccountPanel({
             type="button"
             onClick={startRename}
             disabled={mutating}
-            className="text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Rename “{selected.name}”
           </button>
@@ -313,7 +313,7 @@ export function MoveToAccountPanel({
                 if (event.key === "Enter") void handleRename();
                 if (event.key === "Escape") setRenaming(false);
               }}
-              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             />
           </label>
           <div className="flex gap-2">
@@ -321,7 +321,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => void handleRename()}
               disabled={mutating || renameDraft.trim().length === 0}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {mutating ? "Saving…" : "Save name"}
             </button>
@@ -329,7 +329,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => setRenaming(false)}
               disabled={mutating}
-              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Cancel
             </button>
@@ -357,7 +357,7 @@ export function MoveToAccountPanel({
           <button
             type="button"
             onClick={() => setReport(null)}
-            className="mt-2 text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900"
+            className="mt-2 text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900"
           >
             Dismiss
           </button>

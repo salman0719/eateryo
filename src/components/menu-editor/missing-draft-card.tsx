@@ -20,7 +20,7 @@ export function MissingDraftCard({
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       <div>
-        <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
+        <p className="text-xs font-semibold tracking-wide text-warning-800 uppercase">
           Link opened in the wrong place
         </p>
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
@@ -33,7 +33,7 @@ export function MissingDraftCard({
         <li className="flex items-start gap-2.5">
           <span
             aria-hidden="true"
-            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[11px] font-bold text-amber-800"
+            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-warning-200 bg-warning-50 text-[11px] font-bold text-warning-800"
           >
             1
           </span>
@@ -45,7 +45,7 @@ export function MissingDraftCard({
         <li className="flex items-start gap-2.5">
           <span
             aria-hidden="true"
-            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[11px] font-bold text-amber-800"
+            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-warning-200 bg-warning-50 text-[11px] font-bold text-warning-800"
           >
             2
           </span>
@@ -60,14 +60,14 @@ export function MissingDraftCard({
         <button
           type="button"
           onClick={onOpenLibrary}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Go to My menus
         </button>
         <button
           type="button"
           onClick={onStartFresh}
-          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Start a new menu
         </button>

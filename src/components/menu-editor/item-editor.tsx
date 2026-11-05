@@ -63,7 +63,7 @@ export interface ItemActions {
 
 const smallButton =
   "rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 export const ItemEditor = memo(function ItemEditor({
   doc,
@@ -105,12 +105,12 @@ export const ItemEditor = memo(function ItemEditor({
   return (
     <li
       id={`menu-item-${item.id}`}
-      className={`rounded-xl border bg-surface-base ${isRouteTarget ? "border-amber-600 ring-2 ring-amber-200" : "border-line-200"}`}
+      className={`rounded-xl border bg-surface-base ${isRouteTarget ? "border-accent-600 ring-2 ring-accent-200" : "border-line-200"}`}
     >
       {/* The row is the dish: name, price, and the flags that need attention,
           so nothing important is hidden behind the collapse. */}
       <div
-        className={`flex items-center gap-2 px-2 py-1.5 sm:px-3 ${open ? "" : "rounded-xl"} ${selected ? "bg-amber-50/70" : ""}`}
+        className={`flex items-center gap-2 px-2 py-1.5 sm:px-3 ${open ? "" : "rounded-xl"} ${selected ? "bg-warning-50/70" : ""}`}
       >
         <label
           title="Select for bulk move"
@@ -121,7 +121,7 @@ export const ItemEditor = memo(function ItemEditor({
             checked={selected}
             onChange={() => actions.toggleSelected(item.id)}
             aria-label={`Select ${item.name} for bulk move`}
-            className="h-4 w-4 rounded border-line-300 accent-amber-700"
+            className="h-4 w-4 rounded border-line-300 accent-accent-700"
           />
         </label>
         {copy ? (
@@ -140,7 +140,7 @@ export const ItemEditor = memo(function ItemEditor({
           onClick={() => actions.toggleOpen(item.id)}
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -148,7 +148,7 @@ export const ItemEditor = memo(function ItemEditor({
                 {item.name || "Untitled item"}
               </span>
               {needsReview && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                   {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                 </span>
               )}
@@ -221,7 +221,7 @@ export const ItemEditor = memo(function ItemEditor({
                   const v = event.target.value;
                   patch({ available: v === "unknown" ? null : v === "yes" });
                 }}
-                className="w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 focus:border-accent-700 focus:outline-none"
               >
                 <option value="unknown">Unknown</option>
                 <option value="yes">Available</option>
@@ -445,7 +445,7 @@ export const ItemEditor = memo(function ItemEditor({
           </div>
 
           {item.reviewNotes.length > 0 && (
-            <ul className="mt-3 list-disc space-y-0.5 rounded-lg bg-amber-50 p-3 pl-8 text-xs text-amber-900">
+            <ul className="mt-3 list-disc space-y-0.5 rounded-lg bg-warning-50 p-3 pl-8 text-xs text-warning-900">
               {item.reviewNotes.map((note) => (
                 <li key={note}>{note}</li>
               ))}
@@ -492,7 +492,7 @@ export const ItemEditor = memo(function ItemEditor({
                         event.target.value = "";
                       }
                     }}
-                    className="w-full rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none sm:w-auto"
+                    className="w-full rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none sm:w-auto"
                   >
                     <option value="">Category…</option>
                     {categories
@@ -508,7 +508,7 @@ export const ItemEditor = memo(function ItemEditor({
             )}
             <div className="flex flex-wrap items-center gap-2 sm:contents">
               {needsReview && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                   {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                 </span>
               )}

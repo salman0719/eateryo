@@ -141,16 +141,16 @@ interface MenuEditorProps {
 
 const smallButton =
   "rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 const primaryButton =
-  "rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors " +
-  "hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
+  "rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors " +
+  "hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 const tinyButton =
   "rounded-full border border-line-300 px-2 py-1 text-xs font-medium text-ink-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40";
 
 export function MenuEditor({
   doc,
@@ -534,7 +534,7 @@ export function MenuEditor({
         <button
           type="button"
           onClick={handleUndo}
-          className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:border-amber-700 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:border-accent-700 hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           ↩ Undo {undoLabel}
         </button>
@@ -687,7 +687,7 @@ export function MenuEditor({
                             {duplicateIds.has(item.id) && (
                               <span
                                 title="This name appears more than once — see the duplicate review on the edit screen."
-                                className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+                                className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
                               >
                                 duplicate
                               </span>
@@ -743,7 +743,7 @@ export function MenuEditor({
                                     event.target.value = "";
                                   }
                                 }}
-                                className="shrink-0 rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+                                className="shrink-0 rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
                               >
                                 <option value="">Move to…</option>
                                 {doc.categories
@@ -780,7 +780,7 @@ export function MenuEditor({
               <button
                 type="button"
                 onClick={onRetryAccountCheck}
-                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>
@@ -798,7 +798,7 @@ export function MenuEditor({
             <button
               type="button"
               onClick={onStartPublish}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               set up table ordering
             </button>{" "}
@@ -806,7 +806,7 @@ export function MenuEditor({
             <button
               type="button"
               onClick={() => changeMode("preview")}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               preview the order page
             </button>
@@ -818,7 +818,7 @@ export function MenuEditor({
             <button
               type="button"
               onClick={() => changeMode("preview")}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               go to Preview
             </button>{" "}
@@ -870,7 +870,7 @@ export function MenuEditor({
                 )}
                 {canManage && (
                   <label
-                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-amber-700 hover:bg-amber-50 focus-within:border-amber-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
+                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-accent-700 hover:bg-accent-50 focus-within:border-accent-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
                   >
                     <span
                       aria-hidden="true"
@@ -903,7 +903,7 @@ export function MenuEditor({
             </div>
           )}
           {reviewCount > 0 && (
-            <p className="mt-2 text-xs font-medium text-amber-800">
+            <p className="mt-2 text-xs font-medium text-warning-800">
               {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
             </p>
           )}
@@ -920,16 +920,16 @@ export function MenuEditor({
       {duplicateGroups.length > 0 && (
         <section
           aria-label="Possible duplicates"
-          className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4"
+          className="rounded-2xl border border-warning-300 bg-warning-50/70 p-4"
         >
-          <p className="text-sm font-semibold text-amber-900">
+          <p className="text-sm font-semibold text-warning-900">
             {duplicateGroups.length === 1
               ? "1 possible duplicate found — review it; nothing is deleted automatically."
               : `${duplicateGroups.length} possible duplicates found — review them; nothing is deleted automatically.`}
           </p>
           <ul className="mt-3 space-y-3">
             {duplicateGroups.map((group) => (
-              <li key={group.key} className="rounded-xl border border-amber-200 bg-surface-base p-3">
+              <li key={group.key} className="rounded-xl border border-warning-200 bg-surface-base p-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-ink-900">
                     “{group.displayName}” appears {group.occurrences.length} times
@@ -986,7 +986,7 @@ export function MenuEditor({
             if (event.key === "Escape" && query) setQuery("");
           }}
           placeholder="Search items, descriptions, or categories…"
-          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-amber-700 focus:outline-none"
+          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
         />
         {isFiltering && (
           <button type="button" onClick={() => setQuery("")} className={smallButton}>
@@ -1017,18 +1017,18 @@ export function MenuEditor({
         <div
           role="region"
           aria-label="Bulk actions"
-          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3 shadow-sm backdrop-blur"
+          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-300 bg-warning-50/95 p-3 shadow-sm backdrop-blur"
         >
-          <p className="text-xs font-semibold text-amber-900">
+          <p className="text-xs font-semibold text-warning-900">
             {selected.length} {selected.length === 1 ? "item" : "items"} selected
           </p>
-          <label className="flex items-center gap-1.5 text-xs text-amber-900">
+          <label className="flex items-center gap-1.5 text-xs text-warning-900">
             Move to
             <select
               aria-label="Category to move selected items to"
               value={bulkTarget}
               onChange={(event) => setBulkTarget(event.target.value)}
-              className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+              className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
             >
               <option value="">Category…</option>
               {doc.categories.map((category) => (
@@ -1069,7 +1069,7 @@ export function MenuEditor({
               type="button"
               onClick={() => stepCategory(-1)}
               aria-label="Previous category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               ‹
             </button>
@@ -1078,7 +1078,7 @@ export function MenuEditor({
               <select
                 value={activeMatch.category.id}
                 onChange={(event) => setActiveCategoryId(event.target.value)}
-                className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
               >
                 {search.categories.map(({ category, items }) => (
                   <option key={category.id} value={category.id}>
@@ -1091,7 +1091,7 @@ export function MenuEditor({
               type="button"
               onClick={() => stepCategory(1)}
               aria-label="Next category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               ›
             </button>
@@ -1150,7 +1150,7 @@ export function MenuEditor({
                         ? "Collapse this section"
                         : "Expand this section"
                   }
-                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
                 >
                   {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </button>
@@ -1159,14 +1159,14 @@ export function MenuEditor({
                     label={`Category ${index + 1}`}
                     value={category.name}
                     hideLabel
-                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-line-300 focus:border-amber-700 focus:bg-surface-base"
+                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-line-300 focus:border-accent-700 focus:bg-surface-base"
                     onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
                   />
                 </div>
                 <p className="shrink-0 text-xs text-ink-500">
                   {items.length} {items.length === 1 ? "item" : "items"}
                   {toCheck > 0 && (
-                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                    <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                       {toCheck} to check
                     </span>
                   )}
@@ -1248,7 +1248,7 @@ export function MenuEditor({
       <button
         type="button"
         onClick={handleAddCategory}
-        className="rounded-2xl border-2 border-dashed border-line-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="rounded-2xl border-2 border-dashed border-line-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         + Add category
       </button>
@@ -1304,7 +1304,7 @@ export function MenuEditor({
       {addPages.status === "working" && (
         <p
           role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900"
         >
           Reading the new pages… keep this tab open. Your edits are safe.
         </p>
@@ -1336,7 +1336,7 @@ export function MenuEditor({
               <button
                 type="button"
                 onClick={onRetryAccountCheck}
-                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>

@@ -18,7 +18,7 @@ const DISHES = [
 function MenuCard({ rows }: { rows: number }) {
   return (
     <div className="rounded-2xl border border-line-200 bg-surface-base p-5 shadow-[0_18px_40px_-32px_rgba(28,25,23,0.55)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-700">
         Lunch · today
       </p>
       <h3 className="mt-1 text-lg font-semibold text-ink-900">The counter menu</h3>
@@ -77,7 +77,7 @@ export function HeightRevealDemo() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-10">
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent-700">
           Developer preview
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink-900">Height reveal</h1>
@@ -160,11 +160,11 @@ export function HeightRevealDemo() {
       </p>
 
       <div className="mt-6 grid items-start gap-5 md:grid-cols-2">
-        <section className="rounded-3xl border border-amber-200 bg-amber-50/40 p-4">
+        <section className="rounded-3xl border border-warning-200 bg-warning-50/40 p-4">
           <header className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
             <div className="flex items-center gap-2">
               <h2 className="font-mono text-xs font-semibold text-ink-800">observeResize</h2>
-              <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+              <span className="rounded-full bg-warning-200 px-2 py-0.5 text-[11px] font-semibold text-warning-900">
                 on
               </span>
             </div>

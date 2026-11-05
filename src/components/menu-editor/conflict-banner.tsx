@@ -28,10 +28,10 @@ export function ConflictBanner({
     <div
       role="alert"
       data-print-hide
-      className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4"
+      className="rounded-2xl border border-warning-300 bg-warning-50 px-5 py-4"
     >
-      <p className="font-medium text-amber-900">This menu was changed on your other device</p>
-      <p className="mt-1 text-sm leading-6 text-amber-800">
+      <p className="font-medium text-warning-900">This menu was changed on your other device</p>
+      <p className="mt-1 text-sm leading-6 text-warning-800">
         A newer version was saved after the one you have open. Your edits are safe in this browser —
         choose which version wins.
       </p>
@@ -40,7 +40,7 @@ export function ConflictBanner({
         <button
           type="button"
           onClick={onReloadServer}
-          className="rounded-full bg-amber-800 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800"
+          className="rounded-full bg-accent-800 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
         >
           Load the newest version
         </button>
@@ -48,13 +48,13 @@ export function ConflictBanner({
           type="button"
           onClick={onKeepMine}
           disabled={serverUpdatedAt === null}
-          className="rounded-full border border-amber-700 px-4 py-1.5 text-sm font-medium text-amber-900 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-accent-700 px-4 py-1.5 text-sm font-medium text-accent-900 transition-colors hover:bg-accent-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Keep my version
         </button>
       </div>
       {serverUpdatedAt === null && (
-        <p className="mt-2 text-xs text-amber-800">
+        <p className="mt-2 text-xs text-warning-800">
           This menu is no longer in your account, so there is nothing to overwrite — keep your
           version, or add it again from My menus.
         </p>
