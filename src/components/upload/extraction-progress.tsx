@@ -141,7 +141,7 @@ export function ExtractionProgress({
         </p>
       </div>
 
-      <aside className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+      <aside className="rounded-2xl border border-line-200 bg-surface-base p-5">
         <p className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase">
           While you wait
         </p>

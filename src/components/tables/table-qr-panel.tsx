@@ -448,7 +448,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
         <>
           <div
             data-print-hide
-            className="flex flex-wrap items-end gap-3 rounded-2xl border border-stone-200 bg-surface-base p-4"
+            className="flex flex-wrap items-end gap-3 rounded-2xl border border-line-200 bg-surface-base p-4"
           >
             <label className="text-xs font-semibold text-ink-600">
               Tables
@@ -465,7 +465,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                     : undefined
                 }
                 onChange={(event) => changeCount(Number(event.target.value))}
-                className="mt-1 block w-24 rounded-xl border border-stone-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
+                className="mt-1 block w-24 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
               />
             </label>
             <label className="text-xs font-semibold text-ink-600">
@@ -481,14 +481,14 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 }
                 onChange={(event) => changePrefix(event.target.value)}
                 placeholder="Table"
-                className="mt-1 block w-40 rounded-xl border border-stone-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
+                className="mt-1 block w-40 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none disabled:opacity-50"
               />
             </label>
             {custom && (
               <button
                 type="button"
                 onClick={resetNames}
-                className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-semibold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-800"
+                className="rounded-full border border-line-300 px-4 py-1.5 text-xs font-semibold text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-800"
               >
                 Reset names
               </button>
@@ -498,7 +498,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
               <select
                 value={focusedLabel ?? ""}
                 onChange={(event) => setFocusLabel(event.target.value)}
-                className="mt-1 block w-40 rounded-xl border border-stone-300 bg-surface-base px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none"
+                className="mt-1 block w-40 rounded-xl border border-line-300 bg-surface-base px-3 py-1.5 text-sm font-normal focus:border-amber-700 focus:outline-none"
               >
                 <option value="">All tables</option>
                 {labels.map((label) => (
@@ -579,7 +579,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
           <div
             data-qr-sheet
             data-qr-single={focusedLabel ? "" : undefined}
-            className={`grid gap-3 rounded-2xl border border-stone-200 bg-surface-base p-4 ${
+            className={`grid gap-3 rounded-2xl border border-line-200 bg-surface-base p-4 ${
               focusedLabel ? "mx-auto w-full max-w-sm grid-cols-1" : "sm:grid-cols-2"
             }`}
           >
@@ -587,7 +587,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
               <article
                 key={code.label}
                 data-qr-card
-                className="flex flex-col items-center gap-2 rounded-xl border border-stone-200 p-4 text-center"
+                className="flex flex-col items-center gap-2 rounded-xl border border-line-200 p-4 text-center"
               >
                 <p className="text-xs font-semibold tracking-widest text-ink-500 uppercase">
                   {cardEyebrow.trim() || "Untitled menu"}

@@ -33,7 +33,7 @@ export function OrderSkeleton({ label }: { label: string }) {
     <div
       role="status"
       aria-busy="true"
-      className="rounded-2xl border border-stone-200 bg-surface-base p-6"
+      className="rounded-2xl border border-line-200 bg-surface-base p-6"
     >
       <span className="sr-only">{label}</span>
       <Skeleton className="h-6 w-1/2" />
@@ -141,12 +141,12 @@ export function OrderMenuSection({
   return (
     <section
       aria-label={category.name}
-      className="overflow-hidden rounded-2xl border border-stone-200 bg-surface-base"
+      className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
     >
-      <h2 className="border-b border-stone-100 bg-surface-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
+      <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
         {category.name}
       </h2>
-      <ul className="divide-y divide-stone-100">
+      <ul className="divide-y divide-line-100">
         {category.items.map((item) => {
           const soldOut = item.available === false;
           // One chip per diet: an older document (or a CSV import) can hold the
@@ -203,7 +203,7 @@ export function OrderMenuSection({
                     <select
                       value={variant?.name ?? ""}
                       onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-stone-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
+                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-amber-700 focus:outline-none"
                     >
                       {item.variants.map((option) => (
                         <option key={option.name} value={option.name}>
@@ -312,7 +312,7 @@ export function StickyCartBar({
   if (contained) {
     return (
       <div
-        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-stone-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
+        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {inner}
@@ -324,7 +324,7 @@ export function StickyCartBar({
     <>
       <div aria-hidden="true" className="h-16" />
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-full max-w-4xl">{inner}</div>

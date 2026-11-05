@@ -127,7 +127,7 @@ function PriceField({
           aria-label="Proposed price"
           aria-invalid={error !== null}
           className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-ink-900 focus:border-amber-700 focus:outline-none disabled:bg-surface-100 ${
-            error ? "border-danger-500" : "border-stone-300"
+            error ? "border-danger-500" : "border-line-300"
           }`}
         />
         {currency && <span className="font-normal text-ink-500">{currency}</span>}
@@ -202,7 +202,7 @@ export function ProposalReview({
           return (
             <li
               key={`${operation.op}-${index}`}
-              className="rounded-xl border border-stone-200 bg-surface-50 p-3"
+              className="rounded-xl border border-line-200 bg-surface-50 p-3"
             >
               <p className="text-sm font-medium text-ink-900">
                 {preview?.summary ?? operation.op.replaceAll("_", " ")}
@@ -279,7 +279,7 @@ export function ProposalReview({
           type="button"
           onClick={onDiscard}
           disabled={busy}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-stone-400 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-line-400 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           Discard
         </button>

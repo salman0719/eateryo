@@ -85,7 +85,7 @@ export function OrderCartLines({
   return (
     <>
       {lines.length > 0 && (
-        <ul className="divide-y divide-stone-100">
+        <ul className="divide-y divide-line-100">
           {lines.map((line, index) => (
             <li key={orderLineKey(line)} className="py-3">
               <div className="flex items-baseline justify-between gap-2">
@@ -115,7 +115,7 @@ export function OrderCartLines({
                   type="button"
                   aria-label={`Decrease ${line.name}`}
                   onClick={() => onQuantityChange(index, line.quantity - 1)}
-                  className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
+                  className="h-7 w-7 rounded-full border border-line-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
                 >
                   −
                 </button>
@@ -124,7 +124,7 @@ export function OrderCartLines({
                   type="button"
                   aria-label={`Increase ${line.name}`}
                   onClick={() => onQuantityChange(index, line.quantity + 1)}
-                  className="h-7 w-7 rounded-full border border-stone-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
+                  className="h-7 w-7 rounded-full border border-line-300 text-sm font-semibold text-ink-700 hover:border-amber-700"
                 >
                   +
                 </button>
@@ -152,7 +152,7 @@ export function OrderCartLines({
         rows={2}
         maxLength={280}
         placeholder="Allergies, no onions…"
-        className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
       />
     </>
   );
@@ -198,7 +198,7 @@ export function OrderCartPanel({
   return (
     <aside
       aria-label="Your order"
-      className="h-fit rounded-2xl border border-stone-200 bg-surface-base p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
+      className="h-fit rounded-2xl border border-line-200 bg-surface-base p-5 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto"
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2 className="text-lg font-bold text-ink-900">Your order</h2>
@@ -209,7 +209,7 @@ export function OrderCartPanel({
       {subtitle && <p className="mt-0.5 truncate text-xs text-ink-500">{subtitle}</p>}
 
       {lines.length === 0 && (
-        <p className="mt-3 rounded-xl border border-dashed border-stone-300 p-4 text-center text-sm text-ink-500">
+        <p className="mt-3 rounded-xl border border-dashed border-line-300 p-4 text-center text-sm text-ink-500">
           Nothing added yet.
         </p>
       )}
@@ -226,7 +226,7 @@ export function OrderCartPanel({
         />
       </div>
 
-      <div className="mt-4 border-t border-stone-200 pt-3">{footer}</div>
+      <div className="mt-4 border-t border-line-200 pt-3">{footer}</div>
     </aside>
   );
 }

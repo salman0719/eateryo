@@ -21,7 +21,7 @@ export function InvitationSkeleton() {
     <div role="status" aria-busy="true" className="flex flex-col gap-6">
       <span className="sr-only">Loading the invitation…</span>
       <Skeleton className="h-4 w-4/5" />
-      <div className="rounded-lg border border-stone-200 bg-surface-base p-4">
+      <div className="rounded-lg border border-line-200 bg-surface-base p-4">
         <Skeleton className="h-3 w-2/3" />
         <Skeleton className="mt-2 h-3 w-1/2" />
       </div>
@@ -149,7 +149,7 @@ export function InvitationClient({ token }: { token: string }) {
       {!invitation && !loadError && <InvitationSkeleton />}
 
       {invitation && (
-        <div className="rounded-lg border border-stone-200 bg-surface-base p-4 text-sm text-ink-700">
+        <div className="rounded-lg border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
           <p>
             Invited email: <span className="font-medium text-ink-900">{invitation.email}</span>
           </p>

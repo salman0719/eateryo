@@ -183,7 +183,7 @@ function LocalOrdersBoard() {
         <button
           type="button"
           onClick={() => void refresh()}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
         >
           Refresh
         </button>
@@ -219,7 +219,7 @@ function LocalOrdersBoard() {
             const total = orderTotal(order.lines);
             const canAdvance = nextOrderStatus(order.status) !== order.status;
             return (
-              <li key={order.id} className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+              <li key={order.id} className="rounded-2xl border border-line-200 bg-surface-base p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -242,7 +242,7 @@ function LocalOrdersBoard() {
                   </p>
                 </div>
 
-                <ul className="mt-3 space-y-1 border-t border-stone-100 pt-3">
+                <ul className="mt-3 space-y-1 border-t border-line-100 pt-3">
                   {order.lines.map((line, index) => (
                     <li
                       key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
@@ -286,7 +286,7 @@ function LocalOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => void cancel(order)}
-                      className="rounded-full border border-stone-300 px-3.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
+                      className="rounded-full border border-line-300 px-3.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
                     >
                       Cancel
                     </button>

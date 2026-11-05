@@ -75,7 +75,7 @@ export function OrderAlertsCard({
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Order alerts</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         One email per new order for {restaurantName}, from the verified Eateryo sender. A rush
@@ -105,7 +105,7 @@ export function OrderAlertsCard({
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Blank means every owner"
               autoComplete="email"
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             />
           </label>
           <p className="-mt-1 text-[11px] leading-4 text-ink-400">

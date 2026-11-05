@@ -64,7 +64,7 @@ export function ServerTableOrder({
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   function chosenVariantName(item: MenuItem): string | null {
     if (item.variants.length === 0) return null;

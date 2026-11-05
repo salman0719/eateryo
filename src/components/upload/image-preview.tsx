@@ -22,8 +22,8 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
   const atPageLimit = pages.length >= MAX_MENU_PAGES;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-surface-base">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
+    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-100 px-4 py-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink-900">
             {pages.length === 1 ? "Menu image" : `${pages.length} page images`}
@@ -39,7 +39,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
           onClick={onAdd}
           disabled={atPageLimit}
           title={atPageLimit ? `A menu can have up to ${MAX_MENU_PAGES} pages.` : undefined}
-          className="shrink-0 rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="shrink-0 rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           + Add page
         </button>
@@ -49,7 +49,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
         {pages.map((page, index) => (
           <li
             key={`${page.file.name}-${index}`}
-            className="overflow-hidden rounded-xl border border-stone-200"
+            className="overflow-hidden rounded-xl border border-line-200"
           >
             <div className="flex items-center justify-center bg-surface-100 p-3">
               {/* Plain img keeps EXIF orientation handling simple for the prototype. */}
@@ -78,14 +78,14 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
                 <button
                   type="button"
                   onClick={() => onReplace(index)}
-                  className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                 >
                   Replace
                 </button>
                 <button
                   type="button"
                   onClick={() => onRemove(index)}
-                  className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                  className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                 >
                   Remove
                 </button>

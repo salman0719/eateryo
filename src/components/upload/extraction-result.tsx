@@ -239,12 +239,12 @@ export function ExtractionResult({
     return (
       <div
         key={categoryName}
-        className="overflow-hidden rounded-2xl border border-stone-200 bg-surface-base"
+        className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
       >
-        <h3 className="border-b border-stone-100 bg-surface-50 px-5 py-3 text-sm font-bold tracking-wide text-ink-800 uppercase">
+        <h3 className="border-b border-line-100 bg-surface-50 px-5 py-3 text-sm font-bold tracking-wide text-ink-800 uppercase">
           {categoryName}
         </h3>
-        <ul className="divide-y divide-stone-100">
+        <ul className="divide-y divide-line-100">
           {items.map((item, rowIndex) => {
             const needsReview = isFlagged(item);
             const loc = locator?.(rowIndex) ?? null;
@@ -330,7 +330,7 @@ export function ExtractionResult({
                       <button
                         type="button"
                         onClick={() => onResolveItem?.(loc, "looks-good")}
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
                       >
                         ✓ Looks good
                       </button>
@@ -339,7 +339,7 @@ export function ExtractionResult({
                         type="button"
                         onClick={() => onResolveItem?.(loc, "leave-unpriced")}
                         title="Keeps the price blank — totals stay honestly blank for this item."
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-green-700 hover:text-green-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-700"
                       >
                         ✓ Leave unpriced
                       </button>
@@ -359,7 +359,7 @@ export function ExtractionResult({
   // exactly as before.
   const draftDetails =
     data.categories.length === 0 ? (
-      <div className="rounded-2xl border border-stone-200 bg-surface-base p-8 text-center">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
         <p className="font-medium text-ink-900">No menu content detected</p>
         <p className="mt-1 text-sm text-ink-600">
           The image may not show a menu, or the text was unreadable. Try a clearer photo.
@@ -372,7 +372,7 @@ export function ExtractionResult({
     ) : (
       <div className="flex flex-col gap-3">
         {!onlyFlagged && (
-          <section aria-label="Ready items" className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+          <section aria-label="Ready items" className="rounded-2xl border border-line-200 bg-surface-base p-5">
             <h3 className="text-sm font-semibold text-ink-900">
               ✓ Ready ({readyItems.length})
             </h3>
@@ -382,7 +382,7 @@ export function ExtractionResult({
               </p>
             ) : (
               <>
-                <ul className="mt-2 divide-y divide-stone-100">
+                <ul className="mt-2 divide-y divide-line-100">
                   {visibleReady.map((item) => (
                     <li
                       key={`ready-${item.name}`}
@@ -449,7 +449,7 @@ export function ExtractionResult({
         active={allClear}
         pulse={false}
         scrollBlock="start"
-        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-stone-200 bg-surface-base p-5 scroll-mt-4"
+        className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-line-200 bg-surface-base p-5 scroll-mt-4"
       >
         <div>
           <div className="flex flex-wrap items-center gap-2">
@@ -532,7 +532,7 @@ export function ExtractionResult({
           <button
             type="button"
             onClick={onStartOver}
-            className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
             Start over
           </button>

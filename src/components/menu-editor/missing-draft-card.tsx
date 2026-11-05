@@ -29,7 +29,7 @@ export function MissingDraftCard({
         <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">{MISSING_PUBLISH_DRAFT_MESSAGE}</p>
       </div>
 
-      <ol className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-surface-base p-5">
+      <ol className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-5">
         <li className="flex items-start gap-2.5">
           <span
             aria-hidden="true"
@@ -67,7 +67,7 @@ export function MissingDraftCard({
         <button
           type="button"
           onClick={onStartFresh}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
         >
           Start a new menu
         </button>

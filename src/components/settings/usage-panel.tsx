@@ -96,7 +96,7 @@ export function UsagePanel() {
       <div
         role="status"
         aria-busy="true"
-        className="rounded-2xl border border-stone-200 bg-surface-base p-5"
+        className="rounded-2xl border border-line-200 bg-surface-base p-5"
       >
         <span className="sr-only">Checking your usage…</span>
         <Skeleton className="h-4 w-24" />
@@ -130,7 +130,7 @@ export function UsagePanel() {
   const percent = Math.min(100, Math.round((used / usage.cap) * 100));
 
   return (
-    <section className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+    <section className="rounded-2xl border border-line-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Usage</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Free allowances for this account — extraction photos and assistant messages reset each UTC
@@ -190,7 +190,7 @@ export function UsagePanel() {
       </p>
 
       {state.status.assistant.messages > 0 ? (
-        <div className="mt-4 border-t border-stone-100 pt-3">
+        <div className="mt-4 border-t border-line-100 pt-3">
           <h4 className="text-xs font-semibold tracking-wide text-ink-700 uppercase">
             Assistant this month
           </h4>

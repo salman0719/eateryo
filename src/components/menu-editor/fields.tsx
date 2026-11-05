@@ -28,7 +28,7 @@ interface CommitInputProps {
 }
 
 const baseInput =
-  "w-full rounded-lg border border-stone-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
+  "w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
   // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
   "resize-none focus:border-amber-700 focus:outline-none sm:resize-y";
 
@@ -123,7 +123,7 @@ function KeyHint({ glyph, children }: { glyph: string; children: string }) {
       <span className="font-semibold text-ink-700">{children}</span>
       <kbd
         aria-hidden="true"
-        className="rounded border border-stone-300 bg-surface-base px-1 py-px font-sans text-[10px] leading-none text-ink-500"
+        className="rounded border border-line-300 bg-surface-base px-1 py-px font-sans text-[10px] leading-none text-ink-500"
       >
         {glyph}
       </kbd>
@@ -261,7 +261,7 @@ export function CommitTags({
               // The click adds it: for the mouse, and for Enter or Space on the
               // focused button, which is what a button is expected to do.
               onClick={() => commit([...tags, candidate])}
-              className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-[11px] text-ink-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-dashed border-line-300 px-2 py-0.5 text-[11px] text-ink-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               + {candidate}
             </button>

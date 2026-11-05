@@ -35,14 +35,14 @@ function navigateInApp(event: MouseEvent<HTMLAnchorElement>, href: string) {
 
 export function GuidanceCard({ title, steps, action }: GuidanceCardProps) {
   return (
-    <div className="rounded-2xl border border-dashed border-stone-300 bg-surface-base p-8 text-center">
+    <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
       <p className="font-medium text-ink-900">{title}</p>
       <ol className="mx-auto mt-3 max-w-md space-y-2 text-left">
         {steps.map((step, index) => (
           <li key={step} className="flex items-start gap-2.5 text-sm leading-6 text-ink-600">
             <span
               aria-hidden="true"
-              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 bg-surface-base text-[11px] font-bold text-ink-400"
+              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-300 bg-surface-base text-[11px] font-bold text-ink-400"
             >
               {index + 1}
             </span>

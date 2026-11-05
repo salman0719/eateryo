@@ -116,7 +116,7 @@ export function LaunchChecklist() {
 
   if (state.kind === "loading") {
     return (
-      <div role="status" aria-busy="true" className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+      <div role="status" aria-busy="true" className="rounded-2xl border border-line-200 bg-surface-base p-5">
         <span className="sr-only">Checking your account…</span>
         <Skeleton className="h-5 w-48" />
         <div className="mt-4 flex flex-col gap-3">
@@ -181,7 +181,7 @@ export function LaunchChecklist() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+      <section className="rounded-2xl border border-line-200 bg-surface-base p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-ink-900">Your launch checklist</h2>
           <p className="text-xs text-ink-500">
@@ -209,7 +209,7 @@ export function LaunchChecklist() {
                   "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                   (step.done
                     ? "border-amber-700 bg-amber-700 text-white"
-                    : "border-stone-300 bg-surface-base text-ink-400")
+                    : "border-line-300 bg-surface-base text-ink-400")
                 }
               >
                 {step.done ? "✓" : index + 1}
@@ -240,7 +240,7 @@ export function LaunchChecklist() {
                           type="checkbox"
                           checked={cardsPrinted}
                           onChange={(event) => toggleCardsPrinted(event.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-stone-300 accent-amber-700"
+                          className="h-3.5 w-3.5 rounded border-line-300 accent-amber-700"
                         />
                         {cardsPrinted ? "I printed them (untick to undo)" : "I printed them"}
                       </label>

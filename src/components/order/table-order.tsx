@@ -151,7 +151,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     }
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   if (state === "invalid_link") {
     return (
@@ -197,7 +197,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             </button>
             <Link
               href="/"
-              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900"
             >
               Back to the app
             </Link>

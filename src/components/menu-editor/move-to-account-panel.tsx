@@ -230,7 +230,7 @@ export function MoveToAccountPanel({
                 value={newName}
                 onChange={(event) => setNameDraft(event.target.value)}
                 placeholder="e.g. Sunny Side Café"
-                className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               />
             </label>
             <button
@@ -257,7 +257,7 @@ export function MoveToAccountPanel({
             <select
               value={selectedId}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               <option value="" disabled>
                 Choose a restaurant…
@@ -313,7 +313,7 @@ export function MoveToAccountPanel({
                 if (event.key === "Enter") void handleRename();
                 if (event.key === "Escape") setRenaming(false);
               }}
-              className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             />
           </label>
           <div className="flex gap-2">
@@ -329,7 +329,7 @@ export function MoveToAccountPanel({
               type="button"
               onClick={() => setRenaming(false)}
               disabled={mutating}
-              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-stone-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               Cancel
             </button>
@@ -340,7 +340,7 @@ export function MoveToAccountPanel({
       {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
 
       {report && (
-        <div className="mt-3 rounded-xl border border-stone-200 bg-surface-50 p-3">
+        <div className="mt-3 rounded-xl border border-line-200 bg-surface-50 p-3">
           <p className="text-sm font-medium text-ink-900">
             Added {report.imported.length} · already there {report.skipped.length} · failed{" "}
             {report.failed.length}

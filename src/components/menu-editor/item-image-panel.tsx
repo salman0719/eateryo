@@ -23,7 +23,7 @@ import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
  */
 
 const smallButton =
-  "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
+  "rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
   "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 " +
   "disabled:cursor-not-allowed disabled:opacity-40";
 
@@ -72,7 +72,7 @@ export function ItemImagePanel({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-surface-base p-2.5">
+    <div className="rounded-lg border border-line-200 bg-surface-base p-2.5">
       <div className="flex items-center gap-3">
         {copy ? (
           // Straight from the CDN at the size we stored — no optimizer runs
@@ -84,12 +84,12 @@ export function ItemImagePanel({
             height={copy.height}
             loading="lazy"
             decoding="async"
-            className="h-12 w-12 shrink-0 rounded-md border border-stone-200 object-cover"
+            className="h-12 w-12 shrink-0 rounded-md border border-line-200 object-cover"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-stone-300 bg-surface-50 text-lg text-ink-400"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-line-300 bg-surface-50 text-lg text-ink-400"
           >
             ▢
           </span>
@@ -145,7 +145,7 @@ export function ItemImagePanel({
         <p role="status" className="mt-2 text-xs text-ink-500">
           <span
             aria-hidden="true"
-            className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-stone-400 border-t-transparent align-[-2px]"
+            className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-line-400 border-t-transparent align-[-2px]"
           />
           Uploading photo… {state.percent}%
         </p>

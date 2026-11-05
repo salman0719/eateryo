@@ -40,7 +40,7 @@ export function TeamActivity({
   }, [restaurantId, refreshKey]);
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Team activity</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Who invited, changed roles for, or removed someone — most recent first.
@@ -58,7 +58,7 @@ export function TeamActivity({
           {[0, 1, 2].map((row) => (
             <div
               key={row}
-              className="flex items-baseline justify-between gap-3 border-b border-stone-100 pb-2 last:border-b-0 last:pb-0"
+              className="flex items-baseline justify-between gap-3 border-b border-line-100 pb-2 last:border-b-0 last:pb-0"
             >
               <Skeleton className="h-3 flex-1" />
               <Skeleton className="h-3 w-12 shrink-0" />
@@ -78,7 +78,7 @@ export function TeamActivity({
           {events.map((event) => (
             <li
               key={event.id}
-              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-stone-100 pb-2 last:border-b-0 last:pb-0"
+              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line-100 pb-2 last:border-b-0 last:pb-0"
             >
               <p className="min-w-0 flex-1 text-xs leading-5 text-ink-700">
                 {describeAuditEvent(event)}

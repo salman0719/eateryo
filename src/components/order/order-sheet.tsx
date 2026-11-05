@@ -114,7 +114,7 @@ export function OrderSheet({
         tabIndex={-1}
         className={`sheet-up pointer-events-auto ${placed} inset-x-0 bottom-0 ${
           layer ? "z-10" : "z-50"
-        } mx-auto flex max-h-[85%] w-full max-w-xl flex-col rounded-t-2xl border-t border-stone-200 bg-surface-base shadow-[0_-10px_30px_rgba(28,25,23,0.18)] outline-none`}
+        } mx-auto flex max-h-[85%] w-full max-w-xl flex-col rounded-t-2xl border-t border-line-200 bg-surface-base shadow-[0_-10px_30px_rgba(28,25,23,0.18)] outline-none`}
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="flex items-start justify-between gap-3 px-4 pt-4">
@@ -130,7 +130,7 @@ export function OrderSheet({
               type="button"
               onClick={onClose}
               aria-label="Close your order"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-stone-300 text-base font-semibold text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-line-300 text-base font-semibold text-ink-600 transition-colors hover:border-amber-700 hover:text-amber-900"
             >
               ×
             </button>
@@ -149,7 +149,7 @@ export function OrderSheet({
           />
         </div>
 
-        <div className="mt-3 border-t border-stone-200 px-4 pt-3">{footer}</div>
+        <div className="mt-3 border-t border-line-200 px-4 pt-3">{footer}</div>
       </div>
     </>,
     layer ?? document.body

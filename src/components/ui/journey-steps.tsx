@@ -36,7 +36,7 @@ export function JourneySteps({
               className={[
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs",
                 status === "upcoming"
-                  ? "border border-stone-300 bg-surface-base text-ink-600"
+                  ? "border border-line-300 bg-surface-base text-ink-600"
                   : "bg-amber-700 text-white",
               ].join(" ")}
             >

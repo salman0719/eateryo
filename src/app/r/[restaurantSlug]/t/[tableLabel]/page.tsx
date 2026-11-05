@@ -88,7 +88,7 @@ async function TableLandingContent({
   if (!tableLabel) {
     return (
       <OrderShell>
-        <div className="rounded-2xl border border-stone-200 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
           <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
           <p className="mt-2 text-sm leading-6 text-ink-600">
             A table link includes the table number, like{" "}
@@ -102,7 +102,7 @@ async function TableLandingContent({
     );
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   if (landing.menus.length === 0 && landing.closedMenus.length === 0) {
     return (

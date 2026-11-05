@@ -126,7 +126,7 @@ export function LibraryPanel({
       </div>
 
       {secondMenuSuggestions.length > 0 && (
-        <div className="rounded-2xl border border-stone-200 bg-surface-50 px-4 py-3">
+        <div className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3">
           <p className="text-sm text-ink-700">
             Adding another? <span className="font-medium">Is it for a different time or service?</span>
           </p>
@@ -137,7 +137,7 @@ export function LibraryPanel({
                 type="button"
                 onClick={() => onNew(name)}
                 disabled={unavailable}
-                className="rounded-full border border-stone-300 bg-surface-base px-3 py-1 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-sm font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
               >
                 {name}
               </button>
@@ -160,7 +160,7 @@ export function LibraryPanel({
         <div role="status" aria-busy="true" className="flex flex-col gap-3">
           <span className="sr-only">Loading your menus…</span>
           {[0, 1, 2].map((row) => (
-            <div key={row} className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+            <div key={row} className="rounded-2xl border border-line-200 bg-surface-base p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <Skeleton className="h-5 w-2/5" />
@@ -175,7 +175,7 @@ export function LibraryPanel({
           ))}
         </div>
       ) : menus.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">
             {hasHiddenMenus ? "Signed out" : "No saved menus yet"}
           </p>
@@ -188,7 +188,7 @@ export function LibraryPanel({
       ) : (
         <ul className="space-y-3">
           {menus.map((menu) => (
-            <li key={menu.id} className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+            <li key={menu.id} className="rounded-2xl border border-line-200 bg-surface-base p-4">
               {menu.corrupt ? (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -207,7 +207,7 @@ export function LibraryPanel({
                       });
                       if (ok) onDelete(menu.id);
                     }}
-                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                    className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Delete
                   </button>
@@ -269,7 +269,7 @@ export function LibraryPanel({
                         });
                         if (ok) onDelete(menu.id);
                       }}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                     >
                       Delete
                     </button>
@@ -277,13 +277,13 @@ export function LibraryPanel({
                 </div>
               )}
               {pickerMenuId === menu.id && (
-                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-stone-200 bg-surface-50 p-3 sm:flex-row sm:items-end">
+                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line-200 bg-surface-50 p-3 sm:flex-row sm:items-end">
                   <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
                     Add “{menu.title}” to
                     <select
                       value={targetId}
                       onChange={(event) => setTargetId(event.target.value)}
-                      className="rounded-lg border border-stone-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…
@@ -308,7 +308,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => setPickerMenuId(null)}
                       disabled={movingId !== null}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-stone-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
                     >
                       Cancel
                     </button>

@@ -2492,7 +2492,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 ${
                   screen === tab.id
                     ? "bg-surface-900 text-white"
-                    : "bg-surface-base text-ink-600 ring-1 ring-stone-200 hover:text-ink-900"
+                    : "bg-surface-base text-ink-600 ring-1 ring-line-200 hover:text-ink-900"
                 }`}
               >
                 {tab.label}
@@ -2542,7 +2542,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         {/* A failed account read is no longer silent: the gate settles, the
             server paths stay off, and this says so once. */}
         {signedIn && claimGate.incomplete && screen !== "editor" && (
-          <p className="rounded-2xl border border-stone-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
+          <p className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
             We couldn&apos;t check your account just now, so nothing was imported from this
             browser. Reload when you&apos;re back online and it will try again.
           </p>
@@ -2638,14 +2638,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 offer handles the common case, and this is where a partial
                 import is retried. */}
             {signedIn && libraryAccountMode && localOnlyCount > 0 && (
-              <details className="rounded-2xl border border-stone-200 bg-surface-base">
+              <details className="rounded-2xl border border-line-200 bg-surface-base">
                 <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-700 marker:text-ink-400">
                   Import from this browser
                   <span className="ml-2 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                     {localOnlyCount}
                   </span>
                 </summary>
-                <div className="border-t border-stone-200">
+                <div className="border-t border-line-200">
                   <MoveToAccountPanel
                     menuCount={localOnlyCount}
                     menuIds={localOnly.map((menu) => menu.id)}
@@ -2679,7 +2679,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               role="status"
               aria-busy="true"
               aria-label="Loading the assistant"
-              className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-surface-base p-6"
+              className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
             >
               <span className="sr-only">Loading the assistant…</span>
               <Skeleton className="h-6 w-40" />
@@ -2701,7 +2701,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             // back to capture — so render nothing while the bounce lands.
             null
           ) : (
-            <section className="rounded-2xl border border-dashed border-stone-300 bg-surface-base p-8 text-center">
+            <section className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
               <h1 className="font-medium text-ink-900">Assistant isn’t available</h1>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 The assistant isn’t released to this account yet. Everything else in Eateryo works
@@ -2993,7 +2993,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           />
         )}
         {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
-          <section className="rounded-2xl border border-stone-200 bg-surface-base p-6 text-center">
+          <section className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
             <h1 className="font-medium text-ink-900">Checking your session…</h1>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
               We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft
@@ -3031,14 +3031,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <Skeleton className="h-4 w-40" />
             </div>
             <div className="grid items-start gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-stone-200 bg-surface-base p-5">
+              <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
                 <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
                   <Skeleton className="h-9" />
                   <Skeleton className="h-9" />
                 </div>
                 <Skeleton className="mt-3 h-28" />
               </div>
-              <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+              <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
                 <Skeleton className="h-4 w-28" />
                 <Skeleton className="mt-2 h-3 w-3/5" />
                 <Skeleton className="mt-4 h-9" />
@@ -3061,7 +3061,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       <nav
         data-print-hide
         aria-label="Sections"
-        className="sticky bottom-0 z-30 border-t border-stone-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
+        className="sticky bottom-0 z-30 border-t border-line-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div
@@ -3128,7 +3128,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           <div
             role="dialog"
             aria-label="More"
-            className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-stone-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+            className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-line-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
           >
             <div aria-hidden="true" className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-surface-200" />
             {moreSheetRows({ signedIn, assistantEnabled: featureFlags.assistant }).map((row) => (

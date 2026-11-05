@@ -42,7 +42,7 @@ export function PhoneFrame({
 
   return (
     <figure aria-label={label} className={`mx-auto w-full ${widthClass}`}>
-      <div className="rounded-[2.4rem] border-[10px] border-stone-900 bg-surface-900 shadow-xl">
+      <div className="rounded-[2.4rem] border-[10px] border-line-900 bg-surface-900 shadow-xl">
         <div className="relative overflow-hidden rounded-[1.7rem] bg-surface-base">
           <div className={`phone-scroll relative overflow-y-auto ${heightClass}`}>
             <div

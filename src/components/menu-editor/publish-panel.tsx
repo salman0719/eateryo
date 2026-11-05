@@ -153,7 +153,7 @@ function ChangeList({
         <summary className="cursor-pointer text-xs font-medium text-amber-800 underline hover:text-amber-900">
           Show details
         </summary>
-        <ul className="mt-2 max-h-56 divide-y divide-stone-100 overflow-y-auto rounded-xl border border-stone-200">
+        <ul className="mt-2 max-h-56 divide-y divide-line-100 overflow-y-auto rounded-xl border border-line-200">
           {summary.rows.map((row, index) => (
             <li
               key={`${row.kind}:${row.name}:${index}`}
@@ -201,7 +201,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (!signedIn) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <StatusPill status={null} />
@@ -232,7 +232,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (inAccount === null && accountCheckFailed) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <span className={`${pill} bg-surface-100 text-ink-600`}>Not checked</span>
@@ -245,7 +245,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           <button
             type="button"
             onClick={onRetryAccountCheck}
-            className="mt-3 rounded-full border border-stone-300 px-4 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+            className="mt-3 rounded-full border border-line-300 px-4 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
           >
             Try again
           </button>
@@ -256,7 +256,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (inAccount === null) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <Skeleton className="h-5 w-16 rounded-full" />
@@ -274,7 +274,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
 
   if (!inAccount) {
     return (
-      <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+      <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
           <StatusPill status={status} />
@@ -302,7 +302,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
   }
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
         <StatusPill status={status} />
@@ -373,7 +373,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
                 if (ok) onUnpublish();
               }}
               disabled={busy}
-              className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
             >
               {busy ? "Working…" : "Unpublish"}
             </button>

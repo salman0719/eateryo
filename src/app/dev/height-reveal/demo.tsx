@@ -17,12 +17,12 @@ const DISHES = [
 
 function MenuCard({ rows }: { rows: number }) {
   return (
-    <div className="rounded-2xl border border-stone-200 bg-surface-base p-5 shadow-[0_18px_40px_-32px_rgba(28,25,23,0.55)]">
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-5 shadow-[0_18px_40px_-32px_rgba(28,25,23,0.55)]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
         Lunch · today
       </p>
       <h3 className="mt-1 text-lg font-semibold text-ink-900">The counter menu</h3>
-      <ul className="mt-3 divide-y divide-stone-100">
+      <ul className="mt-3 divide-y divide-line-100">
         {Array.from({ length: rows }, (_, index) => {
           const dish = DISHES[index % DISHES.length];
           return (
@@ -38,7 +38,7 @@ function MenuCard({ rows }: { rows: number }) {
           );
         })}
       </ul>
-      <p className="mt-3 border-t border-stone-100 pt-3 text-xs text-ink-500">
+      <p className="mt-3 border-t border-line-100 pt-3 text-xs text-ink-500">
         {rows} {rows === 1 ? "dish" : "dishes"} · prices include tax
       </p>
     </div>
@@ -46,10 +46,10 @@ function MenuCard({ rows }: { rows: number }) {
 }
 
 const BUTTON =
-  "rounded-full border border-stone-300 bg-surface-base px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-stone-400 hover:bg-surface-50";
+  "rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-line-400 hover:bg-surface-50";
 
 const STEP_BUTTON =
-  "grid size-8 place-items-center rounded-full border border-stone-300 bg-surface-base text-base leading-none text-ink-700 hover:border-stone-400";
+  "grid size-8 place-items-center rounded-full border border-line-300 bg-surface-base text-base leading-none text-ink-700 hover:border-line-400";
 
 /**
  * Demo-only speed presets. The first is the library's real default; the others
@@ -121,7 +121,7 @@ export function HeightRevealDemo() {
             +
           </button>
         </div>
-        <div className="ml-1 flex items-center gap-1 rounded-full border border-stone-300 bg-surface-base p-1 text-sm">
+        <div className="ml-1 flex items-center gap-1 rounded-full border border-line-300 bg-surface-base p-1 text-sm">
           <span className="pl-2 pr-1 text-xs text-ink-500">Speed</span>
           {SPEEDS.map((speed) => (
             <button
@@ -188,7 +188,7 @@ export function HeightRevealDemo() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-stone-200 bg-surface-100/60 p-4">
+        <section className="rounded-3xl border border-line-200 bg-surface-100/60 p-4">
           <header className="mb-3 flex items-center gap-2">
             <h2 className="font-mono text-xs font-semibold text-ink-700">HeightReveal</h2>
             <span className="rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
@@ -204,21 +204,21 @@ export function HeightRevealDemo() {
       </div>
 
       <section className="mt-10 grid gap-4 text-sm leading-relaxed text-ink-600 sm:grid-cols-3">
-        <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <h2 className="text-sm font-semibold text-ink-900">Measured, not configured</h2>
           <p className="mt-1.5">
             The inner box is never clamped, so `getBoundingClientRect` before paint is the real
             height. Nothing in this page knows the size of a card.
           </p>
         </div>
-        <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <h2 className="text-sm font-semibold text-ink-900">Retargetable</h2>
           <p className="mt-1.5">
             When content changes mid-reveal, the current frame is frozen, the old animation is
             cancelled, and a new one starts from that exact height.
           </p>
         </div>
-        <div className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <h2 className="text-sm font-semibold text-ink-900">Polite to the layout</h2>
           <p className="mt-1.5">
             Overflow is clipped only while a frame can overflow. Reduced-motion visitors get the

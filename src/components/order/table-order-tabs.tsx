@@ -288,7 +288,7 @@ export function TableOrderTabs({
     }
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   /**
    * What sits under the cart's total — one node for the phone sheet and the
@@ -416,7 +416,7 @@ export function TableOrderTabs({
                         ? "Search dishes…"
                         : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+                    className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
                   />
                 </label>
                 {searching && (
@@ -592,7 +592,7 @@ function TabButton({
       className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
           ? "bg-surface-900 text-white"
-          : "border border-stone-300 text-ink-700 hover:border-amber-700 hover:text-amber-900"
+          : "border border-line-300 text-ink-700 hover:border-amber-700 hover:text-amber-900"
       }`}
     >
       {label}
@@ -643,8 +643,8 @@ function ClosedTabButton({
       }}
       className={`shrink-0 cursor-not-allowed rounded-full border border-dashed px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         show
-          ? "border-stone-400 bg-surface-base text-ink-600"
-          : "border-stone-300 bg-surface-50 text-ink-400"
+          ? "border-line-400 bg-surface-base text-ink-600"
+          : "border-line-300 bg-surface-50 text-ink-400"
       }`}
     >
       {label}

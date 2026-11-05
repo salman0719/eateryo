@@ -83,7 +83,7 @@ async function TableOrderLink({
   if (!tableLabel) {
     return (
       <OrderShell>
-        <div className="rounded-2xl border border-stone-200 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
           <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
           <p className="mt-2 text-sm leading-6 text-ink-600">
             A table link includes the table number, like{" "}

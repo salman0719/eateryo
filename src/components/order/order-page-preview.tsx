@@ -67,7 +67,7 @@ export function OrderPagePreview({
     []
   );
 
-  const frame = "rounded-2xl border border-stone-200 bg-surface-base";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
   const search = searchMenu(doc, query);
   const searching = query.trim().length > 0;
   const tableName = `${restaurantName?.trim() || "Your café"} · ${formatTableLabel(
@@ -150,7 +150,7 @@ export function OrderPagePreview({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search dishes…"
-              className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
             />
           </label>
           {searching && (

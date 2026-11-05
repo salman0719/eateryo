@@ -65,7 +65,7 @@ export default function LaunchPage() {
           <h2 className="text-xl font-bold tracking-tight text-ink-900">What you get</h2>
           <ul className="mt-4 grid gap-4 sm:grid-cols-2">
             {WHAT_YOU_GET.map((item) => (
-              <li key={item.title} className="rounded-2xl border border-stone-200 bg-surface-base p-4">
+              <li key={item.title} className="rounded-2xl border border-line-200 bg-surface-base p-4">
                 <h3 className="text-sm font-semibold text-ink-900">{item.title}</h3>
                 <p className="mt-1 text-sm text-ink-600">{item.body}</p>
               </li>
@@ -73,7 +73,7 @@ export default function LaunchPage() {
           </ul>
         </section>
 
-        <section className="mt-10 rounded-2xl border border-stone-200 bg-surface-base p-5">
+        <section className="mt-10 rounded-2xl border border-line-200 bg-surface-base p-5">
           <h2 className="text-base font-semibold text-ink-900">What it is not</h2>
           <ul className="mt-2 space-y-1.5 text-sm text-ink-600">
             <li>
@@ -91,7 +91,7 @@ export default function LaunchPage() {
           </ul>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-stone-200 bg-surface-50 p-5">
+        <section className="mt-6 rounded-2xl border border-line-200 bg-surface-50 p-5">
           <h2 className="text-base font-semibold text-ink-900">Taking it step by step</h2>
           <p className="mt-1 text-sm text-ink-600">
             The checklist above is the whole process, in order. If a step does not apply to you
