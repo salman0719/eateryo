@@ -140,17 +140,17 @@ interface MenuEditorProps {
 }
 
 const smallButton =
-  "rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
+  "rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors " +
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 const primaryButton =
-  "rounded-full bg-amber-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors " +
-  "hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
+  "rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors " +
+  "hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 const tinyButton =
-  "rounded-full border border-stone-300 px-2 py-1 text-xs font-medium text-stone-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
-  "focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded-full border border-line-300 px-2 py-1 text-xs font-medium text-ink-600 transition-colors " +
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
+  "focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40";
 
 export function MenuEditor({
   doc,
@@ -534,7 +534,7 @@ export function MenuEditor({
         <button
           type="button"
           onClick={handleUndo}
-          className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:border-amber-700 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:border-accent-700 hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           ↩ Undo {undoLabel}
         </button>
@@ -542,13 +542,13 @@ export function MenuEditor({
       <div
         role="status"
         title={saveState.detail}
-        className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-red-700" : "text-stone-500"}`}
+        className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-danger-700" : "text-ink-500"}`}
       >
         {saveState.kind === "saving" ? (
           <span>
             <span
               aria-hidden="true"
-              className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-stone-400 border-t-transparent align-[-2px]"
+              className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-line-400 border-t-transparent align-[-2px]"
             />
             Saving…
           </span>
@@ -619,16 +619,16 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
-        <div className="rounded-2xl border border-stone-200 bg-white p-4">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h2 className="text-base font-semibold text-stone-900">Reorder items</h2>
-            <p className="text-xs text-stone-500">
+            <h2 className="text-base font-semibold text-ink-900">Reorder items</h2>
+            <p className="text-xs text-ink-500">
               A compact list for arranging — the full editing boxes stay on the edit screen.
               {isFiltering && " Search is paused here; every item is shown."}
             </p>
           </div>
           {doc.categories.length === 0 ? (
-            <p className="mt-3 text-sm text-stone-500">
+            <p className="mt-3 text-sm text-ink-500">
               No categories yet — add one on the edit screen.
             </p>
           ) : (
@@ -636,12 +636,12 @@ export function MenuEditor({
               {doc.categories.map((category, categoryIndex) => (
                 <li
                   key={category.id}
-                  className="overflow-hidden rounded-xl border border-stone-200"
+                  className="overflow-hidden rounded-xl border border-line-200"
                 >
-                  <div className="flex items-center gap-1.5 border-b border-stone-100 bg-stone-50 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-stone-900">
+                  <div className="flex items-center gap-1.5 border-b border-line-100 bg-surface-50 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
                       {category.name || "Untitled category"}
-                      <span className="ml-2 font-normal text-stone-500">
+                      <span className="ml-2 font-normal text-ink-500">
                         {category.items.length} {category.items.length === 1 ? "item" : "items"}
                       </span>
                     </span>
@@ -665,7 +665,7 @@ export function MenuEditor({
                     </button>
                   </div>
                   {category.items.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-stone-500">No items.</p>
+                    <p className="px-3 py-2 text-xs text-ink-500">No items.</p>
                   ) : (
                     <ol>
                       {category.items.map((item, index) => {
@@ -673,21 +673,21 @@ export function MenuEditor({
                         return (
                           <li
                             key={item.id}
-                            className="flex items-center gap-1.5 border-b border-stone-100 px-3 py-1.5 last:border-0"
+                            className="flex items-center gap-1.5 border-b border-line-100 px-3 py-1.5 last:border-0"
                           >
                             <span
                               aria-hidden="true"
-                              className="w-6 shrink-0 text-right text-xs text-stone-400"
+                              className="w-6 shrink-0 text-right text-xs text-ink-400"
                             >
                               {index + 1}
                             </span>
-                            <span className="min-w-0 flex-1 truncate text-sm text-stone-800">
+                            <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
                               {label}
                             </span>
                             {duplicateIds.has(item.id) && (
                               <span
                                 title="This name appears more than once — see the duplicate review on the edit screen."
-                                className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900"
+                                className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
                               >
                                 duplicate
                               </span>
@@ -695,12 +695,12 @@ export function MenuEditor({
                             {item.reviewNotes.length > 0 && (
                               <span
                                 title={item.reviewNotes.join("\n")}
-                                className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600"
+                                className="shrink-0 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
                               >
                                 {hasAnyPrice(item) ? "couldn't read" : "check price"}
                               </span>
                             )}
-                            <span className="shrink-0 text-xs whitespace-nowrap text-stone-500">
+                            <span className="shrink-0 text-xs whitespace-nowrap text-ink-500">
                               {formatItemPrice(item, doc.currency)}
                             </span>
                             <button
@@ -743,7 +743,7 @@ export function MenuEditor({
                                     event.target.value = "";
                                   }
                                 }}
-                                className="shrink-0 rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none"
+                                className="shrink-0 rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
                               >
                                 <option value="">Move to…</option>
                                 {doc.categories
@@ -772,7 +772,7 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      <div className="rounded-2xl border border-stone-200 bg-white px-4 py-3 text-xs leading-5 text-stone-600">
+      <div className="rounded-2xl border border-line-200 bg-surface-base px-4 py-3 text-xs leading-5 text-ink-600">
         {onStartPublish && accountCheckFailed ? (
           <p>
             We couldn&apos;t check your account just now, so publishing is paused.{" "}
@@ -780,7 +780,7 @@ export function MenuEditor({
               <button
                 type="button"
                 onClick={onRetryAccountCheck}
-                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>
@@ -798,7 +798,7 @@ export function MenuEditor({
             <button
               type="button"
               onClick={onStartPublish}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               set up table ordering
             </button>{" "}
@@ -806,7 +806,7 @@ export function MenuEditor({
             <button
               type="button"
               onClick={() => changeMode("preview")}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               preview the order page
             </button>
@@ -818,7 +818,7 @@ export function MenuEditor({
             <button
               type="button"
               onClick={() => changeMode("preview")}
-              className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               go to Preview
             </button>{" "}
@@ -827,7 +827,7 @@ export function MenuEditor({
         )}
       </div>
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-stone-200 bg-white p-5">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
           <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
             <CommitInput
               label="Menu title"
@@ -846,42 +846,42 @@ export function MenuEditor({
           </div>
           {sourceLabel &&
             (doc.source?.provider === "demo" ? (
-              <p className="mt-2 inline-block rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-900">
+              <p className="mt-2 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
                 Demo data
               </p>
             ) : (
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-ink-500">
                 {sourceLabel}
                 {doc.source?.originalFileName && (
-                  <span className="text-stone-400"> · {doc.source.originalFileName}</span>
+                  <span className="text-ink-400"> · {doc.source.originalFileName}</span>
                 )}
               </p>
             ))}
           {(imageUrl || canManage) && (
             <div className="mt-3">
-              {imageUrl && <p className="mb-1 text-xs font-medium text-stone-500">Source image</p>}
+              {imageUrl && <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>}
               <div className="flex items-stretch gap-3">
                 {imageUrl && (
                   <img
                     src={imageUrl}
                     alt="Original uploaded menu"
-                    className="max-h-28 w-auto self-center rounded-lg border border-stone-200 object-contain"
+                    className="max-h-28 w-auto self-center rounded-lg border border-line-200 object-contain"
                   />
                 )}
                 {canManage && (
                   <label
-                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-2 text-center transition-colors hover:border-amber-700 hover:bg-amber-50 focus-within:border-amber-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-amber-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
+                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-accent-700 hover:bg-accent-50 focus-within:border-accent-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
                   >
                     <span
                       aria-hidden="true"
-                      className="text-xl leading-none font-bold text-stone-500"
+                      className="text-xl leading-none font-bold text-ink-500"
                     >
                       +
                     </span>
-                    <span className="text-xs font-semibold text-stone-700">
+                    <span className="text-xs font-semibold text-ink-700">
                       {addPages.status === "working" ? "Reading pages…" : "Add pages"}
                     </span>
-                    <span className="text-[11px] leading-4 text-stone-500">
+                    <span className="text-[11px] leading-4 text-ink-500">
                       Photograph more pages of this menu to add their items
                     </span>
                     <input
@@ -903,7 +903,7 @@ export function MenuEditor({
             </div>
           )}
           {reviewCount > 0 && (
-            <p className="mt-2 text-xs font-medium text-amber-800">
+            <p className="mt-2 text-xs font-medium text-warning-800">
               {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
             </p>
           )}
@@ -920,18 +920,18 @@ export function MenuEditor({
       {duplicateGroups.length > 0 && (
         <section
           aria-label="Possible duplicates"
-          className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4"
+          className="rounded-2xl border border-warning-300 bg-warning-50/70 p-4"
         >
-          <p className="text-sm font-semibold text-amber-900">
+          <p className="text-sm font-semibold text-warning-900">
             {duplicateGroups.length === 1
               ? "1 possible duplicate found — review it; nothing is deleted automatically."
               : `${duplicateGroups.length} possible duplicates found — review them; nothing is deleted automatically.`}
           </p>
           <ul className="mt-3 space-y-3">
             {duplicateGroups.map((group) => (
-              <li key={group.key} className="rounded-xl border border-amber-200 bg-white p-3">
+              <li key={group.key} className="rounded-xl border border-warning-200 bg-surface-base p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-stone-900">
+                  <p className="text-sm font-medium text-ink-900">
                     “{group.displayName}” appears {group.occurrences.length} times
                   </p>
                   <span className="flex-1" />
@@ -947,11 +947,11 @@ export function MenuEditor({
                   {group.occurrences.map((occurrence) => (
                     <li
                       key={occurrence.item.id}
-                      className="flex flex-wrap items-center gap-2 text-sm text-stone-700"
+                      className="flex flex-wrap items-center gap-2 text-sm text-ink-700"
                     >
                       <span className="min-w-[160px] flex-1">
                         {occurrence.item.name}
-                        <span className="text-xs text-stone-500">
+                        <span className="text-xs text-ink-500">
                           {" "}
                           in {occurrence.categoryName}
                           {occurrence.item.price !== null &&
@@ -961,7 +961,7 @@ export function MenuEditor({
                       <button
                         type="button"
                         onClick={() => removeItem(occurrence.categoryId, occurrence.item)}
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                       >
                         Delete this copy
                       </button>
@@ -973,7 +973,7 @@ export function MenuEditor({
           </ul>
         </section>
       )}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3">
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
         <label htmlFor="menu-search" className="sr-only">
           Search the menu
         </label>
@@ -986,14 +986,14 @@ export function MenuEditor({
             if (event.key === "Escape" && query) setQuery("");
           }}
           placeholder="Search items, descriptions, or categories…"
-          className="min-w-[200px] flex-1 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-700 focus:outline-none"
+          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
         />
         {isFiltering && (
           <button type="button" onClick={() => setQuery("")} className={smallButton}>
             Clear
           </button>
         )}
-        <p role="status" className="text-xs font-medium text-stone-500">
+        <p role="status" className="text-xs font-medium text-ink-500">
           {isFiltering
             ? `${search.matchCount} of ${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`
             : `${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`}
@@ -1017,18 +1017,18 @@ export function MenuEditor({
         <div
           role="region"
           aria-label="Bulk actions"
-          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3 shadow-sm backdrop-blur"
+          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-300 bg-warning-50/95 p-3 shadow-sm backdrop-blur"
         >
-          <p className="text-xs font-semibold text-amber-900">
+          <p className="text-xs font-semibold text-warning-900">
             {selected.length} {selected.length === 1 ? "item" : "items"} selected
           </p>
-          <label className="flex items-center gap-1.5 text-xs text-amber-900">
+          <label className="flex items-center gap-1.5 text-xs text-warning-900">
             Move to
             <select
               aria-label="Category to move selected items to"
               value={bulkTarget}
               onChange={(event) => setBulkTarget(event.target.value)}
-              className="rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none"
+              className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
             >
               <option value="">Category…</option>
               {doc.categories.map((category) => (
@@ -1049,7 +1049,7 @@ export function MenuEditor({
           <button
             type="button"
             onClick={() => void handleBulkDelete()}
-            className="rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+            className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
           >
             Delete selected
           </button>
@@ -1060,7 +1060,7 @@ export function MenuEditor({
       )}
       {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
         <div
-          className={`z-20 -mx-4 bg-[#faf8f5]/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
+          className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
             selected.length === 0 ? "sticky top-0" : ""
           }`}
         >
@@ -1069,7 +1069,7 @@ export function MenuEditor({
               type="button"
               onClick={() => stepCategory(-1)}
               aria-label="Previous category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-white text-lg font-bold text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               ‹
             </button>
@@ -1078,7 +1078,7 @@ export function MenuEditor({
               <select
                 value={activeMatch.category.id}
                 onChange={(event) => setActiveCategoryId(event.target.value)}
-                className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm font-semibold text-stone-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
               >
                 {search.categories.map(({ category, items }) => (
                   <option key={category.id} value={category.id}>
@@ -1091,25 +1091,25 @@ export function MenuEditor({
               type="button"
               onClick={() => stepCategory(1)}
               aria-label="Next category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-stone-300 bg-white text-lg font-bold text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               ›
             </button>
           </div>
-          <p className="mt-1 text-center text-xs text-stone-500">
+          <p className="mt-1 text-center text-xs text-ink-500">
             Category {activeIndex + 1} of {search.categories.length}
           </p>
         </div>
       )}
       {doc.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-          <p className="font-medium text-stone-900">No categories yet</p>
-          <p className="mt-1 text-sm text-stone-600">Add a category below, then add items to it.</p>
+        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+          <p className="font-medium text-ink-900">No categories yet</p>
+          <p className="mt-1 text-sm text-ink-600">Add a category below, then add items to it.</p>
         </div>
       ) : search.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-          <p className="font-medium text-stone-900">No items match “{query.trim()}”</p>
-          <p className="mt-1 text-sm text-stone-600">
+        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+          <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
+          <p className="mt-1 text-sm text-ink-600">
             {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
           </p>
           <button type="button" onClick={() => setQuery("")} className={`${smallButton} mt-3`}>
@@ -1131,12 +1131,12 @@ export function MenuEditor({
             <section
               key={category.id}
               aria-label={`Category ${category.name}`}
-              className={`${phoneOnly}overflow-hidden rounded-2xl border border-stone-200 bg-white`}
+              className={`${phoneOnly}overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
             >
               {/* The band says what the section is and how much is in it, and
                   holds its own actions — so a collapsed section is still
                   legible and still manageable. */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-stone-200 bg-stone-100 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
                 <button
                   type="button"
                   onClick={() => applyFold(toggleCategory(foldState, category.id))}
@@ -1150,7 +1150,7 @@ export function MenuEditor({
                         ? "Collapse this section"
                         : "Expand this section"
                   }
-                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-stone-300 bg-white text-sm text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
                 >
                   {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
                 </button>
@@ -1159,14 +1159,14 @@ export function MenuEditor({
                     label={`Category ${index + 1}`}
                     value={category.name}
                     hideLabel
-                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-stone-300 focus:border-amber-700 focus:bg-white"
+                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-line-300 focus:border-accent-700 focus:bg-surface-base"
                     onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
                   />
                 </div>
-                <p className="shrink-0 text-xs text-stone-500">
+                <p className="shrink-0 text-xs text-ink-500">
                   {items.length} {items.length === 1 ? "item" : "items"}
                   {toCheck > 0 && (
-                    <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                    <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                       {toCheck} to check
                     </span>
                   )}
@@ -1199,7 +1199,7 @@ export function MenuEditor({
                 <button
                   type="button"
                   onClick={() => handleDeleteCategory(category, index)}
-                  className={`${tinyButton} hover:border-red-700 hover:text-red-800`}
+                  className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
                 >
                   Delete
                 </button>
@@ -1207,7 +1207,7 @@ export function MenuEditor({
               <Collapse open={categoryOpen}>
                 <div id={categoryPanelId} className="p-4">
                   {items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 text-center text-sm text-stone-500">
+                    <p className="mt-3 rounded-xl border border-dashed border-line-300 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
                       No items — add the first one below.
                     </p>
                   ) : (
@@ -1248,12 +1248,12 @@ export function MenuEditor({
       <button
         type="button"
         onClick={handleAddCategory}
-        className="rounded-2xl border-2 border-dashed border-stone-300 bg-white px-4 py-3 text-sm font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="rounded-2xl border-2 border-dashed border-line-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         + Add category
       </button>
-      <div className="flex flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
-        <span className="text-xs font-semibold tracking-wide text-stone-500 uppercase">Menu</span>
+      <div className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+        <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">Menu</span>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={onExportJson} className={smallButton}>
             Export JSON
@@ -1288,7 +1288,7 @@ export function MenuEditor({
             });
             if (ok) onDeleteMenu();
           }}
-          className="self-start rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:self-auto"
+          className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:self-auto"
         >
           Delete menu
         </button>
@@ -1296,7 +1296,7 @@ export function MenuEditor({
       {importError && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           {importError}
         </p>
@@ -1304,7 +1304,7 @@ export function MenuEditor({
       {addPages.status === "working" && (
         <p
           role="status"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900"
         >
           Reading the new pages… keep this tab open. Your edits are safe.
         </p>
@@ -1312,7 +1312,7 @@ export function MenuEditor({
       {addPages.status === "added" && (
         <p
           role="status"
-          className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800"
         >
           Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in {addPages.categories}{" "}
           {addPages.categories === 1 ? "category" : "categories"} from the new pages. Repeats with
@@ -1322,12 +1322,12 @@ export function MenuEditor({
       {addPages.status === "error" && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           {addPages.message}
         </p>
       )}{" "}
-      <div className="text-xs leading-5 text-stone-500">
+      <div className="text-xs leading-5 text-ink-500">
         {onServer === null && accountCheckFailed ? (
           <p>
             This browser has your menu saved. We couldn&apos;t check your account just now, so it
@@ -1336,7 +1336,7 @@ export function MenuEditor({
               <button
                 type="button"
                 onClick={onRetryAccountCheck}
-                className="font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
               </button>

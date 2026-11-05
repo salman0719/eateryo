@@ -169,33 +169,33 @@ export function MagicLinkForm({
       const settling = devLink?.email !== status.email;
       const url = settling ? null : devLink.url;
       return (
-        <div className="rounded-xl border border-dashed border-stone-400 bg-stone-50 p-4 text-sm text-stone-700">
+        <div className="rounded-xl border border-dashed border-line-400 bg-surface-50 p-4 text-sm text-ink-700">
           <p className="font-medium">Development sign-in — no email was sent</p>
           <p className="mt-1">
-            <code className="rounded bg-stone-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
+            <code className="rounded bg-surface-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
             is on, so the one-time link for <span className="font-medium">{status.email}</span> is
             shown here instead of being emailed. It expires in 5 minutes.
           </p>
           {settling ? (
-            <p className="mt-3 text-stone-500">Preparing the link…</p>
+            <p className="mt-3 text-ink-500">Preparing the link…</p>
           ) : url ? (
             <a
               href={url}
-              className="mt-3 inline-block rounded-lg bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-stone-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900"
+              className="mt-3 inline-block rounded-lg bg-surface-900 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-surface-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-900"
             >
               Open the sign-in link
             </a>
           ) : (
             <p
               role="alert"
-              className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-red-800"
+              className="mt-3 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-danger-800"
             >
               Couldn&apos;t read the link back — it may have expired. Send a fresh one.
             </p>
           )}
           <button
             type="button"
-            className="mt-3 block text-xs text-stone-600 underline underline-offset-2 hover:text-stone-900"
+            className="mt-3 block text-xs text-ink-600 underline underline-offset-2 hover:text-ink-900"
             onClick={resetToIdle}
           >
             Use a different email
@@ -206,7 +206,7 @@ export function MagicLinkForm({
 
     const expiry = linkExpiryCopy(status.sentAt, now ?? status.sentAt);
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+      <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm text-success-900">
         <p className="font-medium">Check your email</p>
         <p className="mt-1">
           We sent a one-time sign-in link to <span className="font-medium">{status.email}</span>.{" "}
@@ -216,7 +216,7 @@ export function MagicLinkForm({
         </p>
         <button
           type="button"
-          className="mt-3 font-medium underline underline-offset-2 hover:text-emerald-950"
+          className="mt-3 font-medium underline underline-offset-2 hover:text-success-950"
           onClick={resetToIdle}
         >
           {expiry.expired ? "Send a fresh link" : "Use a different email"}
@@ -230,13 +230,13 @@ export function MagicLinkForm({
       {linkError ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800"
         >
           That sign-in link didn&apos;t work — it may have expired or been used already. Send
           yourself a fresh one below.
         </p>
       ) : null}
-      <label htmlFor={inputId} className="text-sm font-medium text-stone-700">
+      <label htmlFor={inputId} className="text-sm font-medium text-ink-700">
         Email address
       </label>
       <input
@@ -247,12 +247,12 @@ export function MagicLinkForm({
         placeholder="you@cafe.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600"
       />
       {status.kind === "error" ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800"
         >
           {status.message}
         </p>
@@ -260,7 +260,7 @@ export function MagicLinkForm({
       <button
         type="submit"
         disabled={status.kind === "sending"}
-        className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         {status.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
       </button>

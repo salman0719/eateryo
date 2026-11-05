@@ -15,6 +15,9 @@ export function escapeEmailHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/* Email clients do not resolve our CSS variables, so these literals repeat the
+   role values on purpose: ink, surface, line, accent and warning. Keep them in
+   sync with `theme.css` by hand when a role value changes. */
 const OUTER_BG = "#f5f4f2";
 const CARD_BG = "#ffffff";
 const CARD_BORDER = "#e7e5e4";

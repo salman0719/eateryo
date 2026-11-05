@@ -43,17 +43,17 @@ export default function LaunchPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <p className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
+        <p className="inline-flex items-center rounded-full bg-warning-100 px-3 py-1 text-xs font-semibold text-warning-900">
           Free while it lasts — no payment step
         </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
+        <h1 className="mt-3 text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
           One photo to a live menu with table ordering
         </h1>
-        <p className="mt-3 max-w-2xl text-base text-stone-600">
+        <p className="mt-3 max-w-2xl text-base text-ink-600">
           During the launch promotion, everything here is free: your public menu page, the QR table
           cards, and the live order board. There is no checkout, no card, and no plan to cancel.
         </p>
-        <p className="mt-2 max-w-2xl text-sm text-stone-500">
+        <p className="mt-2 max-w-2xl text-sm text-ink-500">
           We will tell cafés already using it before anything about that ever changes.
         </p>
 
@@ -62,45 +62,45 @@ export default function LaunchPage() {
         </div>
 
         <section className="mt-10">
-          <h2 className="text-xl font-bold tracking-tight text-stone-900">What you get</h2>
+          <h2 className="text-xl font-bold tracking-tight text-ink-900">What you get</h2>
           <ul className="mt-4 grid gap-4 sm:grid-cols-2">
             {WHAT_YOU_GET.map((item) => (
-              <li key={item.title} className="rounded-2xl border border-stone-200 bg-white p-4">
-                <h3 className="text-sm font-semibold text-stone-900">{item.title}</h3>
-                <p className="mt-1 text-sm text-stone-600">{item.body}</p>
+              <li key={item.title} className="rounded-2xl border border-line-200 bg-surface-base p-4">
+                <h3 className="text-sm font-semibold text-ink-900">{item.title}</h3>
+                <p className="mt-1 text-sm text-ink-600">{item.body}</p>
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="mt-10 rounded-2xl border border-stone-200 bg-white p-5">
-          <h2 className="text-base font-semibold text-stone-900">What it is not</h2>
-          <ul className="mt-2 space-y-1.5 text-sm text-stone-600">
+        <section className="mt-10 rounded-2xl border border-line-200 bg-surface-base p-5">
+          <h2 className="text-base font-semibold text-ink-900">What it is not</h2>
+          <ul className="mt-2 space-y-1.5 text-sm text-ink-600">
             <li>
-              <strong className="font-medium text-stone-800">Not a payment system.</strong> Diners
+              <strong className="font-medium text-ink-800">Not a payment system.</strong> Diners
               order; money still changes hands at the counter, exactly as it does today.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">No diner accounts.</strong> A guest
+              <strong className="font-medium text-ink-800">No diner accounts.</strong> A guest
               types nothing but their table number. We never ask for a name, phone, or email.
             </li>
             <li>
-              <strong className="font-medium text-stone-800">No stored menu photos.</strong> Images
+              <strong className="font-medium text-ink-800">No stored menu photos.</strong> Images
               are read in memory to extract the menu and are not kept on the server.
             </li>
           </ul>
         </section>
 
-        <section className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 p-5">
-          <h2 className="text-base font-semibold text-stone-900">Taking it step by step</h2>
-          <p className="mt-1 text-sm text-stone-600">
+        <section className="mt-6 rounded-2xl border border-line-200 bg-surface-50 p-5">
+          <h2 className="text-base font-semibold text-ink-900">Taking it step by step</h2>
+          <p className="mt-1 text-sm text-ink-600">
             The checklist above is the whole process, in order. If a step does not apply to you
             yet, it stays open — nothing is marked done that we did not actually see. Printing is
             the one exception, which is why you tick it yourself.
           </p>
           <Link
             href="/"
-            className="mt-3 inline-flex text-sm font-semibold text-amber-800 underline underline-offset-2 hover:text-amber-900"
+            className="mt-3 inline-flex text-sm font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
           >
             Open the editor
           </Link>

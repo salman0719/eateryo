@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-7">
-      <h2 className="text-base font-semibold text-stone-900">{title}</h2>
-      <div className="mt-2 space-y-2 text-sm leading-relaxed text-stone-600">{children}</div>
+      <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+      <div className="mt-2 space-y-2 text-sm leading-relaxed text-ink-600">{children}</div>
     </section>
   );
 }
@@ -27,10 +27,10 @@ export default function TermsPage() {
     <>
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">
+        <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
           Terms of use
         </h1>
-        <p className="mt-2 text-sm text-stone-500">Last updated {LEGAL_UPDATED}.</p>
+        <p className="mt-2 text-sm text-ink-500">Last updated {LEGAL_UPDATED}.</p>
 
         <Section title="The service">
           <p>
@@ -130,7 +130,7 @@ export default function TermsPage() {
             <p>
               Questions about these terms:{" "}
               <a
-                className="font-medium text-amber-800 underline underline-offset-2"
+                className="font-medium text-accent-800 underline underline-offset-2"
                 href={`mailto:${email}`}
               >
                 {email}
@@ -145,9 +145,9 @@ export default function TermsPage() {
           )}
         </Section>
 
-        <p className="mt-8 text-sm text-stone-500">
+        <p className="mt-8 text-sm text-ink-500">
           See also the{" "}
-          <Link href="/privacy" className="font-medium text-amber-800 underline underline-offset-2">
+          <Link href="/privacy" className="font-medium text-accent-800 underline underline-offset-2">
             privacy policy
           </Link>
           .

@@ -62,8 +62,8 @@ export interface ItemActions {
 }
 
 const smallButton =
-  "rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors " +
-  "hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700";
+  "rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
+  "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 export const ItemEditor = memo(function ItemEditor({
   doc,
@@ -105,12 +105,12 @@ export const ItemEditor = memo(function ItemEditor({
   return (
     <li
       id={`menu-item-${item.id}`}
-      className={`rounded-xl border bg-white ${isRouteTarget ? "border-amber-600 ring-2 ring-amber-200" : "border-stone-200"}`}
+      className={`rounded-xl border bg-surface-base ${isRouteTarget ? "border-accent-600 ring-2 ring-accent-200" : "border-line-200"}`}
     >
       {/* The row is the dish: name, price, and the flags that need attention,
           so nothing important is hidden behind the collapse. */}
       <div
-        className={`flex items-center gap-2 px-2 py-1.5 sm:px-3 ${open ? "" : "rounded-xl"} ${selected ? "bg-amber-50/70" : ""}`}
+        className={`flex items-center gap-2 px-2 py-1.5 sm:px-3 ${open ? "" : "rounded-xl"} ${selected ? "bg-warning-50/70" : ""}`}
       >
         <label
           title="Select for bulk move"
@@ -121,7 +121,7 @@ export const ItemEditor = memo(function ItemEditor({
             checked={selected}
             onChange={() => actions.toggleSelected(item.id)}
             aria-label={`Select ${item.name} for bulk move`}
-            className="h-4 w-4 rounded border-stone-300 accent-amber-700"
+            className="h-4 w-4 rounded border-line-300 accent-accent-700"
           />
         </label>
         {copy ? (
@@ -132,7 +132,7 @@ export const ItemEditor = memo(function ItemEditor({
             height={copy.height}
             loading="lazy"
             decoding="async"
-            className="h-8 w-8 shrink-0 rounded-md border border-stone-200 object-cover"
+            className="h-8 w-8 shrink-0 rounded-md border border-line-200 object-cover"
           />
         ) : null}
         <button
@@ -140,42 +140,42 @@ export const ItemEditor = memo(function ItemEditor({
           onClick={() => actions.toggleOpen(item.id)}
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
-          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 py-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           <span className="min-w-0 flex-1">
             <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-              <span className="truncate text-sm font-semibold text-stone-900">
+              <span className="truncate text-sm font-semibold text-ink-900">
                 {item.name || "Untitled item"}
               </span>
               {needsReview && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                   {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                 </span>
               )}
               {duplicate && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-900">
+                <span className="rounded-full bg-danger-100 px-2 py-0.5 text-[11px] font-medium text-danger-900">
                   Possible duplicate
                 </span>
               )}
             </span>
             {!open && rowSummary && (
-              <span className="mt-0.5 block truncate text-xs text-stone-500">{rowSummary}</span>
+              <span className="mt-0.5 block truncate text-xs text-ink-500">{rowSummary}</span>
             )}
           </span>
-          <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-stone-600">
+          <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-ink-600">
             {formatItemPrice(item, doc.currency)}
           </span>
           {open ? (
-            <ChevronUpIcon className="shrink-0 text-stone-400" />
+            <ChevronUpIcon className="shrink-0 text-ink-400" />
           ) : (
-            <ChevronDownIcon className="shrink-0 text-stone-400" />
+            <ChevronDownIcon className="shrink-0 text-ink-400" />
           )}
         </button>
       </div>
       {/* Lazy: forty shut dish forms must not cost ~5,000 DOM nodes, and this
           one is rebuilt from the document when it is reopened. */}
       <Collapse open={open} lazy>
-        <div id={panelId} className="border-t border-stone-100 p-4">
+        <div id={panelId} className="border-t border-line-100 p-4">
           <div className="grid gap-3 sm:grid-cols-[1fr_120px_90px]">
             <CommitInput
               label="Item name"
@@ -213,7 +213,7 @@ export const ItemEditor = memo(function ItemEditor({
               }
             />
             <label className="block">
-              <span className="mb-1 block text-xs font-medium text-stone-500">Availability</span>
+              <span className="mb-1 block text-xs font-medium text-ink-500">Availability</span>
               <select
                 aria-label={`Availability of ${item.name}`}
                 value={item.available === null ? "unknown" : item.available ? "yes" : "no"}
@@ -221,7 +221,7 @@ export const ItemEditor = memo(function ItemEditor({
                   const v = event.target.value;
                   patch({ available: v === "unknown" ? null : v === "yes" });
                 }}
-                className="w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 focus:border-amber-700 focus:outline-none"
+                className="w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 focus:border-accent-700 focus:outline-none"
               >
                 <option value="unknown">Unknown</option>
                 <option value="yes">Available</option>
@@ -249,12 +249,12 @@ export const ItemEditor = memo(function ItemEditor({
             />
           </div>
 
-          <div className="mt-3 rounded-lg bg-stone-50 p-3">
-            <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">
+          <div className="mt-3 rounded-lg bg-surface-50 p-3">
+            <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Variants / sizes
             </p>
             {item.variants.length === 0 && (
-              <p className="mt-1 text-xs text-stone-500">None — add one if the menu shows sizes.</p>
+              <p className="mt-1 text-xs text-ink-500">None — add one if the menu shows sizes.</p>
             )}
             <ul className="mt-2 space-y-2">
               {item.variants.map((variant, vIndex) => (
@@ -313,12 +313,12 @@ export const ItemEditor = memo(function ItemEditor({
               capture UI comes back intact once table ordering supports choices
               (local/issues/020); re-enable by dropping `hidden` here and
               restoring the row's option count in `shape` above. */}
-          <div className="mt-3 hidden rounded-lg bg-stone-50 p-3">
-            <p className="text-xs font-semibold tracking-wide text-stone-600 uppercase">
+          <div className="mt-3 hidden rounded-lg bg-surface-50 p-3">
+            <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Options / add-ons
             </p>
             {item.options.length === 0 && (
-              <p className="mt-1 text-xs text-stone-500">
+              <p className="mt-1 text-xs text-ink-500">
                 None — add a group if the menu shows choices.
               </p>
             )}
@@ -326,7 +326,7 @@ export const ItemEditor = memo(function ItemEditor({
               {item.options.map((option, oIndex) => (
                 <li
                   key={`${option.name}-${oIndex}`}
-                  className="rounded-lg border border-stone-200 bg-white p-2.5"
+                  className="rounded-lg border border-line-200 bg-surface-base p-2.5"
                 >
                   <div className="grid grid-cols-[1fr_auto] items-end gap-2">
                     <CommitInput
@@ -445,7 +445,7 @@ export const ItemEditor = memo(function ItemEditor({
           </div>
 
           {item.reviewNotes.length > 0 && (
-            <ul className="mt-3 list-disc space-y-0.5 rounded-lg bg-amber-50 p-3 pl-8 text-xs text-amber-900">
+            <ul className="mt-3 list-disc space-y-0.5 rounded-lg bg-warning-50 p-3 pl-8 text-xs text-warning-900">
               {item.reviewNotes.map((note) => (
                 <li key={note}>{note}</li>
               ))}
@@ -457,7 +457,7 @@ export const ItemEditor = memo(function ItemEditor({
                 <button
                   type="button"
                   onClick={() => patch({ reviewNotes: [] })}
-                  className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+                  className={`${smallButton} border-success-300 text-success-800 hover:border-success-700 hover:text-success-900`}
                 >
                   ✓ Looks good
                 </button>
@@ -466,7 +466,7 @@ export const ItemEditor = memo(function ItemEditor({
                   type="button"
                   onClick={() => patch({ reviewNotes: [], unpricedAccepted: true })}
                   title="Keeps the price blank — totals stay honestly blank for this item."
-                  className={`${smallButton} border-green-300 text-green-800 hover:border-green-700 hover:text-green-900`}
+                  className={`${smallButton} border-success-300 text-success-800 hover:border-success-700 hover:text-success-900`}
                 >
                   ✓ Leave unpriced
                 </button>
@@ -476,10 +476,10 @@ export const ItemEditor = memo(function ItemEditor({
 
           {/* One control group per row on phones (sm:contents dissolves the rows
           back into today's single wrapping row, so desktop is unchanged). */}
-          <div className="mt-3 flex flex-col gap-2 border-t border-stone-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="mt-3 flex flex-col gap-2 border-t border-line-100 pt-3 sm:flex-row sm:flex-wrap sm:items-center">
             {categories.length > 1 && (
               <div className="sm:contents">
-                <label className="flex w-full flex-col gap-1 text-xs text-stone-500 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
+                <label className="flex w-full flex-col gap-1 text-xs text-ink-500 sm:w-auto sm:flex-row sm:items-center sm:gap-1.5">
                   Move to
                   <select
                     aria-label={`Move ${item.name} to another category`}
@@ -492,7 +492,7 @@ export const ItemEditor = memo(function ItemEditor({
                         event.target.value = "";
                       }
                     }}
-                    className="w-full rounded-full border border-stone-300 bg-white px-2 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none sm:w-auto"
+                    className="w-full rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none sm:w-auto"
                   >
                     <option value="">Category…</option>
                     {categories
@@ -508,12 +508,12 @@ export const ItemEditor = memo(function ItemEditor({
             )}
             <div className="flex flex-wrap items-center gap-2 sm:contents">
               {needsReview && (
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-900">
+                <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
                   {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                 </span>
               )}
               {duplicate && (
-                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-900">
+                <span className="rounded-full bg-danger-100 px-2 py-0.5 text-[11px] font-medium text-danger-900">
                   Possible duplicate
                 </span>
               )}
@@ -530,7 +530,7 @@ export const ItemEditor = memo(function ItemEditor({
               <button
                 type="button"
                 onClick={() => actions.delete(categoryId, item.id)}
-                className="flex-1 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 sm:flex-none"
+                className="flex-1 rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:flex-none"
               >
                 Delete
               </button>
