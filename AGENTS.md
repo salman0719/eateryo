@@ -58,9 +58,9 @@ errors, or add lint/type suppressions just to make checks pass.
   `accent` (brand actions, focus rings, links), `warning` (caution and
   draft/paused/review states, never a primary action), `danger`, `success`, `info`,
   `on-accent` (text on a filled control), `scrim` (the overlay behind a sheet).
-  Never add raw palette utilities (`text-stone-600`,
-  `bg-white`, `border-amber-300`) in new or edited code; the palette ramps in
-  that file exist only until the migration finishes. A colour that genuinely
+  Never add raw palette utilities (`text-stone-<shade>`,
+  `bg-white`, `border-amber-<shade>`) in new or edited code; name a role token
+  instead. A colour that genuinely
   cannot belong to a role is allowed on the bespoke component alone, with a
   comment saying why no category applies. Token values change in `theme.css`
   only — never inline in a component.
