@@ -34,7 +34,7 @@ async function MenuPathContent({ params }: { params: Promise<{ path: string[] }>
  */
 function MenuPathLoading() {
   return (
-    <div className="flex w-full flex-1 items-start">
+    <div className="flex w-full flex-1">
       <aside
         aria-hidden="true"
         className="app-sidebar hidden h-screen shrink-0 self-start border-r border-line-200 bg-surface-base sm:block"

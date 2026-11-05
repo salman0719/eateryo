@@ -2428,7 +2428,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     <div className="flex min-h-full flex-1 flex-col">
       {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
-      <div className="flex w-full flex-1 items-start">
+      {/* Default stretch: the content column fills the row, so its flex-1 main
+          absorbs the spare height and the footer rests on the viewport bottom
+          instead of floating under short content. */}
+      <div className="flex w-full flex-1">
         <AppSidebar
           sections={
             sessionPending
