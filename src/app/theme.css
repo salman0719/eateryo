@@ -136,3 +136,12 @@
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, Menlo, monospace;
 }
+
+/* One bar height shared by the sidebar's bottom control and the site footer.
+   Both sit on the viewport bottom, so equal heights are what put their rules
+   on the same line. At >=sm the footer takes this as a fixed height (its copy
+   is one line there); narrower screens let it grow, because the sidebar is
+   hidden and nothing has to line up. */
+:root {
+  --app-bottom-bar-height: 3.0625rem;
+}

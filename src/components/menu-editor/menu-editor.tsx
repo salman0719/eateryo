@@ -1130,8 +1130,10 @@ export function MenuEditor({
           return (
             <section
               key={category.id}
+              data-menu-section={category.id}
+              id={`menu-section-${category.id}`}
               aria-label={`Category ${category.name}`}
-              className={`${phoneOnly}overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
+              className={`${phoneOnly}scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
             >
               {/* The band says what the section is and how much is in it, and
                   holds its own actions — so a collapsed section is still

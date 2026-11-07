@@ -185,6 +185,76 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   }
 }
 
+/* App sidebar (src/components/layout/app-sidebar.tsx).
+
+   Width and rail/expanded layout are driven by the preference on <html>, set
+   before paint by the boot script in layout.tsx, so a saved choice never
+   flashes the other width. Unset means "follow the window": a 72px rail
+   until xl has room for the 260px column. The explicit attributes come last
+   so a choice wins at every width. */
+@media (min-width: 640px) {
+  .app-sidebar {
+    width: 72px;
+    transition: width 180ms ease;
+  }
+
+  .app-sidebar-label {
+    display: none;
+  }
+
+  .app-sidebar-item,
+  .app-sidebar-brand {
+    justify-content: center;
+  }
+}
+
+@media (min-width: 1280px) {
+  html:not([data-sidebar="rail"]) .app-sidebar {
+    width: 260px;
+  }
+
+  html:not([data-sidebar="rail"]) .app-sidebar-label {
+    display: block;
+  }
+
+  html:not([data-sidebar="rail"]) .app-sidebar-item,
+  html:not([data-sidebar="rail"]) .app-sidebar-brand {
+    justify-content: flex-start;
+  }
+}
+
+html[data-sidebar="rail"] .app-sidebar {
+  width: 72px;
+}
+
+html[data-sidebar="rail"] .app-sidebar-label {
+  display: none;
+}
+
+html[data-sidebar="rail"] .app-sidebar-item,
+html[data-sidebar="rail"] .app-sidebar-brand {
+  justify-content: center;
+}
+
+html[data-sidebar="expanded"] .app-sidebar {
+  width: 260px;
+}
+
+html[data-sidebar="expanded"] .app-sidebar-label {
+  display: block;
+}
+
+html[data-sidebar="expanded"] .app-sidebar-item,
+html[data-sidebar="expanded"] .app-sidebar-brand {
+  justify-content: flex-start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar {
+    transition: none;
+  }
+}
+
 /* Printing table cards: chrome hidden, cards kept whole. */
 @media print {
   [data-print-hide] {

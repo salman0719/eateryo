@@ -43,6 +43,23 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 - Do NOT add shadcn/ui (user decision). Use Tailwind + small local primitives.
 - Do not add dependencies unless they materially reduce effort or improve reliability.
 
+## Local workspace (`local/`)
+
+`local/` is the research and experiment sandbox. `local/README.md` is the only
+tracked file there; read it before starting research, a spike, a prototype, or
+a one-off investigation.
+
+- Look for an existing topic folder first and reuse the one whose purpose fits.
+- Create a kebab-case folder only when none fits, and add it to the README's
+  folder index in the same change.
+- Keep the root of `local/` for the README and genuinely cross-topic files;
+  put one-off scripts and outputs in a topic folder.
+- Deliverables are HTML, not Markdown-only. Markdown is for source notes and
+  folder READMEs.
+- A serious finding may live there, but anything that changes a product or
+  roadmap decision must also be promoted into tracked repo docs or the issue
+  log. Nothing under `local/` except its README is committed.
+
 ## Quality gates (run before finishing)
 
 - `npm run lint`
@@ -104,6 +121,13 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/components/layout/app-sidebar.tsx`, `sidebar-preference.ts` — the app's
+  left column: destinations from `appSections` (signed-out gating included),
+  the open menu's outline in the edit workspace, the account, and a
+  rail/expanded toggle whose choice is remembered. Widths are CSS driven by
+  `data-sidebar` on `<html>`, set before paint by the boot script in
+  `layout.tsx` so a saved choice never flashes. The app shell has no global
+  header; `site-header.tsx` stays for content pages (launch, legal, dev).
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.

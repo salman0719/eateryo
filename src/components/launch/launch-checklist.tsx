@@ -14,25 +14,19 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchLaunchStatus } from "@/features/launch/client";
+import {
+  CARDS_PRINTED_KEY,
+  cardsPrintedOnThisDevice,
+} from "@/features/launch/progress";
 import type { LaunchStatus } from "@/features/launch/schema";
 import { launchSteps, verifiedProgress, type LaunchStep } from "@/features/launch/steps";
 import { SyncError } from "@/features/menus/sync";
-
-const CARDS_PRINTED_KEY = "eateryo:launch:cards-printed";
 
 type State =
   | { kind: "loading" }
   | { kind: "signed_out" }
   | { kind: "error"; message: string }
   | { kind: "ready"; status: LaunchStatus };
-
-function cardsPrintedOnThisDevice(): boolean {
-  try {
-    return window.localStorage.getItem(CARDS_PRINTED_KEY) === "yes";
-  } catch {
-    return false;
-  }
-}
 
 function stepHref(step: LaunchStep): string {
   // Table cards belong to the restaurant, not to a menu: the Tables tab is

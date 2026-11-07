@@ -115,22 +115,21 @@ export function parseAppRoute(input: string | URL): AppRoute {
 /**
  * R0 phone nav: the bottom tab bar pins Capture · My menus · Orders, so the
  * R0.3 order monitor keeps a persistent home for its badge. Everything else
- * lives in the More sheet, led by Tables. Desktop keeps pills. Pure data so
- * tests can pin the order without rendering the shell. Signed out the shell
+ * lives in the More sheet, led by Tables. The glyphs come from the shared
+ * icon set in the shell, so this stays pure data tests can pin. Signed out the shell
  * is capture-only (home-screen gates this list: Capture, plus My menus
  * while anonymous drafts exist) — no Orders, no More.
  */
 export interface PhoneTab {
   id: "capture" | "library" | "orders";
   label: string;
-  icon: string;
 }
 
 export function phoneTabs(): PhoneTab[] {
   return [
-    { id: "capture", label: "Capture", icon: "📸" },
-    { id: "library", label: "My menus", icon: "📚" },
-    { id: "orders", label: "Orders", icon: "🧾" },
+    { id: "capture", label: "Capture" },
+    { id: "library", label: "My menus" },
+    { id: "orders", label: "Orders" },
   ];
 }
 
@@ -157,6 +156,61 @@ export function moreSheetRows(options: {
   }
   rows.push({ id: "settings", label: "Settings", why: "Restaurant · Team · Usage" });
   return rows;
+}
+
+/**
+ * The app's top-level destinations, derived once so the sidebar (and the
+ * phone tab bar's gating) cannot drift. Signed out the shell is capture-only,
+ * plus the anonymous working set while it still holds drafts; orders, tables,
+ * settings and the assistant need an account. `menuCount` is the number of
+ * menus the library is actually showing.
+ */
+export type AppSectionId =
+  | "capture"
+  | "library"
+  | "orders"
+  | "assistant"
+  | "tables"
+  | "settings";
+
+export interface AppSection {
+  id: AppSectionId;
+  label: string;
+  /** My menus only: how many menus the working set holds. */
+  count?: number;
+}
+
+export function appSections(options: {
+  signedIn: boolean;
+  assistantEnabled: boolean;
+  menuCount: number;
+}): AppSection[] {
+  const sections: AppSection[] = [{ id: "capture", label: "Capture" }];
+  if (options.signedIn || options.menuCount > 0) {
+    sections.push({
+      id: "library",
+      label: "My menus",
+      ...(options.menuCount > 0 ? { count: options.menuCount } : {}),
+    });
+  }
+  if (options.signedIn) {
+    sections.push({ id: "orders", label: "Orders" });
+    if (options.assistantEnabled) {
+      sections.push({ id: "assistant", label: "Assistant" });
+    }
+    sections.push({ id: "tables", label: "Tables" });
+    sections.push({ id: "settings", label: "Settings" });
+  }
+  return sections;
+}
+
+/**
+ * Which destination a screen belongs to. An open menu (and its item deep
+ * link) lives under My menus: the sidebar should not go blank just because
+ * the editor took the canvas.
+ */
+export function sectionForScreen(screen: AppScreen): AppSectionId {
+  return screen === "editor" || screen === "item" ? "library" : screen;
 }
 
 /** Build the canonical path for an application screen. */
