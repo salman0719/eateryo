@@ -364,10 +364,10 @@ export function AppSidebar({
         ) : null}
       </div>
 
-      {/* Same height as SiteFooter (py-4 around one text-xs line, 49px), so
-          the sidebar's last rule meets the footer's on the same line instead
-          of sitting a few pixels above it. */}
-      <div className="border-t border-line-200 px-2 py-1.5">
+      {/* The height is the shared --app-bottom-bar-height token, the same one
+          SiteFooter uses, so the sidebar's last rule meets the footer's on the
+          same line: both columns end on the viewport bottom. */}
+      <div className="flex h-[var(--app-bottom-bar-height)] items-center border-t border-line-200 px-2">
         <button
           type="button"
           onClick={toggle}
