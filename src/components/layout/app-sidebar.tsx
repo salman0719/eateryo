@@ -57,6 +57,12 @@ interface AppSidebarProps {
    * sidebar should not keep advertising a finished checklist.
    */
   launch?: { done: number; total: number } | null;
+  /**
+   * The account's menu list is still being read, so the My menus count is not
+   * known yet. A placeholder holds its place instead of a smaller number that
+   * is about to grow.
+   */
+  menusPending?: boolean;
 }
 
 function SectionIcon({ id, size = 18 }: { id: AppSectionId; size?: number }) {
@@ -118,6 +124,7 @@ export function AppSidebar({
   outlineKey = "",
   onOutlineSelect,
   launch,
+  menusPending = false,
 }: AppSidebarProps) {
   // The boot script has already applied a saved mode before paint, so the
   // toggle reads the live attribute instead of mirroring it in state. The
@@ -211,7 +218,11 @@ export function AppSidebar({
               >
                 {section.label}
               </span>
-              {section.count ? (
+              {section.id === "library" && menusPending ? (
+                <span aria-hidden="true" className="app-sidebar-label shrink-0">
+                  <Skeleton className="h-4 w-6 rounded-full" />
+                </span>
+              ) : section.count ? (
                 <span
                   aria-hidden="true"
                   className="app-sidebar-label rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600"
@@ -222,7 +233,11 @@ export function AppSidebar({
               {/* The icon and visible label are decoration for assistive tech;
                   this is the name in both the rail and the expanded column. */}
               <span className="sr-only">
-                {section.count ? `${section.label}, ${section.count} menus` : section.label}
+                {section.id === "library" && menusPending
+                  ? `${section.label}, loading your menus`
+                  : section.count
+                    ? `${section.label}, ${section.count} menus`
+                    : section.label}
               </span>
               {section.id === "orders" ? <NewOrdersBadge tone="rail" /> : null}
             </button>
