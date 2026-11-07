@@ -364,7 +364,10 @@ export function AppSidebar({
         ) : null}
       </div>
 
-      <div className="border-t border-line-200 p-2">
+      {/* Same height as SiteFooter (py-4 around one text-xs line, 49px), so
+          the sidebar's last rule meets the footer's on the same line instead
+          of sitting a few pixels above it. */}
+      <div className="border-t border-line-200 px-2 py-1.5">
         <button
           type="button"
           onClick={toggle}
