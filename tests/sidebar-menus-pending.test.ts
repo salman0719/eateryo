@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -13,22 +13,27 @@ import { OrderMonitorProvider } from "@/features/orders/monitor";
  * enough: the count and its placeholder are what must not swap meanings.
  */
 
-function render(options: { menusPending: boolean; count: number }) {
-  const sections = appSections({
-    signedIn: true,
-    assistantEnabled: false,
-    menuCount: options.count,
-  });
+function render(options: { menusPending: boolean; count: number; sessionPending?: boolean }) {
+  const sessionPending = options.sessionPending ?? false;
+  const sections = sessionPending
+    ? []
+    : appSections({
+        signedIn: true,
+        assistantEnabled: false,
+        menuCount: options.count,
+      });
   return renderToStaticMarkup(
     createElement(
-      OrderMonitorProvider,
+      // The provider requires children in its type; createElement passes them
+      // as arguments, so the wrapper's type drops that one prop.
+      OrderMonitorProvider as ComponentType<{ userId: string | null }>,
       { userId: null },
       createElement(AppSidebar, {
         sections,
         activeSection: "capture",
-        sessionPending: false,
-        signedIn: true,
-        email: "owner@example.com",
+        sessionPending,
+        signedIn: !sessionPending,
+        email: sessionPending ? null : "owner@example.com",
         onNavigate: () => {},
         onSignOut: () => {},
         menusPending: options.menusPending,
@@ -56,5 +61,20 @@ describe("AppSidebar My menus count", () => {
     expect(markup).toContain("4 menus");
     expect(markup).not.toContain("loading your menus");
     expect(markup).not.toContain("animate-pulse");
+  });
+});
+
+describe("AppSidebar destinations while the session is unknown", () => {
+  it("holds the nav's shape instead of an empty column", () => {
+    const markup = render({ menusPending: false, count: 0, sessionPending: true });
+    expect(markup).toContain("Loading navigation");
+    expect(markup).toContain('aria-busy="true"');
+    expect(markup.match(/min-h-\[40px\]/g)?.length).toBe(5);
+  });
+
+  it("announces the wait once, not once per placeholder row", () => {
+    const markup = render({ menusPending: false, count: 0, sessionPending: true });
+    expect(markup.match(/Loading navigation/g)).toHaveLength(1);
+    expect(markup).not.toContain(">Capture<");
   });
 });

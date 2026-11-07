@@ -194,6 +194,27 @@ export function AppSidebar({
         aria-label="Sections"
         className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3"
       >
+        {/* The session read has not answered, so the destination list is not
+            known yet: hold its shape instead of an empty column that fills
+            in a moment later. Five rows is a signed-in account's list. */}
+        {sessionPending ? (
+          <div role="status" aria-busy="true" className="flex flex-col gap-0.5">
+            <span className="sr-only">Loading navigation…</span>
+            {[0, 1, 2, 3, 4].map((row) => (
+              <div key={row} className={`${itemBase} min-h-[40px] px-2.5 py-1.5`}>
+                <span
+                  aria-hidden="true"
+                  className="flex w-5 shrink-0 items-center justify-center"
+                >
+                  <Skeleton className="h-5 w-5 rounded-md" />
+                </span>
+                <span aria-hidden="true" className="app-sidebar-label min-w-0 flex-1">
+                  <Skeleton className="h-3.5 w-24" />
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
         {sections.map((section) => {
           const active = section.id === activeSection;
           return (
