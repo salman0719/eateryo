@@ -5,7 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { Attention } from "@/components/ui/attention";
-import { BookIcon, CameraIcon, MoreIcon, ReceiptIcon } from "@/components/ui/icons";
+import {
+  BookIcon,
+  CameraIcon,
+  ChecklistIcon,
+  MoreIcon,
+  ReceiptIcon,
+} from "@/components/ui/icons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { JourneySteps } from "@/components/ui/journey-steps";
@@ -2468,6 +2474,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     signedIn && launchChecklist && launchChecklist.accountKey === accountKey && !launchChecklist.complete
       ? { done: launchChecklist.done, total: launchChecklist.total }
       : null;
+  /** The More sheet's checklist line: progress, finished, or not read yet. */
+  const sheetLaunchHint = sidebarLaunch
+    ? "What's left to set up"
+    : launchChecklist && launchChecklist.accountKey === accountKey
+      ? "All steps done"
+      : "See what's left to set up";
+  /**
+   * The My menus count is only true once the account's list has been read.
+   * Before that the local set can be smaller than the account's, so the
+   * sidebar holds a placeholder rather than a number that will jump.
+   */
+  const sidebarMenuCountPending =
+    !sessionPending && (libraryLoading || (signedIn && serverMenusReadFor !== accountKey));
 
   /** Jump the editor list to the section chosen in the sidebar. */
   function scrollToMenuSection(categoryId: string) {
@@ -2503,6 +2522,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           outlineKey={sidebarOutlineKey}
           onOutlineSelect={scrollToMenuSection}
           launch={sidebarLaunch}
+          menusPending={sidebarMenuCountPending}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <main
@@ -3158,10 +3178,43 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 <span className="text-xs font-normal text-ink-500">{row.why}</span>
               </button>
             ))}
+            {/* The checklist is progress, not another destination: its own
+                card above the rule, with the count the sidebar shows. */}
+            <a
+              href="/launch"
+              className="mt-2 flex min-h-[56px] items-center gap-3 rounded-xl border border-line-200 bg-surface-50 px-3 py-2.5 transition-colors hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-base text-ink-600"
+              >
+                <ChecklistIcon size={18} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-ink-900">
+                  Launch checklist
+                </span>
+                <span className="block text-xs font-normal text-ink-500">{sheetLaunchHint}</span>
+              </span>
+              {sidebarLaunch ? (
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 rounded-full bg-surface-base px-2 py-0.5 text-[11px] font-semibold text-ink-600"
+                >
+                  {sidebarLaunch.done}/{sidebarLaunch.total}
+                </span>
+              ) : null}
+              {sidebarLaunch ? (
+                <span className="sr-only">
+                  {sidebarLaunch.done} of {sidebarLaunch.total} steps done
+                </span>
+              ) : null}
+            </a>
             {/* The app has no top bar on a phone, so the account lives here:
-                one place to see who is signed in and to end the session. */}
-            <div className="mt-1 border-t border-line-200 pt-1">
-              <p className="truncate px-2 py-1 text-[11px] text-ink-500">
+                one place to see who is signed in and to end the session. It
+                is the last thing in the sheet, under the destinations. */}
+            <div className="mt-2 border-t border-line-200 pt-1">
+              <p className="truncate px-2 pt-1 text-[11px] text-ink-500">
                 {session?.user?.email}
               </p>
               <button
@@ -3175,15 +3228,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 Sign out
               </button>
             </div>
-            <a
-              href="/launch"
-              className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              <span className="text-sm font-semibold text-ink-900">Get started</span>
-              <span className="text-xs font-normal text-ink-500">
-                The launch checklist and offer
-              </span>
-            </a>
           </div>
         </div>
       )}
