@@ -271,6 +271,21 @@ export function moreSheetRows(sections: readonly AppSection[]): MoreSheetRow[] {
     .map((section) => ({ id: section.id, label: section.label, why: section.why ?? "" }));
 }
 
+/**
+ * A pill's label. `libraryCount` is null while the count is not a fact yet —
+ * the café map has not answered, or its read failed — so the tab keeps its
+ * plain label instead of printing a number that is about to change.
+ */
+export function sectionTabLabel(
+  section: AppSection,
+  libraryCount: number | null
+): string {
+  if (section.id === "library" && libraryCount !== null && libraryCount > 0) {
+    return `${section.label} (${libraryCount})`;
+  }
+  return section.label;
+}
+
 /** Build the canonical path for an application screen. */
 export function appRouteHref(route: AppRoute): string {
   switch (route.screen) {

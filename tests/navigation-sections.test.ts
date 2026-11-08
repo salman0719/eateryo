@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   APP_SECTIONS,
   availableSections,
+  sectionTabLabel,
   type SectionAccess,
 } from "@/features/navigation/routes";
 import { CAPABILITIES, STAFF_CAPABILITIES } from "@/features/tenancy/permissions";
@@ -95,5 +96,26 @@ describe("availableSections", () => {
   it("hides the Assistant while its release flag is off", () => {
     expect(sectionsFor().map((section) => section.id)).not.toContain("assistant");
     expect(staffSections(false).map((section) => section.id)).not.toContain("assistant");
+  });
+});
+
+describe("sectionTabLabel", () => {
+  const library = APP_SECTIONS.find((section) => section.id === "library")!;
+  const orders = APP_SECTIONS.find((section) => section.id === "orders")!;
+
+  it("names the active café's count once it is known", () => {
+    expect(sectionTabLabel(library, 1)).toBe("My menus (1)");
+  });
+
+  it("keeps the plain label while the count is unresolved", () => {
+    expect(sectionTabLabel(library, null)).toBe("My menus");
+  });
+
+  it("does not print a zero", () => {
+    expect(sectionTabLabel(library, 0)).toBe("My menus");
+  });
+
+  it("leaves the other sections alone", () => {
+    expect(sectionTabLabel(orders, 3)).toBe("Orders");
   });
 });

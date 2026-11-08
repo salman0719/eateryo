@@ -103,6 +103,7 @@ import {
   parseAppRoute,
   phoneTabs,
   routeMenuId,
+  sectionTabLabel,
   signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
@@ -2544,6 +2545,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     (!accountAccessPending &&
       serverMenusReadFor === accountKey &&
       serverMenusReadFailedFor !== accountKey);
+  /**
+   * The tab's number is a fact about one café, so it waits for the café map:
+   * before that the unfiltered rows would be counted as if they belonged to
+   * the active membership, and the tab would shrink a moment later. Signed
+   * out the working set is the whole list, so it is known already.
+   */
+  const libraryCountKnown = !signedIn || menuCafesKnown;
   const workspaceMenuIds = new Set(
     signedIn
       ? scopeMenusToCafe({
@@ -2834,9 +2842,10 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 {/* My menus signed out is the anonymous working set: the
                     count is what there is to continue (the outer gate already
                     waited for the library to settle). */}
-                {section.id === "library" && libraryMenus.length
-                  ? `My menus (${libraryMenus.length})`
-                  : section.label}
+                {sectionTabLabel(
+                  section,
+                  libraryCountKnown ? libraryMenus.length : null
+                )}
                 {section.id === "orders" && <NewOrdersBadge tone="pill" />}
               </button>
             ))}
