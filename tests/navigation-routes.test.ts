@@ -4,6 +4,7 @@ import {
   appRouteHref,
   menuIdFromPathname,
   parseAppRoute,
+  sectionForScreen,
   signOutLandingRoute,
   unresolvableMenuMessage,
 } from "../src/features/navigation/routes";
@@ -80,6 +81,13 @@ describe("application routes", () => {
     expect(signOutLandingRoute({ wasSignedIn: true, signedIn: false })).toEqual({
       screen: "capture",
     });
+  });
+
+  it("keeps an open menu under My menus in the sidebar", () => {
+    expect(sectionForScreen("capture")).toBe("capture");
+    expect(sectionForScreen("editor")).toBe("library");
+    expect(sectionForScreen("item")).toBe("library");
+    expect(sectionForScreen("settings")).toBe("settings");
   });
 
   it("round-trips every supported route and URL-encodes menu ids", () => {

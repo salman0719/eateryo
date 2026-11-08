@@ -144,6 +144,11 @@ export interface AppSection {
   why?: string;
   /** The bottom bar's glyph; the label carries the accessible name. */
   icon?: string;
+  /**
+   * Filled in by the shell, never by the table: how many menus the library is
+   * showing in the active café, once that number is a fact.
+   */
+  count?: number;
 }
 
 /**
@@ -238,12 +243,12 @@ export function availableSections(access: SectionAccess): AppSection[] {
  * R0 phone nav: the bottom tab bar pins the sections marked `bar`, so the
  * R0.3 order monitor keeps a persistent home for its badge. Everything else
  * lives in the More sheet, led by Tables. Derived from the filtered list, so
- * a hidden section cannot survive in either renderer.
+ * a hidden section cannot survive in either renderer; the glyphs come from
+ * the shared icon set in the shell, so this stays pure data tests can pin.
  */
 export interface PhoneTab {
   id: AppSectionId;
   label: string;
-  icon: string;
 }
 
 export function phoneTabs(sections: readonly AppSection[]): PhoneTab[] {
@@ -284,6 +289,15 @@ export function sectionTabLabel(
     return `${section.label} (${libraryCount})`;
   }
   return section.label;
+}
+
+/**
+ * Which destination a screen belongs to. An open menu (and its item deep
+ * link) lives under My menus: the sidebar should not go blank just because
+ * the editor took the canvas.
+ */
+export function sectionForScreen(screen: AppScreen): AppSectionId {
+  return screen === "editor" || screen === "item" ? "library" : screen;
 }
 
 /** Build the canonical path for an application screen. */
