@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   accessCan,
   accessIsStaff,
-  anyRestaurantCan,
   menuAccessById,
   restaurantCapabilities,
   type MenuAccess,
@@ -73,24 +72,6 @@ describe("restaurantCapabilities", () => {
     expect(staffCaps).toContain("orders.read");
     expect(staffCaps).not.toContain("menus.write");
     expect(restaurantCapabilities({ role: "owner" })).toContain("menus.write");
-  });
-});
-
-describe("anyRestaurantCan", () => {
-  it("is true when any membership grants the capability", () => {
-    expect(
-      anyRestaurantCan(
-        [
-          { role: "staff", access: { role: "staff", capabilities: ["orders.read"] } },
-          { role: "owner", access: owner },
-        ],
-        "menus.publish"
-      )
-    ).toBe(true);
-  });
-
-  it("is false for an empty account", () => {
-    expect(anyRestaurantCan([], "orders.read")).toBe(false);
   });
 });
 

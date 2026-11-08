@@ -31,8 +31,11 @@ function render(options: { menusPending: boolean; count: number; sessionPending?
     createElement(
       // The provider requires children in its type; createElement passes them
       // as arguments, so the wrapper's type drops that one prop.
-      OrderMonitorProvider as ComponentType<{ userId: string | null }>,
-      { userId: null },
+      OrderMonitorProvider as ComponentType<{
+        userId: string | null;
+        restaurantId: string | null;
+      }>,
+      { userId: null, restaurantId: null },
       createElement(AppSidebar, {
         sections,
         activeSection: "capture",

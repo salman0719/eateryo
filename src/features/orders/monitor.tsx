@@ -134,9 +134,19 @@ function notificationBody(order: Order): string {
 
 export function OrderMonitorProvider({
   userId,
+  restaurantId,
+  pending = false,
   children,
 }: {
   userId: string | null;
+  /**
+   * The café the shell is acting in. One membership at a time: a person who
+   * both owns a café and works a shift elsewhere must never see the other
+   * café's tickets, toasts or badge.
+   */
+  restaurantId: string | null;
+  /** The membership read has not answered: hold the board's shape. */
+  pending?: boolean;
   children: ReactNode;
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -163,13 +173,15 @@ export function OrderMonitorProvider({
   const notificationsAvailable =
     typeof window !== "undefined" && "Notification" in window;
 
-  // A new session (sign-out, or a different account) resets the monitor's
-  // state synchronously during render — React's endorsed pattern for syncing
-  // state to new props, with no effect round-trip and no stale flash. Refs
-  // are reset in the polling effect below (refs must never be touched here).
-  const [monitorUser, setMonitorUser] = useState(userId);
-  if (monitorUser !== userId) {
-    setMonitorUser(userId);
+  // A new session (sign-out, a different account, or a different café) resets
+  // the monitor synchronously during render — React's endorsed pattern for
+  // syncing state to new props, with no effect round-trip and no stale flash:
+  // the previous café's tickets must not survive a switch even for a frame.
+  // Refs are reset in the polling effect below (refs are never touched here).
+  const monitorKey = `${userId ?? ""}::${restaurantId ?? ""}`;
+  const [monitorFor, setMonitorFor] = useState(monitorKey);
+  if (monitorFor !== monitorKey) {
+    setMonitorFor(monitorKey);
     setOrders([]);
     setPhase("loading");
     setConnection("idle");
@@ -226,7 +238,10 @@ export function OrderMonitorProvider({
 
   const poll = useCallback(
     async (initial: boolean) => {
+      // Always one café: the server would otherwise answer with every
+      // membership's tickets, which is a union the shell never acts in.
       const result = await fetchStaffOrders({
+        restaurantId,
         since: initial ? null : sinceRef.current,
         limit: 100,
       });
@@ -269,7 +284,7 @@ export function OrderMonitorProvider({
       setConnection("live");
       setPollError(null);
     },
-    [pushToast]
+    [pushToast, restaurantId]
   );
 
   useEffect(() => {
@@ -280,6 +295,23 @@ export function OrderMonitorProvider({
       for (const timer of toastTimers.current.values()) clearTimeout(timer);
       toastTimers.current.clear();
       return;
+    }
+    if (pending) {
+      // The café is still being resolved. Polling now would fetch the union of
+      // every membership — the exact leak this guard exists to prevent.
+      return;
+    }
+    if (!restaurantId) {
+      // Signed in with no café to act in: an empty board is the truth here,
+      // not a loading one. Deferred so the effect body never sets state.
+      const settle = setTimeout(() => {
+        setOrders([]);
+        setPhase("ready");
+        setConnection("idle");
+        setLastSyncedAt(null);
+        setPollError(null);
+      }, 0);
+      return () => clearTimeout(settle);
     }
     let cancelled = false;
     let failures = 0;
@@ -319,7 +351,7 @@ export function OrderMonitorProvider({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [userId, poll]);
+  }, [userId, restaurantId, pending, poll]);
 
   useEffect(
     () => () => {

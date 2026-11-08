@@ -64,16 +64,6 @@ export function restaurantCapabilities(restaurant: {
   return restaurant.access?.capabilities ?? capabilitiesForMembership(restaurant.role, null);
 }
 
-/** True when any restaurant on the account grants this capability. */
-export function anyRestaurantCan(
-  restaurants: readonly { role: "owner" | "staff"; access?: MembershipAccess }[],
-  capability: Capability
-): boolean {
-  return restaurants.some((restaurant) =>
-    hasCapability(restaurantCapabilities(restaurant), capability)
-  );
-}
-
 /** True when the caller is on the restaurant as staff (their role axis). */
 export function accessIsStaff(access: MenuAccess | undefined): boolean {
   return (

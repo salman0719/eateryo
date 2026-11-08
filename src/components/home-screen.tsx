@@ -2648,17 +2648,27 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       failedFor: restaurantReadFailedFor,
     }),
   });
-  const localDraftsDecision = decideLocalDraftClaimSurface({
-    gate: claimGate,
-    signedIn,
-    claim: {
-      localCount: localOnlyCount,
-      accountMenuCount: serverIds.size,
-      restaurantCount,
-      ownedRestaurantCount: ownedRestaurantsForAccount.length,
-      status: claimStatus,
-    },
-  });
+  /**
+   * Browser drafts are the owner's to file: the offer and the automatic
+   * import both write to a café, so they exist only while the shell acts in a
+   * membership that can write menus. On a staff shift they wait, and come
+   * back after switching to the owner café — the other membership's cafés are
+   * never offered as a target here.
+   */
+  const canFileBrowserDrafts = signedIn && accountCan("menus.write");
+  const localDraftsDecision = canFileBrowserDrafts
+    ? decideLocalDraftClaimSurface({
+        gate: claimGate,
+        signedIn,
+        claim: {
+          localCount: localOnlyCount,
+          accountMenuCount: serverIds.size,
+          restaurantCount,
+          ownedRestaurantCount: ownedRestaurantsForAccount.length,
+          status: claimStatus,
+        },
+      })
+    : "none";
   // Neither claim surface renders while the gate says the account is unknown.
   const claimSurfaceQuiet =
     localDraftsDecision === "none" || localDraftsDecision === "unavailable";
@@ -2879,7 +2889,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   return (
-    <OrderMonitorProvider userId={session?.user?.id ?? null}>
+    <OrderMonitorProvider
+      userId={session?.user?.id ?? null}
+      restaurantId={activeWorkspace?.restaurantId ?? null}
+      pending={sessionPending || accountAccessPending}
+    >
     <div className="flex min-h-full flex-1 flex-col">
       {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
@@ -3110,7 +3124,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               sessionPending={sessionPending}
               proposalsEnabled={featureFlags.assistantProposals}
               menusLoading={libraryLoading}
-              menus={menus
+              // The active café's writable menus only: the assistant proposes
+              // edits, so it must not offer the other membership's menus.
+              menus={workspaceMenus
                 .filter(
                   (menu) => serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
                 )
