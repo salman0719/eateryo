@@ -28,7 +28,7 @@ import {
 } from "react";
 
 import { fetchStaffOrders } from "./client";
-import { detectNewOrders, mergeBoardOrders } from "./monitor-utils";
+import { detectNewOrders, mergeBoardOrders, monitorPollScope, monitorScopeKey } from "./monitor-utils";
 import { orderCode, type Order, type OrderStatus } from "./schema";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "./table-links";
@@ -178,7 +178,7 @@ export function OrderMonitorProvider({
   // syncing state to new props, with no effect round-trip and no stale flash:
   // the previous café's tickets must not survive a switch even for a frame.
   // Refs are reset in the polling effect below (refs are never touched here).
-  const monitorKey = `${userId ?? ""}::${restaurantId ?? ""}`;
+  const monitorKey = monitorScopeKey(userId, restaurantId);
   const [monitorFor, setMonitorFor] = useState(monitorKey);
   if (monitorFor !== monitorKey) {
     setMonitorFor(monitorKey);
@@ -237,11 +237,11 @@ export function OrderMonitorProvider({
   );
 
   const poll = useCallback(
-    async (initial: boolean) => {
+    async (initial: boolean, cafeId: string) => {
       // Always one café: the server would otherwise answer with every
       // membership's tickets, which is a union the shell never acts in.
       const result = await fetchStaffOrders({
-        restaurantId,
+        restaurantId: cafeId,
         since: initial ? null : sinceRef.current,
         limit: 100,
       });
@@ -284,11 +284,12 @@ export function OrderMonitorProvider({
       setConnection("live");
       setPollError(null);
     },
-    [pushToast, restaurantId]
+    [pushToast]
   );
 
   useEffect(() => {
-    if (!userId) {
+    const scope = monitorPollScope({ userId, restaurantId, pending });
+    if (scope.kind === "signed-out") {
       sinceRef.current = null;
       seenAtRef.current = null;
       guardedRef.current = new Set();
@@ -296,12 +297,12 @@ export function OrderMonitorProvider({
       toastTimers.current.clear();
       return;
     }
-    if (pending) {
+    if (scope.kind === "membership-pending") {
       // The café is still being resolved. Polling now would fetch the union of
       // every membership — the exact leak this guard exists to prevent.
       return;
     }
-    if (!restaurantId) {
+    if (scope.kind === "no-cafe") {
       // Signed in with no café to act in: an empty board is the truth here,
       // not a loading one. Deferred so the effect body never sets state.
       const settle = setTimeout(() => {
@@ -313,6 +314,7 @@ export function OrderMonitorProvider({
       }, 0);
       return () => clearTimeout(settle);
     }
+    const cafeId = scope.restaurantId;
     let cancelled = false;
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -324,7 +326,7 @@ export function OrderMonitorProvider({
 
     async function tick() {
       try {
-        await poll(sinceRef.current === null);
+        await poll(sinceRef.current === null, cafeId);
         if (cancelled) return;
         failures = 0;
         schedule(POLL_MS);
@@ -340,7 +342,8 @@ export function OrderMonitorProvider({
 
     const initial = setTimeout(() => void tick(), 0);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void poll(false).catch(() => undefined);
+      if (document.visibilityState === "visible")
+        void poll(false, cafeId).catch(() => undefined);
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
@@ -396,8 +399,10 @@ export function OrderMonitorProvider({
   );
 
   const refresh = useCallback(() => {
-    void poll(false).catch(() => undefined);
-  }, [poll]);
+    // Never refresh the union: with no café to act in there is nothing to read.
+    if (!restaurantId) return;
+    void poll(false, restaurantId).catch(() => undefined);
+  }, [poll, restaurantId]);
 
   const applyOptimistic = useCallback((orderId: string, status: OrderStatus) => {
     guardedRef.current.add(orderId);
