@@ -76,6 +76,7 @@ import {
   SyncError,
   updateServerMenu,
 } from "@/features/menus/sync";
+import { scopeMenusToCafe } from "@/features/menus/library-scope";
 import {
   fetchLiveMenuDoc,
   fetchPublication,
@@ -447,6 +448,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   /** Ids of the caller's menus that exist on the server (chips + operations). */
   const serverIdsRef = useRef<ReadonlySet<string>>(new Set());
   const [serverIds, setServerIds] = useState<ReadonlySet<string>>(new Set());
+  /**
+   * The café each account menu belongs to, keyed by menu id. A browser-only
+   * draft has no entry — it belongs to no café until it is moved. The
+   * summaries already carry this, so the library can be scoped without a
+   * second request.
+   */
+  const [menuRestaurantById, setMenuRestaurantById] = useState<ReadonlyMap<string, string>>(
+    new Map()
+  );
   /** Ids of account menus where the caller is staff only (view, never edit). */
   /**
    * Server-resolved access for each menu, keyed by id. A missing id is the
@@ -826,6 +836,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       }
       replaceServerIds(new Set());
       replaceMenuAccess(new Map());
+      setMenuRestaurantById(new Map());
       setRestaurants(null);
       // The ids and the read that produced them reset together (001): a stale
       // "settled" marker over an empty id set would let the next sign-in paint
@@ -931,6 +942,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         const serverMenus = await fetchServerMenus();
         replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
+        setMenuRestaurantById(
+          new Map(serverMenus.map((menu) => [menu.id, menu.restaurantId] as const))
+        );
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
         if (signedInRef.current) {
@@ -2452,15 +2466,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   );
   const visibleMenus = menus.filter((menu) => visibleIds.has(menu.id));
   const hasHiddenMenus = visibleMenus.length !== menus.length;
-  // Library rows carry their account state: menus on the server show as
-  // synced; the rest are browser-only until moved (or downloaded).
-  const libraryMenus = visibleMenus.map((menu) => ({
-    ...menu,
-    onServer: serverIds.has(menu.id),
-    // The row's verbs follow the same answer as the editor. An unanswered
-    // menu is read-only here too, so no owner control appears on a guess.
-    canWrite: !signedIn || accessCan(menuAccess.get(menu.id), "menus.write"),
-  }));
   /**
    * The chip column may only speak once the account's menu list has been read
    * (001). Before that an empty id set is "not asked yet", so the rows keep
@@ -2472,8 +2477,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // answered lets the rows name membership (001).
   const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
   const libraryAccountMode = signedIn && serverMenusFor === accountKey;
-  const localOnly = libraryMenus.filter((menu) => !menu.onServer);
-  const localOnlyCount = localOnly.length;
   // A list cached from another account is never offered as a move target.
   const ownedRestaurantsForAccount = ownedRestaurantsFor === accountKey ? ownedRestaurants : [];
   const restaurantsLoading = signedIn && ownedRestaurantsFor !== accountKey;
@@ -2516,6 +2519,41 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     if (accountIsNew) return true;
     return workspaceCan(activeWorkspace, capability);
   }
+  /**
+   * The active café's rows. Server menus name their restaurant; a browser-only
+   * draft names none, so it belongs to a membership that can write and is
+   * hidden on a staff shift. While the menu list has not answered — or the
+   * read failed — the café of every row is unknown, so nothing is hidden on a
+   * guess (and the panel is already skeletoning in the pending case).
+   */
+  const menuCafesKnown =
+    !signedIn ||
+    (!accountAccessPending &&
+      serverMenusReadFor === accountKey &&
+      serverMenusReadFailedFor !== accountKey);
+  const workspaceMenuIds = new Set(
+    signedIn
+      ? scopeMenusToCafe({
+          menuIds: visibleMenus.map((menu) => menu.id),
+          restaurantById: menuRestaurantById,
+          restaurantId: activeWorkspace?.restaurantId ?? null,
+          canWrite: accountCan("menus.write"),
+          known: menuCafesKnown,
+        })
+      : visibleMenus.map((menu) => menu.id)
+  );
+  const workspaceMenus = visibleMenus.filter((menu) => workspaceMenuIds.has(menu.id));
+  // Library rows carry their account state: menus on the server show as
+  // synced; the rest are browser-only until moved (or downloaded).
+  const libraryMenus = workspaceMenus.map((menu) => ({
+    ...menu,
+    onServer: serverIds.has(menu.id),
+    // The row's verbs follow the same answer as the editor. An unanswered
+    // menu is read-only here too, so no owner control appears on a guess.
+    canWrite: !signedIn || accessCan(menuAccess.get(menu.id), "menus.write"),
+  }));
+  const localOnly = libraryMenus.filter((menu) => !menu.onServer);
+  const localOnlyCount = localOnly.length;
   // A name for the first-run "Name your restaurant" field, guessed from the
   // titles of the menus the move would copy (null when they say nothing).
   const suggestedRestaurantName = suggestRestaurantName(localOnly.map((menu) => menu.title));
@@ -2657,7 +2695,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     signedIn,
     can: accountCan,
     assistantEnabled: featureFlags.assistant,
-    hasWorkingSet: visibleMenus.length > 0,
+    hasWorkingSet: libraryMenus.length > 0,
   });
   const availableScreenIds = new Set(sections.map((section) => section.id));
   const phoneTabList = phoneTabs(sections);
@@ -2668,20 +2706,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const screenInMore = moreRows.some((row) => row.id === screen);
   const canGetStarted = signedIn && accountCan("settings.manage");
   /** Why an empty library is empty, when the shell can tell. */
-  const libraryEmpty =
-    signedIn && restaurantList !== null
-      ? restaurantList.length === 0
-        ? {
-            title: "No café on this account yet",
-            body: "If you were invited, open the invitation link from your email, or ask the owner to add this address in Settings → Team. Otherwise, capture a menu to start your own café.",
-          }
-        : !accountCan("menus.write")
-          ? {
-              title: "No menus to show",
-              body: "Staff see published menus only. Ask the owner to publish one; drafts and unpublished menus stay private until then.",
-            }
-          : undefined
-      : undefined;
+  const libraryEmpty = (() => {
+    if (!signedIn || restaurantList === null) return undefined;
+    if (restaurantList.length === 0) {
+      return {
+        title: "No café on this account yet",
+        body: "If you were invited, open the invitation link from your email, or ask the owner to add this address in Settings → Team. Otherwise, capture a menu to start your own café.",
+      };
+    }
+    if (activeWorkspace === null) return undefined;
+    // The list is the active café's, so the empty state names that café — not
+    // the account, whose other café may be full of menus.
+    return {
+      title: `No menus at ${activeWorkspace.name} yet`,
+      body: accountCan("menus.write")
+        ? "Capture a menu or start a blank one — it will appear here and survive refreshes."
+        : "Staff see this café's published menus only. Ask the owner to publish one; drafts and unpublished menus stay private until then.",
+    };
+  })();
 
   // A typed URL or old bookmark for a surface this membership cannot use
   // lands on the first one it can — Capture for an owner, My menus for a
@@ -2725,7 +2767,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             one appearance after the load settles. */}
         {screen !== "editor" &&
           navReady &&
-          (signedIn || (!libraryLoading && visibleMenus.length > 0)) && (
+          (signedIn || (!libraryLoading && libraryMenus.length > 0)) && (
           <nav
             data-print-hide
             aria-label="Sections"
@@ -2747,8 +2789,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 {/* My menus signed out is the anonymous working set: the
                     count is what there is to continue (the outer gate already
                     waited for the library to settle). */}
-                {section.id === "library" && visibleMenus.length
-                  ? `My menus (${visibleMenus.length})`
+                {section.id === "library" && libraryMenus.length
+                  ? `My menus (${libraryMenus.length})`
                   : section.label}
                 {section.id === "orders" && <NewOrdersBadge tone="pill" />}
               </button>
@@ -2879,6 +2921,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               menus={libraryMenus}
               loading={libraryLoading || libraryAccountPending}
               accountMode={libraryAccountMode}
+              canCreate={!signedIn || accountCan("menus.write")}
               hasHiddenMenus={hasHiddenMenus}
               emptyTitle={libraryEmpty?.title}
               emptyBody={libraryEmpty?.body}
@@ -3350,7 +3393,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         the page and sticks to the viewport bottom instead of floating above
         the footer links.
       */}
-      {navReady && (signedIn || (!libraryLoading && visibleMenus.length > 0)) ? (
+      {navReady && (signedIn || (!libraryLoading && libraryMenus.length > 0)) ? (
       <nav
         data-print-hide
         aria-label="Sections"

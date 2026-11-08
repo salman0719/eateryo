@@ -36,6 +36,12 @@ interface LibraryPanelProps {
    * answered yet", so nothing claims "this browser only" on a guess.
    */
   accountMode: boolean;
+  /**
+   * Whether this membership may start a menu (`menus.write`). A staff shift
+   * reads the café's published menus; it never creates a draft, so the
+   * creation controls are absent rather than disabled.
+   */
+  canCreate?: boolean;
   /** Signed out with stamped rows hidden: say so instead of "no menus". */
   hasHiddenMenus?: boolean;
   /** Restaurants the caller owns — where a per-row add can put a menu. */
@@ -66,6 +72,7 @@ export function LibraryPanel({
   menus,
   loading = false,
   accountMode,
+  canCreate = true,
   hasHiddenMenus = false,
   ownedRestaurants = [],
   onMoveToAccount,
@@ -89,7 +96,9 @@ export function LibraryPanel({
   // Q2 companion: the second menu gets a contextual ask, not a bare
   // duplicate — chips name it for its service, the button keeps numbering.
   const secondMenuSuggestions =
-    menus.length > 0 && !loading ? suggestSecondMenuNames(menus.map((menu) => menu.title)) : [];
+    canCreate && menus.length > 0 && !loading
+      ? suggestSecondMenuNames(menus.map((menu) => menu.title))
+      : [];
 
   function startMove(id: string) {
     setMoveError(null);
@@ -126,14 +135,16 @@ export function LibraryPanel({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-ink-900">My menus</h2>
-        <button
-          type="button"
-          onClick={() => onNew()}
-          disabled={unavailable}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          + New menu
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => onNew()}
+            disabled={unavailable}
+            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            + New menu
+          </button>
+        )}
       </div>
 
       {secondMenuSuggestions.length > 0 && (
