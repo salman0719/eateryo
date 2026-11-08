@@ -1,10 +1,13 @@
 /**
- * Server-side launch snapshot: what the account actually has, so the
- * onboarding checklist reports facts rather than a guessed progress bar.
+ * Server-side launch snapshot: what one café actually has, so the onboarding
+ * checklist reports facts rather than a guessed progress bar.
  *
- * Every query is scoped by the verified user id through membership (never a
- * client-supplied id), and review counts come from documents re-validated
- * with the canonical menu schema — an unreadable menu is counted, not hidden.
+ * Scoped to one membership at a time: an account that owns one café and works
+ * a shift at another must not see the other café's menus or orders in this
+ * count. Every query also joins membership on the verified user id, so a
+ * client-supplied restaurant id can never widen the read. Review counts come
+ * from documents re-validated with the canonical menu schema — an unreadable
+ * menu is counted, not hidden.
  */
 
 import { and, count, desc, eq, isNotNull } from "drizzle-orm";
@@ -18,13 +21,16 @@ import type { LaunchSnapshot } from "./schema";
 
 export async function getLaunchSnapshot(
   db: TenancyDb,
-  userId: string
+  userId: string,
+  restaurantId: string
 ): Promise<LaunchSnapshot> {
   const menus = await db
     .select({ id: menu.id, doc: menu.doc })
     .from(menu)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
-    .where(eq(restaurantMembership.userId, userId));
+    .where(
+      and(eq(restaurantMembership.userId, userId), eq(menu.restaurantId, restaurantId))
+    );
 
   const publications = await db
     .select({
@@ -36,14 +42,20 @@ export async function getLaunchSnapshot(
       restaurantMembership,
       eq(restaurantMembership.restaurantId, publishedMenu.restaurantId)
     )
-    .where(and(eq(restaurantMembership.userId, userId), isNotNull(publishedMenu.publishedAt)))
+    .where(
+      and(
+        eq(restaurantMembership.userId, userId),
+        eq(publishedMenu.restaurantId, restaurantId),
+        isNotNull(publishedMenu.publishedAt)
+      )
+    )
     .orderBy(desc(publishedMenu.publishedAt));
 
   const orders = await db
     .select({ value: count() })
     .from(order)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, order.restaurantId))
-    .where(eq(restaurantMembership.userId, userId));
+    .where(and(eq(restaurantMembership.userId, userId), eq(order.restaurantId, restaurantId)));
 
   let unpricedItems = 0;
   let reviewNotes = 0;

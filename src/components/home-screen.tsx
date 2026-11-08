@@ -259,6 +259,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const [launchChecklist, setLaunchChecklist] = useState<{
     accountKey: string;
+    restaurantId: string;
     done: number;
     total: number;
     complete: boolean;
@@ -451,25 +452,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     session?.user?.id ?? null
   );
 
-  // Refresh the sidebar's launch progress when the account or screen changes:
-  // publishing or a first order moves the count, and the next navigation is
-  // when the owner sees it. A failed read hides the row instead of guessing.
-  useEffect(() => {
-    if (!signedIn || !accountKey) return;
-    let cancelled = false;
-    void fetchLaunchStatus()
-      .then((status) => {
-        if (cancelled) return;
-        const progress = launchProgress(status, cardsPrintedOnThisDevice());
-        setLaunchChecklist({ accountKey, ...progress });
-      })
-      .catch(() => {
-        if (!cancelled) setLaunchChecklist(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [signedIn, accountKey, screen]);
   const signedInRef = useRef(false);
   /** Session state at decision time (a closure may outlive the render). */
   const sessionStateRef = useRef<SessionState>("unknown");
@@ -2536,6 +2518,35 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     !signedIn || workspacePending
       ? null
       : resolveActiveWorkspace(workspaces, activeWorkspaceKey);
+  const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
+  // Refresh the sidebar's launch progress when the account, the café, or the
+  // screen changes: publishing or a first order moves the count, and the next
+  // navigation is when the owner sees it. It asks for the café the shell is
+  // acting in — never the account's other memberships — and waits for that
+  // café to be resolved. A failed read hides the row instead of guessing.
+  useEffect(() => {
+    // Nothing to read without an account and a café. The stored count is not
+    // cleared here (a synchronous setState in an effect); the render compares
+    // account and café, so an old membership's count can never show.
+    if (!signedIn || !accountKey || !activeRestaurantId) return;
+    let cancelled = false;
+    void fetchLaunchStatus(activeRestaurantId)
+      .then((status) => {
+        if (cancelled) return;
+        const progress = launchProgress(status, cardsPrintedOnThisDevice());
+        setLaunchChecklist({
+          accountKey,
+          restaurantId: activeRestaurantId,
+          ...progress,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setLaunchChecklist(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, accountKey, activeRestaurantId, screen]);
   /**
    * Switch the membership the shell acts in. Stored under the account, so a
    * staff context chosen on a shared device never greets the next person.
@@ -2861,15 +2872,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }))
       : null;
   const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
-  /** Unfinished checklist for this account only; complete or unknown hides it. */
+  /**
+   * Unfinished checklist for this account **and this café** only: another
+   * membership's count is never shown, and complete or unknown hides the row.
+   */
+  const launchChecklistForActive =
+    launchChecklist &&
+    launchChecklist.accountKey === accountKey &&
+    launchChecklist.restaurantId === activeRestaurantId
+      ? launchChecklist
+      : null;
   const sidebarLaunch =
-    signedIn && launchChecklist && launchChecklist.accountKey === accountKey && !launchChecklist.complete
-      ? { done: launchChecklist.done, total: launchChecklist.total }
+    signedIn && launchChecklistForActive && !launchChecklistForActive.complete
+      ? { done: launchChecklistForActive.done, total: launchChecklistForActive.total }
       : null;
   /** The More sheet's checklist line: progress, finished, or not read yet. */
   const sheetLaunchHint = sidebarLaunch
     ? "What's left to set up"
-    : launchChecklist && launchChecklist.accountKey === accountKey
+    : launchChecklistForActive
       ? "All steps done"
       : "See what's left to set up";
   /**

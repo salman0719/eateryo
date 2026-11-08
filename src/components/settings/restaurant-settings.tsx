@@ -310,7 +310,7 @@ export function RestaurantSettings({
           on the session, so there is no dead UI while it resolves. */}
       {signedIn && (
         <>
-          <UsagePanel />
+          <UsagePanel restaurantId={selected?.id ?? null} />
           <DataControls />
         </>
       )}

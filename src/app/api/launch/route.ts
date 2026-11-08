@@ -10,13 +10,16 @@ import { getDb } from "@/lib/db";
 import { reportError } from "@/lib/observability/alerts";
 
 /**
- * GET /api/launch — the signed-in account's onboarding state: how many menus
- * exist, whether one is live, how many orders have arrived, what still needs
- * a price, and this month's extraction + assistant spend against their caps.
+ * GET /api/launch?restaurantId=… — one café's onboarding state: how many of
+ * its menus exist, whether one is live, how many of its orders have arrived,
+ * what still needs a price, and this month's extraction + assistant spend
+ * against the account's caps.
  *
- * One request feeds the whole checklist; personalized, so never cached.
+ * One membership at a time: the caller names the café it is acting in, and the
+ * answer never mixes in another membership's menus or orders. One request
+ * feeds the whole checklist; personalized, so never cached.
  */
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: Request): Promise<NextResponse> {
   let userId: string | null;
   try {
     userId = await getSessionUserId();
@@ -38,29 +41,48 @@ export async function GET(): Promise<NextResponse> {
     );
   }
 
+  const restaurantId = new URL(request.url).searchParams.get("restaurantId")?.trim() ?? "";
+  if (!restaurantId) {
+    return NextResponse.json(
+      {
+        error: {
+          code: "invalid_body",
+          message: "Choose the café whose checklist you want to see.",
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   try {
     const db = getDb();
     // The checklist is the owner's onboarding: extract, review, publish,
-    // print. A staff member cannot do those things, so the merged account
-    // snapshot would only hand them a list of steps they must not take.
+    // print. A staff member cannot do those things, so that membership gets a
+    // refusal rather than a list of steps it must not take. A café on another
+    // account is a 404, never a hint that it exists.
     const memberships = await listRestaurantsForUser(db, userId);
-    if (
-      !memberships.some((membership) =>
-        hasCapability(membership.access.capabilities, "settings.manage")
-      )
-    ) {
+    const membership = memberships.find((row) => row.id === restaurantId);
+    if (!membership) {
+      return NextResponse.json(
+        {
+          error: { code: "not_found", message: "That café is not on this account." },
+        },
+        { status: 404 }
+      );
+    }
+    if (!hasCapability(membership.access.capabilities, "settings.manage")) {
       return NextResponse.json(
         {
           error: {
             code: "forbidden",
-            message: "The launch checklist belongs to the café owner.",
+            message: "The launch checklist belongs to the café you are acting in as its owner.",
           },
         },
         { status: 403 }
       );
     }
     const [snapshot, usage, assistant] = await Promise.all([
-      getLaunchSnapshot(db, userId),
+      getLaunchSnapshot(db, userId, restaurantId),
       getMonthlyUsageSummary(db, userId),
       getAssistantSpendSummary(db, userId),
     ]);
