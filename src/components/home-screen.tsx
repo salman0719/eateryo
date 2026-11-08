@@ -96,6 +96,7 @@ import {
 import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
 import {
+  availableSections,
   appRouteHref,
   moreSheetRows,
   parseAppRoute,
@@ -2645,25 +2646,26 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // their writes anyway; the UI must not offer the controls at all).
   const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
 
-  // Shell surfaces follow the same answer as the rows and the editor.
-  const canOrders = accountCan("orders.read");
-  const canTables = accountCan("tables.print") || accountCan("tables.link");
-  const canSettings = accountCan("settings.read");
-  const canAssistant = accountCan("assistant.use");
-  const canMenus = accountCan("menus.read") || visibleMenus.length > 0;
-  const showMyMenus = signedIn ? canMenus : visibleMenus.length > 0;
-  const phoneTabList = (signedIn
-    ? phoneTabs()
-    : phoneTabs().filter((tab) => tab.id === "capture" || tab.id === "library")
-  ).filter((tab) =>
-    tab.id === "orders" ? canOrders : tab.id === "library" ? showMyMenus : true
-  );
-  const moreRows = moreSheetRows({
+  /**
+   * Every surface follows the one navigation table: a section is visible only
+   * when the active membership holds its capability (signed out: Capture
+   * plus the anonymous working set). The pills, tab bar and More sheet all
+   * read this list, so they cannot drift apart, and a section contributed
+   * later cannot appear ungated.
+   */
+  const sections = availableSections({
     signedIn,
-    assistantEnabled: featureFlags.assistant && canAssistant,
-  }).filter((row) =>
-    row.id === "tables" ? canTables : row.id === "settings" ? canSettings : canAssistant
-  );
+    can: accountCan,
+    assistantEnabled: featureFlags.assistant,
+    hasWorkingSet: visibleMenus.length > 0,
+  });
+  const availableScreenIds = new Set(sections.map((section) => section.id));
+  const phoneTabList = phoneTabs(sections);
+  const moreRows = moreSheetRows(sections);
+  /** Nav waits for the membership read: no provisional tabs, no empty bar. */
+  const navReady = !sessionPending && !accountAccessPending;
+  /** The More sheet owns the current screen (and so shows as pressed). */
+  const screenInMore = moreRows.some((row) => row.id === screen);
   const canGetStarted = signedIn && accountCan("settings.manage");
   /** Why an empty library is empty, when the shell can tell. */
   const libraryEmpty =
@@ -2681,24 +2683,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           : undefined
       : undefined;
 
-  // A typed URL or old bookmark for a surface this account cannot use lands
-  // on the first one it can. Unknown access is not a refusal: the guard waits.
+  // A typed URL or old bookmark for a surface this membership cannot use
+  // lands on the first one it can — Capture for an owner, My menus for a
+  // staff shift. Unknown access is not a refusal: the guard waits.
   useEffect(() => {
     if (!signedIn || accountAccessPending) return;
     const guarded = routeRef.current.screen;
     if (guarded === "assistant" && featureFlagsLoading) return;
-    const allowed =
-      guarded === "orders"
-        ? canOrders
-        : guarded === "tables"
-          ? canTables
-          : guarded === "settings"
-            ? canSettings
-            : guarded === "assistant"
-              ? canAssistant && featureFlags.assistant
-              : true;
-    if (!allowed) {
-      navigateTo({ screen: canOrders ? "orders" : canMenus ? "library" : "capture" }, true);
+    // The editor and item pages answer for themselves: their menu carries
+    // the server's own access answer, and a foreign menu moves the
+    // switcher (below) rather than being refused here.
+    if (guarded === "editor" || guarded === "item") return;
+    if (!availableScreenIds.has(guarded)) {
+      navigateTo({ screen: sections[0]?.id ?? "capture" }, true);
     }
   });
 
@@ -2727,7 +2724,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             fresh profile reads as a flicker. Draft owners get both tabs in
             one appearance after the load settles. */}
         {screen !== "editor" &&
-          !sessionPending &&
+          navReady &&
           (signedIn || (!libraryLoading && visibleMenus.length > 0)) && (
           <nav
             data-print-hide
@@ -2735,49 +2732,25 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             ref={pillsRef}
             className="hidden gap-2 overflow-x-auto pb-1 sm:flex"
           >
-            {(
-              [
-                { id: "capture", label: "Capture" },
-                // My menus signed out is the anonymous working set: only
-                // worth a tab when there are drafts to continue (the outer
-                // gate already waited for the library to settle).
-                ...(showMyMenus
-                  ? [
-                      {
-                        id: "library" as const,
-                        label: `My menus${visibleMenus.length ? ` (${visibleMenus.length})` : ""}`,
-                      },
-                    ]
-                  : []),
-                // Orders/Tables/Settings need an account — signed out is
-                // capture-only (plus the working set above). The assistant
-                // is never offered signed out (its kill switch, A4, only
-                // gates signed-in accounts).
-                ...(signedIn
-                  ? [
-                      ...(canOrders ? [{ id: "orders" as const, label: "Orders" }] : []),
-                      ...(featureFlags.assistant && canAssistant
-                        ? [{ id: "assistant" as const, label: "Assistant" }]
-                        : []),
-                      ...(canTables ? [{ id: "tables" as const, label: "Tables" }] : []),
-                      ...(canSettings ? [{ id: "settings" as const, label: "Settings" }] : []),
-                    ]
-                  : []),
-              ] as const
-            ).map((tab) => (
+            {sections.map((section) => (
               <button
-                key={tab.id}
+                key={section.id}
                 type="button"
-                onClick={() => navigateTo({ screen: tab.id })}
-                aria-current={screen === tab.id ? "page" : undefined}
+                onClick={() => navigateTo({ screen: section.id })}
+                aria-current={screen === section.id ? "page" : undefined}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                  screen === tab.id
+                  screen === section.id
                     ? "bg-surface-900 text-on-accent"
                     : "bg-surface-base text-ink-600 ring-1 ring-line-200 hover:text-ink-900"
                 }`}
               >
-                {tab.label}
-                {tab.id === "orders" && <NewOrdersBadge tone="pill" />}
+                {/* My menus signed out is the anonymous working set: the
+                    count is what there is to continue (the outer gate already
+                    waited for the library to settle). */}
+                {section.id === "library" && visibleMenus.length
+                  ? `My menus (${visibleMenus.length})`
+                  : section.label}
+                {section.id === "orders" && <NewOrdersBadge tone="pill" />}
               </button>
             ))}
           </nav>
@@ -3377,7 +3350,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         the page and sticks to the viewport bottom instead of floating above
         the footer links.
       */}
-      {!sessionPending && (signedIn || (!libraryLoading && visibleMenus.length > 0)) ? (
+      {navReady && (signedIn || (!libraryLoading && visibleMenus.length > 0)) ? (
       <nav
         data-print-hide
         aria-label="Sections"
@@ -3410,18 +3383,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
             aria-expanded={moreOpen}
-            aria-current={
-              screen === "tables" || screen === "assistant" || screen === "settings"
-                ? "page"
-                : undefined
-            }
+            aria-current={screenInMore ? "page" : undefined}
             className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-              moreOpen ||
-              screen === "tables" ||
-              screen === "assistant" ||
-              screen === "settings"
-                ? "text-warning-800"
-                : "text-ink-500"
+              moreOpen || screenInMore ? "text-warning-800" : "text-ink-500"
             }`}
           >
             <span aria-hidden="true" className="text-lg leading-none">

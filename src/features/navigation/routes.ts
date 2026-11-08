@@ -1,3 +1,5 @@
+import type { Capability } from "@/features/tenancy/permissions";
+
 export type AppScreen =
   "capture" | "library" | "orders" | "assistant" | "tables" | "settings" | "editor" | "item";
 
@@ -112,51 +114,161 @@ export function parseAppRoute(input: string | URL): AppRoute {
   return { screen: "capture" };
 }
 
+export type AppSectionId =
+  | "capture"
+  | "library"
+  | "orders"
+  | "assistant"
+  | "tables"
+  | "settings";
+
 /**
- * R0 phone nav: the bottom tab bar pins Capture · My menus · Orders, so the
+ * One section of the shell and the capability that opens it.
+ *
+ * This table is the only place a destination enters the navigation. The
+ * desktop pills, the phone tab bar and the More sheet are all derived from
+ * `availableSections`, so a section added later cannot appear ungated — and a
+ * membership that lacks the capability loses the section everywhere at once.
+ * Pure data so tests can pin the order without rendering the shell.
+ */
+export interface AppSection {
+  id: AppSectionId;
+  label: string;
+  /** Any one of these opens the section. */
+  capabilities: readonly Capability[];
+  /** Where it lives on a phone: the bottom bar or the More sheet. */
+  phone: "bar" | "more";
+  /** More-sheet position, lower first (the bar keeps `APP_SECTIONS` order). */
+  moreRank?: number;
+  /** The More sheet's one-line reason. */
+  why?: string;
+  /** The bottom bar's glyph; the label carries the accessible name. */
+  icon?: string;
+}
+
+/**
+ * Desktop order, which is also the order the guard tries when it has to move
+ * someone off a surface they cannot use. Capture is the owner's home, My menus
+ * the first surface a staff shift can use.
+ *
+ * Flags are not capabilities (the Assistant's release flag is separate), but
+ * every section that needs a permission names it here and nowhere else.
+ */
+export const APP_SECTIONS = [
+  {
+    id: "capture",
+    label: "Capture",
+    capabilities: ["menus.write"],
+    phone: "bar",
+    icon: "📸",
+  },
+  {
+    id: "library",
+    label: "My menus",
+    capabilities: ["menus.read"],
+    phone: "bar",
+    icon: "📚",
+  },
+  {
+    id: "orders",
+    label: "Orders",
+    capabilities: ["orders.read"],
+    phone: "bar",
+    icon: "🧾",
+  },
+  {
+    id: "assistant",
+    label: "Assistant",
+    capabilities: ["assistant.use"],
+    phone: "more",
+    moreRank: 20,
+    why: "Guided fixes and answers",
+  },
+  {
+    id: "tables",
+    label: "Tables",
+    capabilities: ["tables.print", "tables.link"],
+    phone: "more",
+    moreRank: 10,
+    why: "QR cards per table",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    capabilities: ["settings.read"],
+    phone: "more",
+    moreRank: 30,
+    why: "Restaurant · Team · Usage",
+  },
+] as const satisfies readonly AppSection[];
+
+/** Everything the nav needs to know about the person looking at it. */
+export interface SectionAccess {
+  signedIn: boolean;
+  /** The active membership's capability answer, never a union of memberships. */
+  can: (capability: Capability) => boolean;
+  /** The Assistant's release flag (its kill switch, A4). */
+  assistantEnabled: boolean;
+  /** Signed out only: this browser holds anonymous drafts to continue. */
+  hasWorkingSet: boolean;
+}
+
+/**
+ * The sections this person may see, in desktop order.
+ *
+ * Signed in, only capabilities decide (bar the Assistant's release flag).
+ * Signed out the shell is capture-only, plus My menus while anonymous drafts
+ * exist to continue — no account surface and no More sheet, whatever a stale
+ * capability or the flag says.
+ */
+export function availableSections(access: SectionAccess): AppSection[] {
+  if (!access.signedIn) {
+    return APP_SECTIONS.filter(
+      (section) =>
+        section.id === "capture" || (section.id === "library" && access.hasWorkingSet)
+    );
+  }
+  return APP_SECTIONS.filter((section) => {
+    if (section.id === "assistant" && !access.assistantEnabled) return false;
+    return section.capabilities.some((capability) => access.can(capability));
+  });
+}
+
+/**
+ * R0 phone nav: the bottom tab bar pins the sections marked `bar`, so the
  * R0.3 order monitor keeps a persistent home for its badge. Everything else
- * lives in the More sheet, led by Tables. Desktop keeps pills. Pure data so
- * tests can pin the order without rendering the shell. Signed out the shell
- * is capture-only (home-screen gates this list: Capture, plus My menus
- * while anonymous drafts exist) — no Orders, no More.
+ * lives in the More sheet, led by Tables. Derived from the filtered list, so
+ * a hidden section cannot survive in either renderer.
  */
 export interface PhoneTab {
-  id: "capture" | "library" | "orders";
+  id: AppSectionId;
   label: string;
   icon: string;
 }
 
-export function phoneTabs(): PhoneTab[] {
-  return [
-    { id: "capture", label: "Capture", icon: "📸" },
-    { id: "library", label: "My menus", icon: "📚" },
-    { id: "orders", label: "Orders", icon: "🧾" },
-  ];
+export function phoneTabs(sections: readonly AppSection[]): PhoneTab[] {
+  return sections
+    .filter((section) => section.phone === "bar")
+    .map((section) => ({ id: section.id, label: section.label, icon: section.icon ?? "" }));
 }
 
 export interface MoreSheetRow {
-  id: "tables" | "assistant" | "settings";
+  id: AppSectionId;
   label: string;
   why: string;
 }
 
 /**
  * More-sheet rows in display order: Tables first (R0 promotes tables over
- * orders everywhere — Orders already has its tab), then the Assistant for
- * signed-in accounts where the flag is on (never signed out, whatever the
- * flag says), then Settings. The Settings blurb names Usage so the moved
- * allowance panel stays discoverable.
+ * orders everywhere — Orders already has its tab), then the Assistant, then
+ * Settings. The Settings blurb names Usage so the moved allowance panel
+ * stays discoverable.
  */
-export function moreSheetRows(options: {
-  signedIn: boolean;
-  assistantEnabled: boolean;
-}): MoreSheetRow[] {
-  const rows: MoreSheetRow[] = [{ id: "tables", label: "Tables", why: "QR cards per table" }];
-  if (options.signedIn && options.assistantEnabled) {
-    rows.push({ id: "assistant", label: "Assistant", why: "Guided fixes and answers" });
-  }
-  rows.push({ id: "settings", label: "Settings", why: "Restaurant · Team · Usage" });
-  return rows;
+export function moreSheetRows(sections: readonly AppSection[]): MoreSheetRow[] {
+  return sections
+    .filter((section) => section.phone === "more")
+    .sort((a, b) => (a.moreRank ?? 0) - (b.moreRank ?? 0))
+    .map((section) => ({ id: section.id, label: section.label, why: section.why ?? "" }));
 }
 
 /** Build the canonical path for an application screen. */
