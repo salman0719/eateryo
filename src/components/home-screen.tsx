@@ -654,17 +654,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     });
   }, [accountKey, signedIn]);
 
-  /**
-   * Switch the membership the shell acts in. Stored under the account, so a
-   * staff context chosen on a shared device never greets the next person.
-   */
-  function handleSwitchWorkspace(key: string) {
-    if (!accountKey) return;
-    writeStoredWorkspaceKey(browserStorage(), accountKey, key);
-    setActiveWorkspaceKey(key);
-    setWorkspaceKeyFor(accountKey);
-  }
-
   // Display derives from the canonical docs (which carry confirmations),
   // falling back to the raw extraction only for the empty state.
   const result: PreviewMenu | null = resultDoc ?? demoDoc ?? extracted?.menu ?? null;
@@ -2512,6 +2501,30 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     !signedIn || workspacePending
       ? null
       : resolveActiveWorkspace(workspaces, activeWorkspaceKey);
+  /**
+   * Switch the membership the shell acts in. Stored under the account, so a
+   * staff context chosen on a shared device never greets the next person.
+   *
+   * The open editor belongs to its menu's café, so switching to a different
+   * one leaves the editor for the new café's library instead of keeping a
+   * menu on screen under a café it does not belong to. A browser-only draft
+   * has no café, so it stays only where the new membership can write.
+   */
+  function handleSwitchWorkspace(key: string) {
+    if (!accountKey) return;
+    writeStoredWorkspaceKey(browserStorage(), accountKey, key);
+    setActiveWorkspaceKey(key);
+    setWorkspaceKeyFor(accountKey);
+
+    const menuId = routeMenuId(route);
+    if (!menuId) return;
+    const target = workspaces.find((workspace) => workspace.key === key) ?? null;
+    const menuRestaurantId = menuRestaurantById.get(menuId);
+    const belongsToTarget = menuRestaurantId
+      ? menuRestaurantId === target?.restaurantId
+      : workspaceCan(target, "menus.write");
+    if (!belongsToTarget) navigateTo({ screen: "library" });
+  }
   const accountAccessPending = signedIn && (restaurantList === null || workspacePending);
   const accountIsNew = restaurantList !== null && restaurantList.length === 0;
   function accountCan(capability: Capability): boolean {
@@ -2685,6 +2698,35 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
 
   /**
+   * The switcher follows the menu. A deep link can open a menu from the other
+   * café — the account can read it — while the shell is still acting in the
+   * café it was left in, which would leave the switcher and the screen
+   * disagreeing. Select the menu's café instead, once that café is known and
+   * the account actually holds it. Only the routed menu counts: a document
+   * kept in memory while browsing the library must not drag the context back.
+   */
+  const routedMenuRestaurantId = routedDoc
+    ? (menuRestaurantById.get(routedDoc.id) ?? null)
+    : null;
+  const followMenuCafe =
+    signedIn &&
+    !accountAccessPending &&
+    accountKey !== null &&
+    routedMenuRestaurantId !== null &&
+    routedMenuRestaurantId !== activeWorkspace?.restaurantId &&
+    workspaces.some((workspace) => workspace.restaurantId === routedMenuRestaurantId);
+  useEffect(() => {
+    if (!followMenuCafe || !accountKey || !routedMenuRestaurantId) return;
+    // Deferred like the other account reads: never set state synchronously
+    // while rendering the frame that decided to switch.
+    void Promise.resolve().then(() => {
+      writeStoredWorkspaceKey(browserStorage(), accountKey, routedMenuRestaurantId);
+      setActiveWorkspaceKey(routedMenuRestaurantId);
+      setWorkspaceKeyFor(accountKey);
+    });
+  }, [accountKey, followMenuCafe, routedMenuRestaurantId]);
+
+  /**
    * Every surface follows the one navigation table: a section is visible only
    * when the active membership holds its capability (signed out: Capture
    * plus the anonymous working set). The pills, tab bar and More sheet all
@@ -2736,8 +2778,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // the server's own access answer, and a foreign menu moves the
     // switcher (below) rather than being refused here.
     if (guarded === "editor" || guarded === "item") return;
-    if (!availableScreenIds.has(guarded)) {
-      navigateTo({ screen: sections[0]?.id ?? "capture" }, true);
+    // A membership with no usable surface has nowhere to send anyone; it
+    // keeps the page it has rather than bouncing between two refusals.
+    const landing = sections[0]?.id;
+    if (!availableScreenIds.has(guarded) && landing) {
+      navigateTo({ screen: landing }, true);
     }
   });
 
