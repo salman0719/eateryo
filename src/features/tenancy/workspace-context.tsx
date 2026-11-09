@@ -70,10 +70,10 @@ export interface WorkspaceContextValue {
   can: (capability: Capability) => boolean;
   switchTo: (key: string) => void;
   refresh: () => void;
-  /** Record a café this session just created. */
+  /** Record a café the server just answered for — created or renamed. */
   addRestaurant: (restaurant: RestaurantOption) => void;
-  /** Accept the owned list a page just refreshed. */
-  adoptOwned: (owned: RestaurantOption[]) => void;
+  /** Drop a café the server just deleted. */
+  removeRestaurant: (restaurantId: string) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
@@ -210,31 +210,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(() => setReadAttempt((attempt) => attempt + 1), []);
 
+  /**
+   * One café, exactly as the server just confirmed it: a create appends, a
+   * rename replaces in place. Nothing appears that the server did not answer
+   * with, and the rest of the account's cafés stay untouched.
+   */
   const addRestaurant = useCallback((restaurant: RestaurantOption) => {
     setRead((current) => {
-      if (current.list?.some((item) => item.id === restaurant.id)) {
-        return { ...current, failed: false };
-      }
-      return { ...current, list: [...(current.list ?? []), restaurant], failed: false };
+      const list = current.list ?? [];
+      const known = list.some((item) => item.id === restaurant.id);
+      return {
+        ...current,
+        list: known
+          ? list.map((item) => (item.id === restaurant.id ? restaurant : item))
+          : [...list, restaurant],
+        failed: false,
+      };
     });
   }, []);
 
-  /**
-   * A page may have created a café (the move panel's "new café" form), so
-   * its owned list is newer than the provider's. Merge by id: the account's
-   * other cafés stay, and nothing the server did not just confirm appears.
-   */
-  const adoptOwned = useCallback((next: RestaurantOption[]) => {
-    setRead((current) => {
-      if (!current.list) return current;
-      const known = new Map(current.list.map((item) => [item.id, item] as const));
-      for (const item of next) known.set(item.id, item);
-      const merged = current.list.map((item) => known.get(item.id) ?? item);
-      for (const item of next) {
-        if (!merged.some((existing) => existing.id === item.id)) merged.push(item);
-      }
-      return { ...current, list: merged };
-    });
+  const removeRestaurant = useCallback((restaurantId: string) => {
+    setRead((current) => ({
+      ...current,
+      list: (current.list ?? []).filter((item) => item.id !== restaurantId),
+      failed: false,
+    }));
   }, []);
 
   const value = useMemo<WorkspaceContextValue>(
@@ -259,18 +259,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       switchTo,
       refresh,
       addRestaurant,
-      adoptOwned,
+      removeRestaurant,
     }),
     [
       accountKey,
       active,
       addRestaurant,
-      adoptOwned,
       can,
       failedFor,
       owned,
       pending,
       refresh,
+      removeRestaurant,
       restaurants,
       retrySession,
       session?.user?.email,

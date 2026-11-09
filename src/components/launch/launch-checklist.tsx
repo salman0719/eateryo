@@ -10,7 +10,7 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchLaunchStatus } from "@/features/launch/client";
@@ -21,19 +21,19 @@ import {
 import type { LaunchStatus } from "@/features/launch/schema";
 import { launchSteps, verifiedProgress, type LaunchStep } from "@/features/launch/steps";
 import { SyncError } from "@/features/menus/sync";
-import { fetchRestaurants } from "@/features/tenancy/client";
-import {
-  browserStorage,
-  readStoredWorkspaceKey,
-  resolveActiveWorkspace,
-  workspaceList,
-} from "@/features/tenancy/workspace";
-import { authClient } from "@/lib/auth-client";
+import { useWorkspace } from "@/features/tenancy/workspace-context";
 
 type State =
   | { kind: "loading" }
   | { kind: "signed_out" }
   | { kind: "no_cafe" }
+  | { kind: "owner_only" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; status: LaunchStatus };
+
+/** What the checklist read for one café — never for any other. */
+type CafeState =
+  | { kind: "loading" }
   | { kind: "owner_only" }
   | { kind: "error"; message: string }
   | { kind: "ready"; status: LaunchStatus };
@@ -63,66 +63,77 @@ function stepActionLabel(step: LaunchStep): string {
 }
 
 export function LaunchChecklist() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+  const workspace = useWorkspace();
+  const [cafe, setCafe] = useState<{ for: string | null; state: CafeState }>({
+    for: null,
+    state: { kind: "loading" },
+  });
   const [cardsPrinted, setCardsPrinted] = useState(false);
-  const { data: session, isPending: sessionPending } = authClient.useSession();
-  const accountId = session?.user?.id ?? null;
-  /** Bumped by Try again: it re-resolves the café and reloads in one pass. */
+  /** Bumped by Try again: it re-reads the café and reloads in one pass. */
   const [attempt, setAttempt] = useState(0);
+  const restaurantId = workspace.active?.restaurantId ?? null;
 
-  /** Shared error mapping for the first load and the retry button. */
-  const fail = useCallback((error: unknown) => {
-    if (error instanceof SyncError && error.code === "unauthorized") {
-      setState({ kind: "signed_out" });
-      return;
-    }
-    if (error instanceof SyncError && error.code === "forbidden") {
-      setState({ kind: "owner_only" });
-      return;
-    }
-    setState({
-      kind: "error",
-      message: error instanceof Error ? error.message : "Could not load your checklist. Try again.",
-    });
-  }, []);
-
-  // State is only written from the promise callbacks (never synchronously in
-  // the effect), so a load cannot trigger a cascading render. The checklist
-  // belongs to one membership: resolve the café the shell last acted in, the
-  // same choice the app makes, and ask only that café. A content page has no
-  // workspace of its own, so this is the one place outside the shell that
-  // re-reads the choice.
+  // The checklist belongs to one membership: the shell's active café is the
+  // only one this page asks about, and an answer for another café never shows.
   useEffect(() => {
-    if (sessionPending || !accountId) return;
+    if (!restaurantId) return;
     let cancelled = false;
     void (async () => {
       try {
-        const restaurants = await fetchRestaurants();
-        if (cancelled) return;
-        const active = resolveActiveWorkspace(
-          workspaceList(restaurants),
-          readStoredWorkspaceKey(browserStorage(), accountId)
-        );
-        if (!active) {
-          setState({ kind: "no_cafe" });
-          return;
-        }
-        const status = await fetchLaunchStatus(active.restaurantId);
+        const status = await fetchLaunchStatus(restaurantId);
         if (cancelled) return;
         // The manual tick is read in the browser, once the server data lands.
         setCardsPrinted(cardsPrintedOnThisDevice());
-        setState({ kind: "ready", status });
+        setCafe({ for: restaurantId, state: { kind: "ready", status } });
       } catch (error) {
-        if (!cancelled) fail(error);
+        if (cancelled) return;
+        if (error instanceof SyncError && error.code === "forbidden") {
+          setCafe({ for: restaurantId, state: { kind: "owner_only" } });
+          return;
+        }
+        setCafe({
+          for: restaurantId,
+          state: {
+            kind: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not load your checklist. Try again.",
+          },
+        });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [accountId, attempt, fail, sessionPending]);
+  }, [restaurantId, attempt]);
+
+  const cafeState: CafeState = cafe.for === restaurantId ? cafe.state : { kind: "loading" };
+  const state: State =
+    workspace.sessionPending && !workspace.sessionCheckGaveUp
+      ? { kind: "loading" }
+      : workspace.sessionCheckGaveUp && !workspace.signedIn
+        ? {
+            kind: "error",
+            message: "Could not check your sign-in. Check your connection and try again.",
+          }
+        : !workspace.signedIn
+          ? { kind: "signed_out" }
+          : workspace.pending
+            ? { kind: "loading" }
+            : workspace.failedFor !== null
+              ? {
+                  kind: "error",
+                  message: "Could not load your cafés. Check your connection and try again.",
+                }
+              : !restaurantId
+                ? { kind: "no_cafe" }
+                : cafeState;
 
   function retry() {
-    setState({ kind: "loading" });
+    if (workspace.sessionCheckGaveUp) workspace.retrySession();
+    if (workspace.failedFor !== null) workspace.refresh();
+    setCafe({ for: restaurantId, state: { kind: "loading" } });
     setAttempt((current) => current + 1);
   }
 
@@ -136,7 +147,7 @@ export function LaunchChecklist() {
     }
   }
 
-  if (state.kind === "loading" && (sessionPending || accountId)) {
+  if (state.kind === "loading") {
     return (
       <div role="status" aria-busy="true" className="rounded-2xl border border-line-200 bg-surface-base p-5">
         <span className="sr-only">Checking your account…</span>
@@ -153,7 +164,7 @@ export function LaunchChecklist() {
     );
   }
 
-  if (state.kind === "signed_out" || (!sessionPending && !accountId)) {
+  if (state.kind === "signed_out") {
     return (
       <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5">
         <h2 className="text-base font-semibold text-warning-950">Sign in to start the checklist</h2>

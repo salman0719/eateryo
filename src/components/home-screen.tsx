@@ -2977,7 +2977,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 await mergeAccountMenus();
               })();
             }}
-            onOwnedChange={workspace.adoptOwned}
           />
         )}
 
@@ -3002,22 +3001,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           />
         )}
 
-        {screen === "tables" && (
-          <TablesPage
-            signedIn={signedIn}
-            sessionPending={sessionPending}
-            focusRestaurantId={activeWorkspace?.restaurantId ?? null}
-          />
-        )}
+        {screen === "tables" && <TablesPage />}
 
-        {screen === "settings" && (
-          <SettingsPage
-            signedIn={signedIn}
-            sessionPending={sessionPending}
-            currentUserId={userId}
-            focusRestaurantId={activeWorkspace?.restaurantId ?? null}
-          />
-        )}
+        {screen === "settings" && <SettingsPage />}
 
         {screen === "editor" && routedDoc && (
           <>

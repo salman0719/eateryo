@@ -1,14 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { TableQrPanel } from "@/components/tables/table-qr-panel";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { fetchRestaurants, type RestaurantOption } from "@/features/tenancy/client";
-import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
-import { restaurantCapabilities } from "@/features/tenancy/access";
-import { hasCapability } from "@/features/tenancy/permissions";
+import { useWorkspace } from "@/features/tenancy/workspace-context";
 
 /**
  * Restaurant-level table cards.
@@ -17,65 +12,14 @@ import { hasCapability } from "@/features/tenancy/permissions";
  * cards belong to the restaurant, not to whichever menu was open when they
  * were printed. The panel therefore lives here, next to Orders: every member
  * (owner or staff) can print, while only an owner sees the claim action.
+ *
+ * The café is the shell's active membership — this page keeps no list of its
+ * own and offers no second picker, so it cannot disagree with the switcher.
  */
-export function RestaurantTables({
-  signedIn,
-  sessionPending = false,
-  focusRestaurantId = null,
-}: {
-  signedIn: boolean;
-  /** Session still resolving: show the loading shape, never the sign-in card. */
-  sessionPending?: boolean;
-  /** The café the shell is acting in; this page follows it when it is set. */
-  focusRestaurantId?: string | null;
-}) {
-  const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState("");
-
-  useEffect(() => {
-    if (!signedIn) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await fetchRestaurants();
-        if (cancelled) return;
-        setRestaurants(list);
-        // The shell's active membership names the café; without one, a single
-        // café means no choice to make.
-        const focus = focusRestaurantId
-          ? list.find((restaurant) => restaurant.id === focusRestaurantId)
-          : undefined;
-        if (focus) setSelectedId(focus.id);
-        else if (list.length === 1 && list[0]) setSelectedId(list[0].id);
-      } catch {
-        if (!cancelled) {
-          setLoadError("Could not load your restaurants. Check your connection and try again.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [signedIn, focusRestaurantId]);
-
-  /**
-   * Following the shell: the switcher owns the café choice, so this page must
-   * not offer a second one that could disagree with it.
-   */
-  const followsActiveWorkspace =
-    focusRestaurantId != null &&
-    (restaurants ?? []).some((restaurant) => restaurant.id === focusRestaurantId);
-  // The focused café wins straight away, so a switch never shows the
-  // previous café's cards for a frame while the list re-reads.
-  const focusedRestaurant =
-    focusRestaurantId != null
-      ? (restaurants ?? []).find((restaurant) => restaurant.id === focusRestaurantId)
-      : undefined;
-  const selected = focusedRestaurant ?? selectedRestaurant(restaurants, selectedId);
-  const canLink = selected
-    ? hasCapability(restaurantCapabilities(selected), "tables.link")
-    : false;
+export function RestaurantTables() {
+  const workspace = useWorkspace();
+  const { signedIn, sessionPending, restaurants, active } = workspace;
+  const loadFailed = workspace.failedFor !== null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -103,9 +47,20 @@ export function RestaurantTables({
         </div>
       )}
 
-      {signedIn && loadError && <p className="text-xs text-danger-700">{loadError}</p>}
+      {signedIn && loadFailed && (
+        <p className="text-xs text-danger-700">
+          Could not load your restaurants. Check your connection and try again.{" "}
+          <button
+            type="button"
+            onClick={() => workspace.refresh()}
+            className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
+          >
+            Try again
+          </button>
+        </p>
+      )}
 
-      {(sessionPending || signedIn) && restaurants === null && !loadError && (
+      {(sessionPending || signedIn) && restaurants === null && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">
           <span className="sr-only">Loading your restaurants…</span>
           <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
@@ -121,7 +76,7 @@ export function RestaurantTables({
         </div>
       )}
 
-      {signedIn && restaurants !== null && restaurants.length === 0 && (
+      {signedIn && !loadFailed && restaurants !== null && restaurants.length === 0 && (
         <GuidanceCard
           title="No restaurant yet"
           steps={[
@@ -132,43 +87,13 @@ export function RestaurantTables({
         />
       )}
 
-      {signedIn &&
-        !followsActiveWorkspace &&
-        showRestaurantPicker(restaurants) &&
-        restaurants !== null && (
-        <div data-print-hide className="rounded-2xl border border-line-200 bg-surface-base p-5">
-          <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-            Restaurant
-            <select
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              className="max-w-sm rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              <option value="" disabled>
-                Choose a restaurant…
-              </option>
-              {restaurants.map((restaurant) => (
-                <option key={restaurant.id} value={restaurant.id}>
-                  {restaurant.name}
-                  {restaurant.role === "staff" ? " (staff)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="mt-2 text-xs leading-5 text-ink-500">
-            Cards stay attached to this restaurant. Anyone with table-print access can print them;
-            claiming or changing the restaurant link needs the table-link grant.
-          </p>
-        </div>
-      )}
-
-      {signedIn && selected && (
+      {signedIn && active && (
         <TableQrPanel
-          key={selected.id}
+          key={active.restaurantId}
           context="restaurant"
-          restaurantId={selected.id}
-          restaurantName={selected.name}
-          isOwner={canLink}
+          restaurantId={active.restaurantId}
+          restaurantName={active.name}
+          isOwner={workspace.can("tables.link")}
         />
       )}
     </div>

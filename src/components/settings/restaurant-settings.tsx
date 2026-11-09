@@ -14,7 +14,6 @@ import {
   deleteRestaurant,
   fetchMembers,
   fetchPendingInvitations,
-  fetchRestaurants,
   removeMember,
   renameRestaurant,
   resendInvitation,
@@ -22,11 +21,8 @@ import {
   updateMemberRole,
   type MemberOption,
   type PendingInvitation,
-  type RestaurantOption,
 } from "@/features/tenancy/client";
-import { selectedRestaurant, showRestaurantPicker } from "@/features/tenancy/picker";
-import { restaurantCapabilities } from "@/features/tenancy/access";
-import { hasCapability } from "@/features/tenancy/permissions";
+import { useWorkspace } from "@/features/tenancy/workspace-context";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
@@ -39,97 +35,35 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
  * remounts it with fresh state instead of resetting state in effects.
  */
 
-interface RestaurantSettingsProps {
-  signedIn: boolean;
-  /** Session still resolving: show the loading shape, never the sign-in card. */
-  sessionPending?: boolean;
-  /** The signed-in user id, to mark their own row in the team list. */
-  currentUserId: string | null;
-  /**
-   * The café the shell is acting in. When set, this page follows it rather
-   * than keeping a second restaurant picker: one switch, one context.
-   */
-  focusRestaurantId?: string | null;
-}
-
-export function RestaurantSettings({
-  signedIn,
-  sessionPending = false,
-  currentUserId,
-  focusRestaurantId = null,
-}: RestaurantSettingsProps) {
+export function RestaurantSettings() {
+  const workspace = useWorkspace();
   const { confirm, dialog } = useConfirm();
-  const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Bumped after each successful team change so the activity card reloads.
   const [teamVersion, setTeamVersion] = useState(0);
 
-  useEffect(() => {
-    if (!signedIn) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await fetchRestaurants();
-        if (cancelled) return;
-        setRestaurants(list);
-        // The shell's active membership decides which café this page shows.
-        // Without one (not signed in, or the shell has no context yet) fall
-        // back to the café the account owns, then to a lone staff café.
-        const focus = focusRestaurantId
-          ? list.find((restaurant) => restaurant.id === focusRestaurantId)
-          : undefined;
-        const owners = list.filter((r) => r.role === "owner");
-        const initial =
-          focus ?? (owners.length === 1 ? owners[0] : list.length === 1 ? list[0] : undefined);
-        if (initial) setSelectedId(initial.id);
-      } catch {
-        if (!cancelled) {
-          setLoadError("Could not load your restaurants. Check your connection and try again.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [signedIn, focusRestaurantId]);
-
+  // The café is the shell's active membership: this page keeps no list and no
+  // second picker, so it cannot disagree with the switcher.
+  const active = workspace.active;
+  const selected = active ? { id: active.restaurantId, name: active.name } : null;
+  const restaurants = workspace.restaurants;
   const allRestaurants = restaurants ?? [];
-  /**
-   * Following the shell: the switcher owns the café choice, so this page must
-   * not offer a second one that could disagree with it.
-   */
-  const followsActiveWorkspace =
-    focusRestaurantId != null &&
-    allRestaurants.some((restaurant) => restaurant.id === focusRestaurantId);
-  // The focused café wins straight away, so a switch never shows the
-  // previous café's team for a frame while the list re-reads.
-  const focusedRestaurant =
-    focusRestaurantId != null
-      ? allRestaurants.find((restaurant) => restaurant.id === focusRestaurantId)
-      : undefined;
-  const selected = focusedRestaurant ?? selectedRestaurant(allRestaurants, selectedId);
-  const selectedCapabilities = selected ? restaurantCapabilities(selected) : [];
-  const canManageSettings = selected
-    ? hasCapability(selectedCapabilities, "settings.manage")
-    : false;
-  const canManageTeam = selected ? hasCapability(selectedCapabilities, "team.manage") : false;
-  const canReadTeam = selected ? hasCapability(selectedCapabilities, "team.read") : false;
+  const loadFailed = workspace.failedFor !== null;
+  const signedIn = workspace.signedIn;
+  const sessionPending = workspace.sessionPending;
+  const currentUserId = workspace.userId;
+  const canManageSettings = workspace.can("settings.manage");
+  const canManageTeam = workspace.can("team.manage");
+  const canReadTeam = workspace.can("team.read");
 
   async function handleRename(name: string) {
     if (!selected || !canManageSettings) return;
-    const previous = selected.name;
-    setRestaurants((prev) => (prev ?? []).map((r) => (r.id === selected.id ? { ...r, name } : r)));
+    setError(null);
     try {
       const updated = await renameRestaurant(selected.id, name);
-      setRestaurants((prev) => (prev ?? []).map((r) => (r.id === updated.id ? updated : r)));
+      workspace.addRestaurant(updated);
     } catch {
-      // Roll the optimistic edit back so the field shows the truth again.
-      setRestaurants((prev) =>
-        (prev ?? []).map((r) => (r.id === selected.id ? { ...r, name: previous } : r))
-      );
       setError("Could not rename the restaurant. Try again.");
     }
   }
@@ -146,8 +80,7 @@ export function RestaurantSettings({
     setError(null);
     try {
       await deleteRestaurant(selected.id);
-      setRestaurants((prev) => (prev ?? []).filter((r) => r.id !== selected.id));
-      setSelectedId("");
+      workspace.removeRestaurant(selected.id);
     } catch {
       setError("Could not delete the restaurant. Try again.");
     } finally {
@@ -174,9 +107,20 @@ export function RestaurantSettings({
         </div>
       )}
 
-      {signedIn && loadError && <p className="text-xs text-danger-700">{loadError}</p>}
+      {signedIn && loadFailed && (
+        <p className="text-xs text-danger-700">
+          Could not load your restaurants. Check your connection and try again.{" "}
+          <button
+            type="button"
+            onClick={() => workspace.refresh()}
+            className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
+          >
+            Try again
+          </button>
+        </p>
+      )}
 
-      {(sessionPending || signedIn) && restaurants === null && !loadError && (
+      {(sessionPending || signedIn) && restaurants === null && !loadFailed && (
         <div role="status" aria-busy="true" className="flex flex-col gap-4">
           <span className="sr-only">Loading your restaurants…</span>
           <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
@@ -198,7 +142,7 @@ export function RestaurantSettings({
         </p>
       )}
 
-      {signedIn && restaurants !== null && allRestaurants.length === 0 && (
+      {signedIn && !loadFailed && restaurants !== null && allRestaurants.length === 0 && (
         <GuidanceCard
           title="You don't own a restaurant yet"
           steps={[
@@ -208,28 +152,6 @@ export function RestaurantSettings({
           ]}
           action={{ href: "/menus", label: "Go to My menus" }}
         />
-      )}
-
-      {!followsActiveWorkspace && showRestaurantPicker(allRestaurants) && (
-        <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
-          <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-            Restaurant
-            <select
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              <option value="" disabled>
-                Choose a restaurant…
-              </option>
-              {allRestaurants.map((restaurant) => (
-                <option key={restaurant.id} value={restaurant.id}>
-                  {restaurant.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
       )}
 
       {error && (

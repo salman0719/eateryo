@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,10 +8,9 @@ import { moveLocalMenusToAccount, type MoveReport } from "@/features/menus/move-
 import {
   createRestaurant,
   deleteRestaurant,
-  fetchRestaurants,
   renameRestaurant,
-  type RestaurantOption,
 } from "@/features/tenancy/client";
+import { useWorkspace } from "@/features/tenancy/workspace-context";
 
 /**
  * "Import from this browser": the manual fallback for menus saved here.
@@ -25,9 +24,9 @@ import {
  * or delete the selected restaurant (delete cascades its menus, published
  * pages and orders server-side, so it warns first).
  *
- * Individual rows carry their own "Add to account" action in the library;
- * `onOwnedChange` keeps that action's target list in step with the
- * restaurants created, renamed, or deleted here.
+ * The owned cafés are the workspace's, so the library's per-row "Add to
+ * account" target list follows a create, rename, or delete here without a
+ * second read.
  */
 
 interface MoveToAccountPanelProps {
@@ -39,8 +38,6 @@ interface MoveToAccountPanelProps {
   suggestedName?: string | null;
   /** Called after a run that imported at least one menu (stamp + refresh). */
   onMoved?: (report: MoveReport) => void;
-  /** The owned restaurants, mirrored up for the per-row add action. */
-  onOwnedChange?: (owned: RestaurantOption[]) => void;
 }
 
 export function MoveToAccountPanel({
@@ -48,11 +45,14 @@ export function MoveToAccountPanel({
   menuIds,
   suggestedName,
   onMoved,
-  onOwnedChange,
 }: MoveToAccountPanelProps) {
   const { confirm, dialog } = useConfirm();
-  const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const workspace = useWorkspace();
+  const restaurants = workspace.restaurants;
+  const loadError =
+    workspace.failedFor !== null
+      ? "Could not load your restaurants. Check your connection and try again."
+      : null;
   const [selectedId, setSelectedId] = useState("");
   /** The create field's value: the suggestion from the menu titles until the user types. */
   const [nameDraft, setNameDraft] = useState<string | null>(null);
@@ -65,35 +65,12 @@ export function MoveToAccountPanel({
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<MoveReport | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await fetchRestaurants();
-        if (cancelled) return;
-        setRestaurants(list);
-        onOwnedChange?.(list.filter((r) => r.role === "owner"));
-        const owners = list.filter((r) => r.role === "owner");
-        if (owners.length === 1 && owners[0]) setSelectedId(owners[0].id);
-      } catch {
-        if (!cancelled) {
-          setLoadError("Could not load your restaurants. Check your connection and try again.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [onOwnedChange]);
-
-  const owned = restaurants?.filter((r) => r.role === "owner") ?? [];
+  const owned = workspace.owned;
   const staffOnly = restaurants !== null && owned.length === 0 && restaurants.length > 0;
-  const selected = owned.find((r) => r.id === selectedId) ?? null;
-
-  /** Mirror the owned restaurants up for the per-row add action. */
-  function publishOwned(list: RestaurantOption[]) {
-    onOwnedChange?.(list.filter((restaurant) => restaurant.role === "owner"));
-  }
+  // One owned café needs no choice; more than one keeps the explicit pick.
+  const selected =
+    owned.find((restaurant) => restaurant.id === selectedId) ??
+    (owned.length === 1 ? (owned[0] ?? null) : null);
 
   async function handleCreate() {
     const name = newName.trim();
@@ -102,9 +79,7 @@ export function MoveToAccountPanel({
     setError(null);
     try {
       const created = await createRestaurant(name);
-      const next = [...(restaurants ?? []), created];
-      setRestaurants(next);
-      publishOwned(next);
+      workspace.addRestaurant(created);
       setSelectedId(created.id);
       setNameDraft(null);
     } catch {
@@ -127,9 +102,7 @@ export function MoveToAccountPanel({
     setError(null);
     try {
       const updated = await renameRestaurant(selected.id, name);
-      const next = (restaurants ?? []).map((r) => (r.id === updated.id ? updated : r));
-      setRestaurants(next);
-      publishOwned(next);
+      workspace.addRestaurant(updated);
       setRenaming(false);
     } catch {
       setError("Could not rename the restaurant. Check your connection and try again.");
@@ -150,9 +123,7 @@ export function MoveToAccountPanel({
     setError(null);
     try {
       await deleteRestaurant(selected.id);
-      const next = (restaurants ?? []).filter((r) => r.id !== selected.id);
-      setRestaurants(next);
-      publishOwned(next);
+      workspace.removeRestaurant(selected.id);
       setSelectedId("");
       setRenaming(false);
     } catch {
@@ -163,12 +134,12 @@ export function MoveToAccountPanel({
   }
 
   async function handleMove() {
-    if (!selectedId || busy) return;
+    if (!selected || busy) return;
     setBusy(true);
     setError(null);
     setReport(null);
     try {
-      const result = await moveLocalMenusToAccount(selectedId, menuIds);
+      const result = await moveLocalMenusToAccount(selected.id, menuIds);
       setReport(result);
       if (result.imported.length > 0) onMoved?.(result);
     } catch (moveError) {
@@ -255,7 +226,7 @@ export function MoveToAccountPanel({
           <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
             Add to
             <select
-              value={selectedId}
+              value={selected?.id ?? ""}
               onChange={(event) => setSelectedId(event.target.value)}
               className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
@@ -272,7 +243,7 @@ export function MoveToAccountPanel({
           <button
             type="button"
             onClick={() => void handleMove()}
-            disabled={busy || !selectedId}
+            disabled={busy || !selected}
             className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             {busy ? "Adding…" : `Add ${menuCount === 1 ? "1 menu" : `${menuCount} menus`}`}

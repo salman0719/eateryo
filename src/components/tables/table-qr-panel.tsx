@@ -27,7 +27,7 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 
 import type { MenuDocument } from "@/features/menu/schema";
-import { fetchServerMenus } from "@/features/menus/sync";
+import { fetchServerMenu } from "@/features/menus/sync";
 import { SyncError } from "@/features/menus/sync";
 import {
   defaultTableLabels,
@@ -41,7 +41,6 @@ import {
   sanitizeTableLabels,
   tableOrderUrl,
 } from "@/features/orders/table-links";
-import { fetchRestaurants } from "@/features/tenancy/client";
 import { ensureRestaurantLink, fetchRestaurantLink } from "@/features/tables/client";
 
 const COUNT_STORAGE_KEY = "table-qr-count";
@@ -208,19 +207,14 @@ export function TableQrPanel(props: TableQrPanelProps) {
     let cancelled = false;
     (async () => {
       try {
-        const [serverMenus, restaurants] = await Promise.all([
-          fetchServerMenus(),
-          fetchRestaurants(),
-        ]);
-        const summary = serverMenus.find((menu) => menu.id === menuId);
-        const restaurant = summary
-          ? restaurants.find((candidate) => candidate.id === summary.restaurantId)
-          : undefined;
-        if (!summary || !restaurant) {
+        if (!menuId) {
           if (!cancelled) setLinkState({ status: "legacy" });
           return;
         }
-        const link = await fetchRestaurantLink(restaurant.id);
+        // The menu names its own café, so this resolves it without reading the
+        // account's restaurant list here.
+        const summary = await fetchServerMenu(menuId);
+        const link = await fetchRestaurantLink(summary.restaurantId);
         if (cancelled) return;
         if (link.slug) {
           setLinkState({ status: "live", restaurantName: link.name, slug: link.slug });
@@ -229,11 +223,22 @@ export function TableQrPanel(props: TableQrPanelProps) {
             status: "unclaimed",
             restaurantId: link.id,
             restaurantName: link.name,
-            isOwner: restaurant.role === "owner",
+            isOwner: summary.access.capabilities.includes("tables.link"),
           });
         }
       } catch (loadError: unknown) {
         if (cancelled) return;
+        if (
+          loadError instanceof SyncError &&
+          (loadError.code === "not_found" ||
+            loadError.code === "forbidden" ||
+            loadError.code === "unauthorized")
+        ) {
+          // This menu is out of this account's reach right now: the per-menu
+          // fallback is the honest answer, not a network error.
+          setLinkState({ status: "legacy" });
+          return;
+        }
         setLinkState({
           status: "unavailable",
           message:

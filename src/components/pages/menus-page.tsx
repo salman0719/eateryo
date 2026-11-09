@@ -35,7 +35,6 @@ export interface MenusPageProps {
   onMoveToAccount: PanelProps["onMoveToAccount"];
   /** Called after an import that copied at least one menu (stamp + refresh). */
   onMoved: (report: MoveReport) => void;
-  onOwnedChange: (owned: RestaurantOption[]) => void;
 }
 
 /**
@@ -65,7 +64,6 @@ export function MenusPage({
   onDelete,
   onMoveToAccount,
   onMoved,
-  onOwnedChange,
 }: MenusPageProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -118,7 +116,6 @@ export function MenusPage({
               menuIds={importMenuIds}
               suggestedName={suggestedName}
               onMoved={onMoved}
-              onOwnedChange={onOwnedChange}
             />
           </div>
         </details>

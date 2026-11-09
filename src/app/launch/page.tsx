@@ -4,6 +4,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { LaunchChecklist } from "@/components/launch/launch-checklist";
+import { WorkspaceProvider } from "@/features/tenancy/workspace-context";
 
 export const metadata: Metadata = {
   title: "Free while it lasts — Eateryo",
@@ -58,7 +59,11 @@ export default function LaunchPage() {
         </p>
 
         <div className="mt-6">
-          <LaunchChecklist />
+          {/* The checklist follows the shell's active café, so this page reads
+              the same one membership the app does. */}
+          <WorkspaceProvider>
+            <LaunchChecklist />
+          </WorkspaceProvider>
         </div>
 
         <section className="mt-10">
