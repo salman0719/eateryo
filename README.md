@@ -197,7 +197,7 @@ Postgres (PGlite) using the real generated migrations.
 Before finishing a change, run the full gate:
 
 ```bash
-npm run lint && npm run typecheck && npm run test && npm run build
+npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build
 npm run secrets:check   # needs the build output above
 ```
 
