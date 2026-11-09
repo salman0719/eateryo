@@ -7,7 +7,7 @@ import { menuDocumentSchema } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
 import { getLaunchSnapshot } from "@/features/launch/repo";
 import type { LaunchSnapshot } from "@/features/launch/schema";
-import { launchSteps, verifiedProgress } from "@/features/launch/steps";
+import { launchSteps, previewLaunchSteps, verifiedProgress } from "@/features/launch/steps";
 import { placeOrderFromSlug } from "@/features/orders/repo";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { setRestaurantSlugForUser } from "@/features/tables/repo";
@@ -49,6 +49,15 @@ describe("launch steps", () => {
     ]);
     expect(steps.filter((step) => step.done)).toHaveLength(0);
     expect(steps.find((step) => step.id === "cards")?.manual).toBe(true);
+    expect(verifiedProgress(steps)).toEqual({ done: 0, total: 4 });
+  });
+
+  it("shows the whole list, all open, before any account is read", () => {
+    // The signed-out launch page renders this instead of a sign-in wall, so
+    // "Get started" lands on the process. Nothing may claim to be done.
+    const steps = previewLaunchSteps();
+    expect(steps.map((step) => step.id)).toEqual(launchSteps(emptySnapshot).map((step) => step.id));
+    expect(steps.filter((step) => step.done)).toHaveLength(0);
     expect(verifiedProgress(steps)).toEqual({ done: 0, total: 4 });
   });
 
