@@ -31,6 +31,16 @@ function plural(count: number, singular: string, pluralForm = `${singular}s`): s
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
+/** The snapshot of an account we have not read — every step is still open. */
+const NOTHING_YET: LaunchSnapshot = {
+  menuCount: 0,
+  publishedCount: 0,
+  orderCount: 0,
+  unpricedItems: 0,
+  reviewNotes: 0,
+  unreadableMenus: 0,
+};
+
 export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
   const hasMenu = snapshot.menuCount > 0;
   const reviewed = hasMenu && snapshot.unpricedItems === 0 && snapshot.reviewNotes === 0;
@@ -87,6 +97,17 @@ export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
           : "No orders yet",
     },
   ];
+}
+
+/**
+ * The same five steps before an account is read, so the signed-out launch
+ * page can show the whole process instead of only a sign-in prompt. Nothing
+ * is ticked: a step is done when the server sees it, and there is no server
+ * answer yet. The surfaces using this hide each step's `detail`, which would
+ * otherwise describe an account that does not exist.
+ */
+export function previewLaunchSteps(): LaunchStep[] {
+  return launchSteps(NOTHING_YET);
 }
 
 /** Steps the server can verify (the manual ones are excluded). */
