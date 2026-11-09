@@ -398,5 +398,59 @@ export async function listOpenMenusForRestaurantSlug(
   };
 }
 
+/** One live menu's printable address inside its café. */
+export interface PublishedMenuLink {
+  menuId: string;
+  title: string;
+  /** The menu's own segment in `/r/<café>/m/<menu>`. */
+  slug: string;
+  publishedAt: string;
+}
+
+/**
+ * The café's live menus and their addresses — what the Tables tab prints
+ * cards from. Publishing is private until it is live, so only rows with a
+ * live revision are listed.
+ *
+ * No membership check: callers resolve the workspace (and its
+ * `tables.print`/`tables.link` capability) before calling, the same contract
+ * as `ensureRestaurantSlug`.
+ */
+export async function listPublishedMenuLinksForRestaurant(
+  db: TenancyDb,
+  restaurantId: string
+): Promise<PublishedMenuLink[]> {
+  const rows = await db
+    .select({
+      menuId: menu.id,
+      title: menu.title,
+      slug: publishedMenu.slug,
+      publishedAt: publishedMenu.publishedAt,
+    })
+    .from(publishedMenu)
+    .innerJoin(menu, eq(menu.id, publishedMenu.menuId))
+    .where(
+      and(
+        eq(publishedMenu.restaurantId, restaurantId),
+        isNotNull(publishedMenu.publishedAt),
+        isNotNull(publishedMenu.liveRevisionId)
+      )
+    )
+    .orderBy(asc(menu.title), asc(menu.id));
+
+  return rows.flatMap((row) =>
+    row.publishedAt
+      ? [
+          {
+            menuId: row.menuId,
+            title: row.title,
+            slug: row.slug,
+            publishedAt: row.publishedAt.toISOString(),
+          },
+        ]
+      : []
+  );
+}
+
 /** Public table-landing path for a restaurant slug — the QR target shape. */
 export { restaurantTablePath } from "@/features/orders/table-links";
