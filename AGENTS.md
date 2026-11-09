@@ -307,7 +307,8 @@ errors, or add lint/type suppressions just to make checks pass.
   `repo.ts` (record/summarize/count), `client.ts`; `src/app/api/usage/`
 - `src/features/launch/` — onboarding snapshot (`repo.ts`), pure checklist
   derivation (`steps.ts`), schemas + client; `/api/launch`, page `/launch`,
-  UI in `src/components/launch/` (checklist, usage panel, data controls)
+  UI in `src/components/launch/` (checklist, plus the account export card and
+  the account danger zone, both rendered by Settings)
 - `src/features/retention/` — Step 11 retention: `schema.ts` (window config),
   `repo.ts` (`purgeOldOrders`, `buildAccountExport`, `deleteAccountForUser`,
   `isCronAuthorized`), `client.ts`; routes `/api/account` (DELETE),

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { DataControls } from "@/components/launch/data-controls";
+import { AccountDangerZone, AccountExportCard } from "@/components/launch/data-controls";
 import { CommitInput } from "@/components/menu-editor/fields";
 import { OrderAlertsCard } from "@/components/settings/order-alerts";
 import { TeamActivity } from "@/components/settings/team-activity";
@@ -29,7 +29,9 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
  * Restaurant settings: rename inline, manage the team (owner-only writes),
- * and delete behind a danger zone that spells out what cascades. Members
+ * and delete behind a danger zone that spells out what cascades. Each scope
+ * ends in its own danger zone — the café's closes the café group, and the
+ * account's is the last block on the page after the export card. Members
  * can see the team; the writes refuse non-owners server-side too, so the UI
  * never has to guess — it just reports what the API answered.
  *
@@ -212,9 +214,17 @@ export function RestaurantSettings() {
             canManage={canManageSettings}
           />
 
+          {/* Usage is the capture allowance, so it follows Capture's
+              permission: a membership that may not upload menus has no
+              extraction spend to see. It is informational, so it sits above
+              the café's danger zone instead of after it. */}
+          {canCapture && <UsagePanel restaurantId={selected.id} />}
+
           {canManageSettings && (
             <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
-              <h3 className="text-sm font-bold tracking-tight text-danger-900">Danger zone</h3>
+              <h3 className="text-sm font-bold tracking-tight text-danger-900">
+                Danger zone — delete this café
+              </h3>
               <p className="mt-1 text-xs leading-5 text-danger-800">
                 Deleting “{selected.name}” removes its menus, published pages and orders from your
                 account. This cannot be undone.
@@ -232,15 +242,14 @@ export function RestaurantSettings() {
         </>
       )}
 
-      {/* Usage is the capture allowance, so it follows Capture's permission: a
-          membership that may not upload menus has no extraction spend to see.
-          The account export/delete stays available to every signed-in user;
-          both cards self-gate on the session, so there is no dead UI while it
-          resolves. */}
+      {/* Account scope, outside the café group: export and deletion do not
+          change with the workspace switcher, and a signed-in account without
+          a café of its own must still reach both. Deletion stays last — no
+          settings section belongs below it. */}
       {signedIn && (
         <>
-          {canCapture && <UsagePanel restaurantId={selected?.id ?? null} />}
-          <DataControls />
+          <AccountExportCard />
+          <AccountDangerZone />
         </>
       )}
       {dialog}
