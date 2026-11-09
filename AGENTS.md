@@ -63,6 +63,7 @@ a one-off investigation.
 ## Quality gates (run before finishing)
 
 - `npm run lint`
+- `npm run format:check` (Prettier, no writes; fix with `npm run format`)
 - `npm run typecheck`
 - `npm run test`
 - `npm run build`
