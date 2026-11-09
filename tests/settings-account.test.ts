@@ -93,7 +93,7 @@ describe("UsagePanel loading", () => {
   it("skeleton-first: no usage numbers before the account data lands", () => {
     signIn();
     try {
-      const html = renderToStaticMarkup(createElement(UsagePanel));
+      const html = renderToStaticMarkup(createElement(UsagePanel, { restaurantId: "cafe-1" }));
       expect(html).toContain("Checking your usage");
       expect(html).not.toContain("free extractions used");
     } finally {

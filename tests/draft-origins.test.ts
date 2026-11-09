@@ -235,4 +235,14 @@ describe("visibleMenuIds", () => {
   it("hides every stamped row when signed out", () => {
     expect(visibleMenuIds(ids, origins, null)).toEqual(["anon"]);
   });
+
+  it("shows a published menu the server listed, even when the cached row is stamped to another account", () => {
+    // Staff on the owner's browser: the row is stamped to user-a, but the
+    // server projected it to the published revision for user-b.
+    expect(visibleMenuIds(ids, origins, "user-b", new Set(["mine"]))).toEqual([
+      "anon",
+      "mine",
+      "theirs",
+    ]);
+  });
 });

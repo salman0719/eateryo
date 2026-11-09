@@ -20,9 +20,12 @@ function describeFailure(failure: unknown): string {
 export function OrderAlertsCard({
   restaurantId,
   restaurantName,
+  canManage = true,
 }: {
   restaurantId: string;
   restaurantName: string;
+  /** False for a reader: the preferences show, the controls do not. */
+  canManage?: boolean;
 }) {
   const [enabled, setEnabled] = useState(true);
   const [email, setEmail] = useState("");
@@ -93,7 +96,8 @@ export function OrderAlertsCard({
               type="checkbox"
               checked={enabled}
               onChange={(event) => setEnabled(event.target.checked)}
-              className="h-5 w-5 shrink-0 accent-accent-700"
+              disabled={!canManage}
+              className="h-5 w-5 shrink-0 accent-accent-700 disabled:opacity-60"
             />
             Email me on every new order
           </label>
@@ -105,23 +109,28 @@ export function OrderAlertsCard({
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Blank means every owner"
               autoComplete="email"
-              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              disabled={!canManage}
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:bg-surface-50 disabled:text-ink-500"
             />
           </label>
           <p className="-mt-1 text-[11px] leading-4 text-ink-400">
             Blank sends to every owner&apos;s account email — fill it to route orders to one
             address instead (the till, a manager…).
           </p>
-          <div>
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={saving}
-              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              {saving ? "Saving…" : "Save alerts"}
-            </button>
-          </div>
+          {canManage ? (
+            <div>
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving}
+                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                {saving ? "Saving…" : "Save alerts"}
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs text-ink-500">Only an owner can change alert settings.</p>
+          )}
           {notice && !error && <p className="text-xs text-success-800">{notice}</p>}
           {error && <p className="text-xs text-danger-700">{error}</p>}
         </div>

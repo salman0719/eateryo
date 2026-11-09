@@ -7,13 +7,22 @@
 
 import { z } from "zod";
 
-import { SyncError, type SyncErrorCode } from "@/features/menus/sync";
+import {
+  membershipAccessSchema,
+  SyncError,
+  type SyncErrorCode,
+} from "@/features/menus/sync";
 
 /** All we need to pick a move target or show a restaurant name. */
 const restaurantOptionSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   role: z.enum(["owner", "staff"]),
+  /**
+   * The server's capability answer for this membership. Optional so an older
+   * or stubbed response still parses; callers fall back to the role defaults.
+   */
+  access: membershipAccessSchema.optional(),
 });
 
 export type RestaurantOption = z.infer<typeof restaurantOptionSchema>;

@@ -18,6 +18,12 @@ import { CommitInput } from "./fields";
  */
 export interface LibraryMenu extends MenuSummary {
   onServer: boolean;
+  /**
+   * False when the server says this caller may not change the menu. A row
+   * without an answer is never offered a write; the shell fills this from
+   * the same capabilities the editor uses.
+   */
+  canWrite?: boolean;
 }
 
 interface LibraryPanelProps {
@@ -30,6 +36,12 @@ interface LibraryPanelProps {
    * answered yet", so nothing claims "this browser only" on a guess.
    */
   accountMode: boolean;
+  /**
+   * Whether this membership may start a menu (`menus.write`). A staff shift
+   * reads the café's published menus; it never creates a draft, so the
+   * creation controls are absent rather than disabled.
+   */
+  canCreate?: boolean;
   /** Signed out with stamped rows hidden: say so instead of "no menus". */
   hasHiddenMenus?: boolean;
   /** Restaurants the caller owns — where a per-row add can put a menu. */
@@ -40,6 +52,9 @@ interface LibraryPanelProps {
    */
   onMoveToAccount?: (menuId: string, restaurantId: string) => Promise<string | null>;
   unavailable: boolean;
+  /** Overrides the empty state when the shell knows why there is nothing. */
+  emptyTitle?: string;
+  emptyBody?: string;
   onOpen: (id: string) => void;
   /** Optional service name from the second-menu chips (Lunch, Dinner…). */
   onNew: (suggestedTitle?: string) => void;
@@ -57,10 +72,13 @@ export function LibraryPanel({
   menus,
   loading = false,
   accountMode,
+  canCreate = true,
   hasHiddenMenus = false,
   ownedRestaurants = [],
   onMoveToAccount,
   unavailable,
+  emptyTitle,
+  emptyBody,
   onOpen,
   onNew,
   onRename,
@@ -78,7 +96,9 @@ export function LibraryPanel({
   // Q2 companion: the second menu gets a contextual ask, not a bare
   // duplicate — chips name it for its service, the button keeps numbering.
   const secondMenuSuggestions =
-    menus.length > 0 && !loading ? suggestSecondMenuNames(menus.map((menu) => menu.title)) : [];
+    canCreate && menus.length > 0 && !loading
+      ? suggestSecondMenuNames(menus.map((menu) => menu.title))
+      : [];
 
   function startMove(id: string) {
     setMoveError(null);
@@ -115,14 +135,16 @@ export function LibraryPanel({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-ink-900">My menus</h2>
-        <button
-          type="button"
-          onClick={() => onNew()}
-          disabled={unavailable}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          + New menu
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => onNew()}
+            disabled={unavailable}
+            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            + New menu
+          </button>
+        )}
       </div>
 
       {secondMenuSuggestions.length > 0 && (
@@ -177,12 +199,20 @@ export function LibraryPanel({
       ) : menus.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">
-            {hasHiddenMenus ? "Signed out" : "No saved menus yet"}
+            {emptyTitle ??
+              (hasHiddenMenus
+                ? accountMode
+                  ? "No menus for this account"
+                  : "Signed out"
+                : "No saved menus yet")}
           </p>
           <p className="mt-1 text-sm text-ink-600">
-            {hasHiddenMenus
-              ? "Your menus reappear when you sign in."
-              : "Extract a menu or start a blank one — it will appear here and survive refreshes."}
+            {emptyBody ??
+              (hasHiddenMenus
+                ? accountMode
+                  ? "This device holds menus for another account. Sign in as that account to see them."
+                  : "Your menus reappear when you sign in."
+                : "Extract a menu or start a blank one — it will appear here and survive refreshes.")}
           </p>
         </div>
       ) : (
@@ -215,11 +245,15 @@ export function LibraryPanel({
               ) : (
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <div className="w-full min-w-0 flex-1 sm:w-auto">
-                    <CommitInput
-                      label={`Rename menu “${menu.title}”`}
-                      value={menu.title}
-                      onCommit={(title) => onRename(menu.id, title.trim())}
-                    />
+                    {menu.canWrite === false ? (
+                      <p className="text-sm font-semibold text-ink-900">{menu.title}</p>
+                    ) : (
+                      <CommitInput
+                        label={`Rename menu “${menu.title}”`}
+                        value={menu.title}
+                        onCommit={(title) => onRename(menu.id, title.trim())}
+                      />
+                    )}
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-500">
                       <span>
                         {menu.categoryCount} {menu.categoryCount === 1 ? "category" : "categories"}{" "}
@@ -237,12 +271,17 @@ export function LibraryPanel({
                           {menu.onServer ? "On your account" : "This browser only"}
                         </span>
                       )}
+                      {menu.canWrite === false && (
+                        <span className="whitespace-nowrap rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
+                          View only
+                        </span>
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {/* Only a read that proved membership may offer the move:
                         while it is unknown, "not on the account" is a guess. */}
-                    {accountMode && !menu.onServer && moveAvailable && (
+                    {menu.canWrite !== false && accountMode && !menu.onServer && moveAvailable && (
                       <button
                         type="button"
                         onClick={() => startMove(menu.id)}
@@ -259,20 +298,22 @@ export function LibraryPanel({
                     >
                       Open
                     </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
-                          confirmLabel: "Delete menu",
-                          destructive: true,
-                        });
-                        if (ok) onDelete(menu.id);
-                      }}
-                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-                    >
-                      Delete
-                    </button>
+                    {menu.canWrite !== false && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
+                            confirmLabel: "Delete menu",
+                            destructive: true,
+                          });
+                          if (ok) onDelete(menu.id);
+                        }}
+                        className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

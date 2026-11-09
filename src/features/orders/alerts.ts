@@ -7,6 +7,7 @@ import {
   user as userTable,
 } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import { can, getMembershipAccess } from "@/features/tenancy/policy";
 
 /**
  * New-order email alerts (R0.4, report 5 tier 3): per-restaurant preference,
@@ -71,17 +72,8 @@ export async function updateOrderAlertPrefsForOwner(
   restaurantId: string,
   prefs: { enabled: boolean; email: string | null }
 ): Promise<OrderAlertPrefs | null> {
-  const membership = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.restaurantId, restaurantId),
-        eq(restaurantMembership.userId, userId)
-      )
-    )
-    .limit(1);
-  if (membership[0]?.role !== "owner") return null;
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return null;
   const updated = await db
     .update(restaurantTable)
     .set({ orderAlertsEnabled: prefs.enabled, orderAlertEmail: prefs.email })

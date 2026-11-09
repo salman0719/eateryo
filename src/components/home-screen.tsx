@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteFooter } from "@/components/layout/site-footer";
-import { Attention } from "@/components/ui/attention";
+import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { AssistantPage } from "@/components/pages/assistant-page";
+import { CapturePage } from "@/components/pages/capture-page";
+import { MenusPage } from "@/components/pages/menus-page";
+import { OrdersPage } from "@/components/pages/orders-page";
+import { SettingsPage } from "@/components/pages/settings-page";
+import { TablesPage } from "@/components/pages/tables-page";
 import {
   BookIcon,
   CameraIcon,
@@ -14,35 +20,25 @@ import {
 } from "@/components/ui/icons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
-import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
-import { LibraryPanel } from "@/components/menu-editor/library-panel";
 import {
   LocalDraftsNotice,
   LocalDraftsOffer,
   type LocalDraftClaimNotice,
 } from "@/components/menu-editor/local-drafts-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
-import { MoveToAccountPanel } from "@/components/menu-editor/move-to-account-panel";
-import { AssistantPanel } from "@/components/assistant/assistant-panel";
-import { RestaurantSettings } from "@/components/settings/restaurant-settings";
-import { RestaurantTables } from "@/components/tables/restaurant-tables";
-import { OrdersBoard } from "@/components/orders/orders-board";
 import { MonitorToasts } from "@/components/orders/monitor-toasts";
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
 import { OrderMonitorProvider, useOrderMonitor } from "@/features/orders/monitor";
 import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
-import { Dropzone } from "@/components/upload/dropzone";
-import { ExtractionProgress } from "@/components/upload/extraction-progress";
-import {
-  ExtractionResult,
+import type {
   PreviewMenu,
-  type ReviewItemLocation,
-  type ReviewResolution,
+  ReviewItemLocation,
+  ReviewResolution,
 } from "@/components/upload/extraction-result";
-import { ImagePreview, type PageImage } from "@/components/upload/image-preview";
+import type { PageImage } from "@/components/upload/image-preview";
 import { extractedMenuToDocument } from "@/features/menu/convert";
 import {
   downloadTextFile,
@@ -78,8 +74,8 @@ import {
 } from "@/features/menu/storage";
 import {
   deleteServerMenu,
+  fetchCafeMenus,
   fetchServerMenu,
-  fetchServerMenus,
   SyncError,
   updateServerMenu,
 } from "@/features/menus/sync";
@@ -100,11 +96,11 @@ import {
   extractMenuFromFiles,
   type MenuExtractionResult,
 } from "@/lib/extract-client";
-import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
+import { validateImageBatch } from "@/lib/image-constraints";
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
 import {
+  availableSections,
   appRouteHref,
-  appSections,
   moreSheetRows,
   parseAppRoute,
   phoneTabs,
@@ -114,17 +110,22 @@ import {
   unresolvableMenuMessage,
   type AppRoute,
   type AppScreen,
+  type AppSectionId,
   type EditorMode,
 } from "@/features/navigation/routes";
 import { useFeatureFlags } from "@/features/flags/client";
 import { fetchLaunchStatus } from "@/features/launch/client";
 import { cardsPrintedOnThisDevice, launchProgress } from "@/features/launch/progress";
-import { staffMenuIds } from "@/features/tenancy/access";
 import {
-  createRestaurant,
-  fetchRestaurants,
-  type RestaurantOption,
-} from "@/features/tenancy/client";
+  accessCan,
+  accessIsStaff,
+  isPublishedOnlyAccess,
+  menuAccessById,
+  type MenuAccess,
+} from "@/features/tenancy/access";
+import { workspaceCan } from "@/features/tenancy/workspace";
+import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
+import { createRestaurant } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
 import {
   clearDraftOrigin,
@@ -151,7 +152,6 @@ import {
 } from "@/features/menus/claim-local-drafts";
 import {
   decideMenuOpen,
-  decideSessionState,
   isSessionGateMessage,
   menuOpenBlockedMessage,
   type SessionState,
@@ -164,11 +164,6 @@ import {
 import { docForRoutedMenu } from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
-
-/** How many automatic retries a failed session read gets before the UI asks. */
-const SESSION_READ_RETRIES = 2;
-/** Delay before each retry, growing linearly (1.5 s, then 3 s). */
-const SESSION_READ_RETRY_MS = 1500;
 
 /** Save status stays one word; `detail` says where the save went. */
 function savedState(detail: string): SaveState {
@@ -201,8 +196,12 @@ function MonitorToastStack({ onOpen }: { onOpen: () => void }) {
   return <MonitorToasts toasts={toasts} onOpen={onOpen} onDismiss={dismissToast} />;
 }
 
-/** The phone tab bar's glyphs come from the shared icon set, never emoji. */
-function PhoneTabIcon({ id }: { id: "capture" | "library" | "orders" }) {
+/**
+ * The phone tab bar's glyphs come from the shared icon set, never emoji. The
+ * bar only ever carries the sections marked `phone: "bar"`; the other ids are
+ * unreachable here and draw nothing.
+ */
+function PhoneTabIcon({ id }: { id: AppSectionId }) {
   switch (id) {
     case "capture":
       return <CameraIcon size={22} />;
@@ -210,6 +209,8 @@ function PhoneTabIcon({ id }: { id: "capture" | "library" | "orders" }) {
       return <BookIcon size={22} />;
     case "orders":
       return <ReceiptIcon size={22} />;
+    default:
+      return null;
   }
 }
 
@@ -221,6 +222,16 @@ function PhoneTabIcon({ id }: { id: "capture" | "library" | "orders" }) {
  * in step with the History API.
  */
 export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
+  // The account and the acting membership live one level up, so every screen
+  // (this shell included) asks about the same café.
+  return (
+    <WorkspaceProvider>
+      <HomeShell initialRoute={initialRoute} />
+    </WorkspaceProvider>
+  );
+}
+
+function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // The URL is the source of truth for the main screen and selected menu.
   const [route, setRoute] = useState<AppRoute>(initialRoute);
   const { confirm, dialog } = useConfirm();
@@ -235,6 +246,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const [launchChecklist, setLaunchChecklist] = useState<{
     accountKey: string;
+    restaurantId: string;
     done: number;
     total: number;
     complete: boolean;
@@ -254,7 +266,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     ((next: AppRoute, replace?: boolean, flushCurrent?: boolean) => void) | null
   >(null);
   const openDocRef = useRef<
-    ((doc: MenuDocument, image: Blob | null, updateRoute?: boolean) => Promise<void>) | null
+    ((
+      doc: MenuDocument,
+      image: Blob | null,
+      updateRoute?: boolean,
+      accessHint?: MenuAccess
+    ) => Promise<void>) | null
   >(null);
   const activeDocIdRef = useRef<string | null>(null);
   /** Previous session state, so only a real sign-out (not a first load) clears. */
@@ -376,34 +393,27 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageDownRef = useRef(false);
 
-  // Server sync (Step 8): signed in = the account is authoritative, and the
-  // IndexedDB copy stays as the offline cache. Signed out, nothing changes —
-  // the whole local-first flow above keeps working untouched.
-  const {
-    data: session,
-    error: sessionError,
-    isPending: sessionLoading,
-    refetch: refetchSession,
-  } = authClient.useSession();
-  /**
-   * Three answers, not two (015). The session is a request: while it is in
-   * flight — the first read of every page load — or after it failed, nothing
-   * is known, and nothing may be refused or hidden on a guess. `isRefetching`
-   * cannot express that (the first read sets it too), so the decision reads
-   * `pending` and `error` instead. A background refetch keeps `data`, so it
-   * still cannot flash skeletons or unmount in-progress forms.
-   */
-  const sessionState: SessionState = decideSessionState({
-    hasUser: session?.user != null,
-    pending: sessionLoading,
-    error: sessionError ?? null,
-  });
-  /** Waiting on the session: guarded surfaces stay inert, skeletons stay up. */
-  const sessionPending = sessionState === "unknown";
-  /** A read that failed has not answered; offer a retry, not a verdict. */
-  const sessionCheckFailed = sessionPending && sessionError != null;
-  const signedIn = session?.user != null;
-  const accountKey = session?.user?.id ?? null;
+  // The account read and the acting membership belong to the provider above
+  // the shell: one read for every screen. What the shell may do is the active
+  // membership's answer, never a union across cafés.
+  const workspace = useWorkspace();
+  const accountCan = workspace.can;
+  const signedIn = workspace.signedIn;
+  const accountKey = workspace.accountKey;
+  const sessionState = workspace.sessionState;
+  const sessionPending = workspace.sessionPending;
+  const sessionCheckGaveUp = workspace.sessionCheckGaveUp;
+  const userId = workspace.userId;
+  const email = workspace.email;
+  const activeWorkspace = workspace.active;
+  const workspaces = workspace.workspaces;
+  const restaurantList = workspace.restaurants;
+  const restaurantSettledFor = workspace.settledFor;
+  const restaurantFailedFor = workspace.failedFor;
+  const ownedRestaurantsForAccount = workspace.owned;
+  const accountAccessPending = signedIn && workspace.pending;
+  const restaurantsLoading = signedIn && workspace.pending;
+  const switchWorkspace = workspace.switchTo;
   /**
    * The ownership wall's sentence is only true while nobody is known, so it is
    * derived away the moment a session settles signed in — never cleared by an
@@ -412,35 +422,12 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const visibleLibraryError =
     signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
-  /** Automatic retries spent on a failed session read (0 = none yet). */
-  const [sessionRetries, setSessionRetries] = useState(0);
   // Server-evaluated release decisions (A4). Both assistant flags default
   // off, so the tab and panel appear only for a released account or a
   // preview link; the loading state below avoids flashing “unavailable” while
   // the server answers.
-  const { flags: featureFlags, loading: featureFlagsLoading } = useFeatureFlags(
-    session?.user?.id ?? null
-  );
+  const { flags: featureFlags, loading: featureFlagsLoading } = useFeatureFlags(userId);
 
-  // Refresh the sidebar's launch progress when the account or screen changes:
-  // publishing or a first order moves the count, and the next navigation is
-  // when the owner sees it. A failed read hides the row instead of guessing.
-  useEffect(() => {
-    if (!signedIn || !accountKey) return;
-    let cancelled = false;
-    void fetchLaunchStatus()
-      .then((status) => {
-        if (cancelled) return;
-        const progress = launchProgress(status, cardsPrintedOnThisDevice());
-        setLaunchChecklist({ accountKey, ...progress });
-      })
-      .catch(() => {
-        if (!cancelled) setLaunchChecklist(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [signedIn, accountKey, screen]);
   const signedInRef = useRef(false);
   /** Session state at decision time (a closure may outlive the render). */
   const sessionStateRef = useRef<SessionState>("unknown");
@@ -454,23 +441,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   /** Ids of the caller's menus that exist on the server (chips + operations). */
   const serverIdsRef = useRef<ReadonlySet<string>>(new Set());
   const [serverIds, setServerIds] = useState<ReadonlySet<string>>(new Set());
-  /** Ids of account menus where the caller is staff only (view, never edit). */
-  const staffMenusRef = useRef<ReadonlySet<string>>(new Set());
-  const [staffMenus, setStaffMenus] = useState<ReadonlySet<string>>(new Set());
-  /** Restaurants the caller owns: the targets for moving menus to the account. */
-  const [ownedRestaurants, setOwnedRestaurants] = useState<RestaurantOption[]>([]);
-  /** Which account the list belongs to; a mismatch means it is still loading. */
-  const [ownedRestaurantsFor, setOwnedRestaurantsFor] = useState<string | null>(null);
-  /** Every restaurant the caller belongs to, in any role (claim decisions). */
-  const [restaurantCount, setRestaurantCount] = useState(0);
-  /** Which account the restaurant count belongs to; null until it settles. */
-  const [restaurantCountFor, setRestaurantCountFor] = useState<string | null>(null);
   /**
-   * Which account's restaurant read *failed* — a third state, because an
-   * error and an in-flight request must not look the same (002). Cleared by
-   * the next successful read.
+   * The café each account menu belongs to, keyed by menu id. A browser-only
+   * draft has no entry — it belongs to no café until it is moved. The
+   * summaries already carry this, so the library can be scoped without a
+   * second request.
    */
-  const [restaurantReadFailedFor, setRestaurantReadFailedFor] = useState<string | null>(null);
+  const [menuRestaurantById, setMenuRestaurantById] = useState<ReadonlyMap<string, string>>(
+    new Map()
+  );
+  /** Ids of account menus where the caller is staff only (view, never edit). */
+  /**
+   * Server-resolved access for each menu, keyed by id. A missing id is the
+   * unanswered state — never "no access" and never "owner". `"local"` is a
+   * browser-only menu the caller owns; `"none"` is a row the server refused,
+   * whose cached copy must not be rendered.
+   */
+  const menuAccessRef = useRef<ReadonlyMap<string, MenuAccess>>(new Map());
+  const [menuAccess, setMenuAccess] = useState<ReadonlyMap<string, MenuAccess>>(new Map());
   /** Which account the server menu ids belong to; null until a merge settles. */
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
   /** Which account's server menu read failed (same third state, menus). */
@@ -566,54 +554,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     accountMenusReadFailedRef.current = serverMenusReadFailedFor;
   }, [serverMenusReadFailedFor]);
 
-  // A failed session read is not a sign-out (015): retry it twice with a
-  // backing-off delay, then stop asking and let the UI say what it knows. Only
-  // the timer writes state, so a failure never cascades a render.
-  useEffect(() => {
-    if (!sessionCheckFailed || sessionRetries >= SESSION_READ_RETRIES) return;
-    const timer = setTimeout(() => {
-      setSessionRetries((attempts) => attempts + 1);
-      void refetchSession?.();
-    }, SESSION_READ_RETRY_MS * (sessionRetries + 1));
-    return () => clearTimeout(timer);
-  }, [sessionCheckFailed, sessionRetries, refetchSession]);
-
-  /** The retries are spent: keep the wait honest instead of guessing. */
-  const sessionCheckGaveUp = sessionCheckFailed && sessionRetries >= SESSION_READ_RETRIES;
-
-  // Moving a single menu needs the owned restaurants up front, so each
-  // browser-only row can offer its target without opening the move panel.
-  useEffect(() => {
-    if (!signedIn || !accountKey) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await fetchRestaurants();
-        if (cancelled) return;
-        setOwnedRestaurants(list.filter((r) => r.role === "owner"));
-        setOwnedRestaurantsFor(accountKey);
-        setRestaurantCount(list.length);
-        setRestaurantCountFor(accountKey);
-        setRestaurantReadFailedFor(null);
-      } catch {
-        // Best-effort: the move panel shows its own load error, the wizard
-        // explains a failed create, and the server still refuses a move the
-        // caller may not make. Settle the loading state so the wizard can
-        // still offer the form (the request will surface the real error).
-        if (!cancelled) {
-          setOwnedRestaurants([]);
-          setOwnedRestaurantsFor(accountKey);
-          // Unknown, not zero: `restaurantCountFor` stays for the old account
-          // and this marker settles the claim gate as *failed* instead.
-          setRestaurantReadFailedFor(accountKey);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accountKey, signedIn]);
-
   // Display derives from the canonical docs (which carry confirmations),
   // falling back to the raw extraction only for the empty state.
   const result: PreviewMenu | null = resultDoc ?? demoDoc ?? extracted?.menu ?? null;
@@ -671,6 +611,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       try {
         let doc: MenuDocument;
         let imageBlob: Blob | null = null;
+        let accessHint: MenuAccess | undefined;
         try {
           doc = await getMenu(menuId);
           // The device stamp is a privacy boundary, not an accusation (015): a
@@ -679,10 +620,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           // somebody else stays shut. An unanswered session decides nothing
           // here — the effect re-runs when the read settles.
           const origin = await getDraftOrigin(menuId).catch(() => undefined);
+          // The server's own list is the second authority for a shared
+          // browser: a published menu it listed for this account opens even
+          // when the local row is stamped to the owner who wrote the draft.
+          const sharedPublished =
+            accountMenusSettledRef.current === accountKeyRef.current &&
+            isPublishedOnlyAccess(menuAccessRef.current.get(menuId));
           const access = decideMenuOpen({
             session: sessionStateRef.current,
             stampAccountId: origin?.accountId,
             accountKey: accountKeyRef.current,
+            sharedPublished,
+            accountReadPending:
+              signedIn && serverMenusReadFor !== accountKey,
           });
           if (access.state === "wait") {
             if (cancelled) return;
@@ -706,11 +656,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         } catch (localError) {
           if (!signedIn) throw localError;
           const serverMenu = await fetchServerMenu(menuId);
+          rememberMenuCafe(serverMenu.id, serverMenu.restaurantId);
           doc = serverMenu.doc;
+          accessHint = serverMenu.access;
           await cacheMenu(doc).catch(() => undefined);
           await refreshLibrary();
         }
-        if (!cancelled) await openDocRef.current?.(doc, imageBlob, false);
+        if (!cancelled) await openDocRef.current?.(doc, imageBlob, false, accessHint);
       } catch {
         if (cancelled) return;
         openedRouteMenuRef.current = null;
@@ -729,7 +681,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       cancelled = true;
       if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
     };
-  }, [route, sessionState, signedIn]);
+  }, [route, sessionState, signedIn, accountKey, serverMenusReadFor]);
 
   useEffect(() => {
     const wasSignedIn = wasSignedInRef.current;
@@ -773,7 +725,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         navigateTo(landing, true, false);
       }
       replaceServerIds(new Set());
-      replaceStaffMenus(new Set());
+      replaceMenuAccess(new Map());
+      setMenuRestaurantById(new Map());
       // The ids and the read that produced them reset together (001): a stale
       // "settled" marker over an empty id set would let the next sign-in paint
       // the same false chip.
@@ -791,10 +744,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // that was never moved to the account stays local-only (serverBaseRef
     // stays null), so this cannot loop.
     void refreshLibrary();
-    // Chain onto a merge left over from the previous session instead of
-    // letting the dedupe swallow this one: the chip column waits for a read,
-    // and a skipped start would leave it waiting forever (001).
-    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
     void healStampedDrafts();
     const doc = docRef.current;
     if (doc && serverBaseRef.current === null && !conflictRef.current) {
@@ -804,14 +753,89 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
+  /** Which account+café the shell has already read this session. */
+  const mergedCafeRef = useRef<string | null>(null);
+
+  /**
+   * Café-keyed read: the library is one café's list, so a different membership
+   * starts from a different read, and an account with no café settles empty
+   * instead of waiting forever. Ids and access answers from the previous café
+   * do not describe this one, so they are dropped before the new read.
+   */
+  useEffect(() => {
+    if (!signedIn || !accountKey) {
+      mergedCafeRef.current = null;
+      return;
+    }
+    if (!activeWorkspace) {
+      if (workspace.pending) return;
+      mergedCafeRef.current = `${accountKey}:none`;
+      // Deferred like the other account reads: the effect must not set state
+      // synchronously while rendering the frame that decided it.
+      void Promise.resolve().then(() => {
+        replaceServerIds(new Set());
+        replaceMenuAccess(new Map());
+        setServerMenusFor(accountKey);
+        setServerMenusReadFailedFor(null);
+        setServerMenusReadFor(accountKey);
+        accountMenusSettledRef.current = accountKey;
+      });
+      return;
+    }
+    const key = `${accountKey}:${activeWorkspace.restaurantId}`;
+    if (mergedCafeRef.current === key) return;
+    mergedCafeRef.current = key;
+    // Keep the browser-only answers: a local draft is the caller's own row and
+    // belongs to no café, so it must not become read-only on a switch.
+    replaceServerIds(new Set());
+    replaceMenuAccess(
+      new Map([...menuAccessRef.current].filter(([, access]) => access === "local"))
+    );
+    setServerMenusFor(null);
+    setServerMenusReadFor(null);
+    setServerMenusReadFailedFor(null);
+    accountMenusSettledRef.current = null;
+    // Chain onto a merge left over from the previous café instead of letting
+    // the dedupe swallow this one (001).
+    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
+  }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
+
   function replaceServerIds(next: ReadonlySet<string>) {
     serverIdsRef.current = next;
     setServerIds(next);
   }
 
-  function replaceStaffMenus(next: ReadonlySet<string>) {
-    staffMenusRef.current = next;
-    setStaffMenus(next);
+  function replaceMenuAccess(next: ReadonlyMap<string, MenuAccess>) {
+    menuAccessRef.current = next;
+    setMenuAccess(next);
+  }
+
+  /**
+   * Which café a menu belongs to, learned from the server's own answer. It
+   * follows the switcher across cafés (a deep link can open another café's
+   * menu) and is never used to filter the library — the café-keyed read
+   * already returns one café's rows.
+   */
+  function rememberMenuCafe(menuId: string, restaurantId: string) {
+    setMenuRestaurantById((current) =>
+      current.get(menuId) === restaurantId ? current : new Map(current).set(menuId, restaurantId)
+    );
+  }
+
+  function rememberMenuCafes(menus: { id: string; restaurantId: string }[]) {
+    setMenuRestaurantById((current) => {
+      const next = new Map(current);
+      for (const menu of menus) next.set(menu.id, menu.restaurantId);
+      return next;
+    });
+  }
+
+  /** Record one menu's access answer without touching the rest. */
+  function setMenuAccessFor(id: string, access: MenuAccess) {
+    if (menuAccessRef.current.get(id) === access) return;
+    const next = new Map(menuAccessRef.current);
+    next.set(id, access);
+    replaceMenuAccess(next);
   }
 
   function addServerId(id: string) {
@@ -866,32 +890,56 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   async function mergeAccountMenus() {
     if (!signedInRef.current || mergeRef.current) return;
+    // Café-keyed: the library is one café's list, so the read names the café.
+    // Until it resolves the keyed effect re-runs; an account with no café is
+    // settled there, never here as an empty "read".
+    const restaurantId = activeRestaurantIdRef.current;
+    if (!restaurantId) return;
     const run = (async () => {
       try {
-        const serverMenus = await fetchServerMenus();
+        const { menus: serverMenus } = await fetchCafeMenus(restaurantId);
         replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
+        rememberMenuCafes(serverMenus);
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
         if (signedInRef.current) {
           setServerMenusFor(accountKey);
           setServerMenusReadFailedFor(null);
         }
-        try {
-          replaceStaffMenus(staffMenuIds(serverMenus, await fetchRestaurants()));
-        } catch {
-          // Role lookup is best-effort; the server still refuses staff writes.
+        // One answer, no second role lookup: each summary already carries the
+        // caller's capabilities. A browser-only menu keeps its local answer
+        // while the server list has nothing to say about it.
+        const accessById = new Map<string, MenuAccess>(menuAccessById(serverMenus));
+        for (const [id, access] of menuAccessRef.current) {
+          if (access === "local" && !accessById.has(id)) accessById.set(id, "local");
         }
+        replaceMenuAccess(accessById);
         const localIds = new Set((await listMenus()).map((menu) => menu.id));
         let cachedAny = false;
         let originsChanged = false;
         for (const summary of serverMenus) {
+          // A member without the draft grant must never open a cached draft:
+          // replace it with the live snapshot before it can be read. This is
+          // the cache half of the server-side projection (the API already
+          // refuses to send the draft).
+          if (!summary.access.capabilities.includes("menus.read_draft")) {
+            try {
+              const full = await fetchServerMenu(summary.id);
+              await cacheMenu({ ...full.doc, updatedAt: full.updatedAt });
+              cachedAny = true;
+            } catch {
+              // One unreadable row never blocks the rest; the next refresh
+              // retries it.
+            }
+            continue;
+          }
           if (localIds.has(summary.id)) {
             // Backfill: this row is provably the account's (same id on the
             // server) but was never marked — signed out, it would resurface
             // as an anonymous draft. The agreed revision comes from the
             // server, so a later return heals instead of conflicting.
             // Staff rows and someone else's cache are never touched.
-            if (staffMenusRef.current.has(summary.id)) continue;
+            if (!accessCan(menuAccessRef.current.get(summary.id), "menus.write")) continue;
             const backfillActor = accountKeyRef.current;
             if (!backfillActor) continue;
             try {
@@ -931,6 +979,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         // Signed out mid-flight, offline, or the server DB is unavailable:
         // the local library stands alone. Remember that the read failed so
         // the claim gate can settle as unknown instead of waiting forever.
+        mergedCafeRef.current = null;
         if (signedInRef.current && accountKeyRef.current) {
           setServerMenusReadFailedFor(accountKeyRef.current);
         }
@@ -971,7 +1020,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     let healedAny = false;
     for (const origin of origins.filter((item) => item.accountId === actor)) {
       if (docRef.current?.id === origin.menuId) continue;
-      if (staffMenusRef.current.has(origin.menuId)) continue;
+      if (!accessCan(menuAccessRef.current.get(origin.menuId), "menus.write")) continue;
       try {
         const local = await getMenu(origin.menuId);
         const server = await fetchServerMenu(origin.menuId);
@@ -1019,7 +1068,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       // keeps the last agreed revision when there is no new baseline, so a
       // later return can tell interrupted work from a stale cache.
       const actor = signedInRef.current ? accountKeyRef.current : null;
-      if (actor && !staffMenusRef.current.has(saved.id)) {
+      if (actor && accessCan(menuAccessRef.current.get(saved.id), "menus.write")) {
         await stampDraftOrigin(saved.id, actor, serverBaseRef.current ?? "");
       }
       setMenus(await listMenus());
@@ -1053,7 +1102,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   async function pushToAccount(saved: MenuDocument): Promise<boolean> {
     if (!signedInRef.current || serverBaseRef.current === null) return false;
     // Staff access is view-only: keep the local copy, never push an edit.
-    if (staffMenusRef.current.has(saved.id)) return false;
+    if (!accessCan(menuAccessRef.current.get(saved.id), "menus.write")) return false;
     if (conflictRef.current) return false;
     setSaveState({ kind: "saving", message: "Saving to your account…" });
     try {
@@ -1156,13 +1205,21 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     });
   }
 
-  async function openDoc(doc: MenuDocument, imageBlob: Blob | null, updateRoute = true) {
+  async function openDoc(
+    doc: MenuDocument,
+    imageBlob: Blob | null,
+    updateRoute = true,
+    accessHint?: MenuAccess
+  ) {
     setPublication(null);
     setPublicationMenuId(null);
     setPublicationLoaded(false);
     setPublishError(null);
     resetLiveDoc();
     void refreshPublication(doc.id);
+    // A caller that already knows the answer (a server route open, or a menu
+    // created here) hands it over so the first frame is decided, not guessed.
+    if (accessHint) setMenuAccessFor(doc.id, accessHint);
     docRef.current = doc;
     lastSavedRef.current = JSON.stringify(doc);
     setActiveDoc(doc);
@@ -1192,15 +1249,28 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     if (!signedInRef.current) return;
     try {
       const serverMenu = await fetchServerMenu(localDoc.id);
+      rememberMenuCafe(localDoc.id, serverMenu.restaurantId);
+      const serverAccess = serverMenu.access;
+      // A write-capable caller may be editable as soon as access is known. A
+      // read-only caller waits for the server's document to replace whatever
+      // this browser cached, so a stale draft is never painted as preview.
+      const serverCanWrite = accessCan(serverAccess, "menus.write");
+      if (serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
       if (docRef.current?.id !== localDoc.id) return;
       const actor = signedInRef.current ? accountKeyRef.current : null;
-      const staffOnly = staffMenusRef.current.has(localDoc.id);
+      const staffOnly = !serverCanWrite;
       const origin = actor ? await getDraftOrigin(localDoc.id).catch(() => undefined) : undefined;
       if (origin && actor && origin.accountId !== actor) {
-        // Another account's cached row on this device: never touch it.
-        removeServerId(localDoc.id);
-        setSaveState(savedState("Saved in this browser — not in your account."));
-        return;
+        // Another account's cached row on this device: never touch its
+        // draft. The exception is a published menu the server just listed
+        // for this read-only caller — that is the shared live snapshot, and
+        // the next step replaces the cached draft with it.
+        if (!isPublishedOnlyAccess(serverAccess)) {
+          removeServerId(localDoc.id);
+          setMenuAccessFor(localDoc.id, "none");
+          setSaveState(savedState("Saved in this browser — not in your account."));
+          return;
+        }
       }
       const equal = sameMenuContent(serverMenu.doc, localDoc);
       const localHash = menuContentHash(localDoc);
@@ -1254,6 +1324,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (decision === "conflict") {
         // Both sides moved since the last agreement: an explicit choice,
         // never a silent adopt over unsynced work.
+        setMenuAccessFor(localDoc.id, serverAccess);
         conflictRef.current = { serverUpdatedAt: serverMenu.updatedAt };
         setConflict(conflictRef.current);
         setConflictError(null);
@@ -1272,12 +1343,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         docRef.current = next;
         lastSavedRef.current = JSON.stringify(next);
         setActiveDoc(next);
+        if (!serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
         if (actor && !staffOnly)
           await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, menuContentHash(next));
         setSaveState(savedState("Showing the version from your account."));
         await refreshLibrary();
         return;
       }
+      if (!serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
       if (actor && !staffOnly)
         await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, localHash);
       setSaveState(savedState("Saved to your account."));
@@ -1285,10 +1358,24 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       if (docRef.current?.id !== localDoc.id) return;
       if (error instanceof SyncError && error.code === "not_found") {
         removeServerId(localDoc.id);
-        setSaveState(savedState("Saved in this browser — not in your account yet."));
+        // The server has no row: a stamp for this account, or the local answer
+        // already recorded, means a browser-only draft. Anything else is a
+        // cached menu this account may not read, so its content stays shut
+        // instead of rendering a stale draft.
+        const originNow = await getDraftOrigin(localDoc.id).catch(() => undefined);
+        const localDraft =
+          menuAccessRef.current.get(localDoc.id) === "local" ||
+          (originNow != null && originNow.accountId === accountKeyRef.current);
+        setMenuAccessFor(localDoc.id, localDraft ? "local" : "none");
+        setSaveState(
+          localDraft
+            ? savedState("Saved in this browser — not in your account yet.")
+            : savedState("This menu isn't available to your account.")
+        );
         return;
       }
       if (error instanceof SyncError && error.code === "unauthorized") {
+        setMenuAccessFor(localDoc.id, "none");
         setSaveState(
           savedState("Saved in this browser — sign in again to save it to your account.")
         );
@@ -1305,6 +1392,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     setConflictError(null);
     try {
       const serverMenu = await fetchServerMenu(doc.id);
+      setMenuAccessFor(doc.id, serverMenu.access);
       let next: MenuDocument = serverMenu.doc;
       if (!storageDownRef.current) {
         next = await saveMenu(serverMenu.doc).catch(() => serverMenu.doc);
@@ -1317,7 +1405,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       conflictRef.current = null;
       setConflict(null);
       const loadActor = accountKeyRef.current;
-      if (loadActor && !staffMenusRef.current.has(doc.id)) {
+      if (loadActor && accessCan(serverMenu.access, "menus.write")) {
         await refreshDraftSync(doc.id, loadActor, serverMenu.updatedAt, menuContentHash(next));
       }
       setSaveState(savedState("Showing the version from your account."));
@@ -1393,14 +1481,19 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     const newMenuActor = signedInRef.current ? accountKeyRef.current : null;
     if (newMenuActor) await stampDraftOrigin(doc.id, newMenuActor, "");
     if (!storageDownRef.current) await refreshLibrary();
-    await openDoc(doc, null);
+    await openDoc(doc, null, true, "local");
   }
 
   async function handleRenameMenu(id: string, title: string) {
+    const access = menuAccessRef.current.get(id);
+    if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
+      setLibraryError("Only someone with menu access can rename this menu.");
+      return;
+    }
     try {
       const renamed = await renameMenu(id, title);
       const renameActor = signedInRef.current ? accountKeyRef.current : null;
-      if (renameActor && !staffMenusRef.current.has(id)) {
+      if (renameActor && accessCan(menuAccessRef.current.get(id), "menus.write")) {
         // Keep the existing baseline when this menu is not open: the
         // editor's baseline belongs to another document.
         await stampDraftOrigin(
@@ -1584,12 +1677,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         return;
       }
       const created = await createRestaurant(target.name);
-      setOwnedRestaurants((current) =>
-        current.some((restaurant) => restaurant.id === created.id) ? current : [...current, created]
-      );
-      setOwnedRestaurantsFor(accountKey);
-      setRestaurantCount((count) => count + 1);
-      setRestaurantCountFor(accountKey);
+      workspace.addRestaurant(created);
       await runLocalDraftClaim(created.id, created.name);
     } catch {
       setClaimError(
@@ -1803,6 +1891,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   async function handleDeleteMenu(id: string) {
+    const access = menuAccessRef.current.get(id);
+    if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
+      setLibraryError("Only someone with menu access can delete this menu.");
+      return;
+    }
     try {
       // Remove it from the account first when it is there, so a failure is
       // reported before the browser copy is gone. The browser delete always
@@ -2127,13 +2220,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }
       }
       if (!storageDownRef.current) await refreshLibrary();
-      await openDoc(saved, firstPage ? firstPage.file : null, updateRoute);
+      await openDoc(saved, firstPage ? firstPage.file : null, updateRoute, "local");
       return saved;
     }
     const doc = demoDoc ?? createSampleMenuDocument();
     const saved = storageDownRef.current ? doc : await saveMenu(doc);
     if (!storageDownRef.current) await refreshLibrary();
-    await openDoc(saved, null, updateRoute);
+    await openDoc(saved, null, updateRoute, "local");
     return saved;
   }
 
@@ -2308,18 +2401,23 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // never render for anyone else (or for nobody signed out); anonymous rows
   // are the shared working set. Hidden rows also stay out of the claim
   // offer, the manual import, the tab count, and the restaurant name guess.
+  // A published-only reader gets the live snapshot even when this browser's
+  // cached row is stamped to the account that wrote the draft (the owner
+  // sharing a device with staff). The server has already projected the
+  // content to the published revision, so the row is safe to show.
+  const sharedLiveMenuIds = new Set(
+    [...serverIds].filter((id) => isPublishedOnlyAccess(menuAccess.get(id)))
+  );
   const visibleIds = new Set(
     visibleMenuIds(
       menus.map((menu) => menu.id),
       originList,
-      signedIn ? accountKey : null
+      signedIn ? accountKey : null,
+      sharedLiveMenuIds
     )
   );
   const visibleMenus = menus.filter((menu) => visibleIds.has(menu.id));
   const hasHiddenMenus = visibleMenus.length !== menus.length;
-  // Library rows carry their account state: menus on the server show as
-  // synced; the rest are browser-only until moved (or downloaded).
-  const libraryMenus = visibleMenus.map((menu) => ({ ...menu, onServer: serverIds.has(menu.id) }));
   /**
    * The chip column may only speak once the account's menu list has been read
    * (001). Before that an empty id set is "not asked yet", so the rows keep
@@ -2331,11 +2429,91 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // answered lets the rows name membership (001).
   const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
   const libraryAccountMode = signedIn && serverMenusFor === accountKey;
+  /**
+   * The acting café's id, and the same answer for async work that finishes
+   * after the render that decided it. Both come from the provider above the
+   * shell, so the switcher, the tabs and the café-keyed read cannot disagree.
+   */
+  const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
+  const activeRestaurantIdRef = useRef<string | null>(activeRestaurantId);
+  activeRestaurantIdRef.current = activeRestaurantId;
+  // Refresh the sidebar's launch progress when the account, the café, or the
+  // screen changes: publishing or a first order moves the count, and the next
+  // navigation is when the owner sees it. It asks for the café the shell is
+  // acting in — never the account's other memberships — and waits for that
+  // café to be resolved. A failed read hides the row instead of guessing.
+  useEffect(() => {
+    // Nothing to read without an account and a café. The stored count is not
+    // cleared here (a synchronous setState in an effect); the render compares
+    // account and café, so an old membership's count can never show.
+    if (!signedIn || !accountKey || !activeRestaurantId) return;
+    let cancelled = false;
+    void fetchLaunchStatus(activeRestaurantId)
+      .then((status) => {
+        if (cancelled) return;
+        const progress = launchProgress(status, cardsPrintedOnThisDevice());
+        setLaunchChecklist({
+          accountKey,
+          restaurantId: activeRestaurantId,
+          ...progress,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setLaunchChecklist(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, accountKey, activeRestaurantId, screen]);
+  /**
+   * Switch the membership the shell acts in. Stored under the account, so a
+   * staff context chosen on a shared device never greets the next person.
+   *
+   * The open editor belongs to its menu's café, so switching to a different
+   * one leaves the editor for the new café's library instead of keeping a
+   * menu on screen under a café it does not belong to. A browser-only draft
+   * has no café, so it stays only where the new membership can write.
+   */
+  function handleSwitchWorkspace(key: string) {
+    const target = workspaces.find((entry) => entry.key === key) ?? null;
+    switchWorkspace(key);
+
+    const menuId = routeMenuId(route);
+    if (!menuId) return;
+    const menuRestaurantId = menuRestaurantById.get(menuId);
+    const belongsToTarget = menuRestaurantId
+      ? menuRestaurantId === target?.restaurantId
+      : workspaceCan(target, "menus.write");
+    if (!belongsToTarget) navigateTo({ screen: "library" });
+  }
+  /**
+   * The acting café's rows. The account read is café-keyed, so every server
+   * row already belongs here — there is no per-row café to filter on. Only
+   * browser drafts still need a rule: they belong to a membership that can
+   * write, and wait (hidden) on a staff shift until the owner files them.
+   */
+  const workspaceMenus =
+    !signedIn || accountCan("menus.write")
+      ? visibleMenus
+      : visibleMenus.filter((menu) => serverIds.has(menu.id));
+  /**
+   * The tab's number is a fact about one café, so it waits for that café's
+   * read to settle — answered or failed. Signed out the working set is the
+   * whole list, so it is known already.
+   */
+  const libraryCountKnown =
+    !signedIn || serverMenusReadFor === accountKey || serverMenusReadFailedFor === accountKey;
+  // Library rows carry their account state: menus on the server show as
+  // synced; the rest are browser-only until moved (or downloaded).
+  const libraryMenus = workspaceMenus.map((menu) => ({
+    ...menu,
+    onServer: serverIds.has(menu.id),
+    // The row's verbs follow the same answer as the editor. An unanswered
+    // menu is read-only here too, so no owner control appears on a guess.
+    canWrite: !signedIn || accessCan(menuAccess.get(menu.id), "menus.write"),
+  }));
   const localOnly = libraryMenus.filter((menu) => !menu.onServer);
   const localOnlyCount = localOnly.length;
-  // A list cached from another account is never offered as a move target.
-  const ownedRestaurantsForAccount = ownedRestaurantsFor === accountKey ? ownedRestaurants : [];
-  const restaurantsLoading = signedIn && ownedRestaurantsFor !== accountKey;
   // A name for the first-run "Name your restaurant" field, guessed from the
   // titles of the menus the move would copy (null when they say nothing).
   const suggestedRestaurantName = suggestRestaurantName(localOnly.map((menu) => menu.title));
@@ -2371,21 +2549,31 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }),
     restaurants: accountReadState({
       accountKey,
-      settledFor: restaurantCountFor,
-      failedFor: restaurantReadFailedFor,
+      settledFor: restaurantSettledFor,
+      failedFor: restaurantFailedFor,
     }),
   });
-  const localDraftsDecision = decideLocalDraftClaimSurface({
-    gate: claimGate,
-    signedIn,
-    claim: {
-      localCount: localOnlyCount,
-      accountMenuCount: serverIds.size,
-      restaurantCount,
-      ownedRestaurantCount: ownedRestaurantsForAccount.length,
-      status: claimStatus,
-    },
-  });
+  /**
+   * Browser drafts are the owner's to file: the offer and the automatic
+   * import both write to a café, so they exist only while the shell acts in a
+   * membership that can write menus. On a staff shift they wait, and come
+   * back after switching to the owner café — the other membership's cafés are
+   * never offered as a target here.
+   */
+  const canFileBrowserDrafts = signedIn && accountCan("menus.write");
+  const localDraftsDecision = canFileBrowserDrafts
+    ? decideLocalDraftClaimSurface({
+        gate: claimGate,
+        signedIn,
+        claim: {
+          localCount: localOnlyCount,
+          accountMenuCount: serverIds.size,
+          restaurantCount: restaurantList?.length ?? 0,
+          ownedRestaurantCount: ownedRestaurantsForAccount.length,
+          status: claimStatus,
+        },
+      })
+    : "none";
   // Neither claim surface renders while the gate says the account is unknown.
   const claimSurfaceQuiet =
     localDraftsDecision === "none" || localDraftsDecision === "unavailable";
@@ -2451,9 +2639,114 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const activePublication = publicationMenuId === activePublicationMenuId ? publication : null;
   const activePublicationLoaded =
     publicationMenuId === activePublicationMenuId && publicationLoaded;
+  /**
+   * The open menu's access answer. Missing is unanswered, not permission: the
+   * editor renders a placeholder until the server says what this caller may
+   * do. Staff without `menus.write` get a preview; a menu the server refused
+   * (`"none"`) is never rendered, cached draft or not.
+   */
+  const activeMenuAccess = activeDoc ? menuAccess.get(activeDoc.id) : undefined;
+  const activeMenuAccessPending = signedIn && activeDoc != null && activeMenuAccess === undefined;
+  const activeMenuAccessDenied = activeMenuAccess === "none";
+  const activeMenuCanWrite = !signedIn || accessCan(activeMenuAccess, "menus.write");
+  const activeMenuCanPublish = !signedIn || accessCan(activeMenuAccess, "menus.publish");
   // Staff on the menu's restaurant get a view-only editor (the server refuses
   // their writes anyway; the UI must not offer the controls at all).
-  const activeMenuIsStaff = routedDoc ? staffMenus.has(routedDoc.id) : false;
+  const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
+
+  /**
+   * The switcher follows the menu. A deep link can open a menu from the other
+   * café — the account can read it — while the shell is still acting in the
+   * café it was left in, which would leave the switcher and the screen
+   * disagreeing. Select the menu's café instead, once that café is known and
+   * the account actually holds it. Only the routed menu counts: a document
+   * kept in memory while browsing the library must not drag the context back.
+   */
+  const routedMenuRestaurantId = routedDoc
+    ? (menuRestaurantById.get(routedDoc.id) ?? null)
+    : null;
+  const followMenuCafe =
+    signedIn &&
+    !accountAccessPending &&
+    accountKey !== null &&
+    routedMenuRestaurantId !== null &&
+    routedMenuRestaurantId !== activeWorkspace?.restaurantId &&
+    workspaces.some((entry) => entry.restaurantId === routedMenuRestaurantId);
+  useEffect(() => {
+    if (!followMenuCafe || !routedMenuRestaurantId) return;
+    // Deferred like the other account reads: never set state synchronously
+    // while rendering the frame that decided to switch.
+    void Promise.resolve().then(() => switchWorkspace(routedMenuRestaurantId));
+  }, [followMenuCafe, routedMenuRestaurantId, switchWorkspace]);
+
+  /**
+   * Every surface follows the one navigation table: a section is visible only
+   * when the active membership holds its capability (signed out: Capture
+   * plus the anonymous working set). The pills, tab bar and More sheet all
+   * read this list, so they cannot drift apart, and a section contributed
+   * later cannot appear ungated.
+   */
+  const sections = availableSections({
+    signedIn,
+    can: accountCan,
+    assistantEnabled: featureFlags.assistant,
+    hasWorkingSet: libraryMenus.length > 0,
+  });
+  /**
+   * The sidebar renders the same table, with the library's number filled in
+   * once it is a fact about the active café (`libraryCountKnown`).
+   */
+  const navSections = sections.map((section) =>
+    section.id === "library" && libraryCountKnown
+      ? { ...section, count: libraryMenus.length }
+      : section
+  );
+  const availableScreenIds = new Set(sections.map((section) => section.id));
+  const phoneTabList = phoneTabs(sections);
+  const moreRows = moreSheetRows(sections);
+  /** Nav waits for the membership read: no provisional tabs, no empty bar. */
+  const navReady = !sessionPending && !accountAccessPending;
+  /** The More sheet owns the current screen (and so shows as pressed). */
+  const screenInMore = moreRows.some((row) => row.id === screen);
+  const canGetStarted = signedIn && accountCan("settings.manage");
+  /** Why an empty library is empty, when the shell can tell. */
+  const libraryEmpty = (() => {
+    if (!signedIn || restaurantList === null) return undefined;
+    if (restaurantList.length === 0) {
+      return {
+        title: "No café on this account yet",
+        body: "If you were invited, open the invitation link from your email, or ask the owner to add this address in Settings → Team. Otherwise, capture a menu to start your own café.",
+      };
+    }
+    if (activeWorkspace === null) return undefined;
+    // The list is the active café's, so the empty state names that café — not
+    // the account, whose other café may be full of menus.
+    return {
+      title: `No menus at ${activeWorkspace.name} yet`,
+      body: accountCan("menus.write")
+        ? "Capture a menu or start a blank one — it will appear here and survive refreshes."
+        : "Staff see this café's published menus only. Ask the owner to publish one; drafts and unpublished menus stay private until then.",
+    };
+  })();
+
+  // A typed URL or old bookmark for a surface this membership cannot use
+  // lands on the first one it can — Capture for an owner, My menus for a
+  // staff shift. Unknown access is not a refusal: the guard waits.
+  useEffect(() => {
+    if (!signedIn || accountAccessPending) return;
+    const guarded = routeRef.current.screen;
+    if (guarded === "assistant" && featureFlagsLoading) return;
+    // The editor and item pages answer for themselves: their menu carries
+    // the server's own access answer, and a foreign menu moves the
+    // switcher (below) rather than being refused here.
+    if (guarded === "editor" || guarded === "item") return;
+    // A membership with no usable surface has nowhere to send anyone; it
+    // keeps the page it has rather than bouncing between two refusals.
+    const landing = sections[0]?.id;
+    if (!availableScreenIds.has(guarded) && landing) {
+      navigateTo({ screen: landing }, true);
+    }
+  });
 
   /**
    * The sidebar's contextual half: the open menu's sections, only while the
@@ -2469,24 +2762,36 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         }))
       : null;
   const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
-  /** Unfinished checklist for this account only; complete or unknown hides it. */
+  /**
+   * Unfinished checklist for this account **and this café** only: another
+   * membership's count is never shown, and complete or unknown hides the row.
+   */
+  const launchChecklistForActive =
+    launchChecklist &&
+    launchChecklist.accountKey === accountKey &&
+    launchChecklist.restaurantId === activeRestaurantId
+      ? launchChecklist
+      : null;
   const sidebarLaunch =
-    signedIn && launchChecklist && launchChecklist.accountKey === accountKey && !launchChecklist.complete
-      ? { done: launchChecklist.done, total: launchChecklist.total }
+    signedIn && launchChecklistForActive && !launchChecklistForActive.complete
+      ? { done: launchChecklistForActive.done, total: launchChecklistForActive.total }
       : null;
   /** The More sheet's checklist line: progress, finished, or not read yet. */
   const sheetLaunchHint = sidebarLaunch
     ? "What's left to set up"
-    : launchChecklist && launchChecklist.accountKey === accountKey
+    : launchChecklistForActive
       ? "All steps done"
       : "See what's left to set up";
   /**
    * The My menus count is only true once the account's list has been read.
    * Before that the local set can be smaller than the account's, so the
-   * sidebar holds a placeholder rather than a number that will jump.
+   * sidebar holds a placeholder rather than a number that will jump. A read
+   * that failed is settled, not pending: it gets no skeleton and no number.
    */
   const sidebarMenuCountPending =
-    !sessionPending && (libraryLoading || (signedIn && serverMenusReadFor !== accountKey));
+    !sessionPending &&
+    (libraryLoading ||
+      (signedIn && !libraryCountKnown && serverMenusReadFailedFor !== accountKey));
 
   /** Jump the editor list to the section chosen in the sidebar. */
   function scrollToMenuSection(categoryId: string) {
@@ -2494,7 +2799,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   return (
-    <OrderMonitorProvider userId={session?.user?.id ?? null}>
+    <OrderMonitorProvider
+      userId={userId}
+      restaurantId={activeWorkspace?.restaurantId ?? null}
+      pending={sessionPending || accountAccessPending}
+    >
     <div className="flex min-h-full flex-1 flex-col">
       {dialog}
       <ViewingTracker viewing={signedIn && screen === "orders"} />
@@ -2503,19 +2812,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           instead of floating under short content. */}
       <div className="flex w-full flex-1">
         <AppSidebar
-          sections={
-            sessionPending
-              ? []
-              : appSections({
-                  signedIn,
-                  assistantEnabled: featureFlags.assistant,
-                  menuCount: visibleMenus.length,
-                })
-          }
+          sections={sessionPending ? [] : navSections}
           activeSection={sectionForScreen(screen)}
           sessionPending={sessionPending}
           signedIn={signedIn}
-          email={session?.user?.email ?? null}
+          email={email}
           onNavigate={(section) => navigateTo({ screen: section })}
           onSignOut={() => void authClient.signOut()}
           outline={sidebarOutline}
@@ -2525,6 +2826,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           menusPending={sidebarMenuCountPending}
         />
         <div className="flex min-w-0 flex-1 flex-col">
+          {/* The sidebar names the account, not the café on shift: a second
+              membership keeps its "Acting as" strip, which sits above the
+              content now that the old header row is gone. */}
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            active={activeWorkspace}
+            onSwitch={handleSwitchWorkspace}
+          />
           <main
             className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 ${
               // The editor is a dense working surface; the other app screens
@@ -2635,130 +2944,66 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           })()}
 
         {screen === "library" && (
-          <div className="flex flex-col gap-4">
-            {visibleLibraryError && (
-              <p
-                role="alert"
-                className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-              >
-                {visibleLibraryError}{" "}
-                {isSessionGateMessage(visibleLibraryError) && (
-                  <a
-                    href="/sign-in"
-                    className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
-                  >
-                    Sign in
-                  </a>
-                )}
-              </p>
-            )}
-            <LibraryPanel
-              menus={libraryMenus}
-              loading={libraryLoading || libraryAccountPending}
-              accountMode={libraryAccountMode}
-              hasHiddenMenus={hasHiddenMenus}
-              ownedRestaurants={signedIn ? ownedRestaurantsForAccount : []}
-              onMoveToAccount={handleMoveMenuToAccount}
-              unavailable={storageDown}
-              onOpen={(id) => void handleOpenMenu(id)}
-              onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
-              onRename={(id, title) => void handleRenameMenu(id, title)}
-              onDelete={(id) => void handleDeleteMenu(id)}
-            />
-            {/* The manual route stays available, quietly: the post-sign-in
-                offer handles the common case, and this is where a partial
-                import is retried. */}
-            {signedIn && libraryAccountMode && localOnlyCount > 0 && (
-              <details className="rounded-2xl border border-line-200 bg-surface-base">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-700 marker:text-ink-400">
-                  Import from this browser
-                  <span className="ml-2 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
-                    {localOnlyCount}
-                  </span>
-                </summary>
-                <div className="border-t border-line-200">
-                  <MoveToAccountPanel
-                    menuCount={localOnlyCount}
-                    menuIds={localOnly.map((menu) => menu.id)}
-                    suggestedName={suggestedRestaurantName}
-                    onMoved={(report) => {
-                      const actor = accountKeyRef.current;
-                      void (async () => {
-                        if (actor) {
-                          await stampClaimedMenus(
-                            [...report.imported, ...report.skipped],
-                            actor,
-                            (id) => getMenu(id)
-                          );
-                        }
-                        await mergeAccountMenus();
-                      })();
-                    }}
-                    onOwnedChange={setOwnedRestaurants}
-                  />
-                </div>
-              </details>
-            )}
-          </div>
-        )}
-
-        {screen === "orders" && <OrdersBoard />}
-
-        {screen === "assistant" &&
-          (assistantPending ? (
-            <section
-              role="status"
-              aria-busy="true"
-              aria-label="Loading the assistant"
-              className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
-            >
-              <span className="sr-only">Loading the assistant…</span>
-              <Skeleton className="h-6 w-40" />
-              <Skeleton className="h-24 w-full" />
-            </section>
-          ) : featureFlags.assistant ? (
-            <AssistantPanel
-              signedIn={signedIn}
-              sessionPending={sessionPending}
-              proposalsEnabled={featureFlags.assistantProposals}
-              menusLoading={libraryLoading}
-              menus={menus
-                .filter((menu) => serverIds.has(menu.id) && !staffMenus.has(menu.id))
-                .map((menu) => ({ id: menu.id, title: menu.title }))}
-            />
-          ) : !signedIn ? (
-            // Unreachable through the UI — both navs hide the assistant when
-            // signed out and the effect below bounces a typed /assistant URL
-            // back to capture — so render nothing while the bounce lands.
-            null
-          ) : (
-            <section className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
-              <h1 className="font-medium text-ink-900">Assistant isn’t available</h1>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
-                The assistant isn’t released to this account yet. Everything else in Eateryo works
-                as usual.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigateTo({ screen: "capture" })}
-                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Back to capture
-              </button>
-            </section>
-          ))}
-
-        {screen === "tables" && (
-          <RestaurantTables signedIn={signedIn} sessionPending={sessionPending} />
-        )}
-
-        {screen === "settings" && (
-          <RestaurantSettings
+          <MenusPage
+            error={visibleLibraryError}
+            menus={libraryMenus}
+            loading={libraryLoading || libraryAccountPending}
+            accountMode={libraryAccountMode}
+            canCreate={!signedIn || accountCan("menus.write")}
+            hasHiddenMenus={hasHiddenMenus}
+            emptyTitle={libraryEmpty?.title}
+            emptyBody={libraryEmpty?.body}
             signedIn={signedIn}
-            sessionPending={sessionPending}
-            currentUserId={session?.user?.id ?? null}
+            importCount={localOnlyCount}
+            importMenuIds={localOnly.map((menu) => menu.id)}
+            suggestedName={suggestedRestaurantName}
+            ownedRestaurants={ownedRestaurantsForAccount}
+            unavailable={storageDown}
+            onOpen={(id) => void handleOpenMenu(id)}
+            onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
+            onRename={(id, title) => void handleRenameMenu(id, title)}
+            onDelete={(id) => void handleDeleteMenu(id)}
+            onMoveToAccount={handleMoveMenuToAccount}
+            onMoved={(report) => {
+              const actor = accountKeyRef.current;
+              void (async () => {
+                if (actor) {
+                  await stampClaimedMenus(
+                    [...report.imported, ...report.skipped],
+                    actor,
+                    (id) => getMenu(id)
+                  );
+                }
+                await mergeAccountMenus();
+              })();
+            }}
           />
         )}
+
+        {screen === "orders" && <OrdersPage />}
+
+
+        {screen === "assistant" && (
+          <AssistantPage
+            signedIn={signedIn}
+            sessionPending={sessionPending}
+            pending={assistantPending}
+            enabled={featureFlags.assistant}
+            proposalsEnabled={featureFlags.assistantProposals}
+            menusLoading={libraryLoading}
+            menus={workspaceMenus
+              .filter(
+                (menu) =>
+                  serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
+              )
+              .map((menu) => ({ id: menu.id, title: menu.title }))}
+            onBackToCapture={() => navigateTo({ screen: "capture" })}
+          />
+        )}
+
+        {screen === "tables" && <TablesPage />}
+
+        {screen === "settings" && <SettingsPage />}
 
         {screen === "editor" && routedDoc && (
           <>
@@ -2770,13 +3015,41 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 onKeepMine={() => void handleKeepMyVersion()}
               />
             )}
-            {activeMenuIsStaff && (
-              <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
-                You have staff access to this restaurant — menus are view-only for staff. Ask an
-                owner to make changes.
-              </p>
-            )}
-            {editorMode === "publish" && !activeMenuIsStaff ? (
+            {activeMenuAccessDenied ? (
+              <section className="rounded-2xl border border-line-200 bg-surface-base p-6">
+                <h1 className="font-medium text-ink-900">This menu isn’t available</h1>
+                <p className="mt-2 max-w-md text-sm leading-6 text-ink-600">
+                  Your account can’t open this menu. Ask the restaurant owner if you think that’s a
+                  mistake.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleBackToLibrary()}
+                  className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  Back to my menus
+                </button>
+              </section>
+            ) : activeMenuAccessPending ? (
+              <section
+                role="status"
+                aria-busy="true"
+                aria-label="Checking access"
+                className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
+              >
+                <span className="sr-only">Checking your access to this menu…</span>
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-40 w-full" />
+              </section>
+            ) : (
+              <>
+                {activeMenuIsStaff && (
+                  <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
+                    You have staff access to this restaurant — menus are view-only for staff. Ask an
+                    owner to make changes.
+                  </p>
+                )}
+                {editorMode === "publish" && activeMenuCanPublish ? (
               <PublishWizard
                 key={routedDoc.id}
                 doc={routedDoc}
@@ -2796,14 +3069,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               <MenuEditor
                 doc={routedDoc}
                 selectedItemId={selectedItemId}
-                mode={activeMenuIsStaff ? "preview" : editorMode}
+                mode={activeMenuCanWrite ? editorMode : "preview"}
                 onModeChange={(mode) =>
                   navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
                 }
                 onChange={handleDocChange}
                 saveState={saveState}
                 syncMode={signedIn ? "account" : "local"}
-                canManage={!activeMenuIsStaff}
+                canManage={activeMenuCanWrite}
                 onServer={activeMenuOnServer}
                 accountCheckFailed={activeMenuAccountCheckFailed}
                 onRetryAccountCheck={handleRetryAccountCheck}
@@ -2837,186 +3110,51 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 }}
                 onPreviewOpen={() => void refreshPublication(routedDoc.id)}
               />
+                )}
+              </>
             )}
           </>
         )}
 
         {screen === "capture" && (
-          <>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-                Turn your photo into a menu
-              </h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-                Upload a photo or scan of a menu, extract it into categories and items with AI, then
-                review and correct the draft. AI output is never guaranteed — you stay in charge.
-              </p>
-              {!signedIn && !sessionPending && (
-                <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
-                  You can upload and review first. Publishing needs an account — we’ll email you a
-                  sign-in link, and your draft stays in this browser.
-                </p>
-              )}
-            </div>
-
-            <JourneySteps current={activeStep} />
-
-            {phase === "upload" && pages.length === 0 && (
-              <div className="flex flex-col gap-3">
-                <Dropzone onSelect={selectFiles} />
-                {fileError && (
-                  <p
-                    role="alert"
-                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-                  >
-                    {fileError}
-                  </p>
-                )}
-                <p className="text-center text-sm text-ink-500">
-                  No menu handy?{" "}
-                  <button
-                    type="button"
-                    onClick={handleDemo}
-                    className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                  >
-                    Preview with demo data
-                  </button>
-                </p>
-              </div>
-            )}
-
-            {pages.length > 0 && (
-              <div className="flex flex-col gap-4">
-                <ImagePreview
-                  pages={pages}
-                  onAdd={() => addInputRef.current?.click()}
-                  onReplace={(index) => {
-                    replaceIndexRef.current = index;
-                    replaceInputRef.current?.click();
-                  }}
-                  onRemove={removePage}
-                />
-                <input
-                  ref={addInputRef}
-                  type="file"
-                  multiple
-                  accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-                  className="sr-only"
-                  tabIndex={-1}
-                  onChange={(event) => {
-                    const added = Array.from(event.target.files ?? []);
-                    event.target.value = "";
-                    if (added.length > 0) addPages(added);
-                  }}
-                />
-                <input
-                  ref={replaceInputRef}
-                  type="file"
-                  accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-                  className="sr-only"
-                  tabIndex={-1}
-                  onChange={(event) => {
-                    const next = event.target.files?.[0];
-                    const index = replaceIndexRef.current;
-                    event.target.value = "";
-                    replaceIndexRef.current = null;
-                    if (next && index !== null) replacePageAt(index, next);
-                  }}
-                />
-                {fileError && (
-                  <p
-                    role="alert"
-                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-                  >
-                    {fileError}
-                  </p>
-                )}
-                <div>
-                  <button
-                    type="button"
-                    onClick={handleExtract}
-                    disabled={phase === "extracting"}
-                    className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
-                  >
-                    {phase === "extracting"
-                      ? "Extracting… this can take up to a minute"
-                      : "Extract menu"}
-                  </button>
-                  <p className="mt-2 text-xs text-ink-500">
-                    Calls the AI once, only when you press this. Accuracy depends on image quality.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <Attention
-              active={phase === "extracting"}
-              pulse={false}
-              scrollBlock="start"
-              className="scroll-mt-4"
-            >
-              {phase === "extracting" && extractProgress && (
-                <ExtractionProgress
-                  pageCount={extractProgress.pageCount}
-                  preparedPages={extractProgress.preparedPages}
-                  requestStartedAt={extractProgress.requestStartedAt}
-                />
-              )}
-            </Attention>
-
-            {extractError && phase !== "extracting" && (
-              <div role="alert" className="rounded-2xl border border-danger-200 bg-danger-50 px-5 py-4">
-                <p className="font-medium text-danger-900">Extraction failed</p>
-                <p className="mt-1 text-sm text-danger-800">{extractError.message}</p>
-                {extractError.code === "missing_api_key" && (
-                  <button
-                    type="button"
-                    onClick={handleDemo}
-                    className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-                  >
-                    Preview with demo data instead
-                  </button>
-                )}
-              </div>
-            )}
-
-            {result && (
-              <div ref={resultRef}>
-                <ExtractionResult
-                  data={result}
-                  source={source}
-                  onStartOver={clearCapture}
-                  onEdit={() => void handleEditResult()}
-                  onResolveItem={handleResolveResultItem}
-                  onResolveAll={handleResolveAllResultItems}
-                  onUpdatePrice={handleUpdateResultPrice}
-                  onRenameTitle={handleRenameResultTitle}
-                  initialReviewCount={initialReviewCount}
-                  onPublish={
-                    source === "demo" || draftSave === "saved"
-                      ? () => void handleStartPublish()
-                      : undefined
-                  }
-                  previewDoc={resultDoc}
-                  savedNotice={
-                    source === "ai" && draftSave === "saved"
-                      ? "Draft saved to My menus"
-                      : source === "ai" && draftSave === "saving"
-                        ? "Saving draft…"
-                        : null
-                  }
-                  editLabel={
-                    source === "ai"
-                      ? draftSave === "saved"
-                        ? "Open in editor"
-                        : "Edit menu"
-                      : "Save & open editor"
-                  }
-                />
-              </div>
-            )}
-          </>
+          <CapturePage
+            signedIn={signedIn}
+            sessionPending={sessionPending}
+            step={activeStep}
+            phase={phase}
+            pages={pages}
+            fileError={fileError}
+            addInputRef={addInputRef}
+            replaceInputRef={replaceInputRef}
+            replaceIndexRef={replaceIndexRef}
+            resultRef={resultRef}
+            onSelectFiles={selectFiles}
+            onDemo={handleDemo}
+            onAddPages={addPages}
+            onReplacePageAt={replacePageAt}
+            onRemovePage={removePage}
+            onExtract={handleExtract}
+            extractProgress={extractProgress}
+            extractError={extractError}
+            result={result}
+            previewDoc={resultDoc}
+            source={source}
+            draftSave={draftSave}
+            initialReviewCount={initialReviewCount}
+            onClear={clearCapture}
+            onEdit={() => void handleEditResult()}
+            onResolveItem={handleResolveResultItem}
+            onResolveAll={handleResolveAllResultItems}
+            onUpdatePrice={handleUpdateResultPrice}
+            onRenameTitle={handleRenameResultTitle}
+            onPublish={
+              source === "demo" || draftSave === "saved"
+                ? () => void handleStartPublish()
+                : undefined
+            }
+          />
         )}
+
         {screen === "editor" && !routedDoc && missingPublishMenuId && (
           <MissingDraftCard
             onOpenLibrary={() => navigateTo({ screen: "library" })}
@@ -3033,10 +3171,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setSessionRetries(0);
-                  void refetchSession?.();
-                }}
+                onClick={workspace.retrySession}
                 className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
@@ -3090,20 +3225,15 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         the page and sticks to the viewport bottom instead of floating above
         the footer links.
       */}
-      {!sessionPending && (signedIn || (!libraryLoading && visibleMenus.length > 0)) ? (
+      {navReady && (signedIn || (!libraryLoading && libraryMenus.length > 0)) ? (
       <nav
         data-print-hide
         aria-label="Sections"
         className="sticky bottom-0 z-30 border-t border-line-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div
-          className={`grid px-2 pt-1 ${signedIn ? "grid-cols-4" : "grid-cols-2"}`}
-        >
-          {(signedIn
-            ? phoneTabs()
-            : phoneTabs().filter((tab) => tab.id === "capture" || tab.id === "library")
-          ).map((tab) => (
+        <div className="flex px-2 pt-1">
+          {phoneTabList.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -3112,7 +3242,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 navigateTo({ screen: tab.id });
               }}
               aria-current={screen === tab.id ? "page" : undefined}
-              className={`relative flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                 screen === tab.id ? "text-warning-800" : "text-ink-500"
               }`}
             >
@@ -3123,23 +3253,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               {tab.label}
             </button>
           ))}
-          {signedIn && (
+          {signedIn && (moreRows.length > 0 || canGetStarted) && (
           <button
             type="button"
             onClick={() => setMoreOpen((open) => !open)}
             aria-expanded={moreOpen}
-            aria-current={
-              screen === "tables" || screen === "assistant" || screen === "settings"
-                ? "page"
-                : undefined
-            }
+            aria-current={screenInMore ? "page" : undefined}
             className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-              moreOpen ||
-              screen === "tables" ||
-              screen === "assistant" ||
-              screen === "settings"
-                ? "text-warning-800"
-                : "text-ink-500"
+              moreOpen || screenInMore ? "text-warning-800" : "text-ink-500"
             }`}
           >
             <span aria-hidden="true" className="flex h-[22px] items-center">
@@ -3164,7 +3285,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-line-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
           >
             <div aria-hidden="true" className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-surface-200" />
-            {moreSheetRows({ signedIn, assistantEnabled: featureFlags.assistant }).map((row) => (
+            {moreRows.map((row) => (
               <button
                 key={row.id}
                 type="button"
@@ -3179,43 +3300,49 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
               </button>
             ))}
             {/* The checklist is progress, not another destination: its own
-                card above the rule, with the count the sidebar shows. */}
-            <a
-              href="/launch"
-              className="mt-2 flex min-h-[56px] items-center gap-3 rounded-xl border border-line-200 bg-surface-50 px-3 py-2.5 transition-colors hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              <span
-                aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-base text-ink-600"
+                card above the rule, with the count the sidebar shows. It
+                stays an owner's surface (`settings.manage`), like the Get
+                started link it replaces. */}
+            {canGetStarted && (
+              <a
+                href="/launch"
+                className="mt-2 flex min-h-[56px] items-center gap-3 rounded-xl border border-line-200 bg-surface-50 px-3 py-2.5 transition-colors hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
-                <ChecklistIcon size={18} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink-900">
-                  Launch checklist
-                </span>
-                <span className="block text-xs font-normal text-ink-500">{sheetLaunchHint}</span>
-              </span>
-              {sidebarLaunch ? (
                 <span
                   aria-hidden="true"
-                  className="shrink-0 rounded-full bg-surface-base px-2 py-0.5 text-[11px] font-semibold text-ink-600"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-base text-ink-600"
                 >
-                  {sidebarLaunch.done}/{sidebarLaunch.total}
+                  <ChecklistIcon size={18} />
                 </span>
-              ) : null}
-              {sidebarLaunch ? (
-                <span className="sr-only">
-                  {sidebarLaunch.done} of {sidebarLaunch.total} steps done
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-ink-900">
+                    Launch checklist
+                  </span>
+                  <span className="block text-xs font-normal text-ink-500">
+                    {sheetLaunchHint}
+                  </span>
                 </span>
-              ) : null}
-            </a>
+                {sidebarLaunch ? (
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 rounded-full bg-surface-base px-2 py-0.5 text-[11px] font-semibold text-ink-600"
+                  >
+                    {sidebarLaunch.done}/{sidebarLaunch.total}
+                  </span>
+                ) : null}
+                {sidebarLaunch ? (
+                  <span className="sr-only">
+                    {sidebarLaunch.done} of {sidebarLaunch.total} steps done
+                  </span>
+                ) : null}
+              </a>
+            )}
             {/* The app has no top bar on a phone, so the account lives here:
                 one place to see who is signed in and to end the session. It
                 is the last thing in the sheet, under the destinations. */}
             <div className="mt-2 border-t border-line-200 pt-1">
               <p className="truncate px-2 pt-1 text-[11px] text-ink-500">
-                {session?.user?.email}
+                {email}
               </p>
               <button
                 type="button"

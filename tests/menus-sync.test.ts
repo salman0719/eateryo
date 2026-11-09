@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createServerMenu,
   deleteServerMenu,
+  fetchCafeMenus,
   fetchServerMenu,
   fetchServerMenus,
   SyncError,
@@ -27,6 +28,7 @@ const serverMenuPayload = {
     availability: [],
     createdAt: "2026-10-18T05:00:00.000Z",
     updatedAt: "2026-10-18T06:00:00.000Z",
+    access: { role: "owner", capabilities: ["menus.read", "menus.write"] },
     doc: createSampleMenuDocument(),
   },
 };
@@ -50,6 +52,7 @@ describe("fetchServerMenus", () => {
     const menus = await fetchServerMenus();
     expect(menus).toHaveLength(1);
     expect(menus[0].id).toBe("menu-1");
+    expect(menus[0].access.capabilities).toContain("menus.write");
     expect(fetchMock).toHaveBeenCalledWith("/api/menus", undefined);
   });
 
@@ -103,6 +106,36 @@ describe("error mapping", () => {
   });
 });
 
+describe("fetchCafeMenus", () => {
+  it("reads one café with the membership that answered", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        workspace: {
+          id: "r-1",
+          name: "Sunny Side Café",
+          role: "owner",
+          capabilities: ["menus.read", "menus.write"],
+        },
+        menus: [serverMenuPayload.menu],
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const cafe = await fetchCafeMenus("r-1");
+    expect(cafe.workspace.id).toBe("r-1");
+    expect(cafe.menus[0]?.restaurantId).toBe("r-1");
+    expect(fetchMock).toHaveBeenCalledWith("/api/restaurants/r-1/menus", undefined);
+  });
+
+  it("maps a non-member to not_found, never to an empty list", async () => {
+    vi.stubGlobal("fetch", async () =>
+      jsonResponse({ error: { code: "not_found", message: "That café does not exist." } }, 404)
+    );
+
+    await expect(fetchCafeMenus("r-2")).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
 describe("createServerMenu", () => {
   it("POSTs the document and reports an existing id as exists", async () => {
     const fetchMock = vi.fn(async () =>
@@ -113,8 +146,8 @@ describe("createServerMenu", () => {
     const doc = createSampleMenuDocument();
     await expect(createServerMenu("r-1", doc)).rejects.toMatchObject({ code: "exists" });
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("/api/menus");
-    expect(JSON.parse(String(init.body))).toEqual({ restaurantId: "r-1", doc });
+    expect(url).toBe("/api/restaurants/r-1/menus");
+    expect(JSON.parse(String(init.body))).toEqual({ doc });
   });
 });
 

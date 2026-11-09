@@ -1,3 +1,5 @@
+import type { Capability } from "@/features/tenancy/permissions";
+
 export type AppScreen =
   "capture" | "library" | "orders" | "assistant" | "tables" | "settings" | "editor" | "item";
 
@@ -112,59 +114,6 @@ export function parseAppRoute(input: string | URL): AppRoute {
   return { screen: "capture" };
 }
 
-/**
- * R0 phone nav: the bottom tab bar pins Capture · My menus · Orders, so the
- * R0.3 order monitor keeps a persistent home for its badge. Everything else
- * lives in the More sheet, led by Tables. The glyphs come from the shared
- * icon set in the shell, so this stays pure data tests can pin. Signed out the shell
- * is capture-only (home-screen gates this list: Capture, plus My menus
- * while anonymous drafts exist) — no Orders, no More.
- */
-export interface PhoneTab {
-  id: "capture" | "library" | "orders";
-  label: string;
-}
-
-export function phoneTabs(): PhoneTab[] {
-  return [
-    { id: "capture", label: "Capture" },
-    { id: "library", label: "My menus" },
-    { id: "orders", label: "Orders" },
-  ];
-}
-
-export interface MoreSheetRow {
-  id: "tables" | "assistant" | "settings";
-  label: string;
-  why: string;
-}
-
-/**
- * More-sheet rows in display order: Tables first (R0 promotes tables over
- * orders everywhere — Orders already has its tab), then the Assistant for
- * signed-in accounts where the flag is on (never signed out, whatever the
- * flag says), then Settings. The Settings blurb names Usage so the moved
- * allowance panel stays discoverable.
- */
-export function moreSheetRows(options: {
-  signedIn: boolean;
-  assistantEnabled: boolean;
-}): MoreSheetRow[] {
-  const rows: MoreSheetRow[] = [{ id: "tables", label: "Tables", why: "QR cards per table" }];
-  if (options.signedIn && options.assistantEnabled) {
-    rows.push({ id: "assistant", label: "Assistant", why: "Guided fixes and answers" });
-  }
-  rows.push({ id: "settings", label: "Settings", why: "Restaurant · Team · Usage" });
-  return rows;
-}
-
-/**
- * The app's top-level destinations, derived once so the sidebar (and the
- * phone tab bar's gating) cannot drift. Signed out the shell is capture-only,
- * plus the anonymous working set while it still holds drafts; orders, tables,
- * settings and the assistant need an account. `menuCount` is the number of
- * menus the library is actually showing.
- */
 export type AppSectionId =
   | "capture"
   | "library"
@@ -173,35 +122,173 @@ export type AppSectionId =
   | "tables"
   | "settings";
 
+/**
+ * One section of the shell and the capability that opens it.
+ *
+ * This table is the only place a destination enters the navigation. The
+ * desktop pills, the phone tab bar and the More sheet are all derived from
+ * `availableSections`, so a section added later cannot appear ungated — and a
+ * membership that lacks the capability loses the section everywhere at once.
+ * Pure data so tests can pin the order without rendering the shell.
+ */
 export interface AppSection {
   id: AppSectionId;
   label: string;
-  /** My menus only: how many menus the working set holds. */
+  /** Any one of these opens the section. */
+  capabilities: readonly Capability[];
+  /** Where it lives on a phone: the bottom bar or the More sheet. */
+  phone: "bar" | "more";
+  /** More-sheet position, lower first (the bar keeps `APP_SECTIONS` order). */
+  moreRank?: number;
+  /** The More sheet's one-line reason. */
+  why?: string;
+  /** The bottom bar's glyph; the label carries the accessible name. */
+  icon?: string;
+  /**
+   * Filled in by the shell, never by the table: how many menus the library is
+   * showing in the active café, once that number is a fact.
+   */
   count?: number;
 }
 
-export function appSections(options: {
+/**
+ * Desktop order, which is also the order the guard tries when it has to move
+ * someone off a surface they cannot use. Capture is the owner's home, My menus
+ * the first surface a staff shift can use.
+ *
+ * Flags are not capabilities (the Assistant's release flag is separate), but
+ * every section that needs a permission names it here and nowhere else.
+ */
+export const APP_SECTIONS = [
+  {
+    id: "capture",
+    label: "Capture",
+    capabilities: ["menus.write"],
+    phone: "bar",
+    icon: "📸",
+  },
+  {
+    id: "library",
+    label: "My menus",
+    capabilities: ["menus.read"],
+    phone: "bar",
+    icon: "📚",
+  },
+  {
+    id: "orders",
+    label: "Orders",
+    capabilities: ["orders.read"],
+    phone: "bar",
+    icon: "🧾",
+  },
+  {
+    id: "assistant",
+    label: "Assistant",
+    capabilities: ["assistant.use"],
+    phone: "more",
+    moreRank: 20,
+    why: "Guided fixes and answers",
+  },
+  {
+    id: "tables",
+    label: "Tables",
+    capabilities: ["tables.print", "tables.link"],
+    phone: "more",
+    moreRank: 10,
+    why: "QR cards per table",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    capabilities: ["settings.read"],
+    phone: "more",
+    moreRank: 30,
+    why: "Restaurant · Team · Usage",
+  },
+] as const satisfies readonly AppSection[];
+
+/** Everything the nav needs to know about the person looking at it. */
+export interface SectionAccess {
   signedIn: boolean;
+  /** The active membership's capability answer, never a union of memberships. */
+  can: (capability: Capability) => boolean;
+  /** The Assistant's release flag (its kill switch, A4). */
   assistantEnabled: boolean;
-  menuCount: number;
-}): AppSection[] {
-  const sections: AppSection[] = [{ id: "capture", label: "Capture" }];
-  if (options.signedIn || options.menuCount > 0) {
-    sections.push({
-      id: "library",
-      label: "My menus",
-      ...(options.menuCount > 0 ? { count: options.menuCount } : {}),
-    });
+  /** Signed out only: this browser holds anonymous drafts to continue. */
+  hasWorkingSet: boolean;
+}
+
+/**
+ * The sections this person may see, in desktop order.
+ *
+ * Signed in, only capabilities decide (bar the Assistant's release flag).
+ * Signed out the shell is capture-only, plus My menus while anonymous drafts
+ * exist to continue — no account surface and no More sheet, whatever a stale
+ * capability or the flag says.
+ */
+export function availableSections(access: SectionAccess): AppSection[] {
+  if (!access.signedIn) {
+    return APP_SECTIONS.filter(
+      (section) =>
+        section.id === "capture" || (section.id === "library" && access.hasWorkingSet)
+    );
   }
-  if (options.signedIn) {
-    sections.push({ id: "orders", label: "Orders" });
-    if (options.assistantEnabled) {
-      sections.push({ id: "assistant", label: "Assistant" });
-    }
-    sections.push({ id: "tables", label: "Tables" });
-    sections.push({ id: "settings", label: "Settings" });
+  return APP_SECTIONS.filter((section) => {
+    if (section.id === "assistant" && !access.assistantEnabled) return false;
+    return section.capabilities.some((capability) => access.can(capability));
+  });
+}
+
+/**
+ * R0 phone nav: the bottom tab bar pins the sections marked `bar`, so the
+ * R0.3 order monitor keeps a persistent home for its badge. Everything else
+ * lives in the More sheet, led by Tables. Derived from the filtered list, so
+ * a hidden section cannot survive in either renderer; the glyphs come from
+ * the shared icon set in the shell, so this stays pure data tests can pin.
+ */
+export interface PhoneTab {
+  id: AppSectionId;
+  label: string;
+}
+
+export function phoneTabs(sections: readonly AppSection[]): PhoneTab[] {
+  return sections
+    .filter((section) => section.phone === "bar")
+    .map((section) => ({ id: section.id, label: section.label, icon: section.icon ?? "" }));
+}
+
+export interface MoreSheetRow {
+  id: AppSectionId;
+  label: string;
+  why: string;
+}
+
+/**
+ * More-sheet rows in display order: Tables first (R0 promotes tables over
+ * orders everywhere — Orders already has its tab), then the Assistant, then
+ * Settings. The Settings blurb names Usage so the moved allowance panel
+ * stays discoverable.
+ */
+export function moreSheetRows(sections: readonly AppSection[]): MoreSheetRow[] {
+  return sections
+    .filter((section) => section.phone === "more")
+    .sort((a, b) => (a.moreRank ?? 0) - (b.moreRank ?? 0))
+    .map((section) => ({ id: section.id, label: section.label, why: section.why ?? "" }));
+}
+
+/**
+ * A pill's label. `libraryCount` is null while the count is not a fact yet —
+ * the café map has not answered, or its read failed — so the tab keeps its
+ * plain label instead of printing a number that is about to change.
+ */
+export function sectionTabLabel(
+  section: AppSection,
+  libraryCount: number | null
+): string {
+  if (section.id === "library" && libraryCount !== null && libraryCount > 0) {
+    return `${section.label} (${libraryCount})`;
   }
-  return sections;
+  return section.label;
 }
 
 /**

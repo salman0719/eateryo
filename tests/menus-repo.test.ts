@@ -9,6 +9,7 @@ import {
   MenuRepoError,
   updateMenuForUser,
 } from "@/features/menus/repo";
+import { publishMenuForUser } from "@/features/publishing/repo";
 import { restaurantMembership } from "@/lib/db/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
@@ -47,6 +48,9 @@ describe("menu repo", () => {
     expect(created.id).toBe("menu-import-1");
     expect(created.restaurantId).toBe(restaurantA);
     expect(created.title).toBe(doc.title);
+    // The access answer rides with the menu, so no second read is needed.
+    expect(created.access.role).toBe("owner");
+    expect(created.access.capabilities).toContain("menus.write");
 
     const fetched = await getMenuForUser(db, ownerA, "menu-import-1");
     // Full fidelity: category/item order, inner ids, variants, options,
@@ -65,6 +69,7 @@ describe("menu repo", () => {
 
     const list = await listMenusForUser(db, ownerA);
     expect(list.map((m) => m.id)).toEqual(["menu-import-1"]);
+    expect(list[0]?.access.role).toBe("owner");
   });
 
   it("refuses to create over an existing id (import skips existing)", async () => {
@@ -95,8 +100,9 @@ describe("menu repo", () => {
     ).rejects.toMatchObject({ code: "not_found" });
   });
 
-  it("lets staff read but never write menus", async () => {
-    await createMenuForUser(db, ownerA, restaurantA, sampleDoc("menu-staff-read"));
+  it("shows staff the published revision, never the draft", async () => {
+    const doc = sampleDoc("menu-staff-read");
+    await createMenuForUser(db, ownerA, restaurantA, doc);
     const staff = await seedUser(db, "staff@cafe.test", "Staff");
     // Staff membership granted by the owner, as in the tenancy tests.
     await db.insert(restaurantMembership).values({
@@ -105,18 +111,73 @@ describe("menu repo", () => {
       role: "staff",
     });
 
-    // Read works.
-    const seen = await getMenuForUser(db, staff, "menu-staff-read");
-    expect(seen.id).toBe("menu-staff-read");
-    // Writes do not.
+    // A menu that has never been published does not exist for staff: no
+    // draft document, no library row.
+    await expect(getMenuForUser(db, staff, "menu-staff-read")).rejects.toMatchObject({
+      code: "not_found",
+    });
+    expect(await listMenusForUser(db, staff)).toEqual([]);
+
+    await publishMenuForUser(db, ownerA, "menu-staff-read");
+    const live = await getMenuForUser(db, staff, "menu-staff-read");
+    expect(live.id).toBe("menu-staff-read");
+    expect(live.title).toBe(doc.title);
+    expect(live.access.role).toBe("staff");
+    expect(live.access.capabilities).toContain("menus.read");
+    expect(live.access.capabilities).not.toContain("menus.read_draft");
+    expect(live.access.capabilities).not.toContain("menus.write");
+
+    // The owner edits after publishing: the staff read stays on the snapshot.
+    const ownerCopy = await getMenuForUser(db, ownerA, "menu-staff-read");
+    await updateMenuForUser(
+      db,
+      ownerA,
+      "menu-staff-read",
+      { ...ownerCopy.doc, title: "Draft only" },
+      ownerCopy.updatedAt
+    );
+    const stillLive = await getMenuForUser(db, staff, "menu-staff-read");
+    expect(stillLive.title).toBe(doc.title);
+    expect(stillLive.doc.title).toBe(doc.title);
+    expect((await listMenusForUser(db, staff))[0]?.title).toBe(doc.title);
+
+    // Writes still do not.
     await expect(
-      updateMenuForUser(db, staff, "menu-staff-read", sampleDoc("menu-staff-read"), seen.updatedAt)
+      updateMenuForUser(db, staff, "menu-staff-read", sampleDoc("menu-staff-read"), stillLive.updatedAt)
     ).rejects.toMatchObject({ code: "forbidden" });
     await expect(
       createMenuForUser(db, staff, restaurantA, sampleDoc("menu-staff-create"))
     ).rejects.toMatchObject({ code: "forbidden" });
     await expect(deleteMenuForUser(db, staff, "menu-staff-read")).rejects.toMatchObject({
       code: "forbidden",
+    });
+  });
+
+  it("honours an explicit draft grant, and hides menus from orders-only staff", async () => {
+    const doc = sampleDoc("menu-override");
+    await createMenuForUser(db, ownerA, restaurantA, doc);
+
+    const draftReader = await seedUser(db, "draft-reader@cafe.test", "Draft Reader");
+    await db.insert(restaurantMembership).values({
+      restaurantId: restaurantA,
+      userId: draftReader,
+      role: "staff",
+      permissions: ["menus.read", "menus.read_draft"],
+    });
+    const seen = await getMenuForUser(db, draftReader, "menu-override");
+    expect(seen.doc.title).toBe(doc.title);
+    expect(seen.access.capabilities).toContain("menus.read_draft");
+
+    const ordersOnly = await seedUser(db, "orders-only@cafe.test", "Orders Only");
+    await db.insert(restaurantMembership).values({
+      restaurantId: restaurantA,
+      userId: ordersOnly,
+      role: "staff",
+      permissions: ["orders.read"],
+    });
+    expect(await listMenusForUser(db, ordersOnly)).toEqual([]);
+    await expect(getMenuForUser(db, ordersOnly, "menu-override")).rejects.toMatchObject({
+      code: "not_found",
     });
   });
 

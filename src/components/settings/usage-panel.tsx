@@ -45,7 +45,12 @@ type State =
   | { kind: "error"; message: string }
   | { kind: "ready"; status: LaunchStatus };
 
-export function UsagePanel() {
+/**
+ * Spend is the account's allowance, but the checklist payload it rides on is
+ * read for one café. The caller passes the café Settings is showing; without
+ * one there is nothing to ask for and the panel stays out of the way.
+ */
+export function UsagePanel({ restaurantId }: { restaurantId: string | null }) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -64,9 +69,9 @@ export function UsagePanel() {
   // State is only written from the promise callbacks (never synchronously in
   // the effect), so a load cannot trigger a cascading render.
   useEffect(() => {
-    if (sessionPending || !session?.user) return;
+    if (sessionPending || !session?.user || !restaurantId) return;
     let cancelled = false;
-    fetchLaunchStatus()
+    fetchLaunchStatus(restaurantId)
       .then((status) => {
         if (!cancelled) setState({ kind: "ready", status });
       })
@@ -76,12 +81,13 @@ export function UsagePanel() {
     return () => {
       cancelled = true;
     };
-  }, [fail, sessionPending, session?.user]);
+  }, [fail, restaurantId, sessionPending, session?.user]);
 
   async function retry() {
+    if (!restaurantId) return;
     setState({ kind: "loading" });
     try {
-      setState({ kind: "ready", status: await fetchLaunchStatus() });
+      setState({ kind: "ready", status: await fetchLaunchStatus(restaurantId) });
     } catch (error) {
       fail(error);
     }
@@ -107,6 +113,8 @@ export function UsagePanel() {
   }
 
   if (state.kind === "signed_out") return null;
+  // No café on screen yet: Settings says that itself, so this card waits.
+  if (!restaurantId) return null;
   if (state.kind === "error") {
     return (
       <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">

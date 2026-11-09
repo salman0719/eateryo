@@ -122,7 +122,7 @@ errors, or add lint/type suppressions just to make checks pass.
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
 - `src/components/layout/app-sidebar.tsx`, `sidebar-preference.ts` — the app's
-  left column: destinations from `appSections` (signed-out gating included),
+  left column: destinations from `availableSections` (signed-out gating included),
   the open menu's outline in the edit workspace, the account, and a
   rail/expanded toggle whose choice is remembered. Widths are CSS driven by
   `data-sidebar` on `<html>`, set before paint by the boot script in
@@ -176,6 +176,13 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/features/tenancy/repo.ts`, `src/app/api/restaurants/` —
   ownership-scoped restaurant repository + API (session id only);
   `src/features/tenancy/client.ts` — typed browser client for it
+- `src/features/tenancy/workspace.ts`,
+  `src/components/layout/workspace-switcher.tsx` — the one membership the
+  shell acts in. One sign-in can hold an owner café and a staff café, so the
+  shell asks only the active membership's capabilities (never a union), and
+  Settings/Tables follow the same café instead of keeping a second picker;
+  the choice is a per-account device preference. Tests:
+  `tests/tenancy-workspace.test.ts`.
 - `src/features/tenancy/invitations.ts`, `invite-mailer.ts`,
   `src/app/api/invitations/`, `src/app/invitations/[token]/` — one-time
   email invitations: hash-only tokens, email-match accept, 7-day expiry,

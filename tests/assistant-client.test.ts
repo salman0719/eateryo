@@ -211,6 +211,7 @@ describe("applyAssistantProposal", () => {
     availability: [],
     createdAt: "2026-10-24T09:00:00.000Z",
     updatedAt: "2026-10-24T10:00:00.000Z",
+    access: { role: "owner", capabilities: ["menus.read", "menus.write"] },
     doc,
   };
   const preview = {

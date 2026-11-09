@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { detectNewOrders, mergeBoardOrders } from "@/features/orders/monitor-utils";
+import { fetchStaffOrders } from "@/features/orders/client";
+import {
+  detectNewOrders,
+  mergeBoardOrders,
+  monitorPollScope,
+  monitorScopeKey,
+} from "@/features/orders/monitor-utils";
 import type { Order } from "@/features/orders/schema";
 
 /**
@@ -57,6 +63,72 @@ describe("mergeBoardOrders", () => {
     const incoming = order({ id: "a", status: "served" });
     const merged = mergeBoardOrders([current], [incoming], new Set(["a"]));
     expect(merged[0]?.status).toBe("preparing");
+  });
+});
+
+describe("monitorPollScope", () => {
+  it("polls the one café the shell is acting in", () => {
+    expect(monitorPollScope({ userId: "u1", restaurantId: "cafe-owner", pending: false })).toEqual({
+      kind: "active",
+      restaurantId: "cafe-owner",
+    });
+  });
+
+  it("never polls while the membership read is pending, even with a café on screen", () => {
+    expect(monitorPollScope({ userId: "u1", restaurantId: "cafe-owner", pending: true })).toEqual({
+      kind: "membership-pending",
+    });
+    expect(monitorPollScope({ userId: "u1", restaurantId: null, pending: true })).toEqual({
+      kind: "membership-pending",
+    });
+  });
+
+  it("settles empty when the signed-in person has no café to act in", () => {
+    expect(monitorPollScope({ userId: "u1", restaurantId: null, pending: false })).toEqual({
+      kind: "no-cafe",
+    });
+  });
+
+  it("stays idle when signed out", () => {
+    expect(monitorPollScope({ userId: null, restaurantId: "cafe-staff", pending: false })).toEqual({
+      kind: "signed-out",
+    });
+  });
+});
+
+describe("monitorScopeKey", () => {
+  it("changes with the café, so an owner↔staff switch clears the other board", () => {
+    expect(monitorScopeKey("u1", "cafe-owner")).not.toBe(monitorScopeKey("u1", "cafe-staff"));
+  });
+
+  it("changes with the account", () => {
+    expect(monitorScopeKey("u1", "cafe-a")).not.toBe(monitorScopeKey("u2", "cafe-a"));
+  });
+
+  it("is stable for the same membership, so a re-render is not a reset", () => {
+    expect(monitorScopeKey("u1", "cafe-a")).toBe(monitorScopeKey("u1", "cafe-a"));
+  });
+});
+
+describe("fetchStaffOrders", () => {
+  it("asks for the active café only — never the account-wide board", async () => {
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        calls.push(String(input));
+        return new Response(
+          JSON.stringify({ orders: [], serverTime: "2026-10-24T10:00:00.000Z" }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      })
+    );
+    try {
+      await fetchStaffOrders({ restaurantId: "cafe-staff", limit: 100 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(calls).toEqual(["/api/orders?restaurantId=cafe-staff&limit=100"]);
   });
 });
 

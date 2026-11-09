@@ -3,11 +3,11 @@ import { z } from "zod";
 
 import { menuAvailabilitySchema } from "@/features/availability/schema";
 import {
+  getMenuAvailabilityForUser,
   getRestaurantTimeZoneForMenu,
   setMenuAvailabilityForUser,
   TableRepoError,
 } from "@/features/tables/repo";
-import { getMenuForUser, MenuRepoError } from "@/features/menus/repo";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -65,11 +65,13 @@ export async function GET(_request: Request, { params }: MenuParams) {
   const { menuId } = await params;
   try {
     // Membership-scoped read: other tenants' menus are not_found, never leaked.
-    const menu = await getMenuForUser(getDb(), userId, menuId);
+    // Opening hours are operational, so this deliberately does not project the
+    // menu document — a published-only reader still needs to know the hours.
+    const menu = await getMenuAvailabilityForUser(getDb(), userId, menuId);
     const timeZone = await getRestaurantTimeZoneForMenu(getDb(), menuId);
     return noStore(NextResponse.json({ availability: menu.availability, timeZone }));
   } catch (error) {
-    if (error instanceof MenuRepoError) {
+    if (error instanceof TableRepoError) {
       if (error.code === "not_found") {
         return errorResponse("not_found", error.message, 404);
       }

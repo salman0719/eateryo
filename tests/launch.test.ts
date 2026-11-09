@@ -11,8 +11,8 @@ import { launchSteps, verifiedProgress } from "@/features/launch/steps";
 import { placeOrderFromSlug } from "@/features/orders/repo";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { setRestaurantSlugForUser } from "@/features/tables/repo";
-import { createRestaurant } from "@/features/tenancy/repo";
-import { publishedMenu } from "@/lib/db/schema";
+import { createRestaurant, listRestaurantsForUser } from "@/features/tenancy/repo";
+import { publishedMenu, restaurantMembership } from "@/lib/db/schema";
 import type { TestDb } from "./helpers/pg-test-db";
 
 const holder: { db: TestDb | null; userId: string | null } = { db: null, userId: null };
@@ -105,7 +105,7 @@ describe("launch snapshot", () => {
   }, 30_000);
 
   it("reports an empty account as empty", async () => {
-    await expect(getLaunchSnapshot(db, ownerId)).resolves.toEqual(emptySnapshot);
+    await expect(getLaunchSnapshot(db, ownerId, restaurantId)).resolves.toEqual(emptySnapshot);
   });
 
   it("counts a size-priced item as priced, not as a review item", async () => {
@@ -121,7 +121,7 @@ describe("launch snapshot", () => {
     });
     await createMenuForUser(db, ownerId, restaurantId, doc);
 
-    await expect(getLaunchSnapshot(db, ownerId)).resolves.toMatchObject({
+    await expect(getLaunchSnapshot(db, ownerId, restaurantId)).resolves.toMatchObject({
       menuCount: 1,
       unpricedItems: 0,
       reviewNotes: 0,
@@ -154,7 +154,7 @@ describe("launch snapshot", () => {
       ],
     });
 
-    const snapshot = await getLaunchSnapshot(db, ownerId);
+    const snapshot = await getLaunchSnapshot(db, ownerId, restaurantId);
     expect(snapshot).toMatchObject({
       menuCount: 1,
       publishedCount: 1,
@@ -165,22 +165,64 @@ describe("launch snapshot", () => {
     });
 
     // The other account sees none of it.
-    await expect(getLaunchSnapshot(db, otherId)).resolves.toEqual(emptySnapshot);
+    await expect(getLaunchSnapshot(db, otherId, restaurantId)).resolves.toEqual(emptySnapshot);
+  });
+
+  it("keeps an owner's two cafés apart", async () => {
+    const second = await createRestaurant(db, ownerId, "Second Café");
+    const base = menuDocumentSchema.parse({
+      ...createSampleMenuDocument(),
+      id: "menu-scope-first",
+      title: "First Café Menu",
+    });
+    await createMenuForUser(db, ownerId, restaurantId, base);
+    await createMenuForUser(db, ownerId, second.id, {
+      ...base,
+      id: "menu-scope-second",
+      title: "Second Café Menu",
+    });
+
+    await expect(getLaunchSnapshot(db, ownerId, restaurantId)).resolves.toMatchObject({
+      menuCount: 1,
+    });
+    await expect(getLaunchSnapshot(db, ownerId, second.id)).resolves.toMatchObject({
+      menuCount: 1,
+    });
+
+    await createMenuForUser(db, ownerId, second.id, {
+      ...base,
+      id: "menu-scope-second-2",
+      title: "Second Café Menu 2",
+    });
+    await expect(getLaunchSnapshot(db, ownerId, restaurantId)).resolves.toMatchObject({
+      menuCount: 1,
+    });
+    await expect(getLaunchSnapshot(db, ownerId, second.id)).resolves.toMatchObject({
+      menuCount: 2,
+    });
   });
 });
 
 describe("GET /api/launch", () => {
+  let apiCafeId: string;
+
+  /** The café is part of the request: there is no account-wide answer. */
+  function launchRequest(restaurantId?: string) {
+    const query = restaurantId ? `?restaurantId=${encodeURIComponent(restaurantId)}` : "";
+    return new Request(`http://localhost/api/launch${query}`);
+  }
+
   beforeEach(async () => {
     const { createTestDb, seedUser } = await import("./helpers/pg-test-db");
     const { db } = await createTestDb();
     holder.db = db;
     holder.userId = await seedUser(db, "launch-api@cafe.test", "API Owner");
-    await createRestaurant(db, holder.userId, "API Café");
+    apiCafeId = (await createRestaurant(db, holder.userId, "API Café")).id;
   }, 30_000);
 
   it("returns the checklist state plus this month's usage", async () => {
     const { GET } = await import("@/app/api/launch/route");
-    const response = await GET();
+    const response = await GET(launchRequest(apiCafeId));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("no-store");
     const body = (await response.json()) as {
@@ -198,10 +240,44 @@ describe("GET /api/launch", () => {
     });
   }, 30_000);
 
+  it("refuses a request without a café", async () => {
+    const { GET } = await import("@/app/api/launch/route");
+    const response = await GET(launchRequest());
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe("invalid_body");
+  });
+
+  it("404s a café on another account instead of reading it", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const stranger = await seedUser(holder.db!, "launch-stranger@cafe.test", "Stranger");
+    const theirs = await createRestaurant(holder.db!, stranger, "Stranger Café");
+    const { GET } = await import("@/app/api/launch/route");
+    const response = await GET(launchRequest(theirs.id));
+    expect(response.status).toBe(404);
+    expect((await response.json()).error.code).toBe("not_found");
+  });
+
   it("answers 401 when signed out", async () => {
     holder.userId = null;
     const { GET } = await import("@/app/api/launch/route");
-    const response = await GET();
+    const response = await GET(launchRequest(apiCafeId));
     expect(response.status).toBe(401);
+  });
+
+  it("answers 403 for a staff account: the checklist is the owner's", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const staff = await seedUser(holder.db!, "launch-staff@cafe.test", "Staff");
+    const [place] = await listRestaurantsForUser(holder.db!, holder.userId!);
+    await holder.db!.insert(restaurantMembership).values({
+      restaurantId: place.id,
+      userId: staff,
+      role: "staff",
+    });
+    holder.userId = staff;
+
+    const { GET } = await import("@/app/api/launch/route");
+    const response = await GET(launchRequest(place.id));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe("forbidden");
   });
 });

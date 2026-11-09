@@ -33,7 +33,10 @@ export interface SidebarOutlineItem {
 }
 
 interface AppSidebarProps {
-  /** Top-level destinations, from `appSections`. Empty while the session is unknown. */
+  /**
+   * Top-level destinations, from `availableSections` (the capability table).
+   * Empty while the session is unknown.
+   */
   sections: AppSection[];
   activeSection: AppSectionId | null;
   /** The session read has not answered: identity stays a placeholder, never "Sign in". */

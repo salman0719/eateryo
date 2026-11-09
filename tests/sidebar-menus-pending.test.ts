@@ -3,8 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
-import { appSections } from "@/features/navigation/routes";
+import { availableSections } from "@/features/navigation/routes";
 import { OrderMonitorProvider } from "@/features/orders/monitor";
+import { CAPABILITIES } from "@/features/tenancy/permissions";
 
 /**
  * The sidebar's My menus count is only trustworthy once the account's menu
@@ -17,17 +18,24 @@ function render(options: { menusPending: boolean; count: number; sessionPending?
   const sessionPending = options.sessionPending ?? false;
   const sections = sessionPending
     ? []
-    : appSections({
+    : availableSections({
         signedIn: true,
+        can: (capability) => CAPABILITIES.includes(capability),
         assistantEnabled: false,
-        menuCount: options.count,
-      });
+        hasWorkingSet: true,
+      }).map((section) =>
+        // The shell fills in the library's number, exactly as home-screen does.
+        section.id === "library" ? { ...section, count: options.count } : section
+      );
   return renderToStaticMarkup(
     createElement(
       // The provider requires children in its type; createElement passes them
       // as arguments, so the wrapper's type drops that one prop.
-      OrderMonitorProvider as ComponentType<{ userId: string | null }>,
-      { userId: null },
+      OrderMonitorProvider as ComponentType<{
+        userId: string | null;
+        restaurantId: string | null;
+      }>,
+      { userId: null, restaurantId: null },
       createElement(AppSidebar, {
         sections,
         activeSection: "capture",
