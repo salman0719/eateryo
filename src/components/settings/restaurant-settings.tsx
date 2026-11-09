@@ -11,6 +11,7 @@ import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   addMember,
+  createRestaurant,
   deleteRestaurant,
   fetchMembers,
   fetchPendingInvitations,
@@ -23,6 +24,7 @@ import {
   type PendingInvitation,
 } from "@/features/tenancy/client";
 import { useWorkspace } from "@/features/tenancy/workspace-context";
+import { SyncError } from "@/features/menus/sync";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 /**
@@ -144,6 +146,8 @@ export function RestaurantSettings() {
         </p>
       )}
 
+      <OwnRestaurantCard />
+
       {signedIn && !loadFailed && restaurants !== null && allRestaurants.length === 0 && (
         <GuidanceCard
           title="You don't own a restaurant yet"
@@ -241,6 +245,105 @@ export function RestaurantSettings() {
       )}
       {dialog}
     </div>
+  );
+}
+
+/**
+ * The offer a staff member sees: they are helping at someone else's café and
+ * this account owns none of its own. One café per account, so the card is
+ * only true while the owned list is empty; once a café is added, the switcher
+ * at the top of the page is where the two are traded.
+ */
+function OwnRestaurantCard() {
+  const workspace = useWorkspace();
+  const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<string | null>(null);
+
+  const active = workspace.active;
+  const helping = active?.role === "staff" && workspace.owned.length === 0;
+  const settled = workspace.restaurants !== null && workspace.failedFor === null;
+  // A created café keeps the card until the page is left, so the answer to
+  // "did that work?" is visible even though the offer itself no longer applies.
+  if (!created && (!helping || !settled)) return null;
+
+  async function handleCreate() {
+    const trimmed = name.trim();
+    if (!trimmed || creating) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const restaurant = await createRestaurant(trimmed);
+      workspace.addRestaurant(restaurant);
+      setCreated(restaurant.name);
+      setName("");
+    } catch (cause) {
+      if (cause instanceof SyncError && cause.code === "conflict") {
+        // One café per account: the existing one is the answer, so let the
+        // provider re-read instead of leaving a stale empty owned list.
+        workspace.refresh();
+        setError(
+          "This account already owns a restaurant. It will appear in the switcher at the top."
+        );
+      } else if (cause instanceof SyncError && cause.code === "unauthorized") {
+        setError("Sign in again to add a restaurant.");
+      } else {
+        setError("Could not create the restaurant. Check your connection and try again.");
+      }
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-accent-200 bg-accent-50 p-5">
+      <h3 className="text-sm font-bold tracking-tight text-accent-900">Your own restaurant</h3>
+      {created ? (
+        <p className="mt-1 text-xs leading-5 text-accent-900">
+          “{created}” is on this account. Switch between it and {active?.name ?? "the café you help"}{" "}
+          from the top of the page.
+        </p>
+      ) : (
+        <>
+          <p className="mt-1 text-xs leading-5 text-accent-900">
+            You’re helping at {active?.name ?? "this café"}. Running your own place too? Add it and
+            you can switch between them from the top of the page.
+          </p>
+          <form
+            className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleCreate();
+            }}
+          >
+            <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-accent-900">
+              Restaurant name
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="e.g. Sunny Side Café"
+                maxLength={120}
+                className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={creating || name.trim().length === 0}
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              {creating ? "Creating…" : "Create my restaurant"}
+            </button>
+          </form>
+        </>
+      )}
+      {error && (
+        <p role="alert" className="mt-2 text-xs text-danger-700">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }
 
