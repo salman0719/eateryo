@@ -4,12 +4,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
 
 /**
- * App header. Storage mode is deliberately not pitched here: signed-out
- * visitors see an ordinary Sign in action, and signed-in ones see the
- * account their menus belong to. The editor reports "Saved" and puts where
- * it went in the tooltip (R1 concept diet).
+ * App header for content pages. Storage mode is deliberately not pitched
+ * here: signed-out visitors get the one "Get started" invitation plus an
+ * ordinary Sign in action, and signed-in ones see the account their menus
+ * belong to. The editor reports "Saved" and puts where it went in the
+ * tooltip (R1 concept diet).
+ *
+ * `getStarted` is false on `/launch`: that page is where the link goes, so a
+ * header link back to it would only point at the page already open.
  */
-export function SiteHeader() {
+export function SiteHeader({ getStarted = true }: { getStarted?: boolean } = {}) {
   const { data, isPending } = authClient.useSession();
   const user = data?.user ?? null;
 
@@ -29,10 +33,10 @@ export function SiteHeader() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {!isPending && !user && (
+          {!isPending && !user && getStarted && (
             <a
               href="/launch"
-              className="hidden rounded-lg px-2 py-1 text-[11px] font-semibold text-warning-800 hover:bg-accent-50 hover:text-accent-900 sm:inline"
+              className="shrink-0 rounded-lg bg-accent-700 px-2.5 py-1 text-[11px] font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Get started
             </a>
