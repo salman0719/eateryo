@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   countAnonymousExtractions,
@@ -22,6 +22,21 @@ import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 const NOW = new Date("2026-10-18T12:00:00.000Z");
 const RATES = { GEMINI_INPUT_USD_PER_MTOK: "0.30", GEMINI_OUTPUT_USD_PER_MTOK: "2.50" };
 const GROQ_RATES = { GROQ_INPUT_USD_PER_MTOK: "0.80", GROQ_OUTPUT_USD_PER_MTOK: "4.00" };
+
+// The route reads the session and the lazy client; the repo tests below take
+// their db explicitly and are unaffected by these mocks.
+const holder: { db: TestDb | null; userId: string | null } = { db: null, userId: null };
+
+vi.mock("@/lib/auth/session", () => ({
+  getSessionUserId: vi.fn(async () => holder.userId),
+}));
+
+vi.mock("@/lib/db", () => ({
+  getDb: () => {
+    if (!holder.db) throw new Error("test db not initialised");
+    return holder.db;
+  },
+}));
 
 describe("extraction pricing", () => {
   it("has no cost without both rates — never a guessed price", () => {
@@ -291,5 +306,38 @@ describe("usage ledger", () => {
       new Date("2026-10-18T10:30:00.000Z")
     );
     expect(recent).toBe(1);
+  });
+});
+
+/**
+ * The Settings spend card reads this route instead of the launch checklist,
+ * so its whole point is that it answers without a café — a staff membership
+ * must see its own allowance rather than the checklist's 403.
+ */
+describe("GET /api/usage", () => {
+  beforeEach(async () => {
+    const { db } = await createTestDb();
+    holder.db = db;
+    holder.userId = await seedUser(db, "usage-api@cafe.test", "Usage API");
+  }, 30_000);
+
+  it("answers with both halves for an account that names no café", async () => {
+    const { GET } = await import("@/app/api/usage/route");
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = (await response.json()) as {
+      usage: { requests: number; cap: number; remaining: number };
+      assistant: { messages: number; cap: number; remaining: number };
+    };
+    expect(body.usage).toMatchObject({ requests: 0, remaining: body.usage.cap });
+    expect(body.assistant).toMatchObject({ messages: 0, remaining: body.assistant.cap });
+  }, 30_000);
+
+  it("is still session-gated", async () => {
+    holder.userId = null;
+    const { GET } = await import("@/app/api/usage/route");
+    const response = await GET();
+    expect(response.status).toBe(401);
   });
 });

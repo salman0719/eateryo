@@ -90,10 +90,10 @@ describe("DataControls sign-in gate", () => {
 });
 
 describe("UsagePanel loading", () => {
-  it("skeleton-first: no usage numbers before the account data lands", () => {
+  it("skeleton-first, with no café needed: spend is the account's", () => {
     signIn();
     try {
-      const html = renderToStaticMarkup(createElement(UsagePanel, { restaurantId: "cafe-1" }));
+      const html = renderToStaticMarkup(createElement(UsagePanel));
       expect(html).toContain("Checking your usage");
       expect(html).not.toContain("free extractions used");
     } finally {
