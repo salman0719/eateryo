@@ -230,6 +230,30 @@ function stampRowValues(doc: MenuDocument, updatedAt: Date) {
 }
 
 /**
+ * Project joined rows into the summaries this caller may see. The account
+ * list and the café-scoped list both use it, so a published-only reader's
+ * projection cannot differ between the two.
+ */
+function projectSummaries(rows: readonly MenuWithRole[]): ServerMenuSummary[] {
+  const visible: ServerMenuSummary[] = [];
+  for (const row of rows) {
+    const access = accessFromMembership(row);
+    if (!canReadMenus(access)) continue;
+    if (canSeeDraft(access)) {
+      visible.push(toSummary(row, access));
+      continue;
+    }
+    const live = liveProjection(row);
+    if (live) visible.push(toSummary(row, access, live));
+  }
+  return visible;
+}
+
+function byRecent(a: ServerMenuSummary, b: ServerMenuSummary): number {
+  return b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id);
+}
+
+/**
  * Menus across the caller's restaurants, most recent first.
  *
  * Owners and explicit draft readers see every menu and its draft values;
@@ -244,20 +268,28 @@ export async function listMenusForUser(
   const rows = await menuJoin(db)
     .where(eq(restaurantMembership.userId, userId))
     .orderBy(desc(menu.updatedAt), asc(menu.id));
-  const visible: ServerMenuSummary[] = [];
-  for (const row of rows) {
-    const access = accessFromMembership(row);
-    if (!canReadMenus(access)) continue;
-    if (canSeeDraft(access)) {
-      visible.push(toSummary(row, access));
-      continue;
-    }
-    const live = liveProjection(row);
-    if (live) visible.push(toSummary(row, access, live));
-  }
-  return visible.sort(
-    (a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
-  );
+  return projectSummaries(rows).sort(byRecent);
+}
+
+/**
+ * One café's menus, projected exactly like the account-wide list.
+ *
+ * `null` means the caller is not a member (the route answers 404). A member
+ * who may not read menus gets `[]`, which is an answer rather than an error
+ * and says nothing about drafts they cannot see.
+ */
+export async function listMenusForRestaurant(
+  db: TenancyDb,
+  userId: string,
+  restaurantId: string
+): Promise<ServerMenuSummary[] | null> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) return null;
+  if (!canReadMenus(access)) return [];
+  const rows = await menuJoin(db)
+    .where(and(eq(restaurantMembership.userId, userId), eq(menu.restaurantId, restaurantId)))
+    .orderBy(desc(menu.updatedAt), asc(menu.id));
+  return projectSummaries(rows).sort(byRecent);
 }
 
 /**
