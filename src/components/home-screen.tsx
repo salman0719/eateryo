@@ -74,12 +74,11 @@ import {
 } from "@/features/menu/storage";
 import {
   deleteServerMenu,
+  fetchCafeMenus,
   fetchServerMenu,
-  fetchServerMenus,
   SyncError,
   updateServerMenu,
 } from "@/features/menus/sync";
-import { scopeMenusToCafe } from "@/features/menus/library-scope";
 import {
   fetchLiveMenuDoc,
   fetchPublication,
@@ -124,20 +123,9 @@ import {
   menuAccessById,
   type MenuAccess,
 } from "@/features/tenancy/access";
-import type { Capability } from "@/features/tenancy/permissions";
-import {
-  browserStorage,
-  readStoredWorkspaceKey,
-  resolveActiveWorkspace,
-  workspaceCan,
-  workspaceList,
-  writeStoredWorkspaceKey,
-} from "@/features/tenancy/workspace";
-import {
-  createRestaurant,
-  fetchRestaurants,
-  type RestaurantOption,
-} from "@/features/tenancy/client";
+import { workspaceCan } from "@/features/tenancy/workspace";
+import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
+import { createRestaurant } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
 import {
   clearDraftOrigin,
@@ -164,7 +152,6 @@ import {
 } from "@/features/menus/claim-local-drafts";
 import {
   decideMenuOpen,
-  decideSessionState,
   isSessionGateMessage,
   menuOpenBlockedMessage,
   type SessionState,
@@ -177,11 +164,6 @@ import {
 import { docForRoutedMenu } from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
-
-/** How many automatic retries a failed session read gets before the UI asks. */
-const SESSION_READ_RETRIES = 2;
-/** Delay before each retry, growing linearly (1.5 s, then 3 s). */
-const SESSION_READ_RETRY_MS = 1500;
 
 /** Save status stays one word; `detail` says where the save went. */
 function savedState(detail: string): SaveState {
@@ -240,6 +222,16 @@ function PhoneTabIcon({ id }: { id: AppSectionId }) {
  * in step with the History API.
  */
 export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
+  // The account and the acting membership live one level up, so every screen
+  // (this shell included) asks about the same café.
+  return (
+    <WorkspaceProvider>
+      <HomeShell initialRoute={initialRoute} />
+    </WorkspaceProvider>
+  );
+}
+
+function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // The URL is the source of truth for the main screen and selected menu.
   const [route, setRoute] = useState<AppRoute>(initialRoute);
   const { confirm, dialog } = useConfirm();
@@ -401,34 +393,27 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storageDownRef = useRef(false);
 
-  // Server sync (Step 8): signed in = the account is authoritative, and the
-  // IndexedDB copy stays as the offline cache. Signed out, nothing changes —
-  // the whole local-first flow above keeps working untouched.
-  const {
-    data: session,
-    error: sessionError,
-    isPending: sessionLoading,
-    refetch: refetchSession,
-  } = authClient.useSession();
-  /**
-   * Three answers, not two (015). The session is a request: while it is in
-   * flight — the first read of every page load — or after it failed, nothing
-   * is known, and nothing may be refused or hidden on a guess. `isRefetching`
-   * cannot express that (the first read sets it too), so the decision reads
-   * `pending` and `error` instead. A background refetch keeps `data`, so it
-   * still cannot flash skeletons or unmount in-progress forms.
-   */
-  const sessionState: SessionState = decideSessionState({
-    hasUser: session?.user != null,
-    pending: sessionLoading,
-    error: sessionError ?? null,
-  });
-  /** Waiting on the session: guarded surfaces stay inert, skeletons stay up. */
-  const sessionPending = sessionState === "unknown";
-  /** A read that failed has not answered; offer a retry, not a verdict. */
-  const sessionCheckFailed = sessionPending && sessionError != null;
-  const signedIn = session?.user != null;
-  const accountKey = session?.user?.id ?? null;
+  // The account read and the acting membership belong to the provider above
+  // the shell: one read for every screen. What the shell may do is the active
+  // membership's answer, never a union across cafés.
+  const workspace = useWorkspace();
+  const accountCan = workspace.can;
+  const signedIn = workspace.signedIn;
+  const accountKey = workspace.accountKey;
+  const sessionState = workspace.sessionState;
+  const sessionPending = workspace.sessionPending;
+  const sessionCheckGaveUp = workspace.sessionCheckGaveUp;
+  const userId = workspace.userId;
+  const email = workspace.email;
+  const activeWorkspace = workspace.active;
+  const workspaces = workspace.workspaces;
+  const restaurantList = workspace.restaurants;
+  const restaurantSettledFor = workspace.settledFor;
+  const restaurantFailedFor = workspace.failedFor;
+  const ownedRestaurantsForAccount = workspace.owned;
+  const accountAccessPending = signedIn && workspace.pending;
+  const restaurantsLoading = signedIn && workspace.pending;
+  const switchWorkspace = workspace.switchTo;
   /**
    * The ownership wall's sentence is only true while nobody is known, so it is
    * derived away the moment a session settles signed in — never cleared by an
@@ -437,15 +422,11 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const visibleLibraryError =
     signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
-  /** Automatic retries spent on a failed session read (0 = none yet). */
-  const [sessionRetries, setSessionRetries] = useState(0);
   // Server-evaluated release decisions (A4). Both assistant flags default
   // off, so the tab and panel appear only for a released account or a
   // preview link; the loading state below avoids flashing “unavailable” while
   // the server answers.
-  const { flags: featureFlags, loading: featureFlagsLoading } = useFeatureFlags(
-    session?.user?.id ?? null
-  );
+  const { flags: featureFlags, loading: featureFlagsLoading } = useFeatureFlags(userId);
 
   const signedInRef = useRef(false);
   /** Session state at decision time (a closure may outlive the render). */
@@ -478,29 +459,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const menuAccessRef = useRef<ReadonlyMap<string, MenuAccess>>(new Map());
   const [menuAccess, setMenuAccess] = useState<ReadonlyMap<string, MenuAccess>>(new Map());
-  /** Every restaurant the caller belongs to, with the server's capabilities. */
-  const [restaurants, setRestaurants] = useState<RestaurantOption[] | null>(null);
-  /** Restaurants the caller owns: the targets for moving menus to the account. */
-  const [ownedRestaurants, setOwnedRestaurants] = useState<RestaurantOption[]>([]);
-  /** Which account the list belongs to; a mismatch means it is still loading. */
-  const [ownedRestaurantsFor, setOwnedRestaurantsFor] = useState<string | null>(null);
-  /** Every restaurant the caller belongs to, in any role (claim decisions). */
-  const [restaurantCount, setRestaurantCount] = useState(0);
-  /** Which account the restaurant count belongs to; null until it settles. */
-  const [restaurantCountFor, setRestaurantCountFor] = useState<string | null>(null);
-  /**
-   * Which account's restaurant read *failed* — a third state, because an
-   * error and an in-flight request must not look the same (002). Cleared by
-   * the next successful read.
-   */
-  const [restaurantReadFailedFor, setRestaurantReadFailedFor] = useState<string | null>(null);
-  /**
-   * Which membership the shell acts in (café + role), remembered per account.
-   * Not a permission: it chooses which server-resolved answer to ask for.
-   */
-  const [activeWorkspaceKey, setActiveWorkspaceKey] = useState<string | null>(null);
-  /** Which account the remembered choice was read for; null until it settles. */
-  const [workspaceKeyFor, setWorkspaceKeyFor] = useState<string | null>(null);
   /** Which account the server menu ids belong to; null until a merge settles. */
   const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
   /** Which account's server menu read failed (same third state, menus). */
@@ -595,76 +553,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   useEffect(() => {
     accountMenusReadFailedRef.current = serverMenusReadFailedFor;
   }, [serverMenusReadFailedFor]);
-
-  // A failed session read is not a sign-out (015): retry it twice with a
-  // backing-off delay, then stop asking and let the UI say what it knows. Only
-  // the timer writes state, so a failure never cascades a render.
-  useEffect(() => {
-    if (!sessionCheckFailed || sessionRetries >= SESSION_READ_RETRIES) return;
-    const timer = setTimeout(() => {
-      setSessionRetries((attempts) => attempts + 1);
-      void refetchSession?.();
-    }, SESSION_READ_RETRY_MS * (sessionRetries + 1));
-    return () => clearTimeout(timer);
-  }, [sessionCheckFailed, sessionRetries, refetchSession]);
-
-  /** The retries are spent: keep the wait honest instead of guessing. */
-  const sessionCheckGaveUp = sessionCheckFailed && sessionRetries >= SESSION_READ_RETRIES;
-
-  // Moving a single menu needs the owned restaurants up front, so each
-  // browser-only row can offer its target without opening the move panel.
-  useEffect(() => {
-    if (!signedIn || !accountKey) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const list = await fetchRestaurants();
-        if (cancelled) return;
-        setRestaurants(list);
-        setOwnedRestaurants(list.filter((r) => r.role === "owner"));
-        setOwnedRestaurantsFor(accountKey);
-        setRestaurantCount(list.length);
-        setRestaurantCountFor(accountKey);
-        setRestaurantReadFailedFor(null);
-      } catch {
-        // Best-effort: the move panel shows its own load error, the wizard
-        // explains a failed create, and the server still refuses a move the
-        // caller may not make. Settle the loading state so the wizard can
-        // still offer the form (the request will surface the real error).
-        if (!cancelled) {
-          setRestaurants([]);
-          setOwnedRestaurants([]);
-          setOwnedRestaurantsFor(accountKey);
-          // Unknown, not zero: `restaurantCountFor` stays for the old account
-          // and this marker settles the claim gate as *failed* instead.
-          setRestaurantReadFailedFor(accountKey);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accountKey, signedIn]);
-
-  // The acting membership is a device preference, not server state: read it
-  // once per account and never reuse another account's choice. Until the read
-  // settles the context is unknown, and nothing acts as a guessed café.
-  useEffect(() => {
-    if (!signedIn || !accountKey) {
-      // Deferred like the other account reads: the effect must not set state
-      // synchronously while rendering the frame that decided to read.
-      void Promise.resolve().then(() => {
-        setActiveWorkspaceKey(null);
-        setWorkspaceKeyFor(null);
-      });
-      return;
-    }
-    const remembered = readStoredWorkspaceKey(browserStorage(), accountKey);
-    void Promise.resolve().then(() => {
-      setActiveWorkspaceKey(remembered);
-      setWorkspaceKeyFor(accountKey);
-    });
-  }, [accountKey, signedIn]);
 
   // Display derives from the canonical docs (which carry confirmations),
   // falling back to the raw extraction only for the empty state.
@@ -768,6 +656,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         } catch (localError) {
           if (!signedIn) throw localError;
           const serverMenu = await fetchServerMenu(menuId);
+          rememberMenuCafe(serverMenu.id, serverMenu.restaurantId);
           doc = serverMenu.doc;
           accessHint = serverMenu.access;
           await cacheMenu(doc).catch(() => undefined);
@@ -838,7 +727,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
       replaceServerIds(new Set());
       replaceMenuAccess(new Map());
       setMenuRestaurantById(new Map());
-      setRestaurants(null);
       // The ids and the read that produced them reset together (001): a stale
       // "settled" marker over an empty id set would let the next sign-in paint
       // the same false chip.
@@ -856,10 +744,6 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // that was never moved to the account stays local-only (serverBaseRef
     // stays null), so this cannot loop.
     void refreshLibrary();
-    // Chain onto a merge left over from the previous session instead of
-    // letting the dedupe swallow this one: the chip column waits for a read,
-    // and a skipped start would leave it waiting forever (001).
-    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
     void healStampedDrafts();
     const doc = docRef.current;
     if (doc && serverBaseRef.current === null && !conflictRef.current) {
@@ -869,6 +753,53 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
+  /** Which account+café the shell has already read this session. */
+  const mergedCafeRef = useRef<string | null>(null);
+
+  /**
+   * Café-keyed read: the library is one café's list, so a different membership
+   * starts from a different read, and an account with no café settles empty
+   * instead of waiting forever. Ids and access answers from the previous café
+   * do not describe this one, so they are dropped before the new read.
+   */
+  useEffect(() => {
+    if (!signedIn || !accountKey) {
+      mergedCafeRef.current = null;
+      return;
+    }
+    if (!activeWorkspace) {
+      if (workspace.pending) return;
+      mergedCafeRef.current = `${accountKey}:none`;
+      // Deferred like the other account reads: the effect must not set state
+      // synchronously while rendering the frame that decided it.
+      void Promise.resolve().then(() => {
+        replaceServerIds(new Set());
+        replaceMenuAccess(new Map());
+        setServerMenusFor(accountKey);
+        setServerMenusReadFailedFor(null);
+        setServerMenusReadFor(accountKey);
+        accountMenusSettledRef.current = accountKey;
+      });
+      return;
+    }
+    const key = `${accountKey}:${activeWorkspace.restaurantId}`;
+    if (mergedCafeRef.current === key) return;
+    mergedCafeRef.current = key;
+    // Keep the browser-only answers: a local draft is the caller's own row and
+    // belongs to no café, so it must not become read-only on a switch.
+    replaceServerIds(new Set());
+    replaceMenuAccess(
+      new Map([...menuAccessRef.current].filter(([, access]) => access === "local"))
+    );
+    setServerMenusFor(null);
+    setServerMenusReadFor(null);
+    setServerMenusReadFailedFor(null);
+    accountMenusSettledRef.current = null;
+    // Chain onto a merge left over from the previous café instead of letting
+    // the dedupe swallow this one (001).
+    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
+  }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
+
   function replaceServerIds(next: ReadonlySet<string>) {
     serverIdsRef.current = next;
     setServerIds(next);
@@ -877,6 +808,26 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   function replaceMenuAccess(next: ReadonlyMap<string, MenuAccess>) {
     menuAccessRef.current = next;
     setMenuAccess(next);
+  }
+
+  /**
+   * Which café a menu belongs to, learned from the server's own answer. It
+   * follows the switcher across cafés (a deep link can open another café's
+   * menu) and is never used to filter the library — the café-keyed read
+   * already returns one café's rows.
+   */
+  function rememberMenuCafe(menuId: string, restaurantId: string) {
+    setMenuRestaurantById((current) =>
+      current.get(menuId) === restaurantId ? current : new Map(current).set(menuId, restaurantId)
+    );
+  }
+
+  function rememberMenuCafes(menus: { id: string; restaurantId: string }[]) {
+    setMenuRestaurantById((current) => {
+      const next = new Map(current);
+      for (const menu of menus) next.set(menu.id, menu.restaurantId);
+      return next;
+    });
   }
 
   /** Record one menu's access answer without touching the rest. */
@@ -939,13 +890,16 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    */
   async function mergeAccountMenus() {
     if (!signedInRef.current || mergeRef.current) return;
+    // Café-keyed: the library is one café's list, so the read names the café.
+    // Until it resolves the keyed effect re-runs; an account with no café is
+    // settled there, never here as an empty "read".
+    const restaurantId = activeRestaurantIdRef.current;
+    if (!restaurantId) return;
     const run = (async () => {
       try {
-        const serverMenus = await fetchServerMenus();
+        const { menus: serverMenus } = await fetchCafeMenus(restaurantId);
         replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
-        setMenuRestaurantById(
-          new Map(serverMenus.map((menu) => [menu.id, menu.restaurantId] as const))
-        );
+        rememberMenuCafes(serverMenus);
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
         if (signedInRef.current) {
@@ -1025,6 +979,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         // Signed out mid-flight, offline, or the server DB is unavailable:
         // the local library stands alone. Remember that the read failed so
         // the claim gate can settle as unknown instead of waiting forever.
+        mergedCafeRef.current = null;
         if (signedInRef.current && accountKeyRef.current) {
           setServerMenusReadFailedFor(accountKeyRef.current);
         }
@@ -1294,6 +1249,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     if (!signedInRef.current) return;
     try {
       const serverMenu = await fetchServerMenu(localDoc.id);
+      rememberMenuCafe(localDoc.id, serverMenu.restaurantId);
       const serverAccess = serverMenu.access;
       // A write-capable caller may be editable as soon as access is known. A
       // read-only caller waits for the server's document to replace whatever
@@ -1721,12 +1677,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         return;
       }
       const created = await createRestaurant(target.name);
-      setOwnedRestaurants((current) =>
-        current.some((restaurant) => restaurant.id === created.id) ? current : [...current, created]
-      );
-      setOwnedRestaurantsFor(accountKey);
-      setRestaurantCount((count) => count + 1);
-      setRestaurantCountFor(accountKey);
+      workspace.addRestaurant(created);
       await runLocalDraftClaim(created.id, created.name);
     } catch {
       setClaimError(
@@ -2478,42 +2429,14 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // answered lets the rows name membership (001).
   const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
   const libraryAccountMode = signedIn && serverMenusFor === accountKey;
-  // A list cached from another account is never offered as a move target.
-  const ownedRestaurantsForAccount = ownedRestaurantsFor === accountKey ? ownedRestaurants : [];
-  const restaurantsLoading = signedIn && ownedRestaurantsFor !== accountKey;
   /**
-   * Capability answer for the shell. `null` while the restaurant read is in
-   * flight: a tab is never shown on a guess, and never hidden on one either
-   * (the nav simply waits). A failed read settles as an empty list, and an
-   * account with no café yet keeps every tab so a brand-new owner can start.
+   * The acting café's id, and the same answer for async work that finishes
+   * after the render that decided it. Both come from the provider above the
+   * shell, so the switcher, the tabs and the café-keyed read cannot disagree.
    */
-  const restaurantList: RestaurantOption[] | null = !signedIn
-    ? []
-    : restaurantCountFor === accountKey
-      ? (restaurants ?? [])
-      : restaurantReadFailedFor === accountKey
-        ? []
-        : null;
-  /**
-   * The memberships this account can act in, and the one it is acting in.
-   * Both the restaurant list and the remembered choice must have answered:
-   * an unread context is never treated as the first café's, and no
-   * capability is granted on a guess.
-   *
-   * The shell asks the active membership only, not a union across cafés. An
-   * owner of one café who also works a staff shift at another must not carry
-   * the owner's controls into the staff context — that blend is exactly the
-   * confusion this switch exists to end. Each open menu still carries its
-   * own server-resolved answer, so the editor follows the menu it shows.
-   */
-  const workspaces = workspaceList(restaurantList ?? []);
-  const workspacePending =
-    signedIn && (restaurantList === null || workspaceKeyFor !== accountKey);
-  const activeWorkspace =
-    !signedIn || workspacePending
-      ? null
-      : resolveActiveWorkspace(workspaces, activeWorkspaceKey);
   const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
+  const activeRestaurantIdRef = useRef<string | null>(activeRestaurantId);
+  activeRestaurantIdRef.current = activeRestaurantId;
   // Refresh the sidebar's launch progress when the account, the café, or the
   // screen changes: publishing or a first order moves the count, and the next
   // navigation is when the owner sees it. It asks for the café the shell is
@@ -2552,58 +2475,34 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
    * has no café, so it stays only where the new membership can write.
    */
   function handleSwitchWorkspace(key: string) {
-    if (!accountKey) return;
-    writeStoredWorkspaceKey(browserStorage(), accountKey, key);
-    setActiveWorkspaceKey(key);
-    setWorkspaceKeyFor(accountKey);
+    const target = workspaces.find((entry) => entry.key === key) ?? null;
+    switchWorkspace(key);
 
     const menuId = routeMenuId(route);
     if (!menuId) return;
-    const target = workspaces.find((workspace) => workspace.key === key) ?? null;
     const menuRestaurantId = menuRestaurantById.get(menuId);
     const belongsToTarget = menuRestaurantId
       ? menuRestaurantId === target?.restaurantId
       : workspaceCan(target, "menus.write");
     if (!belongsToTarget) navigateTo({ screen: "library" });
   }
-  const accountAccessPending = signedIn && (restaurantList === null || workspacePending);
-  const accountIsNew = restaurantList !== null && restaurantList.length === 0;
-  function accountCan(capability: Capability): boolean {
-    if (!signedIn || workspacePending || restaurantList === null) return false;
-    if (accountIsNew) return true;
-    return workspaceCan(activeWorkspace, capability);
-  }
   /**
-   * The active café's rows. Server menus name their restaurant; a browser-only
-   * draft names none, so it belongs to a membership that can write and is
-   * hidden on a staff shift. While the menu list has not answered — or the
-   * read failed — the café of every row is unknown, so nothing is hidden on a
-   * guess (and the panel is already skeletoning in the pending case).
+   * The acting café's rows. The account read is café-keyed, so every server
+   * row already belongs here — there is no per-row café to filter on. Only
+   * browser drafts still need a rule: they belong to a membership that can
+   * write, and wait (hidden) on a staff shift until the owner files them.
    */
-  const menuCafesKnown =
-    !signedIn ||
-    (!accountAccessPending &&
-      serverMenusReadFor === accountKey &&
-      serverMenusReadFailedFor !== accountKey);
+  const workspaceMenus =
+    !signedIn || accountCan("menus.write")
+      ? visibleMenus
+      : visibleMenus.filter((menu) => serverIds.has(menu.id));
   /**
-   * The tab's number is a fact about one café, so it waits for the café map:
-   * before that the unfiltered rows would be counted as if they belonged to
-   * the active membership, and the tab would shrink a moment later. Signed
-   * out the working set is the whole list, so it is known already.
+   * The tab's number is a fact about one café, so it waits for that café's
+   * read to settle — answered or failed. Signed out the working set is the
+   * whole list, so it is known already.
    */
-  const libraryCountKnown = !signedIn || menuCafesKnown;
-  const workspaceMenuIds = new Set(
-    signedIn
-      ? scopeMenusToCafe({
-          menuIds: visibleMenus.map((menu) => menu.id),
-          restaurantById: menuRestaurantById,
-          restaurantId: activeWorkspace?.restaurantId ?? null,
-          canWrite: accountCan("menus.write"),
-          known: menuCafesKnown,
-        })
-      : visibleMenus.map((menu) => menu.id)
-  );
-  const workspaceMenus = visibleMenus.filter((menu) => workspaceMenuIds.has(menu.id));
+  const libraryCountKnown =
+    !signedIn || serverMenusReadFor === accountKey || serverMenusReadFailedFor === accountKey;
   // Library rows carry their account state: menus on the server show as
   // synced; the rest are browser-only until moved (or downloaded).
   const libraryMenus = workspaceMenus.map((menu) => ({
@@ -2650,8 +2549,8 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     }),
     restaurants: accountReadState({
       accountKey,
-      settledFor: restaurantCountFor,
-      failedFor: restaurantReadFailedFor,
+      settledFor: restaurantSettledFor,
+      failedFor: restaurantFailedFor,
     }),
   });
   /**
@@ -2669,7 +2568,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         claim: {
           localCount: localOnlyCount,
           accountMenuCount: serverIds.size,
-          restaurantCount,
+          restaurantCount: restaurantList?.length ?? 0,
           ownedRestaurantCount: ownedRestaurantsForAccount.length,
           status: claimStatus,
         },
@@ -2772,17 +2671,13 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
     accountKey !== null &&
     routedMenuRestaurantId !== null &&
     routedMenuRestaurantId !== activeWorkspace?.restaurantId &&
-    workspaces.some((workspace) => workspace.restaurantId === routedMenuRestaurantId);
+    workspaces.some((entry) => entry.restaurantId === routedMenuRestaurantId);
   useEffect(() => {
-    if (!followMenuCafe || !accountKey || !routedMenuRestaurantId) return;
+    if (!followMenuCafe || !routedMenuRestaurantId) return;
     // Deferred like the other account reads: never set state synchronously
     // while rendering the frame that decided to switch.
-    void Promise.resolve().then(() => {
-      writeStoredWorkspaceKey(browserStorage(), accountKey, routedMenuRestaurantId);
-      setActiveWorkspaceKey(routedMenuRestaurantId);
-      setWorkspaceKeyFor(accountKey);
-    });
-  }, [accountKey, followMenuCafe, routedMenuRestaurantId]);
+    void Promise.resolve().then(() => switchWorkspace(routedMenuRestaurantId));
+  }, [followMenuCafe, routedMenuRestaurantId, switchWorkspace]);
 
   /**
    * Every surface follows the one navigation table: a section is visible only
@@ -2905,7 +2800,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
 
   return (
     <OrderMonitorProvider
-      userId={session?.user?.id ?? null}
+      userId={userId}
       restaurantId={activeWorkspace?.restaurantId ?? null}
       pending={sessionPending || accountAccessPending}
     >
@@ -2921,7 +2816,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           activeSection={sectionForScreen(screen)}
           sessionPending={sessionPending}
           signedIn={signedIn}
-          email={session?.user?.email ?? null}
+          email={email}
           onNavigate={(section) => navigateTo({ screen: section })}
           onSignOut={() => void authClient.signOut()}
           outline={sidebarOutline}
@@ -3082,7 +2977,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 await mergeAccountMenus();
               })();
             }}
-            onOwnedChange={setOwnedRestaurants}
+            onOwnedChange={workspace.adoptOwned}
           />
         )}
 
@@ -3119,7 +3014,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           <SettingsPage
             signedIn={signedIn}
             sessionPending={sessionPending}
-            currentUserId={session?.user?.id ?? null}
+            currentUserId={userId}
             focusRestaurantId={activeWorkspace?.restaurantId ?? null}
           />
         )}
@@ -3290,10 +3185,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setSessionRetries(0);
-                  void refetchSession?.();
-                }}
+                onClick={workspace.retrySession}
                 className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 Try again
@@ -3464,7 +3356,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
                 is the last thing in the sheet, under the destinations. */}
             <div className="mt-2 border-t border-line-200 pt-1">
               <p className="truncate px-2 pt-1 text-[11px] text-ink-500">
-                {session?.user?.email}
+                {email}
               </p>
               <button
                 type="button"
