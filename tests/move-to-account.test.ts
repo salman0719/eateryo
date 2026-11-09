@@ -29,9 +29,13 @@ function stubServer(state: ServerState, options: { offline?: boolean } = {}): vo
     const url = String(input);
     const method = init?.method ?? "GET";
 
-    if (method === "POST" && url.endsWith("/api/menus")) {
-      const body = JSON.parse(String(init?.body)) as { restaurantId: string; doc: MenuDocument };
-      state.restaurants.push(body.restaurantId);
+    // The create route names the café in the path; the body carries only the
+    // document, so the "server" reads the target from the URL.
+    const cafePost = method === "POST" ? /^\/api\/restaurants\/([^/]+)\/menus$/.exec(url) : null;
+    if (cafePost) {
+      const restaurantId = decodeURIComponent(cafePost[1] ?? "");
+      const body = JSON.parse(String(init?.body)) as { doc: MenuDocument };
+      state.restaurants.push(restaurantId);
       if (state.menus.has(body.doc.id)) {
         return new Response(
           JSON.stringify({ error: { code: "menu_exists", message: "Already moved." } }),
@@ -43,7 +47,7 @@ function stubServer(state: ServerState, options: { offline?: boolean } = {}): vo
         JSON.stringify({
           menu: {
             id: body.doc.id,
-            restaurantId: body.restaurantId,
+            restaurantId,
             restaurantName: "Sunny Side Café",
             title: body.doc.title,
             currency: body.doc.currency,
@@ -214,7 +218,7 @@ describe("moveLocalMenusToAccount", () => {
     // The "server" rejects menu-broken specifically.
     vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (init?.method === "POST" && url.endsWith("/api/menus")) {
+      if (init?.method === "POST" && /^\/api\/restaurants\/[^/]+\/menus$/.test(url)) {
         const body = JSON.parse(String(init.body)) as { doc: MenuDocument };
         if (body.doc.id === "menu-broken") {
           return new Response(

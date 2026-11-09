@@ -179,6 +179,38 @@ function jsonInit(method: string, body: unknown): RequestInit {
   };
 }
 
+/** The membership block every café-scoped response carries. */
+const workspacePayloadSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  role: z.enum(["owner", "staff"]),
+  capabilities: z.array(z.enum(CAPABILITIES)),
+});
+
+export type WorkspacePayload = z.infer<typeof workspacePayloadSchema>;
+
+export interface CafeMenus {
+  /** Which membership answered, and what it may do on this café. */
+  workspace: WorkspacePayload;
+  menus: ServerMenuSummary[];
+}
+
+/**
+ * One café's menus, most recent revision first — the café-keyed read every
+ * screen uses instead of fetching the whole account and filtering locally.
+ * A non-member gets 404; a member without menu access gets an empty list.
+ */
+export async function fetchCafeMenus(restaurantId: string): Promise<CafeMenus> {
+  return requestJson(
+    `/api/restaurants/${encodeURIComponent(restaurantId)}/menus`,
+    undefined,
+    (payload) =>
+      z
+        .object({ workspace: workspacePayloadSchema, menus: z.array(serverMenuSummarySchema) })
+        .parse(payload)
+  );
+}
+
 /** All menus across the caller's restaurants, most recent revision first. */
 export async function fetchServerMenus(): Promise<ServerMenuSummary[]> {
   return requestJson("/api/menus", undefined, (payload) => {
@@ -195,16 +227,20 @@ export async function fetchServerMenu(menuId: string): Promise<ServerMenu> {
 }
 
 /**
- * Create a server menu. The document's own `id` becomes the row id, so
- * "Move my menus to my account" preserves local ids (import by id).
- * Throws `SyncError("exists")` when the id is already on the server.
+ * Create a server menu in one café. The café is the path and the body is just
+ * `{ doc }`, so a caller cannot read one café's list and write into another.
+ * The document's own `id` becomes the row id, so "Move my menus to my
+ * account" preserves local ids (import by id). Throws `SyncError("exists")`
+ * when the id is already on the server.
  */
 export async function createServerMenu(
   restaurantId: string,
   doc: MenuDocument
 ): Promise<ServerMenu> {
-  return requestJson("/api/menus", jsonInit("POST", { restaurantId, doc }), (payload) =>
-    menuEnvelope.parse(payload).menu
+  return requestJson(
+    `/api/restaurants/${encodeURIComponent(restaurantId)}/menus`,
+    jsonInit("POST", { doc }),
+    (payload) => menuEnvelope.parse(payload).menu
   );
 }
 
