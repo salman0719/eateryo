@@ -42,7 +42,7 @@ const WHAT_YOU_GET = [
 export default function LaunchPage() {
   return (
     <>
-      <SiteHeader />
+      <SiteHeader getStarted={false} />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <p className="inline-flex items-center rounded-full bg-warning-100 px-3 py-1 text-xs font-semibold text-warning-900">
           Free while it lasts — no payment step

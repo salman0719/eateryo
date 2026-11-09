@@ -237,7 +237,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const { confirm, dialog } = useConfirm();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
   const selectedItemId = route.screen === "item" ? route.itemId : null;
-  /** R0 phone nav: the More sheet (Tables · Assistant · Settings · Get started). */
+  /** R0 phone nav: the More sheet (Tables · Assistant · Settings). */
   const [moreOpen, setMoreOpen] = useState(false);
   /**
    * The launch checklist's progress for the sidebar row. `accountKey` travels

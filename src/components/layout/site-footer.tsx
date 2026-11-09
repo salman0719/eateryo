@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-/** Footer for the marketing/legal pages. Plain links, no client JS. */
+/**
+ * Footer for content and app pages. Legal navigation only — the "Get
+ * started" invitation lives in the content header, never here.
+ * Plain links, no client JS.
+ */
 export function SiteFooter() {
   return (
     <footer
@@ -10,9 +14,6 @@ export function SiteFooter() {
       <div className="mx-auto flex h-full w-full max-w-3xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-ink-500 sm:py-0">
         <p>Eateryo — free while it lasts. No payment step anywhere.</p>
         <nav aria-label="Legal" className="flex items-center gap-4">
-          <Link href="/launch" className="hover:text-ink-800">
-            Get started
-          </Link>
           <Link href="/privacy" className="hover:text-ink-800">
             Privacy
           </Link>

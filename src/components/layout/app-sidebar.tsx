@@ -354,17 +354,6 @@ export function AppSidebar({
             Sign in
           </a>
         )}
-        {/* Signed in, the launch checklist row above replaces this link: a
-            returning owner needs progress, not an invitation. Signed out it
-            stays next to Sign in, where it still is the way in. */}
-        {!signedIn && !sessionPending ? (
-          <a
-            href="/launch"
-            className="mt-2 block rounded-lg px-1 py-1 font-semibold text-warning-800 transition-colors hover:bg-accent-50 hover:text-accent-900"
-          >
-            Get started
-          </a>
-        ) : null}
       </div>
 
       {/* The height is the shared --app-bottom-bar-height token, the same one
