@@ -3,21 +3,17 @@
 /**
  * Settings "Usage" (R0.5, moved off `/launch`): this month's extraction and
  * assistant spend against their caps, plus a nudge to spend the remaining
- * free extractions on a real menu photo.
- *
- * Spend is the account's, not a café's, so this card reads `/api/usage` and
- * never names a restaurant. That is what makes it work for every signed-in
- * membership: the launch checklist it used to ride on belongs to the café's
- * owner and 403s for a staff shift, which showed a "could not load" error no
- * retry could clear.
+ * free extractions on a real menu photo. Nothing renders unless signed in —
+ * Settings only mounts it for signed-in accounts anyway, and the launch API
+ * 401s without a session.
  */
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import type { AssistantSpendSummary } from "@/features/assistant/schema";
-import { fetchUsage } from "@/features/usage/client";
+import { fetchLaunchStatus } from "@/features/launch/client";
+import type { LaunchStatus } from "@/features/launch/schema";
 import type { UsageSummary } from "@/features/usage/schema";
 import { formatMicroUsd } from "@/features/usage/pricing";
 import { authClient } from "@/lib/auth-client";
@@ -47,9 +43,14 @@ type State =
   | { kind: "loading" }
   | { kind: "signed_out" }
   | { kind: "error"; message: string }
-  | { kind: "ready"; usage: UsageSummary; assistant: AssistantSpendSummary };
+  | { kind: "ready"; status: LaunchStatus };
 
-export function UsagePanel() {
+/**
+ * Spend is the account's allowance, but the checklist payload it rides on is
+ * read for one café. The caller passes the café Settings is showing; without
+ * one there is nothing to ask for and the panel stays out of the way.
+ */
+export function UsagePanel({ restaurantId }: { restaurantId: string | null }) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -68,11 +69,11 @@ export function UsagePanel() {
   // State is only written from the promise callbacks (never synchronously in
   // the effect), so a load cannot trigger a cascading render.
   useEffect(() => {
-    if (sessionPending || !session?.user) return;
+    if (sessionPending || !session?.user || !restaurantId) return;
     let cancelled = false;
-    fetchUsage()
-      .then((data) => {
-        if (!cancelled) setState({ kind: "ready", ...data });
+    fetchLaunchStatus(restaurantId)
+      .then((status) => {
+        if (!cancelled) setState({ kind: "ready", status });
       })
       .catch((error: unknown) => {
         if (!cancelled) fail(error);
@@ -80,12 +81,13 @@ export function UsagePanel() {
     return () => {
       cancelled = true;
     };
-  }, [fail, sessionPending, session?.user]);
+  }, [fail, restaurantId, sessionPending, session?.user]);
 
   async function retry() {
+    if (!restaurantId) return;
     setState({ kind: "loading" });
     try {
-      setState({ kind: "ready", ...(await fetchUsage()) });
+      setState({ kind: "ready", status: await fetchLaunchStatus(restaurantId) });
     } catch (error) {
       fail(error);
     }
@@ -111,6 +113,8 @@ export function UsagePanel() {
   }
 
   if (state.kind === "signed_out") return null;
+  // No café on screen yet: Settings says that itself, so this card waits.
+  if (!restaurantId) return null;
   if (state.kind === "error") {
     return (
       <div className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
@@ -127,7 +131,8 @@ export function UsagePanel() {
     );
   }
 
-  const { usage, assistant } = state;
+  const usage = state.status.usage;
+  if (!usage) return null;
   const nudge = extractNudge(usage);
   const used = usage.requests;
   const percent = Math.min(100, Math.round((used / usage.cap) * 100));
@@ -192,17 +197,19 @@ export function UsagePanel() {
         Failed attempts that reached the AI still count: the provider bills them.
       </p>
 
-      {assistant.messages > 0 ? (
+      {state.status.assistant.messages > 0 ? (
         <div className="mt-4 border-t border-line-100 pt-3">
           <h4 className="text-xs font-semibold tracking-wide text-ink-700 uppercase">
             Assistant this month
           </h4>
           <p className="mt-1 text-xs text-ink-600">
-            {assistant.messages} of {assistant.cap} messages used
-            {assistant.neurons !== null
-              ? ` · ${Math.round(assistant.neurons).toLocaleString()} neurons`
+            {state.status.assistant.messages} of {state.status.assistant.cap} messages used
+            {state.status.assistant.neurons !== null
+              ? ` · ${Math.round(state.status.assistant.neurons).toLocaleString()} neurons`
               : " · neuron use not reported"}
-            {assistant.costMicros !== null ? ` · ${formatMicroUsd(assistant.costMicros)}` : " · cost unknown"}
+            {state.status.assistant.costMicros !== null
+              ? ` · ${formatMicroUsd(state.status.assistant.costMicros)}`
+              : " · cost unknown"}
           </p>
           <p className="mt-1 text-xs text-ink-400">
             Assistant calls come from the same free Workers AI allocation as extraction; the message

@@ -306,13 +306,11 @@ export function RestaurantSettings({
 
       {/* Account-level, not restaurant-level: usage allowances and the account
           export/delete live here for every signed-in user, including staff
-          and owners who have not picked a restaurant. Usage never names a
-          café, so a staff shift reads its own allowance instead of the
-          owner-only checklist's 403. Both cards self-gate on the session, so
-          there is no dead UI while it resolves. */}
+          and owners who have not picked a restaurant. Both cards self-gate
+          on the session, so there is no dead UI while it resolves. */}
       {signedIn && (
         <>
-          <UsagePanel />
+          <UsagePanel restaurantId={selected?.id ?? null} />
           <DataControls />
         </>
       )}
