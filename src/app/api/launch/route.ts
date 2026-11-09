@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { getAssistantSpendSummary } from "@/features/assistant/repo";
-import { getLaunchSnapshot } from "@/features/launch/repo";
+import { readLaunchStatus } from "@/features/launch/repo";
 import { listRestaurantsForUser } from "@/features/tenancy/repo";
 import { hasCapability } from "@/features/tenancy/permissions";
-import { getMonthlyUsageSummary } from "@/features/usage/repo";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { reportError } from "@/lib/observability/alerts";
@@ -81,12 +79,9 @@ export async function GET(request: Request): Promise<NextResponse> {
         { status: 403 }
       );
     }
-    const [snapshot, usage, assistant] = await Promise.all([
-      getLaunchSnapshot(db, userId, restaurantId),
-      getMonthlyUsageSummary(db, userId),
-      getAssistantSpendSummary(db, userId),
-    ]);
-    const response = NextResponse.json({ launch: { ...snapshot, usage, assistant } });
+    const response = NextResponse.json({
+      launch: await readLaunchStatus(db, userId, restaurantId),
+    });
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {

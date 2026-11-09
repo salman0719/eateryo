@@ -12,12 +12,14 @@
 
 import { and, count, desc, eq, isNotNull } from "drizzle-orm";
 
+import { getAssistantSpendSummary } from "@/features/assistant/repo";
 import { hasAnyPrice } from "@/features/menu/menu-utils";
 import { menuDocumentSchema } from "@/features/menu/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import { getMonthlyUsageSummary } from "@/features/usage/repo";
 import { menu, order, publishedMenu, restaurantMembership } from "@/lib/db/schema";
 
-import type { LaunchSnapshot } from "./schema";
+import type { LaunchSnapshot, LaunchStatus } from "./schema";
 
 export async function getLaunchSnapshot(
   db: TenancyDb,
@@ -82,4 +84,26 @@ export async function getLaunchSnapshot(
     reviewNotes,
     unreadableMenus,
   };
+}
+
+/**
+ * One café's checklist plus the account's two spend halves — the composition
+ * every launch surface serves, so the café-in-path and café-in-query routes
+ * cannot drift.
+ *
+ * The counts belong to the café; the allowances belong to the account. That
+ * split is why spend has its own account-level route
+ * (`/api/account/usage`) and why a staff membership never reads this payload.
+ */
+export async function readLaunchStatus(
+  db: TenancyDb,
+  userId: string,
+  restaurantId: string
+): Promise<LaunchStatus> {
+  const [snapshot, usage, assistant] = await Promise.all([
+    getLaunchSnapshot(db, userId, restaurantId),
+    getMonthlyUsageSummary(db, userId),
+    getAssistantSpendSummary(db, userId),
+  ]);
+  return { ...snapshot, usage, assistant };
 }
