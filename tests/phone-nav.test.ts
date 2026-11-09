@@ -92,8 +92,6 @@ describe("moreSheetRows", () => {
 describe("UsagePanel signed-out gate", () => {
   it("renders nothing without a session", () => {
     sessionState.user = null;
-    expect(
-      renderToStaticMarkup(createElement(UsagePanel, { restaurantId: "cafe-1" }))
-    ).toBe("");
+    expect(renderToStaticMarkup(createElement(UsagePanel, { restaurantId: "cafe-1" }))).toBe("");
   });
 });

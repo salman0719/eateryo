@@ -475,10 +475,7 @@ export const orderEmailLog = pgTable(
   },
   (t) => ({
     orderUnique: uniqueIndex("order_email_log_order_unique").on(t.orderId),
-    restaurantSentIdx: index("order_email_log_restaurant_sent_idx").on(
-      t.restaurantId,
-      t.sentAt
-    ),
+    restaurantSentIdx: index("order_email_log_restaurant_sent_idx").on(t.restaurantId, t.sentAt),
   })
 );
 

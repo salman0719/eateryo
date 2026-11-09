@@ -17,9 +17,9 @@ describe("providerLabel", () => {
 
 describe("describeExtractionSource", () => {
   it("names the vendor and model that read the menu", () => {
-    expect(
-      describeExtractionSource({ provider: "groq", model: "qwen/qwen3.8-27b" })
-    ).toBe("Read by Groq · qwen/qwen3.8-27b");
+    expect(describeExtractionSource({ provider: "groq", model: "qwen/qwen3.8-27b" })).toBe(
+      "Read by Groq · qwen/qwen3.8-27b"
+    );
   });
 
   it("omits the model when none was recorded", () => {

@@ -25,12 +25,10 @@ import { getDb } from "@/lib/db";
  * data, so the route is a shell plus streamed content.
  */
 
-const loadPublishedMenu = cache(
-  async (restaurantSlug: string, menuSlug: string) => {
-    if (!isSlug(restaurantSlug) || !isSlug(menuSlug)) return null;
-    return getPublishedMenuByPath(getDb(), restaurantSlug, menuSlug);
-  }
-);
+const loadPublishedMenu = cache(async (restaurantSlug: string, menuSlug: string) => {
+  if (!isSlug(restaurantSlug) || !isSlug(menuSlug)) return null;
+  return getPublishedMenuByPath(getDb(), restaurantSlug, menuSlug);
+});
 
 export async function generateMetadata({
   params,

@@ -10,13 +10,7 @@
 
 import type { LaunchSnapshot } from "./schema";
 
-export const LAUNCH_STEP_IDS = [
-  "extract",
-  "review",
-  "cards",
-  "publish",
-  "order",
-] as const;
+export const LAUNCH_STEP_IDS = ["extract", "review", "cards", "publish", "order"] as const;
 
 export type LaunchStepId = (typeof LAUNCH_STEP_IDS)[number];
 
@@ -67,7 +61,8 @@ export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
     {
       id: "cards",
       title: "Print the table cards",
-      guidance: "Open the Tables tab and print one card per table; each card covers every open menu.",
+      guidance:
+        "Open the Tables tab and print one card per table; each card covers every open menu.",
       done: false,
       manual: true,
       detail: "Tick this on the device you printed from — we can't see your printer",

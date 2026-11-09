@@ -77,7 +77,9 @@ export function redactValue(value: unknown, depth = 0): unknown {
   if (Array.isArray(value)) {
     // Bound the payload: a log line must stay one readable line.
     const capped = value.slice(0, 20).map((item) => redactValue(item, depth + 1));
-    return value.length > capped.length ? [...capped, `…${value.length - capped.length} more`] : capped;
+    return value.length > capped.length
+      ? [...capped, `…${value.length - capped.length} more`]
+      : capped;
   }
 
   if (typeof value === "object") {

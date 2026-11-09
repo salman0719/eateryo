@@ -62,9 +62,7 @@ describe("accessCan", () => {
 
 describe("restaurantCapabilities", () => {
   it("uses the server's answer when one was sent", () => {
-    expect(restaurantCapabilities({ role: "staff", access: owner })).toEqual(
-      owner.capabilities
-    );
+    expect(restaurantCapabilities({ role: "staff", access: owner })).toEqual(owner.capabilities);
   });
 
   it("falls back to role defaults, never to a write grant", () => {

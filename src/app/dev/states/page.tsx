@@ -51,7 +51,9 @@ export default function StatusStatesDevPage() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <article className="rounded-2xl border border-line-200 bg-surface-base p-4">
                 <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-4">
-                  <p className="text-sm font-semibold text-danger-900">We couldn&apos;t save this menu</p>
+                  <p className="text-sm font-semibold text-danger-900">
+                    We couldn&apos;t save this menu
+                  </p>
                   <p className="mt-1 text-xs leading-5 text-danger-800">
                     The connection dropped before the change reached your account. Your edits are
                     still in this browser.
@@ -64,8 +66,13 @@ export default function StatusStatesDevPage() {
               </article>
 
               <article className="rounded-2xl border border-line-200 bg-surface-base p-4">
-                <div role="alert" className="rounded-xl border border-warning-200 bg-warning-50 p-4">
-                  <p className="text-sm font-semibold text-warning-900">This invitation has expired</p>
+                <div
+                  role="alert"
+                  className="rounded-xl border border-warning-200 bg-warning-50 p-4"
+                >
+                  <p className="text-sm font-semibold text-warning-900">
+                    This invitation has expired
+                  </p>
                   <p className="mt-1 text-xs leading-5 text-warning-900">
                     Ask the restaurant owner to send a new one — this link can no longer be used.
                   </p>
@@ -77,7 +84,10 @@ export default function StatusStatesDevPage() {
               </article>
 
               <article className="rounded-2xl border border-line-200 bg-surface-base p-4">
-                <div role="status" className="rounded-xl border border-success-200 bg-success-50 p-4">
+                <div
+                  role="status"
+                  className="rounded-xl border border-success-200 bg-success-50 p-4"
+                >
                   <p className="text-sm font-semibold text-success-950">You&apos;re in</p>
                   <p className="mt-1 text-xs leading-5 text-success-900">
                     You joined Olive &amp; Ember as staff. Table orders will appear on the board.
@@ -192,7 +202,9 @@ export default function StatusStatesDevPage() {
                   Saving…
                 </span>
               </div>
-              <Caption>accent-700 · success-800 · danger-700 · danger-700 outline · disabled</Caption>
+              <Caption>
+                accent-700 · success-800 · danger-700 · danger-700 outline · disabled
+              </Caption>
             </div>
           </section>
 
@@ -226,8 +238,12 @@ export default function StatusStatesDevPage() {
                     Saved
                   </span>
                 </div>
-                <p className="mt-2 text-xs text-warning-800">3 items need review before publishing.</p>
-                <p className="mt-1 text-xs text-info-900">Times are shown in the diner&apos;s zone.</p>
+                <p className="mt-2 text-xs text-warning-800">
+                  3 items need review before publishing.
+                </p>
+                <p className="mt-1 text-xs text-info-900">
+                  Times are shown in the diner&apos;s zone.
+                </p>
                 <Caption>success-800 · warning-800 · info-900 inline text</Caption>
               </div>
             </div>

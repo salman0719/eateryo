@@ -69,9 +69,9 @@ describe("application routes", () => {
     const message = unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "publish" });
     expect(message).toContain("without your draft");
     expect(message).toContain("original browser");
-    expect(
-      unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })
-    ).toContain("deleted or moved");
+    expect(unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })).toContain(
+      "deleted or moved"
+    );
     expect(unresolvableMenuMessage({ screen: "library" })).toContain("deleted or moved");
   });
 

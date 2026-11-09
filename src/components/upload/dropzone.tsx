@@ -74,8 +74,8 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
           Drag &amp; drop your menu images here
         </p>
         <p className="mt-1 text-sm text-ink-600">
-          or <span className="font-medium text-accent-800 underline">browse files</span> — JPEG, PNG,
-          WebP, AVIF, or HEIC, up to 4&nbsp;MB each (max 4 pages, merged into one menu)
+          or <span className="font-medium text-accent-800 underline">browse files</span> — JPEG,
+          PNG, WebP, AVIF, or HEIC, up to 4&nbsp;MB each (max 4 pages, merged into one menu)
         </p>
       </div>
       <input

@@ -2,11 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { menuDocumentSchema } from "@/features/menu/schema";
-import {
-  createMenuForUser,
-  listMenusForRestaurant,
-  MenuRepoError,
-} from "@/features/menus/repo";
+import { createMenuForUser, listMenusForRestaurant, MenuRepoError } from "@/features/menus/repo";
 import { can } from "@/features/tenancy/policy";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
 import { workspacePayload } from "@/features/tenancy/workspace-server";
@@ -95,9 +91,7 @@ export async function GET(
       return errorResponse("not_found", "That café does not exist.", 404);
     }
     const menus = await listMenusForRestaurant(db, userId, restaurantId);
-    return noStore(
-      NextResponse.json({ workspace: workspacePayload(workspace), menus })
-    );
+    return noStore(NextResponse.json({ workspace: workspacePayload(workspace), menus }));
   } catch {
     return errorResponse("server_db_unavailable", "Could not load menus. Try again.", 503);
   }

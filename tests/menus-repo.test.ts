@@ -91,7 +91,13 @@ describe("menu repo", () => {
       code: "not_found",
     });
     await expect(
-      updateMenuForUser(db, ownerB, "menu-private", sampleDoc("menu-private"), new Date().toISOString())
+      updateMenuForUser(
+        db,
+        ownerB,
+        "menu-private",
+        sampleDoc("menu-private"),
+        new Date().toISOString()
+      )
     ).rejects.toMatchObject({ code: "not_found" });
     expect(await deleteMenuForUser(db, ownerB, "menu-private")).toBe(false);
     // And cannot create into a restaurant they don't own.
@@ -143,7 +149,13 @@ describe("menu repo", () => {
 
     // Writes still do not.
     await expect(
-      updateMenuForUser(db, staff, "menu-staff-read", sampleDoc("menu-staff-read"), stillLive.updatedAt)
+      updateMenuForUser(
+        db,
+        staff,
+        "menu-staff-read",
+        sampleDoc("menu-staff-read"),
+        stillLive.updatedAt
+      )
     ).rejects.toMatchObject({ code: "forbidden" });
     await expect(
       createMenuForUser(db, staff, restaurantA, sampleDoc("menu-staff-create"))

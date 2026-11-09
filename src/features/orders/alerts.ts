@@ -84,10 +84,7 @@ export async function updateOrderAlertPrefsForOwner(
 }
 
 /** Account emails of every owner — the default recipients. Internal use. */
-export async function listOwnerEmails(
-  db: TenancyDb,
-  restaurantId: string
-): Promise<string[]> {
+export async function listOwnerEmails(db: TenancyDb, restaurantId: string): Promise<string[]> {
   const rows = await db
     .select({ email: userTable.email })
     .from(restaurantMembership)
@@ -102,8 +99,7 @@ export async function listOwnerEmails(
 }
 
 export type OrderEmailAttempt =
-  | { mailed: true }
-  | { mailed: false; reason: "duplicate" | "digest" };
+  { mailed: true } | { mailed: false; reason: "duplicate" | "digest" };
 
 /**
  * Idempotent send gate: records the email for this order, or refuses with
@@ -122,10 +118,7 @@ export async function recordOrderEmailAttempt(
     .select({ id: orderEmailLog.id })
     .from(orderEmailLog)
     .where(
-      and(
-        eq(orderEmailLog.restaurantId, restaurantId),
-        gte(orderEmailLog.sentAt, windowStart)
-      )
+      and(eq(orderEmailLog.restaurantId, restaurantId), gte(orderEmailLog.sentAt, windowStart))
     );
   if (recent.length >= ORDER_EMAIL_DIGEST_THRESHOLD) {
     return { mailed: false, reason: "digest" };

@@ -4,12 +4,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { restaurant, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole, RestaurantWithRole } from "@/lib/db/schema";
 import { recordAuditEvent } from "./audit";
-import {
-  accessFromMembership,
-  can,
-  getMembershipAccess,
-  type MembershipAccess,
-} from "./policy";
+import { accessFromMembership, can, getMembershipAccess, type MembershipAccess } from "./policy";
 
 /**
  * Tenancy repository — every function is scoped by `userId` so a signed-in
@@ -210,11 +205,7 @@ const memberSelect = (db: TenancyDb) =>
  * Owner gate for member management. Non-members get `not_found` (ids stay
  * unprobeable across tenants), staff gets `forbidden`.
  */
-async function requireOwner(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<void> {
+async function requireOwner(db: TenancyDb, userId: string, restaurantId: string): Promise<void> {
   const access = await getMembershipAccess(db, userId, restaurantId);
   if (!access) throw new TenancyRepoError("not_found", "That restaurant does not exist.");
   if (!can(access, "team.manage")) {
@@ -271,7 +262,10 @@ export async function addMemberForOwner(
     );
   }
   if (await getMember(db, restaurantId, target.id)) {
-    throw new TenancyRepoError("already_member", "That account already belongs to this restaurant.");
+    throw new TenancyRepoError(
+      "already_member",
+      "That account already belongs to this restaurant."
+    );
   }
   // An account owns at most one café (006); they can still join as staff.
   if (role === "owner" && (await ownsAnyRestaurant(db, target.id))) {
@@ -285,7 +279,10 @@ export async function addMemberForOwner(
     await db.insert(restaurantMembership).values({ restaurantId, userId: target.id, role });
   } catch {
     // Unique (restaurant, user) index — a concurrent add won the race.
-    throw new TenancyRepoError("already_member", "That account already belongs to this restaurant.");
+    throw new TenancyRepoError(
+      "already_member",
+      "That account already belongs to this restaurant."
+    );
   }
   await recordAuditEvent(db, {
     restaurantId,
@@ -352,7 +349,8 @@ export async function updateMemberRoleForOwner(
       );
   }
   const changed = await getMember(db, restaurantId, targetUserId);
-  if (!changed) throw new TenancyRepoError("not_found", "That member does not belong to this restaurant.");
+  if (!changed)
+    throw new TenancyRepoError("not_found", "That member does not belong to this restaurant.");
   await recordAuditEvent(db, {
     restaurantId,
     actorUserId: userId,

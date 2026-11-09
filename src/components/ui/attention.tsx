@@ -65,16 +65,11 @@ export function Attention({
     wasActive.current = active;
   }, [active, scroll, scrollBlock]);
 
-  const cls = [className, pulse && active ? ATTENTION_PULSE_CLASS : ""]
-    .filter(Boolean)
-    .join(" ");
+  const cls = [className, pulse && active ? ATTENTION_PULSE_CLASS : ""].filter(Boolean).join(" ");
 
   if (inline) {
     return (
-      <span
-        ref={ref as React.RefObject<HTMLSpanElement>}
-        className={cls || undefined}
-      >
+      <span ref={ref as React.RefObject<HTMLSpanElement>} className={cls || undefined}>
         {children}
       </span>
     );

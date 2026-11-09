@@ -179,9 +179,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     return (
       <Shell>
         <div className={`${frame} p-8`}>
-          <p className="text-lg font-semibold text-ink-900">
-            This menu isn&apos;t on this device
-          </p>
+          <p className="text-lg font-semibold text-ink-900">This menu isn&apos;t on this device</p>
           <p className="mt-2 text-sm leading-6 text-ink-600">
             Menus are stored in the browser that created them. This link points at a menu saved
             somewhere else — table links work on the device holding the menu, or anywhere the same

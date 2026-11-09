@@ -67,9 +67,7 @@ export function sameDietaryLabels(a: readonly string[], b: readonly string[]): b
  * (so a steady menu keeps a stable order as the owner types). Labels already
  * in use are never repeated by the starter vocabulary.
  */
-export function dietaryLabelVocabulary(
-  docs: readonly DietaryLabelSource[]
-): string[] {
+export function dietaryLabelVocabulary(docs: readonly DietaryLabelSource[]): string[] {
   const counts = new Map<string, { label: string; count: number }>();
   for (const doc of docs) {
     for (const category of doc.categories) {

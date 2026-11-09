@@ -114,10 +114,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [sessionRetries, setSessionRetries] = useState(0);
   useEffect(() => {
     if (!sessionCheckFailed || sessionRetries >= SESSION_READ_RETRIES) return;
-    const timer = setTimeout(() => {
-      setSessionRetries((attempts) => attempts + 1);
-      void refetchSession?.();
-    }, SESSION_READ_RETRY_MS * (sessionRetries + 1));
+    const timer = setTimeout(
+      () => {
+        setSessionRetries((attempts) => attempts + 1);
+        void refetchSession?.();
+      },
+      SESSION_READ_RETRY_MS * (sessionRetries + 1)
+    );
     return () => clearTimeout(timer);
   }, [sessionCheckFailed, sessionRetries, refetchSession]);
   const sessionCheckGaveUp = sessionCheckFailed && sessionRetries >= SESSION_READ_RETRIES;

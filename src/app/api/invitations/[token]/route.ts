@@ -1,7 +1,11 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { acceptInvitation, getInvitationByToken, InvitationError } from "@/features/tenancy/invitations";
+import {
+  acceptInvitation,
+  getInvitationByToken,
+  InvitationError,
+} from "@/features/tenancy/invitations";
 import { user } from "@/lib/db/schema";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
@@ -42,10 +46,7 @@ function mapInvitationError(error: InvitationError): NextResponse {
   }
 }
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ token: string }> }
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   try {
     const invitation = await getInvitationByToken(getDb(), token);
@@ -69,10 +70,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ token: string }> }
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const crossOrigin = rejectCrossOrigin(request);
   if (crossOrigin) return crossOrigin;
 
@@ -120,6 +118,10 @@ export async function POST(
     return response;
   } catch (error) {
     if (error instanceof InvitationError) return mapInvitationError(error);
-    return errorResponse("server_db_unavailable", "Could not accept the invitation. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not accept the invitation. Try again.",
+      503
+    );
   }
 }

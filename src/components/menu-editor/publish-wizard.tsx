@@ -235,8 +235,8 @@ export function PublishWizard({
               {submitResult?.created.restaurant
                 ? `We created “${submitResult.restaurant.name}” for you — rename it in Settings whenever you like. `
                 : ""}
-              Diners scan a table card and order from this menu; orders land on your board. There
-              is no public menu page, so there is no link to share.
+              Diners scan a table card and order from this menu; orders land on your board. There is
+              no public menu page, so there is no link to share.
             </p>
           </div>
           <button
@@ -253,8 +253,8 @@ export function PublishWizard({
             <div className="rounded-xl border border-line-200 bg-surface-50 p-4">
               <h2 className="text-sm font-semibold text-ink-900">Next: print a table card</h2>
               <p className="mt-1 text-xs leading-5 text-ink-600">
-                One QR per table — each card orders for its table across every open menu. They
-                print from the Tables tab.
+                One QR per table — each card orders for its table across every open menu. They print
+                from the Tables tab.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -455,7 +455,9 @@ export function PublishWizard({
           <PhoneFrame label="What a table card opens">
             <OrderPagePreview
               doc={doc}
-              restaurantName={choice.kind === "existing" || choice.kind === "create" ? choice.name : null}
+              restaurantName={
+                choice.kind === "existing" || choice.kind === "create" ? choice.name : null
+              }
             />
           </PhoneFrame>
           <p className="text-center text-xs text-ink-500">

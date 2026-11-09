@@ -42,7 +42,12 @@ describe("slugifyMenuTitle", () => {
 
 describe("slugCandidates", () => {
   it("offers the base first, then numbered suffixes", () => {
-    expect(slugCandidates("my-cafe", 4)).toEqual(["my-cafe", "my-cafe-2", "my-cafe-3", "my-cafe-4"]);
+    expect(slugCandidates("my-cafe", 4)).toEqual([
+      "my-cafe",
+      "my-cafe-2",
+      "my-cafe-3",
+      "my-cafe-4",
+    ]);
   });
 
   it("keeps suffixed candidates inside the cap", () => {

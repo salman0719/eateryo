@@ -59,9 +59,7 @@ describe("workspaceList", () => {
   });
 
   it("falls back to the role's defaults, never to a write grant", () => {
-    const [staff] = workspaceList([
-      { id: "r-staff", name: "Corner Bakery", role: "staff" },
-    ]);
+    const [staff] = workspaceList([{ id: "r-staff", name: "Corner Bakery", role: "staff" }]);
     expect(staff?.capabilities).toContain("orders.read");
     expect(staff?.capabilities).not.toContain("menus.write");
   });

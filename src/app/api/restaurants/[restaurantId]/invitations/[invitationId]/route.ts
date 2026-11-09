@@ -77,7 +77,11 @@ export async function POST(
     return response;
   } catch (error) {
     if (error instanceof InvitationError) return mapInvitationError(error);
-    return errorResponse("server_db_unavailable", "Could not resend the invitation. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not resend the invitation. Try again.",
+      503
+    );
   }
 }
 
@@ -97,6 +101,10 @@ export async function DELETE(
     return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     if (error instanceof InvitationError) return mapInvitationError(error);
-    return errorResponse("server_db_unavailable", "Could not revoke the invitation. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not revoke the invitation. Try again.",
+      503
+    );
   }
 }
