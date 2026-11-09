@@ -12,7 +12,9 @@ const launchEnvelope = z.object({ launch: launchStatusSchema });
 
 /**
  * One café's checklist. The caller passes the membership the shell is acting
- * in; the API answers 404 for a café on another account and 403 for a shift.
+ * in; the API answers 404 for a café on another account and 403 for a shift
+ * (the checklist is the owner's, so a staff membership gets `forbidden` and
+ * the surfaces render that decision instead of a retry that cannot work).
  */
 export async function fetchLaunchStatus(restaurantId: string): Promise<LaunchStatus> {
   let response: Response;
@@ -32,6 +34,9 @@ export async function fetchLaunchStatus(restaurantId: string): Promise<LaunchSta
 
   if (response.status === 401) {
     throw new SyncError("unauthorized", "Sign in to see your checklist.");
+  }
+  if (response.status === 403) {
+    throw new SyncError("forbidden", "The checklist belongs to the café's owner.");
   }
   if (response.status === 404) {
     throw new SyncError("not_found", "That café is not on this account.");

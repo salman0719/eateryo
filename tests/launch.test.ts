@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { addCategory, addItem, createMenuDocument } from "@/features/menu/menu-utils";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
+import { fetchLaunchStatus } from "@/features/launch/client";
 import { getLaunchSnapshot } from "@/features/launch/repo";
 import type { LaunchSnapshot } from "@/features/launch/schema";
 import { launchSteps, verifiedProgress } from "@/features/launch/steps";
@@ -279,5 +280,69 @@ describe("GET /api/launch", () => {
     const response = await GET(launchRequest(place.id));
     expect(response.status).toBe(403);
     expect((await response.json()).error.code).toBe("forbidden");
+  });
+});
+
+/**
+ * The checklist, and every other caller of this client, decides from the
+ * error code — so the 403 that a staff membership gets must arrive as
+ * `forbidden`, not as a generic "unavailable" with a retry that cannot work.
+ */
+describe("fetchLaunchStatus error mapping", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function jsonResponse(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  it.each([
+    [401, "unauthorized"],
+    [403, "forbidden"],
+    [404, "not_found"],
+    [503, "unavailable"],
+  ] as const)("maps %s to %s", async (status, code) => {
+    vi.stubGlobal(
+      "fetch",
+      async () => jsonResponse({ error: { code: "server_code", message: "nope" } }, status)
+    );
+
+    await expect(fetchLaunchStatus("cafe-1")).rejects.toMatchObject({ code });
+  });
+
+  it("asks for the café it is given, once", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        launch: {
+          menuCount: 0,
+          publishedCount: 0,
+          orderCount: 0,
+          unpricedItems: 0,
+          reviewNotes: 0,
+          unreadableMenus: 0,
+          usage: null,
+          assistant: {
+            periodStart: "2026-10-01T00:00:00.000Z",
+            periodEnd: "2026-11-01T00:00:00.000Z",
+            messages: 0,
+            cap: 300,
+            remaining: 300,
+            neurons: null,
+            costMicros: null,
+            unpricedMessages: 0,
+          },
+        },
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchLaunchStatus("café 1")).resolves.toMatchObject({ menuCount: 0 });
+    expect(fetchMock).toHaveBeenCalledWith("/api/launch?restaurantId=caf%C3%A9+1", {
+      cache: "no-store",
+    });
   });
 });
