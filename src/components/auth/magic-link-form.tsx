@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
+import { DevSignInPanel, useDevSignInLink } from "@/components/auth/dev-sign-in-link";
 import { authClient } from "@/lib/auth-client";
 import { linkExpiryCopy, type WizardLinkSent } from "@/features/publishing/wizard-state";
 
@@ -78,9 +79,6 @@ export function MagicLinkForm({
       : { kind: "idle" }
   );
   const [linkError, setLinkError] = useState<boolean>(readLinkErrorParam);
-  // The captured dev link, tagged with the address it belongs to so a resent
-  // link never shows the previous one while the new one is being fetched.
-  const [devLink, setDevLink] = useState<{ email: string; url: string | null } | null>(null);
   const inputId = useId();
 
   // Ticks the expiry countdown while a link is pending. The clock starts
@@ -109,31 +107,13 @@ export function MagicLinkForm({
   }, [linkError, onSentCleared]);
 
   // Dev bypass: the server parked the link instead of emailing it. Read it
-  // back once; state only changes from the promise callbacks, never inline.
-  // One read per address: the link is single-use, and React's development
-  // double-mount would otherwise spend it on the first call and then report an
-  // expiry that never happened.
-  const devReadRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!devSignIn || status.kind !== "sent") return;
-    const email = status.email;
-    if (devReadRef.current === email) return;
-    devReadRef.current = email;
-    let cancelled = false;
-    fetch(`/api/dev/magic-link?email=${encodeURIComponent(email)}`, { cache: "no-store" })
-      .then(async (response) =>
-        response.ok ? ((await response.json()) as { url?: string }) : null
-      )
-      .then((body) => {
-        if (!cancelled) setDevLink({ email, url: body?.url ?? null });
-      })
-      .catch(() => {
-        if (!cancelled) setDevLink({ email, url: null });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [devSignIn, status]);
+  // back once per request and show it, rather than sending anyone to an inbox
+  // that received nothing.
+  const dev = useDevSignInLink({
+    enabled: devSignIn,
+    email: status.kind === "sent" ? status.email : null,
+    requestKey: status.kind === "sent" ? status.sentAt : null,
+  });
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -149,9 +129,6 @@ export function MagicLinkForm({
       return;
     }
     const sent = { email, sentAt: Date.now() };
-    // A fresh request earns a fresh read: the previous link is spent.
-    devReadRef.current = null;
-    setDevLink(null);
     setStatus({ kind: "sent", ...sent });
     onSent?.(sent);
   }
@@ -159,48 +136,18 @@ export function MagicLinkForm({
   function resetToIdle() {
     onSentCleared?.();
     setLinkError(false);
-    devReadRef.current = null;
-    setDevLink(null);
     setStatus({ kind: "idle" });
   }
 
   if (status.kind === "sent") {
     if (devSignIn) {
-      const settling = devLink?.email !== status.email;
-      const url = settling ? null : devLink.url;
       return (
-        <div className="rounded-xl border border-dashed border-line-400 bg-surface-50 p-4 text-sm text-ink-700">
-          <p className="font-medium">Development sign-in — no email was sent</p>
-          <p className="mt-1">
-            <code className="rounded bg-surface-200 px-1 py-0.5 text-[12px]">DEV_SIGN_IN_BYPASS</code>{" "}
-            is on, so the one-time link for <span className="font-medium">{status.email}</span> is
-            shown here instead of being emailed. It expires in 5 minutes.
-          </p>
-          {settling ? (
-            <p className="mt-3 text-ink-500">Preparing the link…</p>
-          ) : url ? (
-            <a
-              href={url}
-              className="mt-3 inline-block rounded-lg bg-surface-900 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-surface-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-900"
-            >
-              Open the sign-in link
-            </a>
-          ) : (
-            <p
-              role="alert"
-              className="mt-3 rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-danger-800"
-            >
-              Couldn&apos;t read the link back — it may have expired. Send a fresh one.
-            </p>
-          )}
-          <button
-            type="button"
-            className="mt-3 block text-xs text-ink-600 underline underline-offset-2 hover:text-ink-900"
-            onClick={resetToIdle}
-          >
-            Use a different email
-          </button>
-        </div>
+        <DevSignInPanel
+          email={status.email}
+          url={dev.url}
+          settling={dev.settling}
+          onReset={resetToIdle}
+        />
       );
     }
 

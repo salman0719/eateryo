@@ -163,6 +163,11 @@ errors, or add lint/type suppressions just to make checks pass.
   `DEV_SIGN_IN_BYPASS=1` local shortcut: the auth instance parks the freshly
   minted link instead of emailing it and the sign-in page offers it as an
   explicit button, so the browser still walks the real verification route.
+  Every surface that offers a magic link reads the parked link back through
+  `src/components/auth/dev-sign-in-link.tsx` (`useDevSignInLink` +
+  `DevSignInPanel`); a surface that only calls `signIn.magicLink` claims an
+  email was sent while the link sits unread in the store — the invitation
+  page did exactly that until 2026-11-09.
   Off in production whatever the variable says (the flag check returns false
   for `NODE_ENV=production`), never a direct session insert, one read per
   link for the address that asked, five-minute window. The store sits on
