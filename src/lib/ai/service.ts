@@ -17,13 +17,7 @@ import { logEvent } from "../observability/log";
 import { ExtractedMenu, extractedMenuSchema } from "./extraction-schema";
 import { buildExtractionPrompt, buildRepairPrompt } from "./prompts";
 import type { ProviderSlot } from "./provider-config";
-import {
-  addUsage,
-  NO_USAGE,
-  ProviderError,
-  ProviderName,
-  ProviderUsage,
-} from "./provider";
+import { addUsage, NO_USAGE, ProviderError, ProviderName, ProviderUsage } from "./provider";
 
 export { MAX_IMAGE_BYTES, MAX_MENU_PAGES, MAX_TOTAL_IMAGE_BYTES, SUPPORTED_IMAGE_MIME_TYPES };
 
@@ -183,9 +177,7 @@ function validateImages(images: ImageInput[]): NormalizedImage[] {
     // Prefer the real header over the declared type: browsers and camera
     // exports mislabel files (AVIF under .jpg, HEIC with an empty type).
     const sniffed = detectImageMimeType(input.bytes);
-    const declared = SUPPORTED_IMAGE_MIME_TYPES.includes(
-      input.mimeType as SupportedImageMimeType
-    )
+    const declared = SUPPORTED_IMAGE_MIME_TYPES.includes(input.mimeType as SupportedImageMimeType)
       ? (input.mimeType as SupportedImageMimeType)
       : null;
     const mimeType = sniffed ?? declared;
@@ -244,10 +236,7 @@ function eligibleSlots(chain: ProviderSlot[], images: NormalizedImage[]): Provid
 }
 
 /** Explain why no configured vendor can read this upload. */
-function unsupportedForChain(
-  chain: ProviderSlot[],
-  images: NormalizedImage[]
-): ServiceError {
+function unsupportedForChain(chain: ProviderSlot[], images: NormalizedImage[]): ServiceError {
   const pageLimit = Math.max(...chain.map((slot) => slot.maxImages));
   if (images.length > pageLimit) {
     return new ServiceError(
@@ -301,11 +290,7 @@ async function extractWithSlot(
 }
 
 /** Provider failures that another vendor can plausibly recover from. */
-const FALLBACK_PROVIDER_CODES = new Set<ProviderError["code"]>([
-  "auth",
-  "quota",
-  "unavailable",
-]);
+const FALLBACK_PROVIDER_CODES = new Set<ProviderError["code"]>(["auth", "quota", "unavailable"]);
 
 /**
  * Extract one menu from one or more page images, so a menu that spans pages

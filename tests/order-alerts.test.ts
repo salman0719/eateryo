@@ -74,89 +74,89 @@ describe("order alerts", () => {
   });
 
   describe("digest", () => {
-  function emailOrder(overrides: Partial<Order> = {}): Order {
-    return {
-      id: "order-email-1",
-      menuId: "menu-1",
-      menuTitle: "Bistro Four",
-      tableLabel: "4",
-      currency: "USD",
-      note: "Allergy: nuts",
-      lines: [
-        {
-          menuItemId: "item-1",
-          name: "Flat <b>white</b>",
-          variantName: "Large",
-          unitPrice: 4.5,
-          quantity: 2,
-          menuId: null,
-          menuTitle: null,
-        },
-      ],
-      status: "new",
-      createdAt: "2026-10-24T10:00:00.000Z",
-      updatedAt: "2026-10-24T10:00:00.000Z",
-      ...overrides,
-    };
-  }
-
-  function built(overrides: Partial<Order> = {}) {
-    return buildNewOrderEmail({
-      email: "till@cafe.test",
-      restaurantName: "Bistro Four",
-      order: emailOrder(overrides),
-      boardUrl: "https://cafe.test/orders",
-    });
-  }
-
-  it("names the table and totals the lines", () => {
-    const content = built();
-    expect(content.subject).toContain("Table 4");
-    expect(content.subject).toContain("Bistro Four");
-    expect(content.text).toContain("2× Flat <b>white</b> (Large)");
-    expect(content.text).toContain("USD 9.00");
-    expect(content.html).toContain("https://cafe.test/orders");
-  });
-
-  it("escapes item HTML and stays honest about unpriced lines", () => {
-    const content = built({
-      lines: [
-        {
-          menuItemId: "item-9",
-          name: "Market <script>fish</script>",
-          variantName: null,
-          unitPrice: null,
-          quantity: 1,
-          menuId: null,
-          menuTitle: null,
-        },
-      ],
-      note: null,
-    });
-    expect(content.html).not.toContain("<script>");
-    expect(content.html).toContain("Market &lt;script&gt;fish&lt;/script&gt;");
-    expect(content.text).toContain("Total to confirm at the counter");
-  });
-});
-
-describe("order alerts digest", () => {
-  it("skips the mail past the digest threshold inside the window", async () => {
-    for (let i = 0; i < 5; i++) {
-      expect(
-        await recordOrderEmailAttempt(db, restaurantId, `rush-${i}`, "till@cafe.test")
-      ).toEqual({ mailed: true });
+    function emailOrder(overrides: Partial<Order> = {}): Order {
+      return {
+        id: "order-email-1",
+        menuId: "menu-1",
+        menuTitle: "Bistro Four",
+        tableLabel: "4",
+        currency: "USD",
+        note: "Allergy: nuts",
+        lines: [
+          {
+            menuItemId: "item-1",
+            name: "Flat <b>white</b>",
+            variantName: "Large",
+            unitPrice: 4.5,
+            quantity: 2,
+            menuId: null,
+            menuTitle: null,
+          },
+        ],
+        status: "new",
+        createdAt: "2026-10-24T10:00:00.000Z",
+        updatedAt: "2026-10-24T10:00:00.000Z",
+        ...overrides,
+      };
     }
-    expect(await recordOrderEmailAttempt(db, restaurantId, "rush-5", "till@cafe.test")).toEqual({
-      mailed: false,
-      reason: "digest",
+
+    function built(overrides: Partial<Order> = {}) {
+      return buildNewOrderEmail({
+        email: "till@cafe.test",
+        restaurantName: "Bistro Four",
+        order: emailOrder(overrides),
+        boardUrl: "https://cafe.test/orders",
+      });
+    }
+
+    it("names the table and totals the lines", () => {
+      const content = built();
+      expect(content.subject).toContain("Table 4");
+      expect(content.subject).toContain("Bistro Four");
+      expect(content.text).toContain("2× Flat <b>white</b> (Large)");
+      expect(content.text).toContain("USD 9.00");
+      expect(content.html).toContain("https://cafe.test/orders");
     });
-    // A new window lets mail through again.
-    const later = new Date(Date.now() + 11 * 60_000);
-    expect(
-      await recordOrderEmailAttempt(db, restaurantId, "rush-6", "till@cafe.test", later)
-    ).toEqual({ mailed: true });
+
+    it("escapes item HTML and stays honest about unpriced lines", () => {
+      const content = built({
+        lines: [
+          {
+            menuItemId: "item-9",
+            name: "Market <script>fish</script>",
+            variantName: null,
+            unitPrice: null,
+            quantity: 1,
+            menuId: null,
+            menuTitle: null,
+          },
+        ],
+        note: null,
+      });
+      expect(content.html).not.toContain("<script>");
+      expect(content.html).toContain("Market &lt;script&gt;fish&lt;/script&gt;");
+      expect(content.text).toContain("Total to confirm at the counter");
+    });
   });
-});
+
+  describe("order alerts digest", () => {
+    it("skips the mail past the digest threshold inside the window", async () => {
+      for (let i = 0; i < 5; i++) {
+        expect(
+          await recordOrderEmailAttempt(db, restaurantId, `rush-${i}`, "till@cafe.test")
+        ).toEqual({ mailed: true });
+      }
+      expect(await recordOrderEmailAttempt(db, restaurantId, "rush-5", "till@cafe.test")).toEqual({
+        mailed: false,
+        reason: "digest",
+      });
+      // A new window lets mail through again.
+      const later = new Date(Date.now() + 11 * 60_000);
+      expect(
+        await recordOrderEmailAttempt(db, restaurantId, "rush-6", "till@cafe.test", later)
+      ).toEqual({ mailed: true });
+    });
+  });
 
   describe("hook", () => {
     const request = new Request("http://test.local/");

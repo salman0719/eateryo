@@ -8,11 +8,7 @@ import {
   restaurantMembership,
 } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
-import {
-  accessFromMembership,
-  can,
-  getMembershipAccess,
-} from "@/features/tenancy/policy";
+import { accessFromMembership, can, getMembershipAccess } from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { menuSlugSchema } from "@/features/publishing/schema";
 import { isSlug, slugCandidates, slugifyMenuTitle } from "@/features/publishing/slug";
@@ -171,10 +167,7 @@ export async function setMenuAvailabilityForUser(
   // and never shows up as "unpublished changes".
   await db.update(menu).set({ availability: parsed.data }).where(eq(menu.id, menuId));
   if (timeZone !== undefined) {
-    await db
-      .update(restaurant)
-      .set({ timeZone })
-      .where(eq(restaurant.id, row.restaurantId));
+    await db.update(restaurant).set({ timeZone }).where(eq(restaurant.id, row.restaurantId));
   }
   return {
     availability: parsed.data,
@@ -187,7 +180,10 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const candidate = error as { code?: unknown; message?: unknown; cause?: unknown };
   if (candidate.code === "23505") return true;
-  if (typeof candidate.message === "string" && /duplicate key|unique constraint/i.test(candidate.message)) {
+  if (
+    typeof candidate.message === "string" &&
+    /duplicate key|unique constraint/i.test(candidate.message)
+  ) {
     return true;
   }
   return candidate.cause !== error && isUniqueViolation(candidate.cause);

@@ -340,9 +340,7 @@ describe("applyProposalOperations", () => {
       after: "4.25 USD",
     });
     // A price edit never changes the operation list or the counts.
-    expect(edited.preview.operations[0].summary).toBe(
-      proposal.preview.operations[0].summary
-    );
+    expect(edited.preview.operations[0].summary).toBe(proposal.preview.operations[0].summary);
     expect(edited.preview.before).toEqual(proposal.preview.before);
     expect(edited.preview.after).toEqual(proposal.preview.after);
     expect(setProposalOperationPrice(proposal, 0, -1)).toBe(proposal);

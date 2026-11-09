@@ -149,9 +149,7 @@ describe("launch snapshot", () => {
       slug: menuSlug,
       tableLabel: "2",
       note: null,
-      lines: [
-        { menuItemId: doc.categories[0].items[0].id, variantName: "Double", quantity: 1 },
-      ],
+      lines: [{ menuItemId: doc.categories[0].items[0].id, variantName: "Double", quantity: 1 }],
     });
 
     const snapshot = await getLaunchSnapshot(db, ownerId, restaurantId);

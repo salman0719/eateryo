@@ -26,7 +26,9 @@ export function MissingDraftCard({
         <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
           Your draft isn&apos;t in this browser.
         </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">{MISSING_PUBLISH_DRAFT_MESSAGE}</p>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-ink-600">
+          {MISSING_PUBLISH_DRAFT_MESSAGE}
+        </p>
       </div>
 
       <ol className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-5">

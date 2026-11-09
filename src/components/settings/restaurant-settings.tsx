@@ -310,8 +310,8 @@ function OwnRestaurantCard() {
       <h3 className="text-sm font-bold tracking-tight text-accent-900">Your own restaurant</h3>
       {created ? (
         <p className="mt-1 text-xs leading-5 text-accent-900">
-          “{created}” is on this account. Switch between it and {active?.name ?? "the café you help"}{" "}
-          from the top of the page.
+          “{created}” is on this account. Switch between it and{" "}
+          {active?.name ?? "the café you help"} from the top of the page.
         </p>
       ) : (
         <>
@@ -426,9 +426,7 @@ function TeamCard({
     setNotice(null);
     try {
       await resendInvitation(restaurantId, invitation.id);
-      setNotice(
-        `Invitation re-sent to ${invitation.email}. The previous link no longer works.`
-      );
+      setNotice(`Invitation re-sent to ${invitation.email}. The previous link no longer works.`);
     } catch (resendError) {
       setError(
         resendError instanceof Error ? resendError.message : "Could not resend the invitation."
@@ -479,7 +477,9 @@ function TeamCard({
       }
       setAddEmail("");
     } catch (addError) {
-      setError(addError instanceof Error ? addError.message : "Could not add the member. Try again.");
+      setError(
+        addError instanceof Error ? addError.message : "Could not add the member. Try again."
+      );
     } finally {
       setAdding(false);
       // A failed delivery can still leave a pending invitation (the row is
@@ -500,7 +500,9 @@ function TeamCard({
       setMembers((prev) => prev?.map((m) => (m.userId === updated.userId ? updated : m)) ?? prev);
       onTeamChanged();
     } catch (roleError) {
-      setError(roleError instanceof Error ? roleError.message : "Could not change the role. Try again.");
+      setError(
+        roleError instanceof Error ? roleError.message : "Could not change the role. Try again."
+      );
       try {
         // The row must show the server's truth after a refused change.
         setMembers(await fetchMembers(restaurantId));
@@ -528,7 +530,9 @@ function TeamCard({
       onTeamChanged();
     } catch (removeError) {
       setError(
-        removeError instanceof Error ? removeError.message : "Could not remove the member. Try again."
+        removeError instanceof Error
+          ? removeError.message
+          : "Could not remove the member. Try again."
       );
     } finally {
       setMemberBusy(null);
@@ -545,46 +549,46 @@ function TeamCard({
       </p>
 
       {canManage && (
-      <>
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
-          Add by email
-          <input
-            type="email"
-            value={addEmail}
-            onChange={(event) => setAddEmail(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void handleAddMember();
-            }}
-            placeholder="teammate@cafe.com"
-            className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-          />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
-          Role
-          <select
-            value={addRole}
-            onChange={(event) => setAddRole(event.target.value as "owner" | "staff")}
-            className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-          >
-            <option value="staff">Staff</option>
-            <option value="owner">Owner</option>
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => void handleAddMember()}
-          disabled={adding || addEmail.trim().length === 0}
-          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          {adding ? "Adding…" : "Add member"}
-        </button>
-      </div>
-      <p className="mt-1 text-[11px] leading-4 text-ink-400">
-        If they already have an account they join immediately; otherwise we email them a one-time
-        invitation link that accepts on sign-in (expires in 7 days).
-      </p>
-      </>
+        <>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
+              Add by email
+              <input
+                type="email"
+                value={addEmail}
+                onChange={(event) => setAddEmail(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void handleAddMember();
+                }}
+                placeholder="teammate@cafe.com"
+                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
+              Role
+              <select
+                value={addRole}
+                onChange={(event) => setAddRole(event.target.value as "owner" | "staff")}
+                className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                <option value="staff">Staff</option>
+                <option value="owner">Owner</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void handleAddMember()}
+              disabled={adding || addEmail.trim().length === 0}
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              {adding ? "Adding…" : "Add member"}
+            </button>
+          </div>
+          <p className="mt-1 text-[11px] leading-4 text-ink-400">
+            If they already have an account they join immediately; otherwise we email them a
+            one-time invitation link that accepts on sign-in (expires in 7 days).
+          </p>
+        </>
       )}
 
       {error && <p className="mt-2 text-xs text-danger-700">{error}</p>}
@@ -666,9 +670,7 @@ function TeamCard({
             {pending.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink-900">
-                    {invitation.email}
-                  </p>
+                  <p className="truncate text-sm font-medium text-ink-900">{invitation.email}</p>
                   <p className="text-[11px] leading-4 text-ink-500">
                     {invitation.role === "owner" ? "Owner" : "Staff"} · invited by{" "}
                     {invitation.invitedByName.trim() || "a teammate"} · expires{" "}

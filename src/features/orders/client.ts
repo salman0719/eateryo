@@ -126,8 +126,10 @@ function jsonInit(method: string, body: unknown): RequestInit {
 
 /** Place an order from a public table link (no account required). */
 export async function placeOrder(input: PlaceOrderRequest): Promise<Order> {
-  return requestJson("/api/orders", jsonInit("POST", input), (payload) =>
-    orderEnvelope.parse(payload).order
+  return requestJson(
+    "/api/orders",
+    jsonInit("POST", input),
+    (payload) => orderEnvelope.parse(payload).order
   );
 }
 
@@ -135,11 +137,13 @@ export async function placeOrder(input: PlaceOrderRequest): Promise<Order> {
  * Board query. Without `since` it returns the newest orders; with it, every
  * order changed after that server timestamp (status edits included).
  */
-export async function fetchStaffOrders(options: {
-  since?: string | null;
-  restaurantId?: string | null;
-  limit?: number;
-} = {}): Promise<{ orders: Order[]; serverTime: string }> {
+export async function fetchStaffOrders(
+  options: {
+    since?: string | null;
+    restaurantId?: string | null;
+    limit?: number;
+  } = {}
+): Promise<{ orders: Order[]; serverTime: string }> {
   const params = new URLSearchParams();
   if (options.since) params.set("since", options.since);
   if (options.restaurantId) params.set("restaurantId", options.restaurantId);

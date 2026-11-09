@@ -209,7 +209,11 @@ describe("PATCH /api/restaurants/[restaurantId]", () => {
     // Personalized data must never be cached.
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     const payload = await res.json();
-    expect(payload.restaurant).toMatchObject({ id: created.id, name: "Sunny Side Café", role: "owner" });
+    expect(payload.restaurant).toMatchObject({
+      id: created.id,
+      name: "Sunny Side Café",
+      role: "owner",
+    });
 
     const fetched = await getRestaurantForUser(holder.db!, userId, created.id);
     expect(fetched).toMatchObject({ name: "Sunny Side Café" });
@@ -313,15 +317,19 @@ describe("GET /api/restaurants/[restaurantId]/members", () => {
     const owner = await seedUser(holder.db!, "owner@cafe.test", "Owner");
     const created = await createRestaurant(holder.db!, owner, "My cafe");
 
-    const anonymous = await listMembers(asRequest("/api/restaurants/x/members"),
-      restaurantParams(created.id));
+    const anonymous = await listMembers(
+      asRequest("/api/restaurants/x/members"),
+      restaurantParams(created.id)
+    );
     expect(anonymous.status).toBe(401);
     expect((await anonymous.json()).error.code).toBe("unauthorized");
 
     const outsider = await seedUser(holder.db!, "outsider@cafe.test", "Outsider");
     holder.userId = outsider;
-    const denied = await listMembers(asRequest("/api/restaurants/x/members"),
-      restaurantParams(created.id));
+    const denied = await listMembers(
+      asRequest("/api/restaurants/x/members"),
+      restaurantParams(created.id)
+    );
     expect(denied.status).toBe(404);
     expect((await denied.json()).error.code).toBe("not_found");
   });

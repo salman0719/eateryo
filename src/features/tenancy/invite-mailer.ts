@@ -24,10 +24,7 @@ export function publicBaseUrl(request: Request): string {
 }
 
 /** Email a freshly issued invitation token. */
-export async function emailInvitation(
-  created: CreatedInvitation,
-  baseUrl: string
-): Promise<void> {
+export async function emailInvitation(created: CreatedInvitation, baseUrl: string): Promise<void> {
   await sendInvitationEmail({
     email: created.invitation.email,
     restaurantName: created.restaurantName,

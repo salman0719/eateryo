@@ -33,11 +33,7 @@ export function menuSelectionFromPathname(
     const menuId = decodeURIComponent(menuMatch[1]).trim();
     if (!menuId) return null;
     const [, , modeSegment, rawItemId] = menuMatch;
-    if (
-      modeSegment === "reorder" ||
-      modeSegment === "preview" ||
-      modeSegment === "publish"
-    ) {
+    if (modeSegment === "reorder" || modeSegment === "preview" || modeSegment === "publish") {
       return { menuId, mode: modeSegment };
     }
     if (rawItemId !== undefined) {
@@ -114,13 +110,7 @@ export function parseAppRoute(input: string | URL): AppRoute {
   return { screen: "capture" };
 }
 
-export type AppSectionId =
-  | "capture"
-  | "library"
-  | "orders"
-  | "assistant"
-  | "tables"
-  | "settings";
+export type AppSectionId = "capture" | "library" | "orders" | "assistant" | "tables" | "settings";
 
 /**
  * One section of the shell and the capability that opens it.
@@ -229,8 +219,7 @@ export interface SectionAccess {
 export function availableSections(access: SectionAccess): AppSection[] {
   if (!access.signedIn) {
     return APP_SECTIONS.filter(
-      (section) =>
-        section.id === "capture" || (section.id === "library" && access.hasWorkingSet)
+      (section) => section.id === "capture" || (section.id === "library" && access.hasWorkingSet)
     );
   }
   return APP_SECTIONS.filter((section) => {
@@ -281,10 +270,7 @@ export function moreSheetRows(sections: readonly AppSection[]): MoreSheetRow[] {
  * the café map has not answered, or its read failed — so the tab keeps its
  * plain label instead of printing a number that is about to change.
  */
-export function sectionTabLabel(
-  section: AppSection,
-  libraryCount: number | null
-): string {
+export function sectionTabLabel(section: AppSection, libraryCount: number | null): string {
   if (section.id === "library" && libraryCount !== null && libraryCount > 0) {
     return `${section.label} (${libraryCount})`;
   }

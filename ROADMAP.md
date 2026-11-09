@@ -144,7 +144,7 @@ a "changed elsewhere" banner offering an explicit load/keep choice instead
 of silently overwriting. **Live acceptance:** 7 local menus moved intact
 into "My Café" through the real API (ids/order/variants/review notes
 preserved), a re-run reported 0 moved / 7 already-there, and two browser
-tabs converged through *both* conflict resolutions — "Load the server
+tabs converged through _both_ conflict resolutions — "Load the server
 version" adopted the other tab's revision, "Keep my version" overwrote the
 account copy (confirmed in the DB). Source images stay browser-local for
 now — documents (ids, order, variants, prices, review notes) are what
@@ -190,7 +190,7 @@ and a plain not-found page for unknown or unpublished slugs.
 "Bistro Four" through the API and loaded `/r/<restaurant>/m/bistro-four` in a second browser
 tab (bistro theme, 2 categories/2 items, em dashes for unset prices, og title +
 description, `noindex`, view count 0 → 1). Editing the currency then reopening
-the preview showed *Draft changes are not on the public page yet* and the
+the preview showed _Draft changes are not on the public page yet_ and the
 `Draft preview · public page is older` eyebrow while the public page still
 served the old revision; **Publish changes** created revision 2 and the page
 showed the new content with the warning cleared. Renaming the address moved
@@ -219,7 +219,7 @@ variant, and unit price in integer cents, a server-computed `total_cents`
 that is null when any line is unpriced, and a nullable menu link so history
 outlives a deleted menu) and `order_rate_limit` (fixed-window counters keyed
 by a hash of caller + window minute — no raw IP stored). `POST /api/orders`
-is anonymous and resolves every line against the *published snapshot*;
+is anonymous and resolves every line against the _published snapshot_;
 `GET /api/orders` serves the membership-scoped board and returns everything
 changed after `since`; `PATCH /api/orders/[orderId]` moves status forward
 (new → preparing → served, cancel while working) and is conditional on the

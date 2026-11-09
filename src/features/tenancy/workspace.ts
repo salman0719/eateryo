@@ -42,9 +42,7 @@ export interface Workspace {
 }
 
 /** Resolve each membership's capabilities, keeping the server's answer. */
-export function workspaceList(
-  restaurants: readonly WorkspaceRestaurant[]
-): Workspace[] {
+export function workspaceList(restaurants: readonly WorkspaceRestaurant[]): Workspace[] {
   return restaurants.map((restaurant) => ({
     key: restaurant.id,
     restaurantId: restaurant.id,
@@ -68,25 +66,17 @@ export function resolveActiveWorkspace(
     ? workspaces.find((workspace) => workspace.key === storedKey)
     : undefined;
   return (
-    stored ??
-    workspaces.find((workspace) => workspace.role === "owner") ??
-    workspaces[0] ??
-    null
+    stored ?? workspaces.find((workspace) => workspace.role === "owner") ?? workspaces[0] ?? null
   );
 }
 
 /** The one permission question for a chosen membership. */
-export function workspaceCan(
-  workspace: Workspace | null,
-  capability: Capability
-): boolean {
+export function workspaceCan(workspace: Workspace | null, capability: Capability): boolean {
   return workspace !== null && hasCapability(workspace.capabilities, capability);
 }
 
 /** How the switcher names one membership: "Joe's — Owner". */
-export function workspaceLabel(
-  workspace: Pick<Workspace, "name" | "role">
-): string {
+export function workspaceLabel(workspace: Pick<Workspace, "name" | "role">): string {
   return `${workspace.name} — ${workspace.role === "owner" ? "Owner" : "Staff"}`;
 }
 

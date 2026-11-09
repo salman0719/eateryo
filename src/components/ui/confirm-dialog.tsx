@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -43,7 +36,7 @@ export function useConfirm() {
           return { ...options, resolve };
         });
       }),
-    [],
+    []
   );
 
   const answer = useCallback((ok: boolean) => {
@@ -72,7 +65,7 @@ function ConfirmDialog({
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
-    () => false,
+    () => false
   );
 
   // Focus the panel on open and return focus to whatever had it before.
@@ -147,6 +140,6 @@ function ConfirmDialog({
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

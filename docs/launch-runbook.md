@@ -13,20 +13,20 @@ report.
 Set these in Vercel → Project → Environment Variables (production, and preview
 where useful). Secrets stay server-side; none of them may be `NEXT_PUBLIC_`.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `GEMINI_API_KEY` | yes | Extraction via Gemini. |
-| `GROQ_API_KEY` | optional | Extraction via Groq, and failover when the primary vendor is rate-limited or down. `AI_PROVIDER` chooses the primary (default `gemini`); unset `AI_FALLBACK_PROVIDER` means the other configured vendor, `none` disables failover. |
-| `DATABASE_URL` | yes | Neon Postgres. |
-| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | yes | Magic-link sessions. |
-| `RESEND_API_KEY`, `EMAIL_FROM` | yes | Sign-in email and ops alerts. |
-| `UPLOADTHING_TOKEN` | optional | Dish photos on menu items. Without it, photo uploads answer 503 and the editor tells the owner photos are not set up; the rest of the app is unaffected. |
-| `OPS_ALERT_EMAIL` | yes | Where failure/volume alerts land. Without it, alerts only reach the logs. |
-| `CONTACT_EMAIL` | yes | Shown on the privacy and terms pages. |
-| `GEMINI_INPUT_USD_PER_MTOK`, `GEMINI_OUTPUT_USD_PER_MTOK` | recommended | Enables cost for Gemini calls in the spend panel. |
-| `GROQ_INPUT_USD_PER_MTOK`, `GROQ_OUTPUT_USD_PER_MTOK` | recommended with Groq | Same for Groq. A vendor without both rates leaves its calls unpriced, so the panel reports the month's cost as unavailable rather than a partial sum. |
-| `EXTRACTION_MONTHLY_CAP` | optional | The per-account cost brake (default 150/month). |
-| `ORDER_RETENTION_DAYS` | optional | Order history window (default 90). |
+| Variable                                                  | Required              | Purpose                                                                                                                                                                                                                            |
+| --------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                                          | yes                   | Extraction via Gemini.                                                                                                                                                                                                             |
+| `GROQ_API_KEY`                                            | optional              | Extraction via Groq, and failover when the primary vendor is rate-limited or down. `AI_PROVIDER` chooses the primary (default `gemini`); unset `AI_FALLBACK_PROVIDER` means the other configured vendor, `none` disables failover. |
+| `DATABASE_URL`                                            | yes                   | Neon Postgres.                                                                                                                                                                                                                     |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`                   | yes                   | Magic-link sessions.                                                                                                                                                                                                               |
+| `RESEND_API_KEY`, `EMAIL_FROM`                            | yes                   | Sign-in email and ops alerts.                                                                                                                                                                                                      |
+| `UPLOADTHING_TOKEN`                                       | optional              | Dish photos on menu items. Without it, photo uploads answer 503 and the editor tells the owner photos are not set up; the rest of the app is unaffected.                                                                           |
+| `OPS_ALERT_EMAIL`                                         | yes                   | Where failure/volume alerts land. Without it, alerts only reach the logs.                                                                                                                                                          |
+| `CONTACT_EMAIL`                                           | yes                   | Shown on the privacy and terms pages.                                                                                                                                                                                              |
+| `GEMINI_INPUT_USD_PER_MTOK`, `GEMINI_OUTPUT_USD_PER_MTOK` | recommended           | Enables cost for Gemini calls in the spend panel.                                                                                                                                                                                  |
+| `GROQ_INPUT_USD_PER_MTOK`, `GROQ_OUTPUT_USD_PER_MTOK`     | recommended with Groq | Same for Groq. A vendor without both rates leaves its calls unpriced, so the panel reports the month's cost as unavailable rather than a partial sum.                                                                              |
+| `EXTRACTION_MONTHLY_CAP`                                  | optional              | The per-account cost brake (default 150/month).                                                                                                                                                                                    |
+| `ORDER_RETENTION_DAYS`                                    | optional              | Order history window (default 90).                                                                                                                                                                                                 |
 
 ### PARKED: automatic order retention
 

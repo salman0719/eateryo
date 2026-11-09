@@ -7,3 +7,12 @@ coverage/
 public/
 *.min.js
 package-lock.json
+
+# Generated migrations: never hand-edited (AGENTS.md), so never reformatted.
+drizzle/
+
+# Local tool state and the research sandbox are not part of the shipped tree.
+# The sandbox's one tracked file (its README) stays checked.
+.freebuff/
+local/**
+!local/README.md

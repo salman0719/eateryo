@@ -189,9 +189,7 @@ export async function buildAccountExport(
 
   return {
     exportedAt: iso(now),
-    account: account
-      ? { ...account, createdAt: iso(account.createdAt) }
-      : null,
+    account: account ? { ...account, createdAt: iso(account.createdAt) } : null,
     restaurants: restaurantRows.map((row) => ({ ...row, createdAt: iso(row.createdAt) })),
     menus: menuRows.map((row) => ({
       ...row,

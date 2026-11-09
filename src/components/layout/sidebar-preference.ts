@@ -37,17 +37,12 @@ export function defaultSidebarMode(viewportWidth: number): SidebarMode {
  * would set state after paint.
  */
 export function currentSidebarMode(viewportWidth: number): SidebarMode {
-  const applied = parseSidebarMode(
-    document.documentElement.getAttribute(SIDEBAR_MODE_ATTR)
-  );
+  const applied = parseSidebarMode(document.documentElement.getAttribute(SIDEBAR_MODE_ATTR));
   return applied ?? defaultSidebarMode(viewportWidth);
 }
 
 /** The stored choice, else the width's default. */
-export function resolveSidebarMode(input: {
-  stored: unknown;
-  viewportWidth: number;
-}): SidebarMode {
+export function resolveSidebarMode(input: { stored: unknown; viewportWidth: number }): SidebarMode {
   return parseSidebarMode(input.stored) ?? defaultSidebarMode(input.viewportWidth);
 }
 

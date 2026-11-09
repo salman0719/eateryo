@@ -127,7 +127,10 @@ export function ExtractionProgress({
             aria-current="step"
             className="inline-flex items-center gap-1.5 rounded-full bg-accent-700 px-2.5 py-1 text-[11px] font-semibold text-on-accent"
           >
-            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-surface-base" />
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 animate-pulse rounded-full bg-surface-base"
+            />
             Read &amp; draft
           </li>
           <li className="inline-flex items-center gap-1.5 rounded-full bg-surface-base/50 px-2.5 py-1 text-[11px] font-medium text-warning-800/70">

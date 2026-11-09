@@ -31,7 +31,9 @@ export async function DELETE(request: Request): Promise<NextResponse> {
     userId = await getSessionUserId();
   } catch {
     return NextResponse.json(
-      { error: { code: "server_db_unavailable", message: "Account deletion is not available yet." } },
+      {
+        error: { code: "server_db_unavailable", message: "Account deletion is not available yet." },
+      },
       { status: 503 }
     );
   }

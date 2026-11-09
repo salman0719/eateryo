@@ -85,8 +85,9 @@ describe("structured logs", () => {
   it("truncates long strings so a log line stays one line", () => {
     const long = "x".repeat(1000);
     expect(String(redactValue(long)).length).toBeLessThanOrEqual(301);
-    expect(redactValue([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]))
-      .toContain("…1 more");
+    expect(
+      redactValue([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21])
+    ).toContain("…1 more");
   });
 
   it("accepts only id-shaped request ids", () => {
@@ -151,17 +152,20 @@ describe("operator alerts", () => {
   });
 
   it("stays silent when email is not configured, and never throws on failure", async () => {
-    await expect(alertOps({ subject: "s", details: "d", dedupeKey: "unconfigured" }, {})).resolves.toBe(
-      "not_configured"
-    );
+    await expect(
+      alertOps({ subject: "s", details: "d", dedupeKey: "unconfigured" }, {})
+    ).resolves.toBe("not_configured");
     const failing = vi.fn(async () => new Response("nope", { status: 500 }));
     await expect(
-      alertOps({ subject: "s", details: "d", dedupeKey: "failing" }, {
-        fetchImpl: failing,
-        apiKey: "k",
-        from: "a@b.c",
-        to: "ops@b.c",
-      })
+      alertOps(
+        { subject: "s", details: "d", dedupeKey: "failing" },
+        {
+          fetchImpl: failing,
+          apiKey: "k",
+          from: "a@b.c",
+          to: "ops@b.c",
+        }
+      )
     ).resolves.toBe("failed");
   });
 

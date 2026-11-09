@@ -6,10 +6,7 @@ import { OrderShell, OrderSkeleton } from "@/components/order/order-menu";
 import { TableOrderTabs } from "@/components/order/table-order-tabs";
 import { isSlug } from "@/features/publishing/slug";
 import { normalizeTableLabel, formatTableLabel } from "@/features/orders/table-links";
-import {
-  listOpenMenusForRestaurantSlug,
-  type TableLanding,
-} from "@/features/tables/repo";
+import { listOpenMenusForRestaurantSlug, type TableLanding } from "@/features/tables/repo";
 import { getDb } from "@/lib/db";
 
 /**
@@ -26,12 +23,10 @@ import { getDb } from "@/lib/db";
  * an honest empty state instead of a dead page.
  */
 
-const loadLanding = cache(
-  async (restaurantSlug: string): Promise<TableLanding | null> => {
-    if (!isSlug(restaurantSlug)) return null;
-    return listOpenMenusForRestaurantSlug(getDb(), restaurantSlug, new Date());
-  }
-);
+const loadLanding = cache(async (restaurantSlug: string): Promise<TableLanding | null> => {
+  if (!isSlug(restaurantSlug)) return null;
+  return listOpenMenusForRestaurantSlug(getDb(), restaurantSlug, new Date());
+});
 
 export async function generateMetadata({
   params,

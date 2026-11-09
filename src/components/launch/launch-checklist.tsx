@@ -14,10 +14,7 @@ import { useEffect, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchLaunchStatus } from "@/features/launch/client";
-import {
-  CARDS_PRINTED_KEY,
-  cardsPrintedOnThisDevice,
-} from "@/features/launch/progress";
+import { CARDS_PRINTED_KEY, cardsPrintedOnThisDevice } from "@/features/launch/progress";
 import type { LaunchStatus } from "@/features/launch/schema";
 import { launchSteps, verifiedProgress, type LaunchStep } from "@/features/launch/steps";
 import { SyncError } from "@/features/menus/sync";
@@ -96,9 +93,7 @@ export function LaunchChecklist() {
           state: {
             kind: "error",
             message:
-              error instanceof Error
-                ? error.message
-                : "Could not load your checklist. Try again.",
+              error instanceof Error ? error.message : "Could not load your checklist. Try again.",
           },
         });
       }
@@ -149,7 +144,11 @@ export function LaunchChecklist() {
 
   if (state.kind === "loading") {
     return (
-      <div role="status" aria-busy="true" className="rounded-2xl border border-line-200 bg-surface-base p-5">
+      <div
+        role="status"
+        aria-busy="true"
+        className="rounded-2xl border border-line-200 bg-surface-base p-5"
+      >
         <span className="sr-only">Checking your account…</span>
         <Skeleton className="h-5 w-48" />
         <div className="mt-4 flex flex-col gap-3">
@@ -169,8 +168,8 @@ export function LaunchChecklist() {
       <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5">
         <h2 className="text-base font-semibold text-warning-950">Sign in to start the checklist</h2>
         <p className="mt-1 text-sm text-warning-900">
-          Your menus, publishing, and table orders need an account so a phone at the table can
-          reach the same menu your laptop published. It is still free, and there is no card step.
+          Your menus, publishing, and table orders need an account so a phone at the table can reach
+          the same menu your laptop published. It is still free, and there is no card step.
         </p>
         <Link
           href="/sign-in"
@@ -291,7 +290,8 @@ export function LaunchChecklist() {
               <div className="min-w-0">
                 <p
                   className={
-                    "text-sm font-medium " + (step.done ? "text-ink-500 line-through" : "text-ink-900")
+                    "text-sm font-medium " +
+                    (step.done ? "text-ink-500 line-through" : "text-ink-900")
                   }
                 >
                   {step.title}

@@ -92,7 +92,11 @@ export function restaurantTablePath(restaurantSlug: string, tableLabel: string):
   return `/r/${restaurantSlug}/t/${encodeURIComponent(tableLabel)}`;
 }
 
-export function restaurantTableUrl(origin: string, restaurantSlug: string, tableLabel: string): string {
+export function restaurantTableUrl(
+  origin: string,
+  restaurantSlug: string,
+  tableLabel: string
+): string {
   return `${origin.replace(/\/+$/, "")}${restaurantTablePath(restaurantSlug, tableLabel)}`;
 }
 

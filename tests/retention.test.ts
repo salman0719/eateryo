@@ -148,7 +148,13 @@ describe("retention repo", () => {
     expect(data.orders).toHaveLength(1);
     expect(data.orders[0].note).toBe("extra napkins");
     expect(data.orders[0].lines).toEqual([
-      { menuItemId: "item-1", name: "Espresso", variantName: null, unitPriceCents: 450, quantity: 1 },
+      {
+        menuItemId: "item-1",
+        name: "Espresso",
+        variantName: null,
+        unitPriceCents: 450,
+        quantity: 1,
+      },
     ]);
 
     const other = await buildAccountExport(db, otherId, NOW);

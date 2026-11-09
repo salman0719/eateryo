@@ -100,7 +100,11 @@ export async function PATCH(
     }
     return noStore(NextResponse.json({ restaurant }));
   } catch {
-    return errorResponse("server_db_unavailable", "Could not rename the restaurant. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not rename the restaurant. Try again.",
+      503
+    );
   }
 }
 
@@ -122,6 +126,10 @@ export async function DELETE(
     }
     return noStore(new NextResponse(null, { status: 204 }));
   } catch {
-    return errorResponse("server_db_unavailable", "Could not delete the restaurant. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not delete the restaurant. Try again.",
+      503
+    );
   }
 }

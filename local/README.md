@@ -40,25 +40,25 @@ do not rely on it existing on another machine.
 
 ## Folder index
 
-| Folder | Use for |
-| --- | --- |
-| `ab/` | provider A/B extraction harness, fixtures and results |
-| `ai-assistant-rnd/` | AI assistant scope, spike and implementation draft |
-| `crawler/` | menu-sample downloader and collected samples |
-| `email-prototype/` | email template prototype |
-| `gate-logs/` | lint/typecheck/test/build logs from earlier steps |
-| `issues/` | the local issue log; see `issues/README.md` |
-| `logo-concepts/` | logo exploration and exports |
-| `notes/` | working notes that do not belong in repo docs |
-| `performance/` | performance experiments and results |
-| `prototype/` | interactive prototypes |
-| `research/` | research reports, including `research/staff-access/` |
-| `samples/` | menu images and manual test samples |
-| `scratch/` | throwaway experiments and repro files |
-| `study/` | UI study captures |
-| `theme-studio/` | local theme tooling and backups |
-| `tmp/` | disposable files |
-| `worktrees/` | local git worktrees |
+| Folder              | Use for                                               |
+| ------------------- | ----------------------------------------------------- |
+| `ab/`               | provider A/B extraction harness, fixtures and results |
+| `ai-assistant-rnd/` | AI assistant scope, spike and implementation draft    |
+| `crawler/`          | menu-sample downloader and collected samples          |
+| `email-prototype/`  | email template prototype                              |
+| `gate-logs/`        | lint/typecheck/test/build logs from earlier steps     |
+| `issues/`           | the local issue log; see `issues/README.md`           |
+| `logo-concepts/`    | logo exploration and exports                          |
+| `notes/`            | working notes that do not belong in repo docs         |
+| `performance/`      | performance experiments and results                   |
+| `prototype/`        | interactive prototypes                                |
+| `research/`         | research reports, including `research/staff-access/`  |
+| `samples/`          | menu images and manual test samples                   |
+| `scratch/`          | throwaway experiments and repro files                 |
+| `study/`            | UI study captures                                     |
+| `theme-studio/`     | local theme tooling and backups                       |
+| `tmp/`              | disposable files                                      |
+| `worktrees/`        | local git worktrees                                   |
 
 Add a row when you add a folder. Keep the table current rather than letting
 folders become anonymous.

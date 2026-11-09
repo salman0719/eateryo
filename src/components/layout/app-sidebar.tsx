@@ -144,9 +144,7 @@ export function AppSidebar({
   // so reorder/preview simply find nothing and leave the outline quiet.
   useEffect(() => {
     if (!outlineKey) return;
-    const nodes = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-menu-section]")
-    );
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-menu-section]"));
     if (nodes.length === 0) return;
     const observer = new IntersectionObserver(
       (entries) => {
@@ -205,10 +203,7 @@ export function AppSidebar({
             <span className="sr-only">Loading navigation…</span>
             {[0, 1, 2, 3, 4].map((row) => (
               <div key={row} className={`${itemBase} min-h-[40px] px-2.5 py-1.5`}>
-                <span
-                  aria-hidden="true"
-                  className="flex w-5 shrink-0 items-center justify-center"
-                >
+                <span aria-hidden="true" className="flex w-5 shrink-0 items-center justify-center">
                   <Skeleton className="h-5 w-5 rounded-md" />
                 </span>
                 <span aria-hidden="true" className="app-sidebar-label min-w-0 flex-1">
@@ -276,7 +271,10 @@ export function AppSidebar({
             <span className="flex w-5 shrink-0 items-center justify-center">
               <ChecklistIcon />
             </span>
-            <span aria-hidden="true" className="app-sidebar-label min-w-0 flex-1 truncate text-left">
+            <span
+              aria-hidden="true"
+              className="app-sidebar-label min-w-0 flex-1 truncate text-left"
+            >
               Launch checklist
             </span>
             <span
