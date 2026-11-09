@@ -56,6 +56,8 @@ export function RestaurantSettings() {
   const canManageSettings = workspace.can("settings.manage");
   const canManageTeam = workspace.can("team.manage");
   const canReadTeam = workspace.can("team.read");
+  /** Capture's permission: the extraction spend below belongs to whoever may upload. */
+  const canCapture = workspace.can("menus.write");
 
   async function handleRename(name: string) {
     if (!selected || !canManageSettings) return;
@@ -226,13 +228,14 @@ export function RestaurantSettings() {
         </>
       )}
 
-      {/* Account-level, not restaurant-level: usage allowances and the account
-          export/delete live here for every signed-in user, including staff
-          and owners who have not picked a restaurant. Both cards self-gate
-          on the session, so there is no dead UI while it resolves. */}
+      {/* Usage is the capture allowance, so it follows Capture's permission: a
+          membership that may not upload menus has no extraction spend to see.
+          The account export/delete stays available to every signed-in user;
+          both cards self-gate on the session, so there is no dead UI while it
+          resolves. */}
       {signedIn && (
         <>
-          <UsagePanel restaurantId={selected?.id ?? null} />
+          {canCapture && <UsagePanel restaurantId={selected?.id ?? null} />}
           <DataControls />
         </>
       )}
