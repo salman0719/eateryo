@@ -5,7 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
-import { Attention } from "@/components/ui/attention";
+import { AssistantPage } from "@/components/pages/assistant-page";
+import { CapturePage } from "@/components/pages/capture-page";
+import { MenusPage } from "@/components/pages/menus-page";
+import { OrdersPage } from "@/components/pages/orders-page";
+import { SettingsPage } from "@/components/pages/settings-page";
+import { TablesPage } from "@/components/pages/tables-page";
 import {
   BookIcon,
   CameraIcon,
@@ -15,35 +20,25 @@ import {
 } from "@/components/ui/icons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
-import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
-import { LibraryPanel } from "@/components/menu-editor/library-panel";
 import {
   LocalDraftsNotice,
   LocalDraftsOffer,
   type LocalDraftClaimNotice,
 } from "@/components/menu-editor/local-drafts-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
-import { MoveToAccountPanel } from "@/components/menu-editor/move-to-account-panel";
-import { AssistantPanel } from "@/components/assistant/assistant-panel";
-import { RestaurantSettings } from "@/components/settings/restaurant-settings";
-import { RestaurantTables } from "@/components/tables/restaurant-tables";
-import { OrdersBoard } from "@/components/orders/orders-board";
 import { MonitorToasts } from "@/components/orders/monitor-toasts";
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
 import { OrderMonitorProvider, useOrderMonitor } from "@/features/orders/monitor";
 import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
-import { Dropzone } from "@/components/upload/dropzone";
-import { ExtractionProgress } from "@/components/upload/extraction-progress";
-import {
-  ExtractionResult,
+import type {
   PreviewMenu,
-  type ReviewItemLocation,
-  type ReviewResolution,
+  ReviewItemLocation,
+  ReviewResolution,
 } from "@/components/upload/extraction-result";
-import { ImagePreview, type PageImage } from "@/components/upload/image-preview";
+import type { PageImage } from "@/components/upload/image-preview";
 import { extractedMenuToDocument } from "@/features/menu/convert";
 import {
   downloadTextFile,
@@ -102,7 +97,7 @@ import {
   extractMenuFromFiles,
   type MenuExtractionResult,
 } from "@/lib/extract-client";
-import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
+import { validateImageBatch } from "@/lib/image-constraints";
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
 import {
   availableSections,
@@ -3054,128 +3049,66 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
           })()}
 
         {screen === "library" && (
-          <div className="flex flex-col gap-4">
-            {visibleLibraryError && (
-              <p
-                role="alert"
-                className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-              >
-                {visibleLibraryError}{" "}
-                {isSessionGateMessage(visibleLibraryError) && (
-                  <a
-                    href="/sign-in"
-                    className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
-                  >
-                    Sign in
-                  </a>
-                )}
-              </p>
-            )}
-            <LibraryPanel
-              menus={libraryMenus}
-              loading={libraryLoading || libraryAccountPending}
-              accountMode={libraryAccountMode}
-              canCreate={!signedIn || accountCan("menus.write")}
-              hasHiddenMenus={hasHiddenMenus}
-              emptyTitle={libraryEmpty?.title}
-              emptyBody={libraryEmpty?.body}
-              ownedRestaurants={signedIn ? ownedRestaurantsForAccount : []}
-              onMoveToAccount={handleMoveMenuToAccount}
-              unavailable={storageDown}
-              onOpen={(id) => void handleOpenMenu(id)}
-              onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
-              onRename={(id, title) => void handleRenameMenu(id, title)}
-              onDelete={(id) => void handleDeleteMenu(id)}
-            />
-            {/* The manual route stays available, quietly: the post-sign-in
-                offer handles the common case, and this is where a partial
-                import is retried. */}
-            {signedIn && libraryAccountMode && localOnlyCount > 0 && (
-              <details className="rounded-2xl border border-line-200 bg-surface-base">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-ink-700 marker:text-ink-400">
-                  Import from this browser
-                  <span className="ml-2 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
-                    {localOnlyCount}
-                  </span>
-                </summary>
-                <div className="border-t border-line-200">
-                  <MoveToAccountPanel
-                    menuCount={localOnlyCount}
-                    menuIds={localOnly.map((menu) => menu.id)}
-                    suggestedName={suggestedRestaurantName}
-                    onMoved={(report) => {
-                      const actor = accountKeyRef.current;
-                      void (async () => {
-                        if (actor) {
-                          await stampClaimedMenus(
-                            [...report.imported, ...report.skipped],
-                            actor,
-                            (id) => getMenu(id)
-                          );
-                        }
-                        await mergeAccountMenus();
-                      })();
-                    }}
-                    onOwnedChange={setOwnedRestaurants}
-                  />
-                </div>
-              </details>
-            )}
-          </div>
+          <MenusPage
+            error={visibleLibraryError}
+            menus={libraryMenus}
+            loading={libraryLoading || libraryAccountPending}
+            accountMode={libraryAccountMode}
+            canCreate={!signedIn || accountCan("menus.write")}
+            hasHiddenMenus={hasHiddenMenus}
+            emptyTitle={libraryEmpty?.title}
+            emptyBody={libraryEmpty?.body}
+            signedIn={signedIn}
+            importCount={localOnlyCount}
+            importMenuIds={localOnly.map((menu) => menu.id)}
+            suggestedName={suggestedRestaurantName}
+            ownedRestaurants={ownedRestaurantsForAccount}
+            unavailable={storageDown}
+            onOpen={(id) => void handleOpenMenu(id)}
+            onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
+            onRename={(id, title) => void handleRenameMenu(id, title)}
+            onDelete={(id) => void handleDeleteMenu(id)}
+            onMoveToAccount={handleMoveMenuToAccount}
+            onMoved={(report) => {
+              const actor = accountKeyRef.current;
+              void (async () => {
+                if (actor) {
+                  await stampClaimedMenus(
+                    [...report.imported, ...report.skipped],
+                    actor,
+                    (id) => getMenu(id)
+                  );
+                }
+                await mergeAccountMenus();
+              })();
+            }}
+            onOwnedChange={setOwnedRestaurants}
+          />
         )}
 
-        {screen === "orders" && <OrdersBoard />}
+        {screen === "orders" && <OrdersPage />}
 
-        {screen === "assistant" &&
-          (assistantPending ? (
-            <section
-              role="status"
-              aria-busy="true"
-              aria-label="Loading the assistant"
-              className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
-            >
-              <span className="sr-only">Loading the assistant…</span>
-              <Skeleton className="h-6 w-40" />
-              <Skeleton className="h-24 w-full" />
-            </section>
-          ) : featureFlags.assistant ? (
-            <AssistantPanel
-              signedIn={signedIn}
-              sessionPending={sessionPending}
-              proposalsEnabled={featureFlags.assistantProposals}
-              menusLoading={libraryLoading}
-              // The active café's writable menus only: the assistant proposes
-              // edits, so it must not offer the other membership's menus.
-              menus={workspaceMenus
-                .filter(
-                  (menu) => serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
-                )
-                .map((menu) => ({ id: menu.id, title: menu.title }))}
-            />
-          ) : !signedIn ? (
-            // Unreachable through the UI — both navs hide the assistant when
-            // signed out and the effect below bounces a typed /assistant URL
-            // back to capture — so render nothing while the bounce lands.
-            null
-          ) : (
-            <section className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
-              <h1 className="font-medium text-ink-900">Assistant isn’t available</h1>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
-                The assistant isn’t released to this account yet. Everything else in Eateryo works
-                as usual.
-              </p>
-              <button
-                type="button"
-                onClick={() => navigateTo({ screen: "capture" })}
-                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Back to capture
-              </button>
-            </section>
-          ))}
+
+        {screen === "assistant" && (
+          <AssistantPage
+            signedIn={signedIn}
+            sessionPending={sessionPending}
+            pending={assistantPending}
+            enabled={featureFlags.assistant}
+            proposalsEnabled={featureFlags.assistantProposals}
+            menusLoading={libraryLoading}
+            menus={workspaceMenus
+              .filter(
+                (menu) =>
+                  serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
+              )
+              .map((menu) => ({ id: menu.id, title: menu.title }))}
+            onBackToCapture={() => navigateTo({ screen: "capture" })}
+          />
+        )}
 
         {screen === "tables" && (
-          <RestaurantTables
+          <TablesPage
             signedIn={signedIn}
             sessionPending={sessionPending}
             focusRestaurantId={activeWorkspace?.restaurantId ?? null}
@@ -3183,7 +3116,7 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         )}
 
         {screen === "settings" && (
-          <RestaurantSettings
+          <SettingsPage
             signedIn={signedIn}
             sessionPending={sessionPending}
             currentUserId={session?.user?.id ?? null}
@@ -3303,181 +3236,44 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
         )}
 
         {screen === "capture" && (
-          <>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-                Turn your photo into a menu
-              </h1>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-                Upload a photo or scan of a menu, extract it into categories and items with AI, then
-                review and correct the draft. AI output is never guaranteed — you stay in charge.
-              </p>
-              {!signedIn && !sessionPending && (
-                <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
-                  You can upload and review first. Publishing needs an account — we’ll email you a
-                  sign-in link, and your draft stays in this browser.
-                </p>
-              )}
-            </div>
-
-            <JourneySteps current={activeStep} />
-
-            {phase === "upload" && pages.length === 0 && (
-              <div className="flex flex-col gap-3">
-                <Dropzone onSelect={selectFiles} />
-                {fileError && (
-                  <p
-                    role="alert"
-                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-                  >
-                    {fileError}
-                  </p>
-                )}
-                <p className="text-center text-sm text-ink-500">
-                  No menu handy?{" "}
-                  <button
-                    type="button"
-                    onClick={handleDemo}
-                    className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                  >
-                    Preview with demo data
-                  </button>
-                </p>
-              </div>
-            )}
-
-            {pages.length > 0 && (
-              <div className="flex flex-col gap-4">
-                <ImagePreview
-                  pages={pages}
-                  onAdd={() => addInputRef.current?.click()}
-                  onReplace={(index) => {
-                    replaceIndexRef.current = index;
-                    replaceInputRef.current?.click();
-                  }}
-                  onRemove={removePage}
-                />
-                <input
-                  ref={addInputRef}
-                  type="file"
-                  multiple
-                  accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-                  className="sr-only"
-                  tabIndex={-1}
-                  onChange={(event) => {
-                    const added = Array.from(event.target.files ?? []);
-                    event.target.value = "";
-                    if (added.length > 0) addPages(added);
-                  }}
-                />
-                <input
-                  ref={replaceInputRef}
-                  type="file"
-                  accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-                  className="sr-only"
-                  tabIndex={-1}
-                  onChange={(event) => {
-                    const next = event.target.files?.[0];
-                    const index = replaceIndexRef.current;
-                    event.target.value = "";
-                    replaceIndexRef.current = null;
-                    if (next && index !== null) replacePageAt(index, next);
-                  }}
-                />
-                {fileError && (
-                  <p
-                    role="alert"
-                    className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-                  >
-                    {fileError}
-                  </p>
-                )}
-                <div>
-                  <button
-                    type="button"
-                    onClick={handleExtract}
-                    disabled={phase === "extracting"}
-                    className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
-                  >
-                    {phase === "extracting"
-                      ? "Extracting… this can take up to a minute"
-                      : "Extract menu"}
-                  </button>
-                  <p className="mt-2 text-xs text-ink-500">
-                    Calls the AI once, only when you press this. Accuracy depends on image quality.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <Attention
-              active={phase === "extracting"}
-              pulse={false}
-              scrollBlock="start"
-              className="scroll-mt-4"
-            >
-              {phase === "extracting" && extractProgress && (
-                <ExtractionProgress
-                  pageCount={extractProgress.pageCount}
-                  preparedPages={extractProgress.preparedPages}
-                  requestStartedAt={extractProgress.requestStartedAt}
-                />
-              )}
-            </Attention>
-
-            {extractError && phase !== "extracting" && (
-              <div role="alert" className="rounded-2xl border border-danger-200 bg-danger-50 px-5 py-4">
-                <p className="font-medium text-danger-900">Extraction failed</p>
-                <p className="mt-1 text-sm text-danger-800">{extractError.message}</p>
-                {extractError.code === "missing_api_key" && (
-                  <button
-                    type="button"
-                    onClick={handleDemo}
-                    className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-                  >
-                    Preview with demo data instead
-                  </button>
-                )}
-              </div>
-            )}
-
-            {result && (
-              <div ref={resultRef}>
-                <ExtractionResult
-                  data={result}
-                  source={source}
-                  onStartOver={clearCapture}
-                  onEdit={() => void handleEditResult()}
-                  onResolveItem={handleResolveResultItem}
-                  onResolveAll={handleResolveAllResultItems}
-                  onUpdatePrice={handleUpdateResultPrice}
-                  onRenameTitle={handleRenameResultTitle}
-                  initialReviewCount={initialReviewCount}
-                  onPublish={
-                    source === "demo" || draftSave === "saved"
-                      ? () => void handleStartPublish()
-                      : undefined
-                  }
-                  previewDoc={resultDoc}
-                  savedNotice={
-                    source === "ai" && draftSave === "saved"
-                      ? "Draft saved to My menus"
-                      : source === "ai" && draftSave === "saving"
-                        ? "Saving draft…"
-                        : null
-                  }
-                  editLabel={
-                    source === "ai"
-                      ? draftSave === "saved"
-                        ? "Open in editor"
-                        : "Edit menu"
-                      : "Save & open editor"
-                  }
-                />
-              </div>
-            )}
-          </>
+          <CapturePage
+            signedIn={signedIn}
+            sessionPending={sessionPending}
+            step={activeStep}
+            phase={phase}
+            pages={pages}
+            fileError={fileError}
+            addInputRef={addInputRef}
+            replaceInputRef={replaceInputRef}
+            replaceIndexRef={replaceIndexRef}
+            resultRef={resultRef}
+            onSelectFiles={selectFiles}
+            onDemo={handleDemo}
+            onAddPages={addPages}
+            onReplacePageAt={replacePageAt}
+            onRemovePage={removePage}
+            onExtract={handleExtract}
+            extractProgress={extractProgress}
+            extractError={extractError}
+            result={result}
+            previewDoc={resultDoc}
+            source={source}
+            draftSave={draftSave}
+            initialReviewCount={initialReviewCount}
+            onClear={clearCapture}
+            onEdit={() => void handleEditResult()}
+            onResolveItem={handleResolveResultItem}
+            onResolveAll={handleResolveAllResultItems}
+            onUpdatePrice={handleUpdateResultPrice}
+            onRenameTitle={handleRenameResultTitle}
+            onPublish={
+              source === "demo" || draftSave === "saved"
+                ? () => void handleStartPublish()
+                : undefined
+            }
+          />
         )}
+
         {screen === "editor" && !routedDoc && missingPublishMenuId && (
           <MissingDraftCard
             onOpenLibrary={() => navigateTo({ screen: "library" })}
