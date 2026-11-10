@@ -10,6 +10,12 @@
  * in a class string. A colour that genuinely cannot belong to a role is the
  * documented exception (see AGENTS.md, "Colour usage").
  *
+ * The three neutral roles are separate jobs, not one gray in three spellings:
+ * `ink` is text, `surface` is fills, `line` is boundaries. `ink` and `surface`
+ * still carry the same values until the surface pass lands; `line` already has
+ * its own ramp. Each one answers to a different contrast rule, so tuning one
+ * is never paid for by the other two.
+ *
  * Ramps stay in OKLCH so the studio can regenerate any hue from one base
  * colour.
  */
@@ -81,7 +87,9 @@
   --color-info-900: oklch(39.1% 0.09 240.876);
   --color-info-950: oklch(29.3% 0.066 243.157);
 
-  /* Ink: text. */
+  /* Ink: text and glyphs only. The values still match `surface` until the
+     surface pass; the role is text, so a text change must never be the thing
+     that repaints a panel. */
   --color-ink-50: oklch(98.5% 0.001 106.423);
   --color-ink-100: oklch(97% 0.001 106.424);
   --color-ink-200: oklch(92.3% 0.003 48.717);
@@ -94,7 +102,9 @@
   --color-ink-900: oklch(21.6% 0.006 56.043);
   --color-ink-950: oklch(14.7% 0.004 49.25);
 
-  /* Surface: backgrounds, panels, raised cards. */
+  /* Surface: fills — the page, cards, insets, chips, and the inverse bar.
+     Independent of ink in principle (the values still coincide). Read a stop
+     as "how much paper this area gets", never as "how dark the text is". */
   --color-surface-50: oklch(98.5% 0.001 106.423);
   --color-surface-100: oklch(97% 0.001 106.424);
   --color-surface-200: oklch(92.3% 0.003 48.717);
