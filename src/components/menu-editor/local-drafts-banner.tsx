@@ -45,6 +45,7 @@ export function LocalDraftsOffer({
     <HeightReveal>
       <section
         aria-label="Menus from this browser"
+        data-print-hide
         className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -119,6 +120,7 @@ export function LocalDraftsNotice({
       <section
         role="status"
         aria-label="Menus from this browser"
+        data-print-hide
         className="rounded-2xl border border-success-200 bg-success-50 px-4 py-3"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
