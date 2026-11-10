@@ -3,6 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
+import { BrandLockup } from "@/components/ui/brand";
 import {
   BookIcon,
   CameraIcon,
@@ -176,19 +177,12 @@ export function AppSidebar({
       aria-label="Eateryo"
       className="app-sidebar sticky top-0 hidden h-screen shrink-0 flex-col self-start border-r border-line-200 bg-surface-base sm:flex"
     >
-      <div className="app-sidebar-brand flex items-center gap-2.5 px-3 py-4">
-        <span
-          aria-hidden="true"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-on-accent"
-        >
-          E
-        </span>
-        <span className="app-sidebar-label min-w-0">
-          <span className="block truncate text-sm font-bold tracking-tight text-ink-900">
-            Eateryo
-          </span>
-          <span className="block truncate text-xs text-ink-500">Menus · tables · orders</span>
-        </span>
+      <div className="app-sidebar-brand px-3 py-4">
+        <BrandLockup
+          tagline="Menus · tables · orders"
+          truncate
+          labelClassName="app-sidebar-label"
+        />
       </div>
 
       <nav
