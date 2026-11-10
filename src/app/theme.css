@@ -122,9 +122,10 @@
      is the divider weight (card edges, hairlines): decorative, so it only has to
      be seen. `line-300` is the control stop and clears 3:1 against every card it
      can outline (WCAG 1.4.11: 3.51 on surface-base, 3.36 on surface-50, 3.22 on
-     surface-100). `line-400` is hover and pressed, `line-900` is the frame (phone
-     bezel, printed card edge). A container never uses 300: at that weight a
-     dashed empty-state box reads as something to press. */
+     surface-100). `line-400` is hover and pressed, `line-900` is the frame (the
+     phone bezel). A container never uses 300: at that weight a dashed empty-state
+     box reads as something to press. The one exception is the printed QR card,
+     which keeps 300 for its cut line on paper. */
   --color-line-50: oklch(98% 0.004 72);
   --color-line-100: oklch(94.5% 0.008 70);
   --color-line-200: oklch(89% 0.013 67);
