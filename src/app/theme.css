@@ -102,20 +102,27 @@
   --color-ink-900: oklch(21.6% 0.006 56.043);
   --color-ink-950: oklch(14.7% 0.004 49.25);
 
-  /* Surface: fills — the page, cards, insets, chips, and the inverse bar.
-     Independent of ink in principle (the values still coincide). Read a stop
-     as "how much paper this area gets", never as "how dark the text is". */
-  --color-surface-50: oklch(98.5% 0.001 106.423);
-  --color-surface-100: oklch(97% 0.001 106.424);
-  --color-surface-200: oklch(92.3% 0.003 48.717);
-  --color-surface-300: oklch(86.9% 0.005 56.366);
-  --color-surface-400: oklch(70.9% 0.01 56.259);
-  --color-surface-500: oklch(55.3% 0.013 58.071);
-  --color-surface-600: oklch(44.4% 0.011 73.639);
-  --color-surface-700: oklch(37.4% 0.01 67.558);
-  --color-surface-800: oklch(26.8% 0.007 34.298);
-  --color-surface-900: oklch(21.6% 0.006 56.043);
-  --color-surface-950: oklch(14.7% 0.004 49.25);
+  /* Surface: fills — the page, cards, insets, chips, and the inverse bar. Its
+     own ramp, tuned apart from ink: a fill only has to be told apart from the
+     fill beside it, while the text on it carries the 4.5:1. `surface-base` is
+     the card (white), `-50` the page paper and the soft tint a wide panel gets,
+     `-100` the inset a control sits in (chips, disabled fields, inline code),
+     `-200`/`-300` the stronger chip and progress track, and `-900` the inverse
+     fill (tooltips, toasts, the diner's add pill, the phone bezel) and the
+     stock the sheet scrims are mixed from. `-50` stays pale on purpose: ink-500
+     sits on it in the sidebar hover row and a disabled field, so deeper paper
+     would spend their 4.5:1. */
+  --color-surface-50: oklch(98.2% 0.005 76);
+  --color-surface-100: oklch(95.2% 0.008 74);
+  --color-surface-200: oklch(91.5% 0.01 71);
+  --color-surface-300: oklch(86.5% 0.012 68);
+  --color-surface-400: oklch(70.8% 0.01 66);
+  --color-surface-500: oklch(55.2% 0.01 64);
+  --color-surface-600: oklch(44% 0.008 62);
+  --color-surface-700: oklch(36% 0.006 60);
+  --color-surface-800: oklch(27% 0.005 58);
+  --color-surface-900: oklch(20% 0.004 56);
+  --color-surface-950: oklch(13% 0.003 55);
 
   /* Line: borders, dividers, rings, outlines — its own ramp, not a copy of the
      neutrals, because a border answers to a different rule than text. `line-200`
