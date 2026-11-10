@@ -152,7 +152,7 @@ export function OrderCartLines({
         rows={2}
         maxLength={280}
         placeholder="Allergies, no onions…"
-        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
+        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
       />
     </>
   );

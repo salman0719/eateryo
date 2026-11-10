@@ -29,6 +29,9 @@ interface CommitInputProps {
 
 const baseInput =
   "w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
+  // The browser's own placeholder is the field's text at half opacity (3.4:1);
+  // name the faint-text tone instead so it clears 4.5:1 like every other label.
+  "placeholder:text-ink-500 " +
   // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
   "resize-none focus:border-accent-700 focus:outline-none sm:resize-y";
 

@@ -150,7 +150,7 @@ export function OrderPagePreview({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search dishes…"
-              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
+              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
             />
           </label>
           {searching && (

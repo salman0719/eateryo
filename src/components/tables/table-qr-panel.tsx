@@ -498,7 +498,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 }
                 onChange={(event) => changePrefix(event.target.value)}
                 placeholder="Table"
-                className="mt-1 block w-40 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal focus:border-accent-700 focus:outline-none disabled:opacity-50"
+                className="mt-1 block w-40 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal placeholder:text-ink-500 focus:border-accent-700 focus:outline-none disabled:opacity-50"
               />
             </label>
             {custom && (
