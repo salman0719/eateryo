@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLockup } from "@/components/ui/brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import { authClient } from "@/lib/auth-client";
 
@@ -20,18 +21,7 @@ export function SiteHeader({ getStarted = true }: { getStarted?: boolean } = {})
   return (
     <header data-print-hide className="border-b border-line-200 bg-surface-base">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-on-accent"
-          >
-            E
-          </span>
-          <div>
-            <p className="text-sm font-bold tracking-tight text-ink-900">Eateryo</p>
-            <p className="text-xs text-ink-500">Menus, tables, and orders in one place</p>
-          </div>
-        </div>
+        <BrandLockup tagline="Menus, tables, and orders in one place" />
         <div className="flex items-center gap-3">
           {!isPending && !user && getStarted && (
             <a

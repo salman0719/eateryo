@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { BrandBar } from "@/components/layout/brand-bar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { AssistantPage } from "@/components/pages/assistant-page";
@@ -100,6 +101,7 @@ import {
   phoneTabs,
   routeMenuId,
   sectionForScreen,
+  shellColumnVisible,
   signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
@@ -2699,6 +2701,15 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const availableScreenIds = new Set(sections.map((section) => section.id));
   const phoneTabList = phoneTabs(sections);
   const moreRows = moreSheetRows(sections);
+  /**
+   * The left column belongs to the account. A visitor with nothing in the
+   * library gets the entry page instead of a one-row menu, and the brand row
+   * takes over the name and `/sign-in` at every width.
+   */
+  const showShellColumn = shellColumnVisible({
+    sessionState,
+    hasWorkingSet: libraryMenus.length > 0,
+  });
   /** Nav waits for the membership read: no provisional tabs, no empty bar. */
   const navReady = !sessionPending && !accountAccessPending;
   /** The More sheet owns the current screen (and so shows as pressed). */
@@ -2805,21 +2816,32 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           absorbs the spare height and the footer rests on the viewport bottom
           instead of floating under short content. */}
         <div className="flex w-full flex-1">
-          <AppSidebar
-            sections={sessionPending ? [] : navSections}
-            activeSection={sectionForScreen(screen)}
-            sessionPending={sessionPending}
-            signedIn={signedIn}
-            email={email}
-            onNavigate={(section) => navigateTo({ screen: section })}
-            onSignOut={() => void authClient.signOut()}
-            outline={sidebarOutline}
-            outlineKey={sidebarOutlineKey}
-            onOutlineSelect={scrollToMenuSection}
-            launch={sidebarLaunch}
-            menusPending={sidebarMenuCountPending}
-          />
+          {showShellColumn ? (
+            <AppSidebar
+              sections={sessionPending ? [] : navSections}
+              activeSection={sectionForScreen(screen)}
+              sessionPending={sessionPending}
+              signedIn={signedIn}
+              email={email}
+              onNavigate={(section) => navigateTo({ screen: section })}
+              onSignOut={() => void authClient.signOut()}
+              outline={sidebarOutline}
+              outlineKey={sidebarOutlineKey}
+              onOutlineSelect={scrollToMenuSection}
+              launch={sidebarLaunch}
+              menusPending={sidebarMenuCountPending}
+            />
+          ) : null}
           <div className="flex min-w-0 flex-1 flex-col">
+            {/* Wherever the column is absent the row carries the brand, and
+              signed out it carries the only sign-in path. It hides itself
+              below `sm` only when the sidebar is already showing the lockup;
+              nothing here is sticky, so no screen loses height twice. */}
+            <BrandBar
+              signedIn={signedIn}
+              sessionPending={sessionPending}
+              className={showShellColumn ? "sm:hidden" : undefined}
+            />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the
               content now that the old header row is gone. */}
@@ -2829,7 +2851,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               onSwitch={handleSwitchWorkspace}
             />
             <main
-              className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 ${
+              className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6 sm:py-8 ${
                 // The editor is a dense working surface; the other app screens
                 // share the remaining width beside the sidebar instead of
                 // keeping the marketing measure they had under a top bar.

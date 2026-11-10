@@ -1,3 +1,4 @@
+import type { SessionState } from "@/features/session/state";
 import type { Capability } from "@/features/tenancy/permissions";
 
 export type AppScreen =
@@ -226,6 +227,29 @@ export function availableSections(access: SectionAccess): AppSection[] {
     if (section.id === "assistant" && !access.assistantEnabled) return false;
     return section.capabilities.some((capability) => access.can(capability));
   });
+}
+
+/**
+ * Whether the shell shows its left column at all.
+ *
+ * The column is the account's: destinations, the open menu's outline, the
+ * sign-in button and the café on shift. With nobody signed in it would hold a
+ * single row — "Capture" — which reads as a broken menu rather than a front
+ * door, so a settled visitor gets the page instead and `brand-bar.tsx` carries
+ * the name and `/sign-in`.
+ *
+ * Two cases keep it besides an account: a visitor with anonymous drafts, for
+ * whom My menus is a real destination, and a session that has not answered.
+ * `unknown` keeps it because an unanswered read may be an owner, and hanging
+ * the shell's chrome on a guess is exactly what 015 was about.
+ */
+export function shellColumnVisible(input: {
+  sessionState: SessionState;
+  hasWorkingSet: boolean;
+}): boolean {
+  if (input.sessionState === "signed-in") return true;
+  if (input.sessionState === "unknown") return true;
+  return input.hasWorkingSet;
 }
 
 /**
