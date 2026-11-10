@@ -177,7 +177,11 @@ export function AppSidebar({
       aria-label="Eateryo"
       className="app-sidebar sticky top-0 hidden h-screen shrink-0 flex-col self-start border-r border-line-200 bg-surface-base sm:flex"
     >
-      <div className="app-sidebar-brand px-3 py-4">
+      {/* This wrapper must stay a flex container: the rail's centring rule
+          (`html[data-sidebar="rail"] .app-sidebar-brand`) is a
+          `justify-content`, so without it the tile sits at the padding edge
+          while the nav icons below are centred. */}
+      <div className="app-sidebar-brand flex items-center px-3 py-4">
         <BrandLockup
           tagline="Menus · tables · orders"
           truncate
