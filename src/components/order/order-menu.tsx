@@ -110,11 +110,7 @@ export function OrderMenuSection({
    * Quantity of this exact item + variant + picks already in the cart
    * (0 when absent). Picks distinguish two combinations of one dish.
    */
-  itemCount?: (
-    item: MenuItem,
-    variantName: string | null,
-    selections: OptionSelection[]
-  ) => number;
+  itemCount?: (item: MenuItem, variantName: string | null, selections: OptionSelection[]) => number;
 }) {
   // Per-item confirmation: pops on every tap, gone ~2s later. A fresh tap
   // dismisses the visible pop instantly and replays it, so rapid taps

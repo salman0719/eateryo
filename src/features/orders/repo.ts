@@ -299,10 +299,7 @@ function resolveOrderLine(items: Map<string, MenuItem>, request: OrderLineReques
 
   const picks = normalizeSelections(request.options ?? []);
   if (picks.length > MAX_LINE_OPTIONS) {
-    throw new OrderRepoError(
-      "invalid",
-      `A single line takes at most ${MAX_LINE_OPTIONS} options.`
-    );
+    throw new OrderRepoError("invalid", `A single line takes at most ${MAX_LINE_OPTIONS} options.`);
   }
   const problem = validateOptionSelections(item, picks);
   if (problem) {
@@ -364,9 +361,7 @@ async function insertLinesWithOptions(
 ): Promise<{ lines: OrderLineRow[]; options: Map<string, OrderLineOptionRow[]> }> {
   const insertedLines = await db
     .insert(orderLineTable)
-    .values(
-      lines.map(({ options: _picks, ...line }) => ({ ...line, orderId }))
-    )
+    .values(lines.map(({ options: _picks, ...line }) => ({ ...line, orderId })))
     .returning();
   const optionRows = insertedLines.flatMap((inserted, index) =>
     (lines[index]?.options ?? []).map((pick) => ({
@@ -378,10 +373,7 @@ async function insertLinesWithOptions(
   );
   let options = new Map<string, OrderLineOptionRow[]>();
   if (optionRows.length > 0) {
-    const insertedOptions = await db
-      .insert(orderLineOptionTable)
-      .values(optionRows)
-      .returning();
+    const insertedOptions = await db.insert(orderLineOptionTable).values(optionRows).returning();
     for (const row of insertedOptions) {
       const list = options.get(row.orderLineId) ?? [];
       list.push(row);
