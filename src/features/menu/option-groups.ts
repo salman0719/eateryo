@@ -113,7 +113,9 @@ export function optionsPriceDelta(
 ): number | null {
   let total = 0;
   for (const selection of selections) {
-    const group = item.options.find((candidate) => trimmed(candidate.name) === trimmed(selection.groupName));
+    const group = item.options.find(
+      (candidate) => trimmed(candidate.name) === trimmed(selection.groupName)
+    );
     const choice = group?.choices.find(
       (candidate) => trimmed(candidate.name) === trimmed(selection.choiceName)
     );
@@ -149,9 +151,7 @@ export function withResolvedDeltas(
   selections: ReadonlyArray<OptionSelection>
 ): { groupName: string; choiceName: string; priceDelta: number | null }[] {
   return normalizeSelections(selections).map((selection) => {
-    const group = item.options.find(
-      (candidate) => trimmed(candidate.name) === selection.groupName
-    );
+    const group = item.options.find((candidate) => trimmed(candidate.name) === selection.groupName);
     const choice = group?.choices.find(
       (candidate) => trimmed(candidate.name) === selection.choiceName
     );
@@ -164,9 +164,7 @@ export function withResolvedDeltas(
  * group then choice. Two carts holding the same picks in a different tap
  * order share one line instead of splitting into two.
  */
-export function normalizeSelections(
-  selections: ReadonlyArray<OptionSelection>
-): OptionSelection[] {
+export function normalizeSelections(selections: ReadonlyArray<OptionSelection>): OptionSelection[] {
   return selections
     .map((selection) => ({
       groupName: trimmed(selection.groupName),
@@ -188,9 +186,7 @@ export function selectionsKey(selections: ReadonlyArray<OptionSelection>): strin
 }
 
 /** Short diner-facing summary: "Bacon, Extra cheese". */
-export function formatSelectionsSummary(
-  selections: ReadonlyArray<OptionSelection>
-): string {
+export function formatSelectionsSummary(selections: ReadonlyArray<OptionSelection>): string {
   return normalizeSelections(selections)
     .map((selection) => selection.choiceName)
     .join(", ");

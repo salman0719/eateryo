@@ -224,10 +224,7 @@ describe("orders repo", () => {
         {
           menuItemId: "item-loaded",
           quantity: 1,
-          options: [
-            ...sauce,
-            { groupName: "Sauce", choiceName: "BBQ" },
-          ],
+          options: [...sauce, { groupName: "Sauce", choiceName: "BBQ" }],
         },
       ])
     ).rejects.toMatchObject({ code: "invalid" });

@@ -88,10 +88,7 @@ function bodyWithLine(overrides: Partial<typeof validBody> = {}) {
 }
 
 /** A line carrying option picks (kept outside the literal so the array type widens). */
-function lineWithOptions(
-  menuItemId: string,
-  options: { groupName: string; choiceName: string }[]
-) {
+function lineWithOptions(menuItemId: string, options: { groupName: string; choiceName: string }[]) {
   return { menuItemId, quantity: 1, options };
 }
 

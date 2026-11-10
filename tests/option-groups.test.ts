@@ -92,9 +92,7 @@ describe("validateOptionSelections", () => {
   });
 
   it("accepts a satisfied required group and skips the optional one", () => {
-    expect(
-      validateOptionSelections(dish, [{ groupName: "Sauce", choiceName: "Mayo" }])
-    ).toBeNull();
+    expect(validateOptionSelections(dish, [{ groupName: "Sauce", choiceName: "Mayo" }])).toBeNull();
   });
 
   it("refuses a missing required group", () => {
@@ -102,12 +100,12 @@ describe("validateOptionSelections", () => {
   });
 
   it("refuses an unknown group or choice", () => {
-    expect(
-      validateOptionSelections(dish, [{ groupName: "Drink", choiceName: "Cola" }])
-    ).toMatch(/not an option/);
-    expect(
-      validateOptionSelections(dish, [{ groupName: "Sauce", choiceName: "Ranch" }])
-    ).toMatch(/not on the menu/);
+    expect(validateOptionSelections(dish, [{ groupName: "Drink", choiceName: "Cola" }])).toMatch(
+      /not an option/
+    );
+    expect(validateOptionSelections(dish, [{ groupName: "Sauce", choiceName: "Ranch" }])).toMatch(
+      /not on the menu/
+    );
   });
 
   it("refuses two picks in a single-pick group", () => {
@@ -165,19 +163,13 @@ describe("pricing helpers", () => {
   });
 
   it("sums deltas onto the base price", () => {
-    expect(
-      optionsPriceDelta(dish, [{ groupName: "Extras", choiceName: "Bacon" }])
-    ).toBe(1.5);
-    expect(priceWithOptions(10, dish, [{ groupName: "Extras", choiceName: "Bacon" }])).toBe(
-      11.5
-    );
+    expect(optionsPriceDelta(dish, [{ groupName: "Extras", choiceName: "Bacon" }])).toBe(1.5);
+    expect(priceWithOptions(10, dish, [{ groupName: "Extras", choiceName: "Bacon" }])).toBe(11.5);
   });
 
   it("stays null when the base price or any delta is unknown", () => {
     expect(priceWithOptions(null, dish, [])).toBeNull();
-    expect(
-      priceWithOptions(10, dish, [{ groupName: "Extras", choiceName: "Mystery" }])
-    ).toBeNull();
+    expect(priceWithOptions(10, dish, [{ groupName: "Extras", choiceName: "Mystery" }])).toBeNull();
   });
 });
 

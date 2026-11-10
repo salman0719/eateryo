@@ -20,14 +20,16 @@ import type { MenuAvailability } from "@/features/availability/schema";
 import { formatAvailability } from "@/features/availability/format";
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu, type SearchMatch } from "@/features/menu/search";
-import { placeOrder } from "@/features/orders/client";import {
+import { placeOrder } from "@/features/orders/client";
+import {
   priceWithOptions,
   selectionsKey,
   validateOptionSelections,
   withResolvedDeltas,
   type OptionSelection,
 } from "@/features/menu/option-groups";
-import { addLine,
+import {
+  addLine,
   orderCode,
   orderTotal,
   setLineQuantity,

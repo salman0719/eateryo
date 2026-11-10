@@ -17,14 +17,16 @@
 import { useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
-import { placeOrder } from "@/features/orders/client";import {
+import { placeOrder } from "@/features/orders/client";
+import {
   priceWithOptions,
   selectionsKey,
   validateOptionSelections,
   withResolvedDeltas,
   type OptionSelection,
 } from "@/features/menu/option-groups";
-import { addLine,
+import {
+  addLine,
   orderCode,
   orderTotal,
   setLineQuantity,
@@ -122,15 +124,16 @@ export function ServerTableOrder({
         restaurantSlug,
         slug,
         tableLabel,
-        note: note.trim() ? note : null,          lines: lines.map((line) => ({
-            menuItemId: line.menuItemId,
-            variantName: line.variantName,
-            options: line.options.map((option) => ({
-              groupName: option.groupName,
-              choiceName: option.choiceName,
-            })),
-            quantity: line.quantity,
+        note: note.trim() ? note : null,
+        lines: lines.map((line) => ({
+          menuItemId: line.menuItemId,
+          variantName: line.variantName,
+          options: line.options.map((option) => ({
+            groupName: option.groupName,
+            choiceName: option.choiceName,
           })),
+          quantity: line.quantity,
+        })),
         website: honeypot,
       });
       setPlaced(order);

@@ -13,14 +13,16 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import type { MenuDocument, MenuItem } from "@/features/menu/schema";import {
+import type { MenuDocument, MenuItem } from "@/features/menu/schema";
+import {
   priceWithOptions,
   selectionsKey,
   validateOptionSelections,
   withResolvedDeltas,
   type OptionSelection,
 } from "@/features/menu/option-groups";
-import { addLine,
+import {
+  addLine,
   orderCode,
   orderTotal,
   setLineQuantity,

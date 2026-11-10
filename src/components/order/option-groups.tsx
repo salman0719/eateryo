@@ -121,9 +121,7 @@ export function OptionGroupFields({
             </legend>
             <div className="flex flex-col gap-1">
               {group.choices.map((choice) => {
-                const checked = picked.some(
-                  (selection) => selection.choiceName === choice.name
-                );
+                const checked = picked.some((selection) => selection.choiceName === choice.name);
                 const delta = formatPriceDelta(choice.priceDelta);
                 const inputName = `options-${item.id}-${group.name}`;
                 return (
