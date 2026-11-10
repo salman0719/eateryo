@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { BrandBar } from "@/components/layout/brand-bar";
+import { shellColumnVisible } from "@/features/navigation/routes";
 
 function render(props: { signedIn: boolean; sessionPending: boolean }) {
   return renderToStaticMarkup(createElement(BrandBar, props));
@@ -41,5 +42,28 @@ describe("BrandBar", () => {
     const html = render({ signedIn: true, sessionPending: false });
     expect(html).not.toContain('href="/sign-in"');
     expect(html).not.toContain("Sign in");
+  });
+});
+
+/**
+ * The other half of the same decision: the row is the brand surface wherever
+ * the column is gone. A visitor who has nothing in the library used to get a
+ * column holding one "Capture" row, which read as a broken menu.
+ */
+describe("shellColumnVisible", () => {
+  it("keeps the column for a signed-in account", () => {
+    expect(shellColumnVisible({ sessionState: "signed-in", hasWorkingSet: false })).toBe(true);
+  });
+
+  it("drops it for a settled visitor with nothing to show", () => {
+    expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: false })).toBe(false);
+  });
+
+  it("keeps it for a visitor with drafts, because My menus is a destination", () => {
+    expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: true })).toBe(true);
+  });
+
+  it("keeps it while the session is unanswered", () => {
+    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: false })).toBe(true);
   });
 });
