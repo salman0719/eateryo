@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { BrandBar } from "@/components/layout/brand-bar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { AssistantPage } from "@/components/pages/assistant-page";
@@ -2820,6 +2821,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             menusPending={sidebarMenuCountPending}
           />
           <div className="flex min-w-0 flex-1 flex-col">
+            {/* Below sm the sidebar is gone, so the brand (and, signed out,
+              the only sign-in path) lives in this row. It is page content,
+              not chrome: nothing is sticky, so no screen loses height twice. */}
+            <BrandBar signedIn={signedIn} sessionPending={sessionPending} className="sm:hidden" />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the
               content now that the old header row is gone. */}
@@ -2829,7 +2834,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               onSwitch={handleSwitchWorkspace}
             />
             <main
-              className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 ${
+              className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6 sm:py-8 ${
                 // The editor is a dense working surface; the other app screens
                 // share the remaining width beside the sidebar instead of
                 // keeping the marketing measure they had under a top bar.
