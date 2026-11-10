@@ -299,7 +299,17 @@ export function TableQrPanel(props: TableQrPanelProps) {
     return () => {
       cancelled = true;
     };
-  }, [origin, count, prefix, custom, menuId, publicSlug, publicRestaurantSlug, tableSlug, restaurantId]);
+  }, [
+    origin,
+    count,
+    prefix,
+    custom,
+    menuId,
+    publicSlug,
+    publicRestaurantSlug,
+    tableSlug,
+    restaurantId,
+  ]);
 
   useEffect(() => {
     if (custom) {
@@ -397,8 +407,8 @@ export function TableQrPanel(props: TableQrPanelProps) {
           </p>
           <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-ink-600">
             Table cards point at your restaurant link —{" "}
-            <code className="rounded bg-surface-base px-1.5 py-0.5">/r/…/t/3</code> — where diners see
-            every menu that is open right now. Claim it once, then print the cards below.
+            <code className="rounded bg-surface-base px-1.5 py-0.5">/r/…/t/3</code> — where diners
+            see every menu that is open right now. Claim it once, then print the cards below.
           </p>
           {linkState.isOwner && canManage ? (
             <>
@@ -447,9 +457,9 @@ export function TableQrPanel(props: TableQrPanelProps) {
           data-print-hide
           className="rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-xs leading-5 text-warning-900"
         >
-          <span className="font-bold">Table codes moved.</span> This menu no longer prints
-          its own table cards — print them from the Tables tab instead, where one code per
-          table covers the whole restaurant.
+          <span className="font-bold">Table codes moved.</span> This menu no longer prints its own
+          table cards — print them from the Tables tab instead, where one code per table covers the
+          whole restaurant.
         </p>
       ) : (
         <>

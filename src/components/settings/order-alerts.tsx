@@ -81,8 +81,8 @@ export function OrderAlertsCard({
     <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
       <h3 className="text-sm font-bold tracking-tight text-ink-900">Order alerts</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
-        One email per new order for {restaurantName}, from the verified Eateryo sender. A rush
-        never spams the inbox — past a few emails in ten minutes only the board catches the rest.
+        One email per new order for {restaurantName}, from the verified Eateryo sender. A rush never
+        spams the inbox — past a few emails in ten minutes only the board catches the rest.
       </p>
 
       {loading ? (
@@ -114,8 +114,8 @@ export function OrderAlertsCard({
             />
           </label>
           <p className="-mt-1 text-[11px] leading-4 text-ink-400">
-            Blank sends to every owner&apos;s account email — fill it to route orders to one
-            address instead (the till, a manager…).
+            Blank sends to every owner&apos;s account email — fill it to route orders to one address
+            instead (the till, a manager…).
           </p>
           {canManage ? (
             <div>

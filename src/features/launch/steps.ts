@@ -10,13 +10,7 @@
 
 import type { LaunchSnapshot } from "./schema";
 
-export const LAUNCH_STEP_IDS = [
-  "extract",
-  "review",
-  "cards",
-  "publish",
-  "order",
-] as const;
+export const LAUNCH_STEP_IDS = ["extract", "review", "cards", "publish", "order"] as const;
 
 export type LaunchStepId = (typeof LAUNCH_STEP_IDS)[number];
 
@@ -36,6 +30,16 @@ export interface LaunchStep {
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
+
+/** The snapshot of an account we have not read — every step is still open. */
+const NOTHING_YET: LaunchSnapshot = {
+  menuCount: 0,
+  publishedCount: 0,
+  orderCount: 0,
+  unpricedItems: 0,
+  reviewNotes: 0,
+  unreadableMenus: 0,
+};
 
 export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
   const hasMenu = snapshot.menuCount > 0;
@@ -67,7 +71,8 @@ export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
     {
       id: "cards",
       title: "Print the table cards",
-      guidance: "Open the Tables tab and print one card per table; each card covers every open menu.",
+      guidance:
+        "Open the Tables tab and print one card per table; each card covers every open menu.",
       done: false,
       manual: true,
       detail: "Tick this on the device you printed from — we can't see your printer",
@@ -92,6 +97,17 @@ export function launchSteps(snapshot: LaunchSnapshot): LaunchStep[] {
           : "No orders yet",
     },
   ];
+}
+
+/**
+ * The same five steps before an account is read, so the signed-out launch
+ * page can show the whole process instead of only a sign-in prompt. Nothing
+ * is ticked: a step is done when the server sees it, and there is no server
+ * answer yet. The surfaces using this hide each step's `detail`, which would
+ * otherwise describe an account that does not exist.
+ */
+export function previewLaunchSteps(): LaunchStep[] {
+  return launchSteps(NOTHING_YET);
 }
 
 /** Steps the server can verify (the manual ones are excluded). */

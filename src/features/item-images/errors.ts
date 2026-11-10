@@ -14,11 +14,7 @@
 import type { ItemImagePrepareErrorCode } from "./prepare";
 
 export type ItemImageErrorCode =
-  | ItemImagePrepareErrorCode
-  | "sign_in"
-  | "not_configured"
-  | "unsupported"
-  | "failed";
+  ItemImagePrepareErrorCode | "sign_in" | "not_configured" | "unsupported" | "failed";
 
 export class ItemImageError extends Error {
   readonly code: ItemImageErrorCode;

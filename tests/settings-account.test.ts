@@ -5,11 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { UsageSummary } from "@/features/usage/schema";
 
 /**
- * R0.5 — the `/launch` cleanup. Export/delete and usage moved to Settings
- * ("Data & privacy" and "Usage"); the launch page is back to the checklist
- * plus marketing copy. Static rendering is enough: the gate is a session
- * decision, the nudge is a pure function, and the loading skeleton pins that
- * no usage numbers render before the account data lands.
+ * R0.5 — the `/launch` cleanup, then the Settings reorder. Export and account
+ * deletion moved to Settings as two separate cards (a neutral "Data &
+ * privacy" export and the final "Danger zone — delete your account"), and
+ * usage sits with the café sections. Static rendering is enough: the gate is
+ * a session decision, the nudge is a pure function, and the loading skeleton
+ * pins that no usage numbers render before the account data lands.
  */
 
 const sessionState = vi.hoisted(() => ({
@@ -29,7 +30,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: () => {}, refresh: () => {} }),
 }));
 
-import { DataControls } from "@/components/launch/data-controls";
+import { AccountDangerZone, AccountExportCard } from "@/components/launch/data-controls";
 import { UsagePanel, extractNudge } from "@/components/settings/usage-panel";
 import LaunchPage from "@/app/launch/page";
 
@@ -70,19 +71,25 @@ describe("extractNudge", () => {
   });
 });
 
-describe("DataControls sign-in gate", () => {
-  it("renders nothing when signed out", () => {
+describe("account cards sign-in gate", () => {
+  it("renders neither card when signed out", () => {
     sessionState.user = null;
-    expect(renderToStaticMarkup(createElement(DataControls))).toBe("");
+    expect(renderToStaticMarkup(createElement(AccountExportCard))).toBe("");
+    expect(renderToStaticMarkup(createElement(AccountDangerZone))).toBe("");
   });
 
-  it("renders export and delete once signed in", () => {
+  it("keeps export in a neutral card and deletion in the danger zone", () => {
     signIn();
     try {
-      const html = renderToStaticMarkup(createElement(DataControls));
-      expect(html).toContain("Data &amp; privacy");
-      expect(html).toContain("Export my data");
-      expect(html).toContain("Delete my account");
+      const exportHtml = renderToStaticMarkup(createElement(AccountExportCard));
+      expect(exportHtml).toContain("Data &amp; privacy");
+      expect(exportHtml).toContain("Export my data");
+      expect(exportHtml).not.toContain("Delete my account");
+
+      const dangerHtml = renderToStaticMarkup(createElement(AccountDangerZone));
+      expect(dangerHtml).toContain("Danger zone — delete your account");
+      expect(dangerHtml).toContain("Delete my account");
+      expect(dangerHtml).not.toContain("Export my data");
     } finally {
       sessionState.user = null;
     }

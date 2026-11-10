@@ -101,8 +101,8 @@ export function CapturePage({
           Turn your photo into a menu
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-          Upload a photo or scan of a menu, extract it into categories and items with AI, then review
-          and correct the draft. AI output is never guaranteed — you stay in charge.
+          Upload a photo or scan of a menu, extract it into categories and items with AI, then
+          review and correct the draft. AI output is never guaranteed — you stay in charge.
         </p>
         {!signedIn && !sessionPending && (
           <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">

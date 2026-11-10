@@ -111,8 +111,10 @@ function jsonInit(method: string, body: unknown): RequestInit {
 
 /** The restaurant's public `/r/<slug>` address (null until claimed). */
 export async function fetchRestaurantLink(restaurantId: string): Promise<RestaurantLink> {
-  return requestJson(slugUrl(restaurantId), undefined, (payload) =>
-    restaurantLinkEnvelope.parse(payload).restaurant
+  return requestJson(
+    slugUrl(restaurantId),
+    undefined,
+    (payload) => restaurantLinkEnvelope.parse(payload).restaurant
   );
 }
 
@@ -121,8 +123,10 @@ export async function setRestaurantLink(
   restaurantId: string,
   slug: string
 ): Promise<RestaurantLink> {
-  return requestJson(slugUrl(restaurantId), jsonInit("PUT", { slug }), (payload) =>
-    restaurantLinkEnvelope.parse(payload).restaurant
+  return requestJson(
+    slugUrl(restaurantId),
+    jsonInit("PUT", { slug }),
+    (payload) => restaurantLinkEnvelope.parse(payload).restaurant
   );
 }
 
@@ -148,7 +152,5 @@ export async function ensureRestaurantLink(
       throw error;
     }
   }
-  throw (
-    (lastError as Error) ?? new SyncError("slug_taken", "Could not find a free link.")
-  );
+  throw (lastError as Error) ?? new SyncError("slug_taken", "Could not find a free link.");
 }

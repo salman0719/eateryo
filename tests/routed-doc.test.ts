@@ -33,9 +33,9 @@ describe("docForRoutedMenu", () => {
     expect(docForRoutedMenu(first, { screen: "editor", menuId: first.id, mode: "publish" })).toBe(
       first
     );
-    expect(
-      docForRoutedMenu(first, { screen: "item", menuId: first.id, itemId: "item-1" })
-    ).toBe(first);
+    expect(docForRoutedMenu(first, { screen: "item", menuId: first.id, itemId: "item-1" })).toBe(
+      first
+    );
   });
 
   it("renders nothing once the route leaves the editor", () => {

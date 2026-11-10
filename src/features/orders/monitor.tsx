@@ -28,7 +28,12 @@ import {
 } from "react";
 
 import { fetchStaffOrders } from "./client";
-import { detectNewOrders, mergeBoardOrders, monitorPollScope, monitorScopeKey } from "./monitor-utils";
+import {
+  detectNewOrders,
+  mergeBoardOrders,
+  monitorPollScope,
+  monitorScopeKey,
+} from "./monitor-utils";
 import { orderCode, type Order, type OrderStatus } from "./schema";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "./table-links";
@@ -170,8 +175,7 @@ export function OrderMonitorProvider({
   const permissionRef = useRef<NotificationPermission | "unsupported">("unsupported");
   const toastTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const notificationsAvailable =
-    typeof window !== "undefined" && "Notification" in window;
+  const notificationsAvailable = typeof window !== "undefined" && "Notification" in window;
 
   // A new session (sign-out, a different account, or a different café) resets
   // the monitor synchronously during render — React's endorsed pattern for
@@ -342,8 +346,7 @@ export function OrderMonitorProvider({
 
     const initial = setTimeout(() => void tick(), 0);
     const onVisible = () => {
-      if (document.visibilityState === "visible")
-        void poll(false, cafeId).catch(() => undefined);
+      if (document.visibilityState === "visible") void poll(false, cafeId).catch(() => undefined);
     };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("focus", onVisible);
@@ -386,17 +389,14 @@ export function OrderMonitorProvider({
     }
   }, []);
 
-  const setViewingBoard = useCallback(
-    (viewing: boolean) => {
-      viewingRef.current = viewing;
-      if (viewing && sinceRef.current) {
-        seenAtRef.current = sinceRef.current;
-        setSeenAt(sinceRef.current);
-        setToasts([]);
-      }
-    },
-    []
-  );
+  const setViewingBoard = useCallback((viewing: boolean) => {
+    viewingRef.current = viewing;
+    if (viewing && sinceRef.current) {
+      seenAtRef.current = sinceRef.current;
+      setSeenAt(sinceRef.current);
+      setToasts([]);
+    }
+  }, []);
 
   const refresh = useCallback(() => {
     // Never refresh the union: with no café to act in there is nothing to read.

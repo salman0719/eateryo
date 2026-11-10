@@ -27,10 +27,7 @@ export function menuAccessById(
 }
 
 /** The one question every menu surface asks; unanswered and refused are false. */
-export function accessCan(
-  access: MenuAccess | undefined,
-  capability: Capability
-): boolean {
+export function accessCan(access: MenuAccess | undefined, capability: Capability): boolean {
   if (access === "local") return true;
   if (access === undefined || access === "none") return false;
   return hasCapability(access.capabilities, capability);
@@ -66,10 +63,5 @@ export function restaurantCapabilities(restaurant: {
 
 /** True when the caller is on the restaurant as staff (their role axis). */
 export function accessIsStaff(access: MenuAccess | undefined): boolean {
-  return (
-    access !== undefined &&
-    access !== "local" &&
-    access !== "none" &&
-    access.role === "staff"
-  );
+  return access !== undefined && access !== "local" && access !== "none" && access.role === "staff";
 }

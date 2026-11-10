@@ -63,7 +63,10 @@ export function addUsage(a: ProviderUsage, b: ProviderUsage): ProviderUsage {
     if (right === null) return left;
     return left + right;
   };
-  return { inputTokens: sum(a.inputTokens, b.inputTokens), outputTokens: sum(a.outputTokens, b.outputTokens) };
+  return {
+    inputTokens: sum(a.inputTokens, b.inputTokens),
+    outputTokens: sum(a.outputTokens, b.outputTokens),
+  };
 }
 
 export interface ExtractionProvider {

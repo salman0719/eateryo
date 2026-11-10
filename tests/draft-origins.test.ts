@@ -71,7 +71,13 @@ describe("draft origins", () => {
   it("hashes content identically regardless of key order", () => {
     const doc = createMenuDocument({ title: "Café" });
     const reordered = JSON.parse(
-      JSON.stringify({ updatedAt: doc.updatedAt, currency: doc.currency, title: doc.title, id: doc.id, categories: doc.categories })
+      JSON.stringify({
+        updatedAt: doc.updatedAt,
+        currency: doc.currency,
+        title: doc.title,
+        id: doc.id,
+        categories: doc.categories,
+      })
     );
     expect(menuContentHash({ ...doc, id: reordered.id })).toBe(
       menuContentHash({ ...doc, ...reordered })
@@ -89,19 +95,37 @@ describe("decideHeal", () => {
 
   it("does nothing when the content already agrees", () => {
     expect(
-      decideHeal({ contentEqual: true, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1", ...hashed })
+      decideHeal({
+        contentEqual: true,
+        localUpdatedAt: "t2",
+        lastSyncedUpdatedAt: "s0",
+        serverUpdatedAt: "s1",
+        ...hashed,
+      })
     ).toBe("none");
   });
 
   it("pushes local work when the server is untouched", () => {
     expect(
-      decideHeal({ contentEqual: false, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s0", ...hashed })
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "t2",
+        lastSyncedUpdatedAt: "s0",
+        serverUpdatedAt: "s0",
+        ...hashed,
+      })
     ).toBe("push");
   });
 
   it("raises a conflict when both sides moved", () => {
     expect(
-      decideHeal({ contentEqual: false, localUpdatedAt: "t2", lastSyncedUpdatedAt: "s0", serverUpdatedAt: "s1", ...hashed })
+      decideHeal({
+        contentEqual: false,
+        localUpdatedAt: "t2",
+        lastSyncedUpdatedAt: "s0",
+        serverUpdatedAt: "s1",
+        ...hashed,
+      })
     ).toBe("conflict");
   });
 

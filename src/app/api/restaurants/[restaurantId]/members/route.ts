@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import {
-  addMemberForOwner,
-  listMembersForUser,
-  TenancyRepoError,
-} from "@/features/tenancy/repo";
-import {
-  createInvitationForOwner,
-  InvitationError,
-} from "@/features/tenancy/invitations";
+import { addMemberForOwner, listMembersForUser, TenancyRepoError } from "@/features/tenancy/repo";
+import { createInvitationForOwner, InvitationError } from "@/features/tenancy/invitations";
 import { emailInvitation, publicBaseUrl } from "@/features/tenancy/invite-mailer";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
@@ -168,6 +161,10 @@ async function inviteTeammate(
     return NextResponse.json({ invitation: created.invitation }, { status: 201 });
   } catch (error) {
     if (error instanceof InvitationError) return mapInvitationError(error);
-    return errorResponse("server_db_unavailable", "Could not create the invitation. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not create the invitation. Try again.",
+      503
+    );
   }
 }

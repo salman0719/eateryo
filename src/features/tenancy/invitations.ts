@@ -348,7 +348,9 @@ export async function getInvitationByToken(
   token: string
 ): Promise<InvitationDetails | null> {
   if (!token) return null;
-  const rows = await invitationQuery(db).where(eq(restaurantInvitation.tokenHash, hashToken(token)));
+  const rows = await invitationQuery(db).where(
+    eq(restaurantInvitation.tokenHash, hashToken(token))
+  );
   const row = rows[0];
   if (!row) return null;
   return {

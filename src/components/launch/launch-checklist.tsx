@@ -3,10 +3,12 @@
 /**
  * The free-launch onboarding checklist (Step 11).
  *
- * Signed out, it explains what signing in is for and links to the one sign-in
- * flow. Signed in, it reports the account's real state: five steps are
- * derived on the server, and the one step only a human can confirm (printing
- * table cards) is a labelled manual tick stored on this device.
+ * Signed out, it still shows the whole list — every step open, and no state
+ * claimed about an account we have not read — with the sign-in prompt above
+ * it, so the "Get started" call to action lands on the process itself rather
+ * than on a wall. Signed in, it reports the account's real state: five steps
+ * are derived on the server, and the one step only a human can confirm
+ * (printing table cards) is a labelled manual tick stored on this device.
  */
 
 import Link from "next/link";
@@ -14,12 +16,14 @@ import { useEffect, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchLaunchStatus } from "@/features/launch/client";
-import {
-  CARDS_PRINTED_KEY,
-  cardsPrintedOnThisDevice,
-} from "@/features/launch/progress";
+import { CARDS_PRINTED_KEY, cardsPrintedOnThisDevice } from "@/features/launch/progress";
 import type { LaunchStatus } from "@/features/launch/schema";
-import { launchSteps, verifiedProgress, type LaunchStep } from "@/features/launch/steps";
+import {
+  launchSteps,
+  previewLaunchSteps,
+  verifiedProgress,
+  type LaunchStep,
+} from "@/features/launch/steps";
 import { SyncError } from "@/features/menus/sync";
 import { useWorkspace } from "@/features/tenancy/workspace-context";
 
@@ -62,6 +66,85 @@ function stepActionLabel(step: LaunchStep): string {
   }
 }
 
+/** The list before any account is read: every step open, no details shown. */
+const SIGNED_OUT_STEPS = previewLaunchSteps();
+
+/**
+ * The five steps, in order. One list serves both audiences: signed in it
+ * carries the account's real state and the manual print tick; signed out it
+ * is the same process with every step open and no detail line, since there is
+ * no café state to describe.
+ */
+function ChecklistSteps({
+  steps,
+  details,
+  onToggleCards,
+}: {
+  steps: readonly LaunchStep[];
+  /** Print each step's account state — never before an account has been read. */
+  details: boolean;
+  /** Present only signed in: the one tick only a human can give. */
+  onToggleCards?: (next: boolean) => void;
+}) {
+  return (
+    <ol className="mt-4 space-y-3">
+      {steps.map((step, index) => {
+        const showTick = step.manual && onToggleCards;
+        return (
+          <li key={step.id} className="flex gap-3">
+            <span
+              aria-hidden="true"
+              className={
+                "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
+                (step.done
+                  ? "border-accent-700 bg-accent-700 text-on-accent"
+                  : "border-line-300 bg-surface-base text-ink-400")
+              }
+            >
+              {step.done ? "✓" : index + 1}
+            </span>
+            <div className="min-w-0">
+              <p
+                className={
+                  "text-sm font-medium " +
+                  (step.done ? "text-ink-500 line-through" : "text-ink-900")
+                }
+              >
+                {step.title}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-600">{step.guidance}</p>
+              {details ? <p className="mt-1 text-xs text-ink-500">{step.detail}</p> : null}
+              {/* Manual steps keep their control after being ticked,
+                  otherwise a mis-click could never be undone. */}
+              {!step.done || showTick ? (
+                <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                  <Link
+                    href={stepHref(step)}
+                    className="text-xs font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
+                  >
+                    {stepActionLabel(step)}
+                  </Link>
+                  {showTick ? (
+                    <label className="flex items-center gap-1.5 text-xs text-ink-600">
+                      <input
+                        type="checkbox"
+                        checked={step.done}
+                        onChange={(event) => onToggleCards?.(event.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-line-300 accent-accent-700"
+                      />
+                      {step.done ? "I printed them (untick to undo)" : "I printed them"}
+                    </label>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function LaunchChecklist() {
   const workspace = useWorkspace();
   const [cafe, setCafe] = useState<{ for: string | null; state: CafeState }>({
@@ -96,9 +179,7 @@ export function LaunchChecklist() {
           state: {
             kind: "error",
             message:
-              error instanceof Error
-                ? error.message
-                : "Could not load your checklist. Try again.",
+              error instanceof Error ? error.message : "Could not load your checklist. Try again.",
           },
         });
       }
@@ -149,7 +230,11 @@ export function LaunchChecklist() {
 
   if (state.kind === "loading") {
     return (
-      <div role="status" aria-busy="true" className="rounded-2xl border border-line-200 bg-surface-base p-5">
+      <div
+        role="status"
+        aria-busy="true"
+        className="rounded-2xl border border-line-200 bg-surface-base p-5"
+      >
         <span className="sr-only">Checking your account…</span>
         <Skeleton className="h-5 w-48" />
         <div className="mt-4 flex flex-col gap-3">
@@ -166,26 +251,38 @@ export function LaunchChecklist() {
 
   if (state.kind === "signed_out") {
     return (
-      <div className="rounded-2xl border border-warning-200 bg-warning-50 p-5">
-        <h2 className="text-base font-semibold text-warning-950">Sign in to start the checklist</h2>
-        <p className="mt-1 text-sm text-warning-900">
-          Your menus, publishing, and table orders need an account so a phone at the table can
-          reach the same menu your laptop published. It is still free, and there is no card step.
-        </p>
-        <Link
-          href="/sign-in"
-          className="mt-4 inline-flex rounded-lg bg-accent-800 px-3.5 py-2 text-sm font-semibold text-on-accent hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          Sign in with an email link
-        </Link>
-        <p className="mt-3 text-xs text-warning-900/80">
-          Working offline first?{" "}
-          <Link href="/" className="underline underline-offset-2">
-            Try the local editor
-          </Link>{" "}
-          — nothing leaves this browser and no account is needed.
-        </p>
-      </div>
+      <section className="rounded-2xl border border-line-200 bg-surface-base p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-semibold text-ink-900">Your launch checklist</h2>
+          <p className="text-xs text-ink-500">Sign in to start</p>
+        </div>
+        <div className="mt-3 rounded-xl border border-warning-200 bg-warning-50 p-3">
+          <p className="text-sm text-warning-900">
+            <span className="font-semibold text-warning-950">Nothing is ticked yet.</span> Your
+            menus, publishing and table orders need an account so a phone at the table reaches the
+            same menu your laptop published, and so the checklist keeps its place. It is still free,
+            and there is no card step.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <Link
+              href="/sign-in"
+              className="rounded-lg bg-accent-800 px-3.5 py-2 text-sm font-semibold text-on-accent hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              Sign in with an email link
+            </Link>
+            <Link
+              href="/"
+              className="text-xs font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
+            >
+              Try the local editor first
+            </Link>
+          </div>
+          <p className="mt-2 text-xs text-warning-900/80">
+            Offline, nothing leaves this browser and no account is needed.
+          </p>
+        </div>
+        <ChecklistSteps steps={SIGNED_OUT_STEPS} details={false} />
+      </section>
     );
   }
 
@@ -274,57 +371,7 @@ export function LaunchChecklist() {
           />
         </div>
 
-        <ol className="mt-4 space-y-3">
-          {steps.map((step, index) => (
-            <li key={step.id} className="flex gap-3">
-              <span
-                aria-hidden="true"
-                className={
-                  "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
-                  (step.done
-                    ? "border-accent-700 bg-accent-700 text-on-accent"
-                    : "border-line-300 bg-surface-base text-ink-400")
-                }
-              >
-                {step.done ? "✓" : index + 1}
-              </span>
-              <div className="min-w-0">
-                <p
-                  className={
-                    "text-sm font-medium " + (step.done ? "text-ink-500 line-through" : "text-ink-900")
-                  }
-                >
-                  {step.title}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-600">{step.guidance}</p>
-                <p className="mt-1 text-xs text-ink-500">{step.detail}</p>
-                {/* Manual steps keep their control after being ticked,
-                    otherwise a mis-click could never be undone. */}
-                {!step.done || step.manual ? (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-3">
-                    <Link
-                      href={stepHref(step)}
-                      className="text-xs font-semibold text-accent-800 underline underline-offset-2 hover:text-accent-900"
-                    >
-                      {stepActionLabel(step)}
-                    </Link>
-                    {step.manual ? (
-                      <label className="flex items-center gap-1.5 text-xs text-ink-600">
-                        <input
-                          type="checkbox"
-                          checked={cardsPrinted}
-                          onChange={(event) => toggleCardsPrinted(event.target.checked)}
-                          className="h-3.5 w-3.5 rounded border-line-300 accent-accent-700"
-                        />
-                        {cardsPrinted ? "I printed them (untick to undo)" : "I printed them"}
-                      </label>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
+        <ChecklistSteps steps={steps} details onToggleCards={toggleCardsPrinted} />
 
         {allDone ? (
           <p className="mt-4 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-900">

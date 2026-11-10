@@ -11,13 +11,7 @@ export const metadata: Metadata = {
     "What Eateryo stores, what it never stores, how long orders are kept, and how to export or delete your data.",
 };
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-7">
       <h2 className="text-base font-semibold text-ink-900">{title}</h2>
@@ -50,19 +44,19 @@ export default function PrivacyPage() {
         <Section title="What we store">
           <ul className="list-disc space-y-1.5 pl-5">
             <li>
-              <strong className="font-medium text-ink-800">Your account:</strong> the email
-              address you sign in with, sent once as a one-time sign-in link. There is no password.
+              <strong className="font-medium text-ink-800">Your account:</strong> the email address
+              you sign in with, sent once as a one-time sign-in link. There is no password.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Your menu:</strong> the restaurant
-              name, menu text, prices, and the themes you publish.
+              <strong className="font-medium text-ink-800">Your menu:</strong> the restaurant name,
+              menu text, prices, and the themes you publish.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Dish photos:</strong> only the photos
-              you choose to attach to a dish. They are stored by our file host, UploadThing, and
-              served from its CDN to the diners looking at your menu. Removing a photo from a dish
-              stops it being shown; the stored file is kept so that diners still being served your
-              last published menu keep seeing the picture that was published.
+              <strong className="font-medium text-ink-800">Dish photos:</strong> only the photos you
+              choose to attach to a dish. They are stored by our file host, UploadThing, and served
+              from its CDN to the diners looking at your menu. Removing a photo from a dish stops it
+              being shown; the stored file is kept so that diners still being served your last
+              published menu keep seeing the picture that was published.
             </li>
             <li>
               <strong className="font-medium text-ink-800">Table orders:</strong> the table label,
@@ -70,8 +64,8 @@ export default function PrivacyPage() {
               diner, the status, and timestamps.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Extraction usage:</strong> how many
-              pages and tokens each AI extraction used, so we can see the cost and apply the free
+              <strong className="font-medium text-ink-800">Extraction usage:</strong> how many pages
+              and tokens each AI extraction used, so we can see the cost and apply the free
               allowance. This row records no image and no menu content.
             </li>
             <li>
@@ -80,8 +74,8 @@ export default function PrivacyPage() {
               never stored, and the hash cannot be reversed into an address.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Page views:</strong> a plain counter
-              per published menu. No cookie, no fingerprint, no per-visitor record.
+              <strong className="font-medium text-ink-800">Page views:</strong> a plain counter per
+              published menu. No cookie, no fingerprint, no per-visitor record.
             </li>
           </ul>
         </Section>
@@ -99,12 +93,12 @@ export default function PrivacyPage() {
               email, no phone, no account, no device identifier.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Payment data.</strong> Nothing is
-              charged during the launch promotion, so we never see a card number.
+              <strong className="font-medium text-ink-800">Payment data.</strong> Nothing is charged
+              during the launch promotion, so we never see a card number.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Advertising profiles.</strong> There
-              are no ad networks, no tracking pixels, and no analytics cookies.
+              <strong className="font-medium text-ink-800">Advertising profiles.</strong> There are
+              no ad networks, no tracking pixels, and no analytics cookies.
             </li>
           </ul>
         </Section>
@@ -133,8 +127,8 @@ export default function PrivacyPage() {
             look back at past service. You can export everything as JSON at any time, and deleting
             the account removes it all. Nothing in this app deletes your orders automatically today;
             if that changes, the window will be stated on this page first. Extraction usage rows
-            contain no diner data and are kept so cost accounting stays correct. Server request
-            logs are kept by the hosting provider under its retention window and contain no request
+            contain no diner data and are kept so cost accounting stays correct. Server request logs
+            are kept by the hosting provider under its retention window and contain no request
             bodies.
           </p>
         </Section>
@@ -151,7 +145,10 @@ export default function PrivacyPage() {
           {email ? (
             <p>
               Questions about this policy or your data:{" "}
-              <a className="font-medium text-accent-800 underline underline-offset-2" href={`mailto:${email}`}>
+              <a
+                className="font-medium text-accent-800 underline underline-offset-2"
+                href={`mailto:${email}`}
+              >
                 {email}
               </a>
               .

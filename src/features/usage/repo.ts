@@ -157,8 +157,6 @@ export async function countAnonymousExtractions(
   const rows = await db
     .select({ value: count() })
     .from(extractionUsage)
-    .where(
-      and(eq(extractionUsage.callerHash, callerHash), gte(extractionUsage.createdAt, since))
-    );
+    .where(and(eq(extractionUsage.callerHash, callerHash), gte(extractionUsage.createdAt, since)));
   return Number(rows[0]?.value ?? 0);
 }

@@ -52,7 +52,10 @@ describe("assistant spend summary", () => {
   it("sums only this account's calls in the current UTC month", async () => {
     await recordAssistantUsage(db, row(userId, { requestId: "a", neurons: 5.3, now: NOW }));
     await recordAssistantUsage(db, row(userId, { requestId: "b", neurons: 2.1, now: NOW }));
-    await recordAssistantUsage(db, row(userId, { requestId: "old", now: new Date("2026-09-30T23:59:00.000Z") }));
+    await recordAssistantUsage(
+      db,
+      row(userId, { requestId: "old", now: new Date("2026-09-30T23:59:00.000Z") })
+    );
     await recordAssistantUsage(db, row(otherId, { requestId: "c", now: NOW }));
 
     const summary = await getAssistantSpendSummary(db, userId, NOW, {});

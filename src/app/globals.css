@@ -74,7 +74,7 @@ body {
     outline: 3px solid var(--color-accent-700);
     outline-offset: 2px;
   }
-}/* R0 mobile floor: 16px form text stops iOS focus-zoom; coarse-pointer
+} /* R0 mobile floor: 16px form text stops iOS focus-zoom; coarse-pointer
 targets get a 44px minimum so phone taps land; secondary copy never drops
 below 12px on phones (print keeps its 10px QR captions — this is screen-only). */
 @media (max-width: 640px) {

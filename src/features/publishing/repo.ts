@@ -43,11 +43,7 @@ import { slugCandidates, slugifyMenuTitle } from "./slug";
  */
 
 export type PublicationRepoErrorCode =
-  | "not_found"
-  | "forbidden"
-  | "invalid"
-  | "slug_taken"
-  | "not_published";
+  "not_found" | "forbidden" | "invalid" | "slug_taken" | "not_published";
 
 export class PublicationRepoError extends Error {
   readonly code: PublicationRepoErrorCode;
@@ -209,7 +205,10 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const candidate = error as { code?: unknown; message?: unknown; cause?: unknown };
   if (candidate.code === "23505") return true;
-  if (typeof candidate.message === "string" && /duplicate key|unique constraint/i.test(candidate.message)) {
+  if (
+    typeof candidate.message === "string" &&
+    /duplicate key|unique constraint/i.test(candidate.message)
+  ) {
     return true;
   }
   return candidate.cause !== error && isUniqueViolation(candidate.cause);
@@ -363,7 +362,10 @@ export async function unpublishMenuForUser(
   const menuRow = await loadMenuWithRole(db, userId, menuId);
   if (!menuRow) throw new PublicationRepoError("not_found", "That menu does not exist.");
   if (!can(accessFromMembership(menuRow), "menus.publish")) {
-    throw new PublicationRepoError("forbidden", "Only the restaurant owner can unpublish this menu.");
+    throw new PublicationRepoError(
+      "forbidden",
+      "Only the restaurant owner can unpublish this menu."
+    );
   }
   const existing = await db
     .select({ id: publishedMenu.id })

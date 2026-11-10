@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { DevSignInPanel, useDevSignInLink } from "@/components/auth/dev-sign-in-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   acceptInvitation,
@@ -33,7 +34,7 @@ export function InvitationSkeleton() {
 type SignInState =
   | { kind: "idle" }
   | { kind: "sending" }
-  | { kind: "sent" }
+  | { kind: "sent"; email: string; sentAt: number }
   | { kind: "error"; message: string };
 
 /**
@@ -45,11 +46,22 @@ type SignInState =
  * this page. The server refuses acceptance from any other account, so this
  * page only explains what happened.
  *
+ * With `DEV_SIGN_IN_BYPASS=1` locally the server parks the sign-in link
+ * instead of emailing it, so this page reads it back and shows it — otherwise
+ * it would say "check your email" about a message that was never sent. The
+ * server page passes `devSignIn`, which is false in production.
+ *
  * The token arrives as a prop from the server page: reading route params in
  * a client component blocks prerendering (Next 16 flags useParams outside
  * Suspense), and the page has nothing to render until it has the token.
  */
-export function InvitationClient({ token }: { token: string }) {
+export function InvitationClient({
+  token,
+  devSignIn = false,
+}: {
+  token: string;
+  devSignIn?: boolean;
+}) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
 
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
@@ -58,6 +70,12 @@ export function InvitationClient({ token }: { token: string }) {
   const [accepted, setAccepted] = useState<{ name: string; role: "owner" | "staff" } | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [signIn, setSignIn] = useState<SignInState>({ kind: "idle" });
+
+  const dev = useDevSignInLink({
+    enabled: devSignIn,
+    email: signIn.kind === "sent" ? signIn.email : null,
+    requestKey: signIn.kind === "sent" ? signIn.sentAt : null,
+  });
 
   useEffect(() => {
     if (!token) return;
@@ -102,7 +120,7 @@ export function InvitationClient({ token }: { token: string }) {
       });
       return;
     }
-    setSignIn({ kind: "sent" });
+    setSignIn({ kind: "sent", email, sentAt: Date.now() });
   }
 
   async function handleSwitchAccount(email: string) {
@@ -127,6 +145,19 @@ export function InvitationClient({ token }: { token: string }) {
     }
   }
 
+  // The dev shortcut replaces the "check your email" copy wherever it would
+  // otherwise be a lie; both sign-in entry points on this page share it.
+  const pendingDevLink =
+    signIn.kind === "sent" && devSignIn ? (
+      <DevSignInPanel
+        email={signIn.email}
+        url={dev.url}
+        settling={dev.settling}
+        onReset={() => setSignIn({ kind: "idle" })}
+        resetLabel="Try again"
+      />
+    ) : null;
+
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <div>
@@ -141,7 +172,10 @@ export function InvitationClient({ token }: { token: string }) {
       </div>
 
       {loadError && (
-        <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+        <p
+          role="alert"
+          className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800"
+        >
           {loadError}
         </p>
       )}
@@ -201,7 +235,10 @@ export function InvitationClient({ token }: { token: string }) {
       )}
 
       {acceptError && (
-        <p role="alert" className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800">
+        <p
+          role="alert"
+          className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800"
+        >
           {acceptError}
         </p>
       )}
@@ -211,13 +248,15 @@ export function InvitationClient({ token }: { token: string }) {
           {!signedEmail && (
             <div className="flex flex-col gap-3">
               {signIn.kind === "sent" ? (
-                <div className="rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-900">
-                  <p className="font-medium">Check your email</p>
-                  <p className="mt-1">
-                    We sent a one-time sign-in link to {invitation.email}. Open it on this device,
-                    then accept the invitation.
-                  </p>
-                </div>
+                (pendingDevLink ?? (
+                  <div className="rounded-lg border border-success-200 bg-success-50 p-4 text-sm text-success-900">
+                    <p className="font-medium">Check your email</p>
+                    <p className="mt-1">
+                      We sent a one-time sign-in link to {invitation.email}. Open it on this device,
+                      then accept the invitation.
+                    </p>
+                  </div>
+                ))
               ) : (
                 <>
                   <p className="text-sm text-ink-600">
@@ -256,8 +295,8 @@ export function InvitationClient({ token }: { token: string }) {
           {signedEmail && !emailMatches && (
             <div className="flex flex-col gap-3 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
               <p>
-                You&apos;re signed in as <span className="font-medium">{signedEmail}</span>, but this
-                invitation is for <span className="font-medium">{invitation.email}</span>.
+                You&apos;re signed in as <span className="font-medium">{signedEmail}</span>, but
+                this invitation is for <span className="font-medium">{invitation.email}</span>.
               </p>
               <button
                 type="button"
@@ -269,11 +308,12 @@ export function InvitationClient({ token }: { token: string }) {
                   ? "Sending…"
                   : `Sign in with ${invitation.email} instead`}
               </button>
-              {signIn.kind === "sent" && (
-                <p className="text-xs">
-                  Check that inbox for the sign-in link, then accept the invitation.
-                </p>
-              )}
+              {signIn.kind === "sent" &&
+                (pendingDevLink ?? (
+                  <p className="text-xs">
+                    Check that inbox for the sign-in link, then accept the invitation.
+                  </p>
+                ))}
             </div>
           )}
         </>

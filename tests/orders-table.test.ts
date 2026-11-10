@@ -116,9 +116,9 @@ describe("multi-menu table orders", () => {
       ],
     });
     // 1 × 6 + 2 × 5 = 16.
-    expect(
-      placed.lines.reduce((sum, line) => sum + (line.unitPrice ?? 0) * line.quantity, 0)
-    ).toBe(16);
+    expect(placed.lines.reduce((sum, line) => sum + (line.unitPrice ?? 0) * line.quantity, 0)).toBe(
+      16
+    );
   });
 
   it("refuses an unknown restaurant slug without touching the board", async () => {

@@ -81,7 +81,9 @@ describe("jailbreak requests never become operations", () => {
     expect(parsed.success).toBe(false);
   });
 
-  function applyError(operations: Parameters<typeof applyProposalOperations>[1]): ProposalApplyError {
+  function applyError(
+    operations: Parameters<typeof applyProposalOperations>[1]
+  ): ProposalApplyError {
     try {
       applyProposalOperations(createSampleMenuDocument(), operations);
     } catch (error) {

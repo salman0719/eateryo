@@ -11,13 +11,13 @@ correctly afterwards.
 
 ## What is protected, and by whom
 
-| Data | Primary store | Backup |
-| --- | --- | --- |
-| Accounts, sessions | Neon Postgres | Neon history / point-in-time restore |
-| Menus, published revisions, publications | Neon Postgres | same |
-| Orders, usage ledger | Neon Postgres | same |
-| Uploaded menu images | not stored | n/a |
-| Signed-out menus | the owner's browser (IndexedDB) | JSON export, from the app |
+| Data                                     | Primary store                   | Backup                               |
+| ---------------------------------------- | ------------------------------- | ------------------------------------ |
+| Accounts, sessions                       | Neon Postgres                   | Neon history / point-in-time restore |
+| Menus, published revisions, publications | Neon Postgres                   | same                                 |
+| Orders, usage ledger                     | Neon Postgres                   | same                                 |
+| Uploaded menu images                     | not stored                      | n/a                                  |
+| Signed-out menus                         | the owner's browser (IndexedDB) | JSON export, from the app            |
 
 Order history has a second, deliberate limit — currently inactive: a purge
 exists for orders older than `ORDER_RETENTION_DAYS` (90 by default), but
@@ -72,5 +72,5 @@ deletion is immediate and cascades to everything the account created.
 ## Record
 
 | Date | Checked by | Result | Notes |
-| --- | --- | --- | --- |
-| | | | |
+| ---- | ---------- | ------ | ----- |
+|      |            |        |       |

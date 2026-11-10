@@ -86,7 +86,11 @@ export async function GET(_request: Request, { params }: RestaurantParams) {
     if (error instanceof TenancyRepoError) {
       return errorResponse("not_found", error.message, 404);
     }
-    return errorResponse("server_db_unavailable", "Could not load the restaurant link. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not load the restaurant link. Try again.",
+      503
+    );
   }
 }
 
@@ -117,6 +121,10 @@ export async function PUT(request: Request, { params }: RestaurantParams) {
     return noStore(NextResponse.json({ restaurant }));
   } catch (error) {
     if (error instanceof TableRepoError) return mapTableError(error);
-    return errorResponse("server_db_unavailable", "Could not save the restaurant link. Try again.", 503);
+    return errorResponse(
+      "server_db_unavailable",
+      "Could not save the restaurant link. Try again.",
+      503
+    );
   }
 }

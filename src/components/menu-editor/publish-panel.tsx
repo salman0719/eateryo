@@ -293,7 +293,10 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
           </button>
         )}
         {error && (
-          <p role="alert" className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
+          <p
+            role="alert"
+            className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800"
+          >
             {error}
           </p>
         )}

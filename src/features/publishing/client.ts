@@ -117,8 +117,10 @@ function publicationLiveUrl(menuId: string): string {
 
 /** The menu's publication state; null when it has never been published. */
 export async function fetchPublication(menuId: string): Promise<PublicationStatus | null> {
-  return requestJson(publicationUrl(menuId), undefined, (payload) =>
-    optionalPublicationEnvelope.parse(payload).publication
+  return requestJson(
+    publicationUrl(menuId),
+    undefined,
+    (payload) => optionalPublicationEnvelope.parse(payload).publication
   );
 }
 
@@ -127,8 +129,10 @@ export async function fetchPublication(menuId: string): Promise<PublicationStatu
  * to show the owner what publishing changes would alter.
  */
 export async function fetchLiveMenuDoc(menuId: string): Promise<MenuDocument | null> {
-  return requestJson(publicationLiveUrl(menuId), undefined, (payload) =>
-    liveDocEnvelope.parse(payload).doc
+  return requestJson(
+    publicationLiveUrl(menuId),
+    undefined,
+    (payload) => liveDocEnvelope.parse(payload).doc
   );
 }
 
@@ -137,15 +141,18 @@ export async function publishMenu(
   menuId: string,
   input: { slug?: string } = {}
 ): Promise<PublicationStatus> {
-  return requestJson(publicationUrl(menuId), jsonInit("POST", input), (payload) =>
-    publicationEnvelope.parse(payload).publication
+  return requestJson(
+    publicationUrl(menuId),
+    jsonInit("POST", input),
+    (payload) => publicationEnvelope.parse(payload).publication
   );
 }
 
 /** Take the menu out of table ordering; the slug stays reserved. */
 export async function unpublishMenu(menuId: string): Promise<PublicationStatus> {
-  return requestJson(publicationUrl(menuId), { method: "DELETE" }, (payload) =>
-    publicationEnvelope.parse(payload).publication
+  return requestJson(
+    publicationUrl(menuId),
+    { method: "DELETE" },
+    (payload) => publicationEnvelope.parse(payload).publication
   );
 }
-

@@ -221,8 +221,10 @@ export async function fetchServerMenus(): Promise<ServerMenuSummary[]> {
 
 /** One server menu (any member of its restaurant may read). */
 export async function fetchServerMenu(menuId: string): Promise<ServerMenu> {
-  return requestJson(`/api/menus/${encodeURIComponent(menuId)}`, undefined, (payload) =>
-    menuEnvelope.parse(payload).menu
+  return requestJson(
+    `/api/menus/${encodeURIComponent(menuId)}`,
+    undefined,
+    (payload) => menuEnvelope.parse(payload).menu
   );
 }
 

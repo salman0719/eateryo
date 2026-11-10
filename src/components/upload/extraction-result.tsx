@@ -372,14 +372,13 @@ export function ExtractionResult({
     ) : (
       <div className="flex flex-col gap-3">
         {!onlyFlagged && (
-          <section aria-label="Ready items" className="rounded-2xl border border-line-200 bg-surface-base p-5">
-            <h3 className="text-sm font-semibold text-ink-900">
-              ✓ Ready ({readyItems.length})
-            </h3>
+          <section
+            aria-label="Ready items"
+            className="rounded-2xl border border-line-200 bg-surface-base p-5"
+          >
+            <h3 className="text-sm font-semibold text-ink-900">✓ Ready ({readyItems.length})</h3>
             {readyItems.length === 0 ? (
-              <p className="mt-1 text-sm text-ink-600">
-                Every item needs a look — start below.
-              </p>
+              <p className="mt-1 text-sm text-ink-600">Every item needs a look — start below.</p>
             ) : (
               <>
                 <ul className="mt-2 divide-y divide-line-100">
@@ -436,10 +435,15 @@ export function ExtractionResult({
           </div>
         </div>
         {flaggedGroups.map((group) =>
-          renderCategoryCard(group.name, group.entries.map(({ item }) => item), (rowIndex) => ({
-            categoryIndex: group.categoryIndex,
-            itemIndex: group.entries[rowIndex].itemIndex,
-          })))}
+          renderCategoryCard(
+            group.name,
+            group.entries.map(({ item }) => item),
+            (rowIndex) => ({
+              categoryIndex: group.categoryIndex,
+              itemIndex: group.entries[rowIndex].itemIndex,
+            })
+          )
+        )}
       </div>
     );
 
@@ -485,9 +489,7 @@ export function ExtractionResult({
             {data.categories.length} {data.categories.length === 1 ? "category" : "categories"} ·{" "}
             {itemCount} {itemCount === 1 ? "item" : "items"}
             {reviewCount > 0 && (
-              <span className="font-medium text-warning-800">
-                {" "}· {reviewCount} to check
-              </span>
+              <span className="font-medium text-warning-800"> · {reviewCount} to check</span>
             )}
           </p>
           {source === "ai" && (
@@ -504,15 +506,18 @@ export function ExtractionResult({
         </div>
         <div className="flex flex-wrap gap-2">
           {onPublish && (
-            <Attention active={linkReady} scroll={false} inline className="inline-flex rounded-full">
+            <Attention
+              active={linkReady}
+              scroll={false}
+              inline
+              className="inline-flex rounded-full"
+            >
               <button
                 type="button"
                 onClick={handleContinue}
                 className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
-                {reviewCount > 0
-                  ? `Continue → check prices (${reviewCount})`
-                  : "Publish →"}
+                {reviewCount > 0 ? `Continue → check prices (${reviewCount})` : "Publish →"}
               </button>
             </Attention>
           )}
