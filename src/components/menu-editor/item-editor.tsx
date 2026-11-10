@@ -85,14 +85,17 @@ export const ItemEditor = memo(function ItemEditor({
   /**
    * What the closed row says under the name: the description when the menu has
    * one, then the shape of the dish — so a row whose fields are hidden still
-   * says it has sizes behind it.
-   *
-   * Option groups belong here too, but the form no longer collects them (see
-   * the parked block below), so the closed row must not advertise them either.
+   * says it has sizes and option groups behind it.
    */
   const shape: string[] = [];
   if (item.variants.length > 0) {
     shape.push(`${item.variants.length} ${item.variants.length === 1 ? "size" : "sizes"}`);
+  }
+  if (item.options.length > 0) {
+    const choiceCount = item.options.reduce((sum, group) => sum + group.choices.length, 0);
+    shape.push(
+      `${item.options.length} ${item.options.length === 1 ? "option group" : "option groups"} · ${choiceCount} ${choiceCount === 1 ? "choice" : "choices"}`
+    );
   }
   const rowSummary = [item.description?.trim() ?? "", shape.join(" · ")]
     .filter((part) => part.length > 0)
@@ -306,14 +309,12 @@ export const ItemEditor = memo(function ItemEditor({
             </button>
           </div>
 
-          {/* Options / add-ons are parked until the rest of the feature exists.
-              Nothing renders an option group on the diner page and an order
-              line cannot carry a choice, so this block would only collect data
-              the product cannot serve. Hidden with CSS — not deleted — so the
-              capture UI comes back intact once table ordering supports choices
-              (local/issues/020); re-enable by dropping `hidden` here and
-              restoring the row's option count in `shape` above. */}
-          <div className="mt-3 hidden rounded-lg bg-surface-50 p-3">
+          {/* Options / add-ons: groups of add-on choices (sauces, toppings)
+              the diner picks at order time. Rules live on the group so the
+              diner page and the server enforce the same contract: required
+              groups gate Add, single-pick renders radios, multi-pick renders
+              checkboxes, and deltas price server-side from the snapshot. */}
+          <div className="mt-3 rounded-lg bg-surface-50 p-3">
             <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Options / add-ons
             </p>
@@ -351,6 +352,76 @@ export const ItemEditor = memo(function ItemEditor({
                       ✕
                     </button>
                   </div>
+                  <div className="mt-2 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_90px_90px]">
+                    <label className="flex items-center gap-2 rounded-lg border border-line-200 bg-surface-base px-2.5 py-2 text-xs text-ink-700">
+                      <input
+                        type="checkbox"
+                        checked={option.required}
+                        onChange={(event) =>
+                          patch({
+                            options: item.options.map((o, i) =>
+                              i === oIndex ? { ...o, required: event.target.checked } : o
+                            ),
+                          })
+                        }
+                        className="h-4 w-4 rounded accent-accent-700"
+                      />
+                      Required
+                    </label>
+                    <label className="text-xs text-ink-600">
+                      Picks
+                      <select
+                        value={option.selection}
+                        onChange={(event) =>
+                          patch({
+                            options: item.options.map((o, i) =>
+                              i === oIndex
+                                ? { ...o, selection: event.target.value as "one" | "many" }
+                                : o
+                            ),
+                          })
+                        }
+                        className="mt-1 w-full rounded-lg border border-line-300 bg-surface-base px-2 py-1.5 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                      >
+                        <option value="one">One</option>
+                        <option value="many">Many</option>
+                      </select>
+                    </label>
+                    <CommitNumber
+                      label="Min"
+                      value={option.min}
+                      placeholder="0"
+                      onCommit={(min) =>
+                        patch({
+                          options: item.options.map((o, i) =>
+                            i === oIndex
+                              ? { ...o, min: min === null ? 0 : Math.max(0, Math.trunc(min)) }
+                              : o
+                          ),
+                        })
+                      }
+                    />
+                    <CommitNumber
+                      label="Max"
+                      value={option.max}
+                      placeholder="No limit"
+                      onCommit={(max) =>
+                        patch({
+                          options: item.options.map((o, i) =>
+                            i === oIndex
+                              ? { ...o, max: max === null ? null : Math.max(1, Math.trunc(max)) }
+                              : o
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                  {option.choices.length === 0 && (
+                    <p className="mt-2 rounded-lg bg-warning-50 px-2.5 py-1.5 text-xs text-warning-900">
+                      No choices yet — add at least one, or diners can never satisfy
+                      {option.required ? " this required" : " this"} group.
+                    </p>
+                  )}
                   <ul className="mt-2 space-y-2">
                     {option.choices.map((choice, cIndex) => (
                       <li
@@ -446,7 +517,10 @@ export const ItemEditor = memo(function ItemEditor({
                       min: 0,
                       max: null,
                       allowDuplicates: false,
-                      choices: [],
+                      // A group is never left empty: an empty group is a dead
+                      // end the diner cannot satisfy, so it arrives with one
+                      // choice to rename and price.
+                      choices: [{ name: "New choice", priceDelta: null }],
                     },
                   ],
                 })
