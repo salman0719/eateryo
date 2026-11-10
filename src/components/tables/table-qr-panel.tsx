@@ -658,7 +658,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                   height={200}
                   className={focusedLabel ? "h-64 w-64" : "h-44 w-44"}
                 />
-                <p className="text-[10px] leading-4 text-ink-400">Scan to order</p>
+                <p className="text-[10px] leading-4 text-ink-500">Scan to order</p>
                 {(tableSlug || publicSlug) && (
                   <p className="text-[10px] font-medium leading-4 break-all text-ink-600">
                     {displayTableUrl(code.url)}

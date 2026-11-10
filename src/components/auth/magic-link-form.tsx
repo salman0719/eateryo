@@ -194,7 +194,7 @@ export function MagicLinkForm({
         placeholder="you@cafe.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600"
+        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600"
       />
       {status.kind === "error" ? (
         <p

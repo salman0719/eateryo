@@ -584,7 +584,7 @@ function TeamCard({
               {adding ? "Adding…" : "Add member"}
             </button>
           </div>
-          <p className="mt-1 text-[11px] leading-4 text-ink-400">
+          <p className="mt-1 text-[11px] leading-4 text-ink-500">
             If they already have an account they join immediately; otherwise we email them a
             one-time invitation link that accepts on sign-in (expires in 7 days).
           </p>
@@ -623,7 +623,7 @@ function TeamCard({
                 <p className="text-sm font-medium text-ink-900">
                   {member.name.trim() ? member.name : member.email}
                   {member.userId === currentUserId && (
-                    <span className="ml-1 text-xs font-normal text-ink-400">(you)</span>
+                    <span className="ml-1 text-xs font-normal text-ink-500">(you)</span>
                   )}
                 </p>
                 <p className="truncate text-xs text-ink-500">{member.email}</p>

@@ -87,14 +87,20 @@
   --color-info-900: oklch(39.1% 0.09 240.876);
   --color-info-950: oklch(29.3% 0.066 243.157);
 
-  /* Ink: text and glyphs only. The values still match `surface` until the
-     surface pass; the role is text, so a text change must never be the thing
-     that repaints a panel. */
+  /* Ink: text and glyphs only — its own ramp, so a text change never repaints a
+     panel. Text begins at `-500` (4.81 on the card, 4.56 on the page paper):
+     `-600` secondary, `-700` strong secondary, `-900` primary. `-400` is the
+     glyph weight and carries no words — chevrons, separators, the dashed photo
+     box, a disclosure marker, a disabled tab — so it answers to the 3:1 rule a
+     control does (3.51 on the card, 3.33 on the page paper, 3.05 on an inset).
+     At 2.59 it used to paint 10-11px captions, placeholders and timestamps:
+     the one stop that sat under the 4.5 text floor. `-300` and lighter are the
+     inverse fill's tones (12.2 on `surface-900`), where the ladder turns over. */
   --color-ink-50: oklch(98.5% 0.001 106.423);
   --color-ink-100: oklch(97% 0.001 106.424);
   --color-ink-200: oklch(92.3% 0.003 48.717);
   --color-ink-300: oklch(86.9% 0.005 56.366);
-  --color-ink-400: oklch(70.9% 0.01 56.259);
+  --color-ink-400: oklch(63% 0.012 57);
   --color-ink-500: oklch(55.3% 0.013 58.071);
   --color-ink-600: oklch(44.4% 0.011 73.639);
   --color-ink-700: oklch(37.4% 0.01 67.558);

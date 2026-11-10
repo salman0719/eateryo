@@ -249,7 +249,7 @@ export function ServerOrdersBoard() {
                       >
                         {orderStatusLabel(order.status)}
                       </span>
-                      <span className="text-xs font-medium text-ink-400">
+                      <span className="text-xs font-medium text-ink-500">
                         #{orderCode(order.id)} · {formatTime(order.createdAt)}
                       </span>
                     </div>

@@ -674,7 +674,7 @@ export function MenuEditor({
                           >
                             <span
                               aria-hidden="true"
-                              className="w-6 shrink-0 text-right text-xs text-ink-400"
+                              className="w-6 shrink-0 text-right text-xs text-ink-500"
                             >
                               {index + 1}
                             </span>
@@ -850,7 +850,7 @@ export function MenuEditor({
               <p className="mt-2 text-xs text-ink-500">
                 {sourceLabel}
                 {doc.source?.originalFileName && (
-                  <span className="text-ink-400"> · {doc.source.originalFileName}</span>
+                  <span className="text-ink-500"> · {doc.source.originalFileName}</span>
                 )}
               </p>
             ))}
@@ -986,7 +986,7 @@ export function MenuEditor({
             if (event.key === "Escape" && query) setQuery("");
           }}
           placeholder="Search items, descriptions, or categories…"
-          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
+          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
         />
         {isFiltering && (
           <button type="button" onClick={() => setQuery("")} className={smallButton}>

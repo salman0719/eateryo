@@ -291,7 +291,7 @@ export function AppSidebar({
 
         {outline && outline.length > 0 ? (
           <div className="app-sidebar-label mt-3 border-t border-line-200 pt-3">
-            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">
+            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-500 uppercase">
               In this menu
             </p>
             <ul className="flex flex-col gap-0.5">
@@ -310,7 +310,7 @@ export function AppSidebar({
                       }`}
                     >
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                      <span className="shrink-0 text-[11px] font-normal text-ink-400">
+                      <span className="shrink-0 text-[11px] font-normal text-ink-500">
                         {item.itemCount}
                       </span>
                     </button>

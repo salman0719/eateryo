@@ -256,5 +256,5 @@ export default function StatusStatesDevPage() {
 }
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <p className="mt-3 font-mono text-[11px] leading-4 text-ink-400">{children}</p>;
+  return <p className="mt-3 font-mono text-[11px] leading-4 text-ink-500">{children}</p>;
 }

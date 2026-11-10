@@ -42,7 +42,7 @@ export function GuidanceCard({ title, steps, action }: GuidanceCardProps) {
           <li key={step} className="flex items-start gap-2.5 text-sm leading-6 text-ink-600">
             <span
               aria-hidden="true"
-              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-300 bg-surface-base text-[11px] font-bold text-ink-400"
+              className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line-300 bg-surface-base text-[11px] font-bold text-ink-500"
             >
               {index + 1}
             </span>
