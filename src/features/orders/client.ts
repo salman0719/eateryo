@@ -41,6 +41,7 @@ export interface PlaceOrderRequest {
     menuSlug?: string;
     menuItemId: string;
     variantName: string | null;
+    options?: { groupName: string; choiceName: string }[];
     quantity: number;
   }[];
   /** Honeypot — always empty for a human; the server refuses filled values. */
