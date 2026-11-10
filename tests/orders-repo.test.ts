@@ -64,6 +64,32 @@ describe("orders repo", () => {
             }),
             item({ id: "item-unpriced", name: "Market soup", price: null }),
             item({ id: "item-soldout", name: "Croissant", price: 2.75, available: false }),
+            item({
+              id: "item-loaded",
+              name: "Burger",
+              price: 10,
+              options: [
+                {
+                  name: "Sauce",
+                  required: true,
+                  selection: "one",
+                  choices: [
+                    { name: "Mayo", priceDelta: 0 },
+                    { name: "BBQ", priceDelta: 0.5 },
+                  ],
+                },
+                {
+                  name: "Toppings",
+                  selection: "many",
+                  max: 2,
+                  choices: [
+                    { name: "Bacon", priceDelta: 1.5 },
+                    { name: "Cheese", priceDelta: 1 },
+                    { name: "No bun", priceDelta: -1 },
+                  ],
+                },
+              ],
+            }),
           ],
         },
       ],
@@ -84,7 +110,14 @@ describe("orders repo", () => {
     };
   }
 
-  function place(lines: { menuItemId: string; variantName?: string | null; quantity: number }[]) {
+  function place(
+    lines: {
+      menuItemId: string;
+      variantName?: string | null;
+      options?: { groupName: string; choiceName: string }[];
+      quantity: number;
+    }[]
+  ) {
     return placeOrderFromSlug(db, {
       restaurantSlug: "cafe-a",
       slug: "cafe-a-orders",
@@ -119,6 +152,7 @@ describe("orders repo", () => {
         menuItemId: "item-flat",
         name: "Espresso",
         variantName: null,
+        options: [],
         unitPrice: 3.5,
         quantity: 2,
         menuId,
@@ -128,6 +162,7 @@ describe("orders repo", () => {
         menuItemId: "item-variant",
         name: "Latte",
         variantName: "Large",
+        options: [],
         unitPrice: 5,
         quantity: 1,
         menuId,
@@ -149,6 +184,76 @@ describe("orders repo", () => {
     expect(placed.lines[1].unitPrice).toBeNull();
     const rows = await db.select({ totalCents: orderTable.totalCents }).from(orderTable);
     expect(rows[0]?.totalCents).toBeNull();
+  });
+
+  it("prices picked add-ons server-side and snapshots them on the line", async () => {
+    const placed = await place([
+      {
+        menuItemId: "item-loaded",
+        quantity: 1,
+        options: [
+          { groupName: "Sauce", choiceName: "BBQ" },
+          { groupName: "Toppings", choiceName: "Bacon" },
+          { groupName: "Toppings", choiceName: "No bun" },
+        ],
+      },
+    ]);
+
+    // 10 + 0.50 + 1.50 − 1.00 = 11.00, all resolved from the snapshot.
+    expect(placed.lines[0].unitPrice).toBe(11);
+    expect(placed.lines[0].options).toEqual([
+      { groupName: "Sauce", choiceName: "BBQ", priceDelta: 0.5 },
+      { groupName: "Toppings", choiceName: "Bacon", priceDelta: 1.5 },
+      { groupName: "Toppings", choiceName: "No bun", priceDelta: -1 },
+    ]);
+
+    // The staff board reads the same picks back.
+    const board = await listOrdersForStaff(db, ownerA);
+    expect(board.orders[0].lines[0].options).toEqual(placed.lines[0].options);
+    const stored = await getOrderForStaff(db, ownerA, placed.id);
+    expect(stored?.lines[0].options).toEqual(placed.lines[0].options);
+  });
+
+  it("rejects a missing required group, bad picks, and over-max selections", async () => {
+    const sauce = [{ groupName: "Sauce", choiceName: "Mayo" }];
+    await expect(place([{ menuItemId: "item-loaded", quantity: 1 }])).rejects.toMatchObject({
+      code: "invalid",
+    });
+    await expect(
+      place([
+        {
+          menuItemId: "item-loaded",
+          quantity: 1,
+          options: [
+            ...sauce,
+            { groupName: "Sauce", choiceName: "BBQ" },
+          ],
+        },
+      ])
+    ).rejects.toMatchObject({ code: "invalid" });
+    await expect(
+      place([
+        {
+          menuItemId: "item-loaded",
+          quantity: 1,
+          options: [{ groupName: "Drink", choiceName: "Cola" }],
+        },
+      ])
+    ).rejects.toMatchObject({ code: "invalid" });
+    await expect(
+      place([
+        {
+          menuItemId: "item-loaded",
+          quantity: 1,
+          options: [
+            ...sauce,
+            { groupName: "Toppings", choiceName: "Bacon" },
+            { groupName: "Toppings", choiceName: "Cheese" },
+            { groupName: "Toppings", choiceName: "No bun" },
+          ],
+        },
+      ])
+    ).rejects.toMatchObject({ code: "invalid" });
   });
 
   it("rejects requests the client could use to invent menu data", async () => {
