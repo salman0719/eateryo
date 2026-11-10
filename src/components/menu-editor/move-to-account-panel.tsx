@@ -195,7 +195,7 @@ export function MoveToAccountPanel({
                 value={newName}
                 onChange={(event) => setNameDraft(event.target.value)}
                 placeholder="e.g. Sunny Side Café"
-                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               />
             </label>
             <button
