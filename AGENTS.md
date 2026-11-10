@@ -127,8 +127,16 @@ errors, or add lint/type suppressions just to make checks pass.
   the open menu's outline in the edit workspace, the account, and a
   rail/expanded toggle whose choice is remembered. Widths are CSS driven by
   `data-sidebar` on `<html>`, set before paint by the boot script in
-  `layout.tsx` so a saved choice never flashes. The app shell has no global
+  `layout.tsx` so a saved choice never flashes. The app shell has no desktop
   header; `site-header.tsx` stays for content pages (launch, legal, dev).
+- `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
+  one brand lockup (tile + name, role tokens only) and the phone row that shows
+  it below `sm`, where the sidebar is gone. Signed out that row is the only
+  sign-in path a phone has (the sidebar's account block is desktop-only and the
+  More sheet is signed-in only), so it carries `/sign-in` itself and shows
+  nothing extra while the session is unanswered. The chosen identity (concept
+  7, "The Hidden Eat") is not applied yet — the theme landed first, then the
+  drawn lockup replaces the text in `brand.tsx` only.
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.
