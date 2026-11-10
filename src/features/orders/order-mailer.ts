@@ -6,6 +6,7 @@ import {
   emailPage,
   escapeEmailHtml,
 } from "@/lib/email-layout";
+import { formatSelectionsSummary } from "@/features/menu/option-groups";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { publicBaseUrl } from "@/features/tenancy/invite-mailer";
 import { eq } from "drizzle-orm";
@@ -49,13 +50,17 @@ export function buildNewOrderEmail({ email, restaurantName, order, boardUrl }: N
     total === null
       ? "Total to confirm at the counter (a line had no price)."
       : `Total: ${formatPreviewPrice(total, null, order.currency)}`;
-  const lineTexts = order.lines.map(
-    (line) =>
-      `${line.quantity}× ${line.name}${line.variantName ? ` (${line.variantName})` : ""} — ` +
+  const lineTexts = order.lines.map((line) => {
+    const picks = formatSelectionsSummary(line.options);
+    return (
+      `${line.quantity}× ${line.name}${line.variantName ? ` (${line.variantName})` : ""}` +
+      (picks ? ` + ${picks}` : "") +
+      " — " +
       (line.unitPrice === null
         ? "no price"
         : formatPreviewPrice(line.unitPrice * line.quantity, null, order.currency))
-  );
+    );
+  });
   const text =
     `New order #${code} for ${table} at ${restaurantName}.\n` +
     lineTexts.map((line) => `  ${line}`).join("\n") +
@@ -70,6 +75,9 @@ export function buildNewOrderEmail({ email, restaurantName, order, boardUrl }: N
         `<strong>${line.quantity}×</strong> ${escapeEmailHtml(line.name)}` +
         (line.variantName
           ? ` <span style=\"color:${EMAIL_COLORS.MUTED}\">${escapeEmailHtml(line.variantName)}</span>`
+          : "") +
+        (line.options.length > 0
+          ? ` <span style=\"color:${EMAIL_COLORS.MUTED}\">+ ${escapeEmailHtml(formatSelectionsSummary(line.options))}</span>`
           : "") +
         `</td><td align=\"right\" style=\"padding:7px 0;font-family:Arial,sans-serif;font-size:13px;color:${EMAIL_COLORS.BODY_TEXT}\">` +
         (line.unitPrice === null
