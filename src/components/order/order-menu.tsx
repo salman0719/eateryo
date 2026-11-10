@@ -16,11 +16,17 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
+import {
+  priceWithOptions,
+  validateOptionSelections,
+  type OptionSelection,
+} from "@/features/menu/option-groups";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { ClampedDescription } from "./clamped-description";
 import { MenuItemPhoto } from "./menu-item-photo";
+import { OptionGroupFields, toggleOptionSelection } from "./option-groups";
 
 /**
  * Loading placeholder for the diner-facing order surfaces: a menu card in
@@ -98,9 +104,17 @@ export function OrderMenuSection({
   currency: string | null;
   variantChoice: Record<string, string>;
   onVariantChange: (itemId: string, name: string) => void;
-  onAdd: (item: MenuItem) => void;
-  /** Quantity of this exact item + variant already in the cart (0 when absent). */
-  itemCount?: (item: MenuItem, variantName: string | null) => number;
+  /** Add a dish with the diner's current picks for its option groups. */
+  onAdd: (item: MenuItem, selections: OptionSelection[]) => void;
+  /**
+   * Quantity of this exact item + variant + picks already in the cart
+   * (0 when absent). Picks distinguish two combinations of one dish.
+   */
+  itemCount?: (
+    item: MenuItem,
+    variantName: string | null,
+    selections: OptionSelection[]
+  ) => number;
 }) {
   // Per-item confirmation: pops on every tap, gone ~2s later. A fresh tap
   // dismisses the visible pop instantly and replays it, so rapid taps
@@ -109,6 +123,10 @@ export function OrderMenuSection({
   const [flash, setFlash] = useState<Record<string, number>>({});
   const flashTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const flashSeq = useRef(0);
+  /** The diner's current picks per dish, cleared for a dish once added. */
+  const [optionChoice, setOptionChoice] = useState<Record<string, OptionSelection[]>>({});
+  /** Add-gate message per dish (a required group left unanswered). */
+  const [optionError, setOptionError] = useState<Record<string, string | null>>({});
   useEffect(
     () => () => {
       for (const timer of Object.values(flashTimers.current)) clearTimeout(timer);
@@ -158,8 +176,11 @@ export function OrderMenuSection({
             ? item.variants.find((candidate) => candidate.name === variantName)
             : null;
           const price = variant ? variant.price : item.price;
-          const inCart = itemCount?.(item, variantName) ?? 0;
+          const picks = optionChoice[item.id] ?? [];
+          const livePrice = priceWithOptions(price, item, picks);
+          const inCart = itemCount?.(item, variantName, picks) ?? 0;
           const tick = flash[item.id] ?? 0;
+          const pickError = optionError[item.id] ?? null;
           return (
             <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-3">
@@ -192,9 +213,31 @@ export function OrderMenuSection({
                   )}
                 </div>
                 <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
-                  {formatPreviewPrice(price, null, currency)}
+                  {formatPreviewPrice(livePrice, null, currency)}
                 </p>
               </div>
+
+              {item.options.length > 0 && (
+                <OptionGroupFields
+                  item={item}
+                  currency={currency}
+                  selections={picks}
+                  onToggle={(groupName, choiceName) => {
+                    const group = item.options.find((candidate) => candidate.name === groupName);
+                    if (!group) return;
+                    setOptionChoice((current) => ({
+                      ...current,
+                      [item.id]: toggleOptionSelection(current[item.id] ?? [], group, choiceName),
+                    }));
+                    setOptionError((current) => ({ ...current, [item.id]: null }));
+                  }}
+                />
+              )}
+              {pickError && (
+                <p role="alert" className="mt-1 text-xs text-danger-800">
+                  {pickError}
+                </p>
+              )}
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {item.variants.length > 0 && (
@@ -230,7 +273,13 @@ export function OrderMenuSection({
                     type="button"
                     disabled={soldOut}
                     onClick={() => {
-                      onAdd(item);
+                      const problem =
+                        item.options.length > 0 ? validateOptionSelections(item, picks) : null;
+                      if (problem) {
+                        setOptionError((current) => ({ ...current, [item.id]: problem }));
+                        return;
+                      }
+                      onAdd(item, picks);
                       bumpFlash(item.id);
                     }}
                     className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"

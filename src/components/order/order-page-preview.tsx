@@ -26,6 +26,13 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu } from "@/features/menu/search";
+import {
+  priceWithOptions,
+  selectionsKey,
+  validateOptionSelections,
+  withResolvedDeltas,
+  type OptionSelection,
+} from "@/features/menu/option-groups";
 import { addLine, orderTotal, setLineQuantity, type OrderLine } from "@/features/orders/schema";
 import { formatTableLabel } from "@/features/orders/table-links";
 
@@ -88,16 +95,30 @@ export function OrderPagePreview({
     if (next.length === 0) setSheetOpen(false);
   }
 
-  function addItem(item: MenuItem) {
+  function addItem(item: MenuItem, selections: OptionSelection[]) {
+    const problem = validateOptionSelections(item, selections);
+    if (problem) {
+      setNotice(problem);
+      return;
+    }
     const variantName = chosenVariantName(item);
     const variant = variantName ? item.variants.find((v) => v.name === variantName) : null;
+    const base = variant ? variant.price : item.price;
+    const key = selectionsKey(selections);
     setLines((current) =>
       addLine(current, {
         menuItemId: item.id,
         name: item.name,
         variantName,
-        unitPrice: variant ? variant.price : item.price,
-      })
+        options: selections,
+        unitPrice: priceWithOptions(base, item, selections),
+      }).map((line) =>
+        line.menuItemId === item.id &&
+        (line.variantName ?? null) === variantName &&
+        selectionsKey(line.options) === key
+          ? { ...line, options: withResolvedDeltas(item, line.options) }
+          : line
+      )
     );
     setNotice(null);
   }
@@ -188,11 +209,12 @@ export function OrderPagePreview({
                 setVariantChoice((current) => ({ ...current, [itemId]: name }))
               }
               onAdd={addItem}
-              itemCount={(item, variantName) =>
+              itemCount={(item, variantName, picks) =>
                 lines.find(
                   (line) =>
                     line.menuItemId === item.id &&
-                    (line.variantName ?? null) === (variantName ?? null)
+                    (line.variantName ?? null) === (variantName ?? null) &&
+                    selectionsKey(line.options) === selectionsKey(picks)
                 )?.quantity ?? 0
               }
             />

@@ -139,6 +139,27 @@ export function priceWithOptions(
 }
 
 /**
+ * Stamp the server-known deltas onto picks for *display* (cart rows, the
+ * local-only flow). The diner sees the menu's own numbers; the send path
+ * still re-resolves everything from the published snapshot, so these values
+ * are never trusted as prices.
+ */
+export function withResolvedDeltas(
+  item: Pick<ItemWithOptions, "options">,
+  selections: ReadonlyArray<OptionSelection>
+): { groupName: string; choiceName: string; priceDelta: number | null }[] {
+  return normalizeSelections(selections).map((selection) => {
+    const group = item.options.find(
+      (candidate) => trimmed(candidate.name) === selection.groupName
+    );
+    const choice = group?.choices.find(
+      (candidate) => trimmed(candidate.name) === selection.choiceName
+    );
+    return { ...selection, priceDelta: choice?.priceDelta ?? null };
+  });
+}
+
+/**
  * Canonical order for a pick list: trimmed, empties dropped, sorted by
  * group then choice. Two carts holding the same picks in a different tap
  * order share one line instead of splitting into two.

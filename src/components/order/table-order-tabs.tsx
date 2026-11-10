@@ -20,9 +20,14 @@ import type { MenuAvailability } from "@/features/availability/schema";
 import { formatAvailability } from "@/features/availability/format";
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu, type SearchMatch } from "@/features/menu/search";
-import { placeOrder } from "@/features/orders/client";
-import {
-  addLine,
+import { placeOrder } from "@/features/orders/client";import {
+  priceWithOptions,
+  selectionsKey,
+  validateOptionSelections,
+  withResolvedDeltas,
+  type OptionSelection,
+} from "@/features/menu/option-groups";
+import { addLine,
   orderCode,
   orderTotal,
   setLineQuantity,
@@ -221,18 +226,33 @@ export function TableOrderTabs({
     return item.variants[0]?.name ?? null;
   }
 
-  function addItem(menu: TableOrderMenu, item: MenuItem) {
+  function addItem(menu: TableOrderMenu, item: MenuItem, selections: OptionSelection[]) {
+    const problem = validateOptionSelections(item, selections);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const variantName = chosenVariantName(menu, item);
     const variant = variantName ? item.variants.find((v) => v.name === variantName) : null;
+    const base = variant ? variant.price : item.price;
+    const key = selectionsKey(selections);
     setLines((current) =>
       addLine(current, {
         menuItemId: item.id,
         name: item.name,
         variantName,
-        unitPrice: variant ? variant.price : item.price,
+        options: selections,
+        unitPrice: priceWithOptions(base, item, selections),
         menuId: menu.menuId,
         menuTitle: menu.title,
-      })
+      }).map((line) =>
+        line.menuId === menu.menuId &&
+        line.menuItemId === item.id &&
+        (line.variantName ?? null) === variantName &&
+        selectionsKey(line.options) === key
+          ? { ...line, options: withResolvedDeltas(item, line.options) }
+          : line
+      )
     );
     setError(null);
   }
@@ -264,6 +284,10 @@ export function TableOrderTabs({
             menuSlug,
             menuItemId: line.menuItemId,
             variantName: line.variantName,
+            options: line.options.map((option) => ({
+              groupName: option.groupName,
+              choiceName: option.choiceName,
+            })),
             quantity: line.quantity,
           };
         }),
@@ -473,13 +497,14 @@ export function TableOrderTabs({
                           [choiceKey(menu.menuId, itemId)]: name,
                         }))
                       }
-                      onAdd={(item) => addItem(menu, item)}
-                      itemCount={(item, variantName) =>
+                      onAdd={(item, picks) => addItem(menu, item, picks)}
+                      itemCount={(item, variantName, picks) =>
                         lines.find(
                           (line) =>
                             line.menuId === menu.menuId &&
                             line.menuItemId === item.id &&
-                            (line.variantName ?? null) === (variantName ?? null)
+                            (line.variantName ?? null) === (variantName ?? null) &&
+                            selectionsKey(line.options) === selectionsKey(picks)
                         )?.quantity ?? 0
                       }
                     />
