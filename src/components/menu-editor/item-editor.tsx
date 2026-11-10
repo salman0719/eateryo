@@ -436,7 +436,20 @@ export const ItemEditor = memo(function ItemEditor({
             <button
               type="button"
               onClick={() =>
-                patch({ options: [...item.options, { name: "New option", choices: [] }] })
+                patch({
+                  options: [
+                    ...item.options,
+                    {
+                      name: "New option",
+                      required: false,
+                      selection: "one",
+                      min: 0,
+                      max: null,
+                      allowDuplicates: false,
+                      choices: [],
+                    },
+                  ],
+                })
               }
               className={`${smallButton} mt-2`}
             >

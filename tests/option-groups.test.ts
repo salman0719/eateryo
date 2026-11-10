@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   menuItemSchema,
+  menuOptionSchema,
   SCHEMA_VERSION,
   type MenuItem,
+  type MenuOption,
 } from "@/features/menu/schema";
 import {
   formatSelectionsSummary,
@@ -13,6 +15,7 @@ import {
   selectionsKey,
   validateOptionSelections,
 } from "@/features/menu/option-groups";
+import { addLine } from "@/features/orders/schema";
 
 /**
  * P1 option groups: the contract (required / one-vs-many / min-max /
@@ -36,10 +39,15 @@ function item(extra: Partial<MenuItem> = {}): MenuItem {
   });
 }
 
+/** Old/partial group shapes gain the contract defaults on parse. */
+function group(input: unknown): MenuOption {
+  return menuOptionSchema.parse(input);
+}
+
 describe("menu option contract", () => {
   it("defaults old documents to optional single-pick groups", () => {
     const parsed = item({
-      options: [{ name: "Sauce", choices: [{ name: "Mayo", priceDelta: 0 }] }],
+      options: [group({ name: "Sauce", choices: [{ name: "Mayo", priceDelta: 0 }] })],
     });
     expect(parsed.options).toEqual([
       {
@@ -62,31 +70,24 @@ describe("menu option contract", () => {
 describe("validateOptionSelections", () => {
   const dish = item({
     options: [
-      {
+      group({
         name: "Sauce",
         required: true,
-        selection: "one",
-        min: 0,
-        max: null,
-        allowDuplicates: false,
         choices: [
           { name: "Mayo", priceDelta: 0 },
           { name: "BBQ", priceDelta: 0.5 },
         ],
-      },
-      {
+      }),
+      group({
         name: "Toppings",
-        required: false,
         selection: "many",
-        min: 0,
         max: 2,
-        allowDuplicates: false,
         choices: [
           { name: "Bacon", priceDelta: 1.5 },
           { name: "Cheese", priceDelta: 1 },
           { name: "Onions", priceDelta: 0 },
         ],
-      },
+      }),
     ],
   });
 
@@ -151,18 +152,15 @@ describe("validateOptionSelections", () => {
 describe("pricing helpers", () => {
   const dish = item({
     options: [
-      {
+      group({
         name: "Extras",
-        required: false,
         selection: "many",
-        min: 0,
-        max: null,
         allowDuplicates: true,
         choices: [
           { name: "Bacon", priceDelta: 1.5 },
           { name: "Mystery", priceDelta: null },
         ],
-      },
+      }),
     ],
   });
 
@@ -206,5 +204,34 @@ describe("cart key helpers", () => {
 
   it("schema version is unchanged (no migration of stored docs)", () => {
     expect(SCHEMA_VERSION).toBe(1);
+  });
+});
+
+describe("addLine with options", () => {
+  const base = {
+    menuItemId: "i1",
+    name: "Burger",
+    variantName: null,
+    unitPrice: 11.5,
+  };
+
+  it("merges identical picks and separates different ones", () => {
+    const bacon = [{ groupName: "Toppings", choiceName: "Bacon" }];
+    const cheese = [{ groupName: "Toppings", choiceName: "Cheese" }];
+    let cart = addLine([], { ...base, options: bacon });
+    cart = addLine(cart, { ...base, options: [...bacon].reverse() });
+    expect(cart).toHaveLength(1);
+    expect(cart[0]?.quantity).toBe(2);
+    cart = addLine(cart, { ...base, options: cheese });
+    expect(cart).toHaveLength(2);
+  });
+
+  it("keeps a plain line apart from a customized one", () => {
+    let cart = addLine([], { ...base });
+    cart = addLine(cart, {
+      ...base,
+      options: [{ groupName: "Toppings", choiceName: "Bacon" }],
+    });
+    expect(cart).toHaveLength(2);
   });
 });

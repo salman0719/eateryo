@@ -13,17 +13,32 @@
 
 import { z } from "zod";
 
+import { normalizeSelections, selectionsKey } from "@/features/menu/option-groups";
+
 export const ORDER_STATUSES = ["new", "preparing", "served", "cancelled"] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const orderStatusSchema = z.enum(ORDER_STATUSES);
 
+/**
+ * One picked add-on, as snapshotted at order time. The names are what the
+ * kitchen reads; `priceDelta` is the server-resolved extra (null when the
+ * menu showed none), so history survives renames and reprices.
+ */
+export const orderLineOptionSchema = z.object({
+  groupName: z.string().min(1),
+  choiceName: z.string().min(1),
+  priceDelta: z.number().nullable().default(null),
+});
+
 export const orderLineSchema = z.object({
   menuItemId: z.string().min(1),
   name: z.string().min(1),
   /** Chosen size/tier, when the item has variants. */
   variantName: z.string().min(1).nullable().default(null),
+  /** Picked add-ons; empty when the dish has no groups or none were taken. */
+  options: z.array(orderLineOptionSchema).default([]),
   /** Price per unit as printed, or null when the menu had none. */
   unitPrice: z.number().nullable().default(null),
   quantity: z.number().int().positive(),
@@ -58,11 +73,13 @@ export const orderSchema = z.object({
 
 export type OrderLine = z.infer<typeof orderLineSchema>;
 export type Order = z.infer<typeof orderSchema>;
+export type OrderLineOption = z.infer<typeof orderLineOptionSchema>;
 
-export type OrderLineInput = Omit<OrderLine, "quantity" | "menuId" | "menuTitle"> & {
+export type OrderLineInput = Omit<OrderLine, "quantity" | "menuId" | "menuTitle" | "options"> & {
   quantity?: number;
   menuId?: string | null;
   menuTitle?: string | null;
+  options?: ReadonlyArray<{ groupName: string; choiceName: string }>;
 };
 
 /** Sum of priced lines, or null when any line has no price. */
@@ -77,20 +94,25 @@ export function orderTotal(lines: readonly OrderLine[]): number | null {
 }
 
 /**
- * Merge a new line into an existing cart: same item and variant increments
- * the quantity instead of adding a duplicate row.
+ * Merge a new line into an existing cart: same item, variant, menu, and
+ * option picks increments the quantity instead of adding a duplicate row.
+ * A different add-on combination is a different line — merging it would
+ * charge one price for two different dishes.
  */
 export function addLine(lines: readonly OrderLine[], input: OrderLineInput): OrderLine[] {
   const quantity = input.quantity ?? 1;
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw new Error("Quantity must be a positive whole number.");
   }
-  const next = lines.map((line) => ({ ...line }));
+  const options = normalizeSelections(input.options ?? []);
+  const key = selectionsKey(options);
+  const next = lines.map((line) => ({ ...line, options: [...line.options] }));
   const match = next.find(
     (line) =>
       line.menuItemId === input.menuItemId &&
       line.variantName === (input.variantName ?? null) &&
-      (line.menuId ?? null) === (input.menuId ?? null)
+      (line.menuId ?? null) === (input.menuId ?? null) &&
+      selectionsKey(line.options) === key
   );
   if (match) {
     match.quantity += quantity;
@@ -100,6 +122,7 @@ export function addLine(lines: readonly OrderLine[], input: OrderLineInput): Ord
     menuItemId: input.menuItemId,
     name: input.name,
     variantName: input.variantName ?? null,
+    options: options.map((selection) => ({ ...selection, priceDelta: null })),
     unitPrice: input.unitPrice ?? null,
     quantity,
     menuId: input.menuId ?? null,
