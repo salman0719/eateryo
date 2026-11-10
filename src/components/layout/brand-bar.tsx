@@ -23,23 +23,24 @@ export function BrandBar({
 }: {
   signedIn: boolean;
   sessionPending: boolean;
-  /** The caller's width rule — the phone mount passes `sm:hidden`. */
+  /** The caller's width rule — `sm:hidden` while the sidebar carries the brand. */
   className?: string;
 }) {
   return (
-    <div
-      data-print-hide
-      className={`flex items-center justify-between gap-3 px-4 pt-4 ${className}`}
-    >
-      <BrandLockup />
-      {!sessionPending && !signedIn ? (
-        <a
-          href="/sign-in"
-          className="shrink-0 rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          Sign in
-        </a>
-      ) : null}
+    <div data-print-hide className={className}>
+      {/* The same measure as the column's `main`, so the name lines up with the
+          page whether or not the sidebar is beside it. */}
+      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pt-4 sm:px-6">
+        <BrandLockup />
+        {!sessionPending && !signedIn ? (
+          <a
+            href="/sign-in"
+            className="shrink-0 rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            Sign in
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }
