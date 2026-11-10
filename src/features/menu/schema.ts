@@ -39,8 +39,20 @@ export const menuOptionChoiceSchema = z.object({
   priceDelta: z.number().nullable(),
 });
 
+/** How many choices a diner may pick from one group: exactly one, or several. */
+export const menuOptionSelectionSchema = z.enum(["one", "many"]);
+
 export const menuOptionSchema = z.object({
   name: z.string().min(1),
+  /** The diner must pick from this group before the dish can be added. */
+  required: z.boolean().default(false),
+  selection: menuOptionSelectionSchema.default("one"),
+  /** Fewest choices accepted (0 = the group may be skipped when optional). */
+  min: z.number().int().min(0).default(0),
+  /** Most choices accepted (null = no upper bound beyond the choice list). */
+  max: z.number().int().min(1).nullable().default(null),
+  /** Whether the same choice may be picked twice (e.g. "double bacon"). */
+  allowDuplicates: z.boolean().default(false),
   choices: z.array(menuOptionChoiceSchema).default([]),
 });
 
