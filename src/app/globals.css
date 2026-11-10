@@ -198,6 +198,15 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
     transition: width 180ms ease;
   }
 
+  /* The brand is the one block whose height depends on the mode: the rail
+     shows the 32px tile alone, the column adds two label lines (20 + 16). Left
+     to its content, the wrapper grows 4px on the way out and the whole nav
+     snaps vertically while the width is still gliding. Pin the taller case so
+     the column only ever moves sideways (`tests/sidebar-brand.test.ts`). */
+  .app-sidebar-brand {
+    min-height: 4.25rem; /* py-4 (32px) + two label lines (36px) */
+  }
+
   .app-sidebar-label {
     display: none;
   }
