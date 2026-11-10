@@ -17,6 +17,17 @@ export type CapturePhase = "upload" | "ready" | "extracting" | "done";
 
 type ResultProps = ComponentProps<typeof ExtractionResult>;
 
+/**
+ * What a first-time visitor is promised, and only what the app actually does.
+ * No accuracy claim: extraction can be wrong, which is why review is a stop in
+ * the tracker below rather than a footnote.
+ */
+const ENTRY_POINTS = [
+  "Every dish, typed out — AI reads the photo, and anything it is unsure of is flagged for you to check.",
+  "Publish to a QR code at each table — diners scan, order from the live menu, and install nothing.",
+  "Your draft stays in this browser — nothing leaves this device until you publish it.",
+];
+
 export interface CapturePageProps {
   signedIn: boolean;
   /** Session still resolving: never claim "publishing needs an account" yet. */
@@ -57,10 +68,27 @@ export interface CapturePageProps {
   onPublish: (() => void) | undefined;
 }
 
+function FileErrorNotice({ message }: { message: string }) {
+  return (
+    <p
+      role="alert"
+      className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+    >
+      {message}
+    </p>
+  );
+}
+
 /**
  * Capture: photo in, extraction progress, review out. It owns no data — the
  * shell keeps the pages, the extraction and the saved draft — so a retry or a
  * navigation does not reset the flow.
+ *
+ * Signed out on an empty page it also has to be the front door: nobody has a
+ * sidebar destination to click, so the photo field carries the product's one
+ * promise and the three things it actually delivers. That composition is
+ * limited to the empty upload state; the moment a photo is chosen the screen
+ * returns to the plain working layout, and a signed-in owner never sees it.
  */
 export function CapturePage({
   signedIn,
@@ -94,37 +122,95 @@ export function CapturePage({
   onRenameTitle,
   onPublish,
 }: CapturePageProps) {
+  /**
+   * The entry composition: nobody known to be signed in, and nothing uploaded
+   * yet. `sessionPending` is excluded so a signed-in owner's cold load cannot
+   * flash the visitor's page before their own screen appears.
+   */
+  const entering = !signedIn && !sessionPending && phase === "upload" && pages.length === 0;
+
   return (
     <>
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-          Turn your photo into a menu
-        </h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-          Upload a photo or scan of a menu, extract it into categories and items with AI, then
-          review and correct the draft. AI output is never guaranteed — you stay in charge.
-        </p>
-        {!signedIn && !sessionPending && (
-          <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
-            You can upload and review first. Publishing needs an account — we’ll email you a sign-in
-            link, and your draft stays in this browser.
-          </p>
-        )}
-      </div>
+      {entering ? (
+        /**
+         * One column on a phone — headline, the photo field, then the
+         * promises — so the only action is never pushed below the fold. Two
+         * columns from `lg`, where the field gets a column of its own.
+         */
+        <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] lg:items-start lg:gap-x-12 lg:gap-y-8">
+          <div className="order-1 lg:col-start-1 lg:row-start-1">
+            <p className="text-xs font-semibold tracking-[0.16em] text-accent-700 uppercase">
+              Photo in, orders out
+            </p>
+            <h1 className="mt-2 max-w-xl text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
+              Turn a menu photo into a table-ordering page
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
+              Upload the photo you already have. AI types out the categories, dishes and prices, you
+              correct anything it read wrong, and publishing puts a QR code on every table.
+            </p>
+            <JourneySteps current={step} className="mt-6 max-w-xl" />
+          </div>
 
-      <JourneySteps current={step} />
+          <div className="order-2 flex flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <Dropzone onSelect={onSelectFiles} />
+            {fileError && <FileErrorNotice message={fileError} />}
+            <p className="text-center text-sm text-ink-500">
+              No menu handy?{" "}
+              <button
+                type="button"
+                onClick={onDemo}
+                className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                Preview with demo data
+              </button>
+            </p>
+          </div>
 
-      {phase === "upload" && pages.length === 0 && (
+          <div className="order-3 lg:col-start-1 lg:row-start-2">
+            <ul className="flex max-w-xl flex-col gap-3">
+              {ENTRY_POINTS.map((point) => (
+                <li key={point} className="flex gap-3 text-sm leading-6 text-ink-700">
+                  <span
+                    aria-hidden="true"
+                    className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-700"
+                  />
+                  {point}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-5 max-w-xl text-xs leading-5 text-ink-500">
+              Free while it lasts — no card, no payment step. Publishing needs a sign-in link sent
+              to your email, and until you publish your draft stays in this browser.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
+              Turn your photo into a menu
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
+              Upload a photo or scan of a menu, extract it into categories and items with AI, then
+              review and correct the draft. AI output is never guaranteed — you stay in charge.
+            </p>
+            {!signedIn && !sessionPending && (
+              <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
+                You can upload and review first. Publishing needs an account — we’ll email you a
+                sign-in link, and your draft stays in this browser.
+              </p>
+            )}
+          </div>
+
+          <JourneySteps current={step} />
+        </>
+      )}
+
+      {!entering && phase === "upload" && pages.length === 0 && (
         <div className="flex flex-col gap-3">
           <Dropzone onSelect={onSelectFiles} />
-          {fileError && (
-            <p
-              role="alert"
-              className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-            >
-              {fileError}
-            </p>
-          )}
+          {fileError && <FileErrorNotice message={fileError} />}
           <p className="text-center text-sm text-ink-500">
             No menu handy?{" "}
             <button
@@ -176,14 +262,7 @@ export function CapturePage({
               if (next && index !== null) onReplacePageAt(index, next);
             }}
           />
-          {fileError && (
-            <p
-              role="alert"
-              className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-            >
-              {fileError}
-            </p>
-          )}
+          {fileError && <FileErrorNotice message={fileError} />}
           <div>
             <button
               type="button"
