@@ -3,11 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { restaurantMembership } from "@/lib/db/schema";
 import type { RestaurantRole } from "@/lib/db/schema";
 import type { TenancyDb } from "./repo";
-import {
-  capabilitiesForMembership,
-  hasCapability,
-  type Capability,
-} from "./permissions";
+import { capabilitiesForMembership, hasCapability, type Capability } from "./permissions";
 
 /**
  * Server-side policy: resolve a membership to the one access answer every

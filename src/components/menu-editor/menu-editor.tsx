@@ -634,10 +634,7 @@ export function MenuEditor({
           ) : (
             <ol className="mt-3 space-y-4">
               {doc.categories.map((category, categoryIndex) => (
-                <li
-                  key={category.id}
-                  className="overflow-hidden rounded-xl border border-line-200"
-                >
+                <li key={category.id} className="overflow-hidden rounded-xl border border-line-200">
                   <div className="flex items-center gap-1.5 border-b border-line-100 bg-surface-50 px-3 py-2">
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
                       {category.name || "Untitled category"}
@@ -929,7 +926,10 @@ export function MenuEditor({
           </p>
           <ul className="mt-3 space-y-3">
             {duplicateGroups.map((group) => (
-              <li key={group.key} className="rounded-xl border border-warning-200 bg-surface-base p-3">
+              <li
+                key={group.key}
+                className="rounded-xl border border-warning-200 bg-surface-base p-3"
+              >
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-ink-900">
                     “{group.displayName}” appears {group.occurrences.length} times

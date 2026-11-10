@@ -275,7 +275,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let targetMenu: ServerMenu | null = null;
   if (parsed.data.menuId) {
     const loaded = await loadMenu(db, userId, parsed.data.menuId, requestId);
-    if (loaded instanceof NextResponse) return loaded;    // A member without menu write access only gets the help surface even
+    if (loaded instanceof NextResponse) return loaded; // A member without menu write access only gets the help surface even
     // when the browser sends a menu id.
     targetMenu = can(loaded.access, "menus.write") ? loaded.menu : null;
   }

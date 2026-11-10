@@ -66,11 +66,7 @@ function wallClock(now: Date, timeZone: string): { day: number; minutes: number 
 }
 
 /** True when the menu serves at `now` (empty schedule = always open). */
-export function isMenuOpenAt(
-  windows: MenuAvailability,
-  now: Date,
-  timeZone = "UTC"
-): boolean {
+export function isMenuOpenAt(windows: MenuAvailability, now: Date, timeZone = "UTC"): boolean {
   if (windows.length === 0) return true;
   const { day, minutes } = wallClock(now, timeZone);
   const previousDay = (day + 6) % 7;

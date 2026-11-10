@@ -186,7 +186,10 @@ describe("POST /api/restaurants/[restaurantId]/menus", () => {
     const cafe = await createRestaurant(holder.db!, owner, "Café");
     holder.userId = owner;
 
-    const response = await createCafeMenu(createRequest({ doc: doc("menu-created") }), params(cafe.id));
+    const response = await createCafeMenu(
+      createRequest({ doc: doc("menu-created") }),
+      params(cafe.id)
+    );
     expect(response.status).toBe(201);
     expect((await response.json()).menu).toMatchObject({
       id: "menu-created",
@@ -214,7 +217,10 @@ describe("POST /api/restaurants/[restaurantId]/menus", () => {
     await addStaff(holder.db!, cafe.id, staff);
     holder.userId = staff;
 
-    const response = await createCafeMenu(createRequest({ doc: doc("menu-staff") }), params(cafe.id));
+    const response = await createCafeMenu(
+      createRequest({ doc: doc("menu-staff") }),
+      params(cafe.id)
+    );
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ error: { code: "forbidden" } });
   });
@@ -225,7 +231,10 @@ describe("POST /api/restaurants/[restaurantId]/menus", () => {
     const theirs = await createRestaurant(holder.db!, stranger, "Theirs");
     holder.userId = owner;
 
-    const response = await createCafeMenu(createRequest({ doc: doc("menu-foreign") }), params(theirs.id));
+    const response = await createCafeMenu(
+      createRequest({ doc: doc("menu-foreign") }),
+      params(theirs.id)
+    );
     expect(response.status).toBe(404);
   });
 });

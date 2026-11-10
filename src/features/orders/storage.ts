@@ -15,13 +15,7 @@ import {
 } from "../menu/indexeddb";
 import { generateId, nowIso } from "../menu/menu-utils";
 
-import {
-  isOrderStatus,
-  orderSchema,
-  type Order,
-  type OrderLine,
-  type OrderStatus,
-} from "./schema";
+import { isOrderStatus, orderSchema, type Order, type OrderLine, type OrderStatus } from "./schema";
 
 export type OrderStorageErrorCode = "unavailable" | "quota" | "corrupt" | "not_found";
 

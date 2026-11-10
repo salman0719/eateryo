@@ -190,7 +190,10 @@ function LocalOrdersBoard() {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800">
+        <p
+          role="alert"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+        >
           {error}
         </p>
       )}
@@ -258,7 +261,11 @@ function LocalOrdersBoard() {
                       <span className="shrink-0 text-xs tabular-nums text-ink-500">
                         {line.unitPrice === null
                           ? "no price"
-                          : formatPreviewPrice(line.unitPrice * line.quantity, null, order.currency)}
+                          : formatPreviewPrice(
+                              line.unitPrice * line.quantity,
+                              null,
+                              order.currency
+                            )}
                       </span>
                     </li>
                   ))}

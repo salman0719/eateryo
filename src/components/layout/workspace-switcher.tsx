@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  workspaceLabel,
-  type Workspace,
-} from "@/features/tenancy/workspace";
+import { workspaceLabel, type Workspace } from "@/features/tenancy/workspace";
 
 /**
  * Which café-and-role the shell is acting in.

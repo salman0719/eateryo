@@ -173,9 +173,7 @@ describe("summarizeMenuChanges", () => {
     ]);
 
     const summary = summarizeMenuChanges(before, after);
-    expect(summary.rows).toEqual([
-      { kind: "moved", name: "Drinks", detail: "3 dishes reordered" },
-    ]);
+    expect(summary.rows).toEqual([{ kind: "moved", name: "Drinks", detail: "3 dishes reordered" }]);
     expect(summary.counts.moved).toBe(1);
   });
 

@@ -11,13 +11,7 @@ import { MenusPage } from "@/components/pages/menus-page";
 import { OrdersPage } from "@/components/pages/orders-page";
 import { SettingsPage } from "@/components/pages/settings-page";
 import { TablesPage } from "@/components/pages/tables-page";
-import {
-  BookIcon,
-  CameraIcon,
-  ChecklistIcon,
-  MoreIcon,
-  ReceiptIcon,
-} from "@/components/ui/icons";
+import { BookIcon, CameraIcon, ChecklistIcon, MoreIcon, ReceiptIcon } from "@/components/ui/icons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -237,7 +231,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const { confirm, dialog } = useConfirm();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
   const selectedItemId = route.screen === "item" ? route.itemId : null;
-  /** R0 phone nav: the More sheet (Tables · Assistant · Settings · Get started). */
+  /** R0 phone nav: the More sheet (Tables · Assistant · Settings). */
   const [moreOpen, setMoreOpen] = useState(false);
   /**
    * The launch checklist's progress for the sidebar row. `accountKey` travels
@@ -266,12 +260,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     ((next: AppRoute, replace?: boolean, flushCurrent?: boolean) => void) | null
   >(null);
   const openDocRef = useRef<
-    ((
-      doc: MenuDocument,
-      image: Blob | null,
-      updateRoute?: boolean,
-      accessHint?: MenuAccess
-    ) => Promise<void>) | null
+    | ((
+        doc: MenuDocument,
+        image: Blob | null,
+        updateRoute?: boolean,
+        accessHint?: MenuAccess
+      ) => Promise<void>)
+    | null
   >(null);
   const activeDocIdRef = useRef<string | null>(null);
   /** Previous session state, so only a real sign-out (not a first load) clears. */
@@ -420,8 +415,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * effect that could render it for a frame first (015). Derived, not deleted:
    * the stored message is what a later genuine sign-out has to say.
    */
-  const visibleLibraryError =
-    signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
+  const visibleLibraryError = signedIn && isSessionGateMessage(libraryError) ? null : libraryError;
   // Server-evaluated release decisions (A4). Both assistant flags default
   // off, so the tab and panel appear only for a released account or a
   // preview link; the loading state below avoids flashing “unavailable” while
@@ -538,9 +532,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const [liveDoc, setLiveDoc] = useState<MenuDocument | null>(null);
   const [liveDocMenuId, setLiveDocMenuId] = useState<string | null>(null);
-  const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">(
-    "idle"
-  );
+  const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
     signedInRef.current = signedIn;
@@ -631,8 +623,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             stampAccountId: origin?.accountId,
             accountKey: accountKeyRef.current,
             sharedPublished,
-            accountReadPending:
-              signedIn && serverMenusReadFor !== accountKey,
+            accountReadPending: signedIn && serverMenusReadFor !== accountKey,
           });
           if (access.state === "wait") {
             if (cancelled) return;
@@ -966,7 +957,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             await cacheMenu(full.doc);
             const mergeActor = accountKeyRef.current;
             if (mergeActor)
-              await refreshDraftSync(summary.id, mergeActor, full.updatedAt, menuContentHash(full.doc));
+              await refreshDraftSync(
+                summary.id,
+                mergeActor,
+                full.updatedAt,
+                menuContentHash(full.doc)
+              );
             cachedAny = true;
           } catch {
             // One failed download never blocks the rest; the menu stays in
@@ -1433,7 +1429,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       const pushed = await updateServerMenu(doc.id, doc, expected);
       serverBaseRef.current = pushed.updatedAt;
       const keepActor = accountKeyRef.current;
-      if (keepActor) await refreshDraftSync(doc.id, keepActor, pushed.updatedAt, menuContentHash(doc));
+      if (keepActor)
+        await refreshDraftSync(doc.id, keepActor, pushed.updatedAt, menuContentHash(doc));
       conflictRef.current = null;
       setConflict(null);
       setSaveState(savedState("Saved to your account."));
@@ -1533,7 +1530,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         if (docRef.current?.id === renamed.id) serverBaseRef.current = pushed.updatedAt;
         const renameSyncActor = accountKeyRef.current;
         if (renameSyncActor)
-          await refreshDraftSync(renamed.id, renameSyncActor, pushed.updatedAt, menuContentHash(renamed));
+          await refreshDraftSync(
+            renamed.id,
+            renameSyncActor,
+            pushed.updatedAt,
+            menuContentHash(renamed)
+          );
       } catch (error) {
         if (error instanceof SyncError && error.code === "not_found") {
           removeServerId(renamed.id); // Gone on the server; nothing to push.
@@ -1605,10 +1607,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // Claimed rows are provably the account's copies: stamp them so a
       // later sign-out hides them instead of showing stale doppelgängers.
       if (accountKey) {
-        await stampClaimedMenus(
-          [...report.imported, ...report.skipped],
-          accountKey,
-          (id) => getMenu(id)
+        await stampClaimedMenus([...report.imported, ...report.skipped], accountKey, (id) =>
+          getMenu(id)
         );
       }
       // The claim may have run while a draft was open (signing in inside
@@ -1617,8 +1617,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // just created. Reconcile the open row to the agreed revision instead.
       const openId = docRef.current?.id ?? null;
       const openClaimed =
-        openId !== null &&
-        (report.imported.includes(openId) || report.skipped.includes(openId));
+        openId !== null && (report.imported.includes(openId) || report.skipped.includes(openId));
       if (openClaimed && openId !== null && accountKey) {
         try {
           const server = await fetchServerMenu(openId);
@@ -2317,10 +2316,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     for (const category of doc.categories) {
       for (const item of category.items) {
         if (!isItemFlagged(item)) continue;
-        next =
-          hasAnyPrice(item)
-            ? confirmItemReviewed(next, category.id, item.id)
-            : acceptItemUnpriced(next, category.id, item.id);
+        next = hasAnyPrice(item)
+          ? confirmItemReviewed(next, category.id, item.id)
+          : acceptItemUnpriced(next, category.id, item.id);
       }
     }
     patchResultDoc(next);
@@ -2575,8 +2573,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       })
     : "none";
   // Neither claim surface renders while the gate says the account is unknown.
-  const claimSurfaceQuiet =
-    localDraftsDecision === "none" || localDraftsDecision === "unavailable";
+  const claimSurfaceQuiet = localDraftsDecision === "none" || localDraftsDecision === "unavailable";
 
   // The resume banner names one menu as an unpublished browser draft, which it
   // reads off the account's id set — so it waits for that set to have actually
@@ -2662,9 +2659,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * the account actually holds it. Only the routed menu counts: a document
    * kept in memory while browsing the library must not drag the context back.
    */
-  const routedMenuRestaurantId = routedDoc
-    ? (menuRestaurantById.get(routedDoc.id) ?? null)
-    : null;
+  const routedMenuRestaurantId = routedDoc ? (menuRestaurantById.get(routedDoc.id) ?? null) : null;
   const followMenuCafe =
     signedIn &&
     !accountAccessPending &&
@@ -2790,8 +2785,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    */
   const sidebarMenuCountPending =
     !sessionPending &&
-    (libraryLoading ||
-      (signedIn && !libraryCountKnown && serverMenusReadFailedFor !== accountKey));
+    (libraryLoading || (signedIn && !libraryCountKnown && serverMenusReadFailedFor !== accountKey));
 
   /** Jump the editor list to the section chosen in the sidebar. */
   function scrollToMenuSection(categoryId: string) {
@@ -2804,91 +2798,91 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       restaurantId={activeWorkspace?.restaurantId ?? null}
       pending={sessionPending || accountAccessPending}
     >
-    <div className="flex min-h-full flex-1 flex-col">
-      {dialog}
-      <ViewingTracker viewing={signedIn && screen === "orders"} />
-      {/* Default stretch: the content column fills the row, so its flex-1 main
+      <div className="flex min-h-full flex-1 flex-col">
+        {dialog}
+        <ViewingTracker viewing={signedIn && screen === "orders"} />
+        {/* Default stretch: the content column fills the row, so its flex-1 main
           absorbs the spare height and the footer rests on the viewport bottom
           instead of floating under short content. */}
-      <div className="flex w-full flex-1">
-        <AppSidebar
-          sections={sessionPending ? [] : navSections}
-          activeSection={sectionForScreen(screen)}
-          sessionPending={sessionPending}
-          signedIn={signedIn}
-          email={email}
-          onNavigate={(section) => navigateTo({ screen: section })}
-          onSignOut={() => void authClient.signOut()}
-          outline={sidebarOutline}
-          outlineKey={sidebarOutlineKey}
-          onOutlineSelect={scrollToMenuSection}
-          launch={sidebarLaunch}
-          menusPending={sidebarMenuCountPending}
-        />
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* The sidebar names the account, not the café on shift: a second
+        <div className="flex w-full flex-1">
+          <AppSidebar
+            sections={sessionPending ? [] : navSections}
+            activeSection={sectionForScreen(screen)}
+            sessionPending={sessionPending}
+            signedIn={signedIn}
+            email={email}
+            onNavigate={(section) => navigateTo({ screen: section })}
+            onSignOut={() => void authClient.signOut()}
+            outline={sidebarOutline}
+            outlineKey={sidebarOutlineKey}
+            onOutlineSelect={scrollToMenuSection}
+            launch={sidebarLaunch}
+            menusPending={sidebarMenuCountPending}
+          />
+          <div className="flex min-w-0 flex-1 flex-col">
+            {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the
               content now that the old header row is gone. */}
-          <WorkspaceSwitcher
-            workspaces={workspaces}
-            active={activeWorkspace}
-            onSwitch={handleSwitchWorkspace}
-          />
-          <main
-            className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 ${
-              // The editor is a dense working surface; the other app screens
-              // share the remaining width beside the sidebar instead of
-              // keeping the marketing measure they had under a top bar.
-              screen === "editor" ? "max-w-6xl" : "max-w-5xl"
-            }`}
-          >
-        {signedIn && claimNotice && screen !== "editor" && (
-          <LocalDraftsNotice
-            notice={claimNotice}
-            onOpenLibrary={() => navigateTo({ screen: "library" })}
-            onDismiss={() => setClaimNotice(null)}
-          />
-        )}
-        {!claimNotice &&
-          localDraftsDecision === "offer" &&
-          screen !== "editor" &&
-          ownedRestaurantsForAccount.length > 0 && (
-            <LocalDraftsOffer
-              count={localOnlyCount}
-              restaurants={ownedRestaurantsForAccount}
-              busy={claimBusy}
-              onAdd={handleClaimAdd}
-              onDismiss={handleDismissClaim}
+            <WorkspaceSwitcher
+              workspaces={workspaces}
+              active={activeWorkspace}
+              onSwitch={handleSwitchWorkspace}
             />
-          )}
-        {signedIn && claimError && (
-          <div
-            role="alert"
-            className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p>{claimError}</p>
-              <button
-                type="button"
-                onClick={() => setClaimError(null)}
-                className="text-xs font-medium underline underline-offset-2 hover:text-danger-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
+            <main
+              className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 ${
+                // The editor is a dense working surface; the other app screens
+                // share the remaining width beside the sidebar instead of
+                // keeping the marketing measure they had under a top bar.
+                screen === "editor" ? "max-w-6xl" : "max-w-5xl"
+              }`}
+            >
+              {signedIn && claimNotice && screen !== "editor" && (
+                <LocalDraftsNotice
+                  notice={claimNotice}
+                  onOpenLibrary={() => navigateTo({ screen: "library" })}
+                  onDismiss={() => setClaimNotice(null)}
+                />
+              )}
+              {!claimNotice &&
+                localDraftsDecision === "offer" &&
+                screen !== "editor" &&
+                ownedRestaurantsForAccount.length > 0 && (
+                  <LocalDraftsOffer
+                    count={localOnlyCount}
+                    restaurants={ownedRestaurantsForAccount}
+                    busy={claimBusy}
+                    onAdd={handleClaimAdd}
+                    onDismiss={handleDismissClaim}
+                  />
+                )}
+              {signedIn && claimError && (
+                <div
+                  role="alert"
+                  className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p>{claimError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setClaimError(null)}
+                      className="text-xs font-medium underline underline-offset-2 hover:text-danger-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
 
-        {/* A failed account read is no longer silent: the gate settles, the
+              {/* A failed account read is no longer silent: the gate settles, the
             server paths stay off, and this says so once. */}
-        {signedIn && claimGate.incomplete && screen !== "editor" && (
-          <p className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
-            We couldn&apos;t check your account just now, so nothing was imported from this
-            browser. Reload when you&apos;re back online and it will try again.
-          </p>
-        )}
+              {signedIn && claimGate.incomplete && screen !== "editor" && (
+                <p className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
+                  We couldn&apos;t check your account just now, so nothing was imported from this
+                  browser. Reload when you&apos;re back online and it will try again.
+                </p>
+              )}
 
-        {/* Q7 resume banner: the way back for anyone who wandered off (or
+              {/* Q7 resume banner: the way back for anyone who wandered off (or
             returns from the magic-link email) with a saved-but-unpublished
             draft. Whether a draft is unpublished is *server* knowledge, so
             this renders only after `resumeReady` (session, library and —
@@ -2897,326 +2891,331 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             invisible, never provisional. Hidden in the editor (it has its
             own publish entry), while the result is on screen (it IS the
             continue path), and while the claim surfaces speak. */}
-        {(screen === "capture" || screen === "library") &&
-          result === null &&
-          resumeReady &&
-          resumeDismissed === false &&
-          localOnlyCount > 0 &&
-          !claimNotice &&
-          claimSurfaceQuiet &&
-          (() => {
-            const resumable = localOnly.find((menu) => !menu.corrupt);
-            if (!resumable) return null;
-            return (
-              <HeightReveal>
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-warning-950">
-                      📍 Finish publishing your menu →
-                    </p>
-                    <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
-                      {localOnlyCount === 1
-                        ? `“${resumable.title}” is saved in this browser, not published yet.`
-                        : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
+              {(screen === "capture" || screen === "library") &&
+                result === null &&
+                resumeReady &&
+                resumeDismissed === false &&
+                localOnlyCount > 0 &&
+                !claimNotice &&
+                claimSurfaceQuiet &&
+                (() => {
+                  const resumable = localOnly.find((menu) => !menu.corrupt);
+                  if (!resumable) return null;
+                  return (
+                    <HeightReveal>
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-warning-950">
+                            📍 Finish publishing your menu →
+                          </p>
+                          <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
+                            {localOnlyCount === 1
+                              ? `“${resumable.title}” is saved in this browser, not published yet.`
+                              : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigateTo({
+                                screen: "editor",
+                                menuId: resumable.id,
+                                mode: "publish",
+                              })
+                            }
+                            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                          >
+                            Continue →
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setResumeDismissed(true)}
+                            className="rounded-full px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:text-accent-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
+                    </HeightReveal>
+                  );
+                })()}
+
+              {screen === "library" && (
+                <MenusPage
+                  error={visibleLibraryError}
+                  menus={libraryMenus}
+                  loading={libraryLoading || libraryAccountPending}
+                  accountMode={libraryAccountMode}
+                  canCreate={!signedIn || accountCan("menus.write")}
+                  hasHiddenMenus={hasHiddenMenus}
+                  emptyTitle={libraryEmpty?.title}
+                  emptyBody={libraryEmpty?.body}
+                  signedIn={signedIn}
+                  importCount={localOnlyCount}
+                  importMenuIds={localOnly.map((menu) => menu.id)}
+                  suggestedName={suggestedRestaurantName}
+                  ownedRestaurants={ownedRestaurantsForAccount}
+                  unavailable={storageDown}
+                  onOpen={(id) => void handleOpenMenu(id)}
+                  onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
+                  onRename={(id, title) => void handleRenameMenu(id, title)}
+                  onDelete={(id) => void handleDeleteMenu(id)}
+                  onMoveToAccount={handleMoveMenuToAccount}
+                  onMoved={(report) => {
+                    const actor = accountKeyRef.current;
+                    void (async () => {
+                      if (actor) {
+                        await stampClaimedMenus(
+                          [...report.imported, ...report.skipped],
+                          actor,
+                          (id) => getMenu(id)
+                        );
+                      }
+                      await mergeAccountMenus();
+                    })();
+                  }}
+                />
+              )}
+
+              {screen === "orders" && <OrdersPage />}
+
+              {screen === "assistant" && (
+                <AssistantPage
+                  signedIn={signedIn}
+                  sessionPending={sessionPending}
+                  pending={assistantPending}
+                  enabled={featureFlags.assistant}
+                  proposalsEnabled={featureFlags.assistantProposals}
+                  menusLoading={libraryLoading}
+                  menus={workspaceMenus
+                    .filter(
+                      (menu) =>
+                        serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
+                    )
+                    .map((menu) => ({ id: menu.id, title: menu.title }))}
+                  onBackToCapture={() => navigateTo({ screen: "capture" })}
+                />
+              )}
+
+              {screen === "tables" && <TablesPage />}
+
+              {screen === "settings" && <SettingsPage />}
+
+              {screen === "editor" && routedDoc && (
+                <>
+                  {conflict && (
+                    <ConflictBanner
+                      serverUpdatedAt={conflict.serverUpdatedAt}
+                      error={conflictError}
+                      onReloadServer={() => void handleLoadServerVersion()}
+                      onKeepMine={() => void handleKeepMyVersion()}
+                    />
+                  )}
+                  {activeMenuAccessDenied ? (
+                    <section className="rounded-2xl border border-line-200 bg-surface-base p-6">
+                      <h1 className="font-medium text-ink-900">This menu isn’t available</h1>
+                      <p className="mt-2 max-w-md text-sm leading-6 text-ink-600">
+                        Your account can’t open this menu. Ask the restaurant owner if you think
+                        that’s a mistake.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleBackToLibrary()}
+                        className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      >
+                        Back to my menus
+                      </button>
+                    </section>
+                  ) : activeMenuAccessPending ? (
+                    <section
+                      role="status"
+                      aria-busy="true"
+                      aria-label="Checking access"
+                      className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
+                    >
+                      <span className="sr-only">Checking your access to this menu…</span>
+                      <Skeleton className="h-6 w-48" />
+                      <Skeleton className="h-40 w-full" />
+                    </section>
+                  ) : (
+                    <>
+                      {activeMenuIsStaff && (
+                        <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
+                          You have staff access to this restaurant — menus are view-only for staff.
+                          Ask an owner to make changes.
+                        </p>
+                      )}
+                      {editorMode === "publish" && activeMenuCanPublish ? (
+                        <PublishWizard
+                          key={routedDoc.id}
+                          doc={routedDoc}
+                          signedIn={signedIn}
+                          sessionPending={sessionPending}
+                          accountKey={accountKey}
+                          ownedRestaurants={ownedRestaurantsForAccount}
+                          restaurantsLoading={restaurantsLoading}
+                          onPublished={handleWizardPublished}
+                          onBack={() =>
+                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
+                          }
+                          onOpenTables={() => navigateTo({ screen: "tables" })}
+                          onOpenEditor={() =>
+                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
+                          }
+                        />
+                      ) : (
+                        <MenuEditor
+                          doc={routedDoc}
+                          selectedItemId={selectedItemId}
+                          mode={activeMenuCanWrite ? editorMode : "preview"}
+                          onModeChange={(mode) =>
+                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
+                          }
+                          onChange={handleDocChange}
+                          saveState={saveState}
+                          syncMode={signedIn ? "account" : "local"}
+                          canManage={activeMenuCanWrite}
+                          onServer={activeMenuOnServer}
+                          accountCheckFailed={activeMenuAccountCheckFailed}
+                          onRetryAccountCheck={handleRetryAccountCheck}
+                          restaurantName={
+                            ownedRestaurantsForAccount.find(
+                              (restaurant) => restaurant.id === activePublication?.restaurantId
+                            )?.name ?? null
+                          }
+                          onStartPublish={() =>
+                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
+                          }
+                          imageUrl={editorImageUrl}
+                          onExportJson={handleExportJson}
+                          onExportCsv={handleExportCsv}
+                          onImportFile={(f) => void handleImportFile(f)}
+                          importError={importError}
+                          onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
+                          onBack={() => void handleBackToLibrary()}
+                          publishing={{
+                            status: activePublication,
+                            loaded: activePublicationLoaded,
+                            busy: publishBusy,
+                            error: publishError,
+                            inAccount: activeMenuOnServer,
+                            accountCheckFailed: activeMenuAccountCheckFailed,
+                            onRetryAccountCheck: handleRetryAccountCheck,
+                            liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
+                            liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
+                            onPublish: () => void handlePublish(),
+                            onUnpublish: () => void handleUnpublish(),
+                          }}
+                          onPreviewOpen={() => void refreshPublication(routedDoc.id)}
+                        />
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {screen === "capture" && (
+                <CapturePage
+                  signedIn={signedIn}
+                  sessionPending={sessionPending}
+                  step={activeStep}
+                  phase={phase}
+                  pages={pages}
+                  fileError={fileError}
+                  addInputRef={addInputRef}
+                  replaceInputRef={replaceInputRef}
+                  replaceIndexRef={replaceIndexRef}
+                  resultRef={resultRef}
+                  onSelectFiles={selectFiles}
+                  onDemo={handleDemo}
+                  onAddPages={addPages}
+                  onReplacePageAt={replacePageAt}
+                  onRemovePage={removePage}
+                  onExtract={handleExtract}
+                  extractProgress={extractProgress}
+                  extractError={extractError}
+                  result={result}
+                  previewDoc={resultDoc}
+                  source={source}
+                  draftSave={draftSave}
+                  initialReviewCount={initialReviewCount}
+                  onClear={clearCapture}
+                  onEdit={() => void handleEditResult()}
+                  onResolveItem={handleResolveResultItem}
+                  onResolveAll={handleResolveAllResultItems}
+                  onUpdatePrice={handleUpdateResultPrice}
+                  onRenameTitle={handleRenameResultTitle}
+                  onPublish={
+                    source === "demo" || draftSave === "saved"
+                      ? () => void handleStartPublish()
+                      : undefined
+                  }
+                />
+              )}
+
+              {screen === "editor" && !routedDoc && missingPublishMenuId && (
+                <MissingDraftCard
+                  onOpenLibrary={() => navigateTo({ screen: "library" })}
+                  onStartFresh={() => navigateTo({ screen: "capture" })}
+                />
+              )}
+              {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
+                <section className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
+                  <h1 className="font-medium text-ink-900">Checking your session…</h1>
+                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
+                    We couldn’t reach your account just now, so this menu hasn’t been opened. Your
+                    draft is still saved in this browser — nothing is lost.
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
-                      onClick={() =>
-                        navigateTo({ screen: "editor", menuId: resumable.id, mode: "publish" })
-                      }
+                      onClick={workspace.retrySession}
                       className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
-                      Continue →
+                      Try again
                     </button>
                     <button
                       type="button"
-                      onClick={() => setResumeDismissed(true)}
-                      className="rounded-full px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:text-accent-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      onClick={() => navigateTo({ screen: "library" })}
+                      className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
-                      Dismiss
+                      Back to My menus
                     </button>
                   </div>
-                </div>
-              </HeightReveal>
-            );
-          })()}
-
-        {screen === "library" && (
-          <MenusPage
-            error={visibleLibraryError}
-            menus={libraryMenus}
-            loading={libraryLoading || libraryAccountPending}
-            accountMode={libraryAccountMode}
-            canCreate={!signedIn || accountCan("menus.write")}
-            hasHiddenMenus={hasHiddenMenus}
-            emptyTitle={libraryEmpty?.title}
-            emptyBody={libraryEmpty?.body}
-            signedIn={signedIn}
-            importCount={localOnlyCount}
-            importMenuIds={localOnly.map((menu) => menu.id)}
-            suggestedName={suggestedRestaurantName}
-            ownedRestaurants={ownedRestaurantsForAccount}
-            unavailable={storageDown}
-            onOpen={(id) => void handleOpenMenu(id)}
-            onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
-            onRename={(id, title) => void handleRenameMenu(id, title)}
-            onDelete={(id) => void handleDeleteMenu(id)}
-            onMoveToAccount={handleMoveMenuToAccount}
-            onMoved={(report) => {
-              const actor = accountKeyRef.current;
-              void (async () => {
-                if (actor) {
-                  await stampClaimedMenus(
-                    [...report.imported, ...report.skipped],
-                    actor,
-                    (id) => getMenu(id)
-                  );
-                }
-                await mergeAccountMenus();
-              })();
-            }}
-          />
-        )}
-
-        {screen === "orders" && <OrdersPage />}
-
-
-        {screen === "assistant" && (
-          <AssistantPage
-            signedIn={signedIn}
-            sessionPending={sessionPending}
-            pending={assistantPending}
-            enabled={featureFlags.assistant}
-            proposalsEnabled={featureFlags.assistantProposals}
-            menusLoading={libraryLoading}
-            menus={workspaceMenus
-              .filter(
-                (menu) =>
-                  serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
-              )
-              .map((menu) => ({ id: menu.id, title: menu.title }))}
-            onBackToCapture={() => navigateTo({ screen: "capture" })}
-          />
-        )}
-
-        {screen === "tables" && <TablesPage />}
-
-        {screen === "settings" && <SettingsPage />}
-
-        {screen === "editor" && routedDoc && (
-          <>
-            {conflict && (
-              <ConflictBanner
-                serverUpdatedAt={conflict.serverUpdatedAt}
-                error={conflictError}
-                onReloadServer={() => void handleLoadServerVersion()}
-                onKeepMine={() => void handleKeepMyVersion()}
-              />
-            )}
-            {activeMenuAccessDenied ? (
-              <section className="rounded-2xl border border-line-200 bg-surface-base p-6">
-                <h1 className="font-medium text-ink-900">This menu isn’t available</h1>
-                <p className="mt-2 max-w-md text-sm leading-6 text-ink-600">
-                  Your account can’t open this menu. Ask the restaurant owner if you think that’s a
-                  mistake.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void handleBackToLibrary()}
-                  className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  Back to my menus
-                </button>
-              </section>
-            ) : activeMenuAccessPending ? (
-              <section
-                role="status"
-                aria-busy="true"
-                aria-label="Checking access"
-                className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
-              >
-                <span className="sr-only">Checking your access to this menu…</span>
-                <Skeleton className="h-6 w-48" />
-                <Skeleton className="h-40 w-full" />
-              </section>
-            ) : (
-              <>
-                {activeMenuIsStaff && (
-                  <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
-                    You have staff access to this restaurant — menus are view-only for staff. Ask an
-                    owner to make changes.
-                  </p>
+                </section>
+              )}
+              {screen === "editor" &&
+                !routedDoc &&
+                !missingPublishMenuId &&
+                !sessionCheckGaveUp && (
+                  <div role="status" aria-busy="true" className="flex flex-col gap-4">
+                    <span className="sr-only">Opening menu…</span>
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-8 w-28 rounded-full" />
+                      <Skeleton className="h-4 w-40" />
+                    </div>
+                    <div className="grid items-start gap-4 lg:grid-cols-2">
+                      <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+                        <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+                          <Skeleton className="h-9" />
+                          <Skeleton className="h-9" />
+                        </div>
+                        <Skeleton className="mt-3 h-28" />
+                      </div>
+                      <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="mt-2 h-3 w-3/5" />
+                        <Skeleton className="mt-4 h-9" />
+                      </div>
+                    </div>
+                  </div>
                 )}
-                {editorMode === "publish" && activeMenuCanPublish ? (
-              <PublishWizard
-                key={routedDoc.id}
-                doc={routedDoc}
-                signedIn={signedIn}
-                sessionPending={sessionPending}
-                accountKey={accountKey}
-                ownedRestaurants={ownedRestaurantsForAccount}
-                restaurantsLoading={restaurantsLoading}
-                onPublished={handleWizardPublished}
-                onBack={() => navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })}
-                onOpenTables={() => navigateTo({ screen: "tables" })}
-                onOpenEditor={() =>
-                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
-                }
-              />
-            ) : (
-              <MenuEditor
-                doc={routedDoc}
-                selectedItemId={selectedItemId}
-                mode={activeMenuCanWrite ? editorMode : "preview"}
-                onModeChange={(mode) =>
-                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
-                }
-                onChange={handleDocChange}
-                saveState={saveState}
-                syncMode={signedIn ? "account" : "local"}
-                canManage={activeMenuCanWrite}
-                onServer={activeMenuOnServer}
-                accountCheckFailed={activeMenuAccountCheckFailed}
-                onRetryAccountCheck={handleRetryAccountCheck}
-                restaurantName={
-                  ownedRestaurantsForAccount.find(
-                    (restaurant) => restaurant.id === activePublication?.restaurantId
-                  )?.name ?? null
-                }
-                onStartPublish={() =>
-                  navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
-                }
-                imageUrl={editorImageUrl}
-                onExportJson={handleExportJson}
-                onExportCsv={handleExportCsv}
-                onImportFile={(f) => void handleImportFile(f)}
-                importError={importError}
-                onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
-                onBack={() => void handleBackToLibrary()}
-                publishing={{
-                  status: activePublication,
-                  loaded: activePublicationLoaded,
-                  busy: publishBusy,
-                  error: publishError,
-                  inAccount: activeMenuOnServer,
-                  accountCheckFailed: activeMenuAccountCheckFailed,
-                  onRetryAccountCheck: handleRetryAccountCheck,
-                  liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
-                  liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
-                  onPublish: () => void handlePublish(),
-                  onUnpublish: () => void handleUnpublish(),
-                }}
-                onPreviewOpen={() => void refreshPublication(routedDoc.id)}
-              />
-                )}
-              </>
-            )}
-          </>
-        )}
-
-        {screen === "capture" && (
-          <CapturePage
-            signedIn={signedIn}
-            sessionPending={sessionPending}
-            step={activeStep}
-            phase={phase}
-            pages={pages}
-            fileError={fileError}
-            addInputRef={addInputRef}
-            replaceInputRef={replaceInputRef}
-            replaceIndexRef={replaceIndexRef}
-            resultRef={resultRef}
-            onSelectFiles={selectFiles}
-            onDemo={handleDemo}
-            onAddPages={addPages}
-            onReplacePageAt={replacePageAt}
-            onRemovePage={removePage}
-            onExtract={handleExtract}
-            extractProgress={extractProgress}
-            extractError={extractError}
-            result={result}
-            previewDoc={resultDoc}
-            source={source}
-            draftSave={draftSave}
-            initialReviewCount={initialReviewCount}
-            onClear={clearCapture}
-            onEdit={() => void handleEditResult()}
-            onResolveItem={handleResolveResultItem}
-            onResolveAll={handleResolveAllResultItems}
-            onUpdatePrice={handleUpdateResultPrice}
-            onRenameTitle={handleRenameResultTitle}
-            onPublish={
-              source === "demo" || draftSave === "saved"
-                ? () => void handleStartPublish()
-                : undefined
-            }
-          />
-        )}
-
-        {screen === "editor" && !routedDoc && missingPublishMenuId && (
-          <MissingDraftCard
-            onOpenLibrary={() => navigateTo({ screen: "library" })}
-            onStartFresh={() => navigateTo({ screen: "capture" })}
-          />
-        )}
-        {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
-          <section className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
-            <h1 className="font-medium text-ink-900">Checking your session…</h1>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
-              We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft
-              is still saved in this browser — nothing is lost.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={workspace.retrySession}
-                className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Try again
-              </button>
-              <button
-                type="button"
-                onClick={() => navigateTo({ screen: "library" })}
-                className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Back to My menus
-              </button>
-            </div>
-          </section>
-        )}
-        {screen === "editor" &&
-          !routedDoc &&
-          !missingPublishMenuId &&
-          !sessionCheckGaveUp && (
-          <div role="status" aria-busy="true" className="flex flex-col gap-4">
-            <span className="sr-only">Opening menu…</span>
-            <div className="flex items-center gap-3">
-              <Skeleton className="h-8 w-28 rounded-full" />
-              <Skeleton className="h-4 w-40" />
-            </div>
-            <div className="grid items-start gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
-                <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-                  <Skeleton className="h-9" />
-                  <Skeleton className="h-9" />
-                </div>
-                <Skeleton className="mt-3 h-28" />
-              </div>
-              <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="mt-2 h-3 w-3/5" />
-                <Skeleton className="mt-4 h-9" />
-              </div>
-            </div>
+            </main>
+            <SiteFooter />
           </div>
-        )}
-          </main>
-          <SiteFooter />
         </div>
-      </div>
-      {/*
+        {/*
         Phone nav: signed in, the tab bar pins Capture · My menus · Orders ·
         More (Orders keeps its home for the R0.3 monitor badge; the rest
         lives in the More sheet). Signed out, the shell is capture-only:
@@ -3225,141 +3224,142 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         the page and sticks to the viewport bottom instead of floating above
         the footer links.
       */}
-      {navReady && (signedIn || (!libraryLoading && libraryMenus.length > 0)) ? (
-      <nav
-        data-print-hide
-        aria-label="Sections"
-        className="sticky bottom-0 z-30 border-t border-line-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
-        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      >
-        <div className="flex px-2 pt-1">
-          {phoneTabList.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setMoreOpen(false);
-                navigateTo({ screen: tab.id });
-              }}
-              aria-current={screen === tab.id ? "page" : undefined}
-              className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                screen === tab.id ? "text-warning-800" : "text-ink-500"
-              }`}
+        {navReady && (signedIn || (!libraryLoading && libraryMenus.length > 0)) ? (
+          <nav
+            data-print-hide
+            aria-label="Sections"
+            className="sticky bottom-0 z-30 border-t border-line-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
+            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+          >
+            <div className="flex px-2 pt-1">
+              {phoneTabList.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    navigateTo({ screen: tab.id });
+                  }}
+                  aria-current={screen === tab.id ? "page" : undefined}
+                  className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                    screen === tab.id ? "text-warning-800" : "text-ink-500"
+                  }`}
+                >
+                  {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
+                  <span aria-hidden="true" className="flex h-[22px] items-center">
+                    <PhoneTabIcon id={tab.id} />
+                  </span>
+                  {tab.label}
+                </button>
+              ))}
+              {signedIn && (moreRows.length > 0 || canGetStarted) && (
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen((open) => !open)}
+                  aria-expanded={moreOpen}
+                  aria-current={screenInMore ? "page" : undefined}
+                  className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                    moreOpen || screenInMore ? "text-warning-800" : "text-ink-500"
+                  }`}
+                >
+                  <span aria-hidden="true" className="flex h-[22px] items-center">
+                    <MoreIcon size={22} />
+                  </span>
+                  More
+                </button>
+              )}
+            </div>
+          </nav>
+        ) : null}
+        {signedIn && moreOpen && (
+          <div className="sm:hidden">
+            <div
+              aria-hidden="true"
+              onClick={() => setMoreOpen(false)}
+              className="fixed inset-0 z-40 bg-scrim"
+            />
+            <div
+              role="dialog"
+              aria-label="More"
+              className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-line-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
             >
-              {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
-              <span aria-hidden="true" className="flex h-[22px] items-center">
-                <PhoneTabIcon id={tab.id} />
-              </span>
-              {tab.label}
-            </button>
-          ))}
-          {signedIn && (moreRows.length > 0 || canGetStarted) && (
-          <button
-            type="button"
-            onClick={() => setMoreOpen((open) => !open)}
-            aria-expanded={moreOpen}
-            aria-current={screenInMore ? "page" : undefined}
-            className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-              moreOpen || screenInMore ? "text-warning-800" : "text-ink-500"
-            }`}
-          >
-            <span aria-hidden="true" className="flex h-[22px] items-center">
-              <MoreIcon size={22} />
-            </span>
-            More
-          </button>
-          )}
-        </div>
-      </nav>
-      ) : null}
-      {signedIn && moreOpen && (
-        <div className="sm:hidden">
-          <div
-            aria-hidden="true"
-            onClick={() => setMoreOpen(false)}
-            className="fixed inset-0 z-40 bg-scrim"
-          />
-          <div
-            role="dialog"
-            aria-label="More"
-            className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-line-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-          >
-            <div aria-hidden="true" className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-surface-200" />
-            {moreRows.map((row) => (
-              <button
-                key={row.id}
-                type="button"
-                onClick={() => {
-                  setMoreOpen(false);
-                  navigateTo({ screen: row.id });
-                }}
-                className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                <span className="text-sm font-semibold text-ink-900">{row.label}</span>
-                <span className="text-xs font-normal text-ink-500">{row.why}</span>
-              </button>
-            ))}
-            {/* The checklist is progress, not another destination: its own
+              <div
+                aria-hidden="true"
+                className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-surface-200"
+              />
+              {moreRows.map((row) => (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    navigateTo({ screen: row.id });
+                  }}
+                  className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  <span className="text-sm font-semibold text-ink-900">{row.label}</span>
+                  <span className="text-xs font-normal text-ink-500">{row.why}</span>
+                </button>
+              ))}
+              {/* The checklist is progress, not another destination: its own
                 card above the rule, with the count the sidebar shows. It
                 stays an owner's surface (`settings.manage`), like the Get
                 started link it replaces. */}
-            {canGetStarted && (
-              <a
-                href="/launch"
-                className="mt-2 flex min-h-[56px] items-center gap-3 rounded-xl border border-line-200 bg-surface-50 px-3 py-2.5 transition-colors hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                <span
-                  aria-hidden="true"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-base text-ink-600"
+              {canGetStarted && (
+                <a
+                  href="/launch"
+                  className="mt-2 flex min-h-[56px] items-center gap-3 rounded-xl border border-line-200 bg-surface-50 px-3 py-2.5 transition-colors hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
-                  <ChecklistIcon size={18} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-ink-900">
-                    Launch checklist
-                  </span>
-                  <span className="block text-xs font-normal text-ink-500">
-                    {sheetLaunchHint}
-                  </span>
-                </span>
-                {sidebarLaunch ? (
                   <span
                     aria-hidden="true"
-                    className="shrink-0 rounded-full bg-surface-base px-2 py-0.5 text-[11px] font-semibold text-ink-600"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-base text-ink-600"
                   >
-                    {sidebarLaunch.done}/{sidebarLaunch.total}
+                    <ChecklistIcon size={18} />
                   </span>
-                ) : null}
-                {sidebarLaunch ? (
-                  <span className="sr-only">
-                    {sidebarLaunch.done} of {sidebarLaunch.total} steps done
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink-900">
+                      Launch checklist
+                    </span>
+                    <span className="block text-xs font-normal text-ink-500">
+                      {sheetLaunchHint}
+                    </span>
                   </span>
-                ) : null}
-              </a>
-            )}
-            {/* The app has no top bar on a phone, so the account lives here:
+                  {sidebarLaunch ? (
+                    <span
+                      aria-hidden="true"
+                      className="shrink-0 rounded-full bg-surface-base px-2 py-0.5 text-[11px] font-semibold text-ink-600"
+                    >
+                      {sidebarLaunch.done}/{sidebarLaunch.total}
+                    </span>
+                  ) : null}
+                  {sidebarLaunch ? (
+                    <span className="sr-only">
+                      {sidebarLaunch.done} of {sidebarLaunch.total} steps done
+                    </span>
+                  ) : null}
+                </a>
+              )}
+              {/* The app has no top bar on a phone, so the account lives here:
                 one place to see who is signed in and to end the session. It
                 is the last thing in the sheet, under the destinations. */}
-            <div className="mt-2 border-t border-line-200 pt-1">
-              <p className="truncate px-2 pt-1 text-[11px] text-ink-500">
-                {email}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setMoreOpen(false);
-                  void authClient.signOut();
-                }}
-                className="flex min-h-[44px] w-full items-center rounded-xl px-2 text-left text-sm font-medium text-ink-700 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Sign out
-              </button>
+              <div className="mt-2 border-t border-line-200 pt-1">
+                <p className="truncate px-2 pt-1 text-[11px] text-ink-500">{email}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMoreOpen(false);
+                    void authClient.signOut();
+                  }}
+                  className="flex min-h-[44px] w-full items-center rounded-xl px-2 text-left text-sm font-medium text-ink-700 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  Sign out
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-      <MonitorToastStack onOpen={() => navigateTo({ screen: "orders" })} />
-    </div>
+        )}
+        <MonitorToastStack onOpen={() => navigateTo({ screen: "orders" })} />
+      </div>
     </OrderMonitorProvider>
   );
 }

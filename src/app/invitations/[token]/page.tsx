@@ -1,5 +1,7 @@
 import { Suspense } from "react";
 
+import { isDevSignInEnabled } from "@/lib/auth/dev-sign-in";
+
 import { InvitationClient, InvitationSkeleton } from "./invitation-client";
 
 export const metadata = {
@@ -14,7 +16,7 @@ export const metadata = {
  */
 async function InvitationContent({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  return <InvitationClient token={token} />;
+  return <InvitationClient token={token} devSignIn={isDevSignInEnabled()} />;
 }
 
 export default function InvitationPage({ params }: { params: Promise<{ token: string }> }) {

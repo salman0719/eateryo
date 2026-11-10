@@ -81,9 +81,8 @@ describe("error mapping", () => {
     [400, "invalid_body", "invalid"],
     [503, "server_db_unavailable", "unavailable"],
   ] as const)("maps %s %s to %s", async (status, serverCode, clientCode) => {
-    vi.stubGlobal(
-      "fetch",
-      async () => jsonResponse({ error: { code: serverCode, message: "nope" } }, status)
+    vi.stubGlobal("fetch", async () =>
+      jsonResponse({ error: { code: serverCode, message: "nope" } }, status)
     );
 
     await expect(fetchServerMenus()).rejects.toMatchObject({ code: clientCode });
@@ -167,19 +166,17 @@ describe("updateServerMenu", () => {
   });
 
   it("surfaces a stale write as conflict with the server's current updatedAt", async () => {
-    vi.stubGlobal(
-      "fetch",
-      async () =>
-        jsonResponse(
-          {
-            error: {
-              code: "stale_menu",
-              message: "changed elsewhere",
-              currentUpdatedAt: "2026-10-18T07:00:00.000Z",
-            },
+    vi.stubGlobal("fetch", async () =>
+      jsonResponse(
+        {
+          error: {
+            code: "stale_menu",
+            message: "changed elsewhere",
+            currentUpdatedAt: "2026-10-18T07:00:00.000Z",
           },
-          409
-        )
+        },
+        409
+      )
     );
 
     const error = await updateServerMenu("menu-1", createSampleMenuDocument(), "stale").catch(

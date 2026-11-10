@@ -127,7 +127,10 @@ export function setLineQuantity(
 
 /** Short human-facing code derived from the id (e.g. "Order #4F2A9C"). */
 export function orderCode(id: string): string {
-  const compact = id.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
+  const compact = id
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(-6)
+    .toUpperCase();
   return compact || "ORDER";
 }
 

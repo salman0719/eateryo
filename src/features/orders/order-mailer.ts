@@ -36,12 +36,11 @@ export interface NewOrderEmail {
 }
 
 /** Pure branded new-order body, asserted in tests and reused by the sender. */
-export function buildNewOrderEmail({
-  email,
-  restaurantName,
-  order,
-  boardUrl,
-}: NewOrderEmail): { subject: string; text: string; html: string } {
+export function buildNewOrderEmail({ email, restaurantName, order, boardUrl }: NewOrderEmail): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const table = formatTableLabel(order.tableLabel);
   const code = orderCode(order.id);
   const subject = `New order · ${table} — ${restaurantName}`;
@@ -69,7 +68,9 @@ export function buildNewOrderEmail({
       (line) =>
         `<tr><td style=\"padding:7px 0;font-family:Arial,sans-serif;font-size:13px;line-height:1.5;color:${EMAIL_COLORS.BODY_TEXT}\">` +
         `<strong>${line.quantity}×</strong> ${escapeEmailHtml(line.name)}` +
-        (line.variantName ? ` <span style=\"color:${EMAIL_COLORS.MUTED}\">${escapeEmailHtml(line.variantName)}</span>` : "") +
+        (line.variantName
+          ? ` <span style=\"color:${EMAIL_COLORS.MUTED}\">${escapeEmailHtml(line.variantName)}</span>`
+          : "") +
         `</td><td align=\"right\" style=\"padding:7px 0;font-family:Arial,sans-serif;font-size:13px;color:${EMAIL_COLORS.BODY_TEXT}\">` +
         (line.unitPrice === null
           ? "no price"
@@ -152,12 +153,7 @@ export async function sendNewOrderEmail(input: NewOrderEmail): Promise<void> {
   }
 }
 
-export type OrderEmailSkip =
-  | "disabled"
-  | "no_recipient"
-  | "duplicate"
-  | "digest"
-  | "failed";
+export type OrderEmailSkip = "disabled" | "no_recipient" | "duplicate" | "digest" | "failed";
 
 export type OrderEmailOutcome = { mailed: true } | { mailed: false; skipped: OrderEmailSkip };
 
@@ -200,10 +196,7 @@ export async function maybeEmailNewOrder(
     logEvent("info", "orders.email_sent", { orderId: order.id, restaurantId });
     return { mailed: true };
   } catch (error) {
-    return fail(
-      "failed",
-      error instanceof Error ? error.message : "unknown send failure"
-    );
+    return fail("failed", error instanceof Error ? error.message : "unknown send failure");
   }
 }
 

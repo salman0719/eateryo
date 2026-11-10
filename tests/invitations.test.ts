@@ -122,13 +122,7 @@ describe("restaurant invitations", () => {
 
   it("refuses expired invitations", async () => {
     const place = await freshRestaurant("Expiry Place");
-    const created = await createInvitationForOwner(
-      db,
-      owner,
-      place.id,
-      "late@cafe.test",
-      "staff"
-    );
+    const created = await createInvitationForOwner(db, owner, place.id, "late@cafe.test", "staff");
     const late = await seedUser(db, "late@cafe.test", "Late");
 
     await db
@@ -144,13 +138,7 @@ describe("restaurant invitations", () => {
 
   it("keeps the existing role when the invitee already joined", async () => {
     const place = await freshRestaurant("Double Place");
-    const created = await createInvitationForOwner(
-      db,
-      owner,
-      place.id,
-      "early@cafe.test",
-      "staff"
-    );
+    const created = await createInvitationForOwner(db, owner, place.id, "early@cafe.test", "staff");
     const early = await seedUser(db, "early@cafe.test", "Early");
     await addMemberForOwner(db, owner, place.id, "early@cafe.test", "owner");
 
@@ -187,9 +175,9 @@ describe("restaurant invitations", () => {
     await expect(listPendingInvitationsForOwner(db, staff, place.id)).rejects.toMatchObject({
       code: "forbidden",
     });
-    await expect(
-      listPendingInvitationsForOwner(db, outsider, place.id)
-    ).rejects.toMatchObject({ code: "not_found" });
+    await expect(listPendingInvitationsForOwner(db, outsider, place.id)).rejects.toMatchObject({
+      code: "not_found",
+    });
   });
 
   it("resends by rotating the link and keeping email and role", async () => {
@@ -208,26 +196,32 @@ describe("restaurant invitations", () => {
     await expect(
       resendInvitationForOwner(db, staff, place.id, pending[0]!.id)
     ).rejects.toMatchObject({ code: "forbidden" });
-    await expect(
-      resendInvitationForOwner(db, owner, place.id, "no-such-id")
-    ).rejects.toMatchObject({ code: "not_found" });
+    await expect(resendInvitationForOwner(db, owner, place.id, "no-such-id")).rejects.toMatchObject(
+      { code: "not_found" }
+    );
   });
 
   it("revokes a pending invitation so its link stops working", async () => {
     const place = await freshRestaurant("Revoke Place");
     await addMemberForOwner(db, owner, place.id, "staff@cafe.test", "staff");
-    const created = await createInvitationForOwner(db, owner, place.id, "revoked@cafe.test", "staff");
+    const created = await createInvitationForOwner(
+      db,
+      owner,
+      place.id,
+      "revoked@cafe.test",
+      "staff"
+    );
     const [pending] = await listPendingInvitationsForOwner(db, owner, place.id);
 
     await revokeInvitationForOwner(db, owner, place.id, pending!.id);
     expect(await getInvitationByToken(db, created.token)).toBeNull();
     expect(await listPendingInvitationsForOwner(db, owner, place.id)).toHaveLength(0);
 
-    await expect(
-      revokeInvitationForOwner(db, owner, place.id, pending!.id)
-    ).rejects.toMatchObject({ code: "not_found" });
-    await expect(
-      revokeInvitationForOwner(db, staff, place.id, "anything")
-    ).rejects.toMatchObject({ code: "forbidden" });
+    await expect(revokeInvitationForOwner(db, owner, place.id, pending!.id)).rejects.toMatchObject({
+      code: "not_found",
+    });
+    await expect(revokeInvitationForOwner(db, staff, place.id, "anything")).rejects.toMatchObject({
+      code: "forbidden",
+    });
   });
 });

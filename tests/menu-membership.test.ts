@@ -50,7 +50,12 @@ describe("decideMenuMembership", () => {
       decideMenuMembership({ signedIn: true, readSettled: true, readFailed: false, onServer: true })
     ).toBe("account");
     expect(
-      decideMenuMembership({ signedIn: true, readSettled: true, readFailed: false, onServer: false })
+      decideMenuMembership({
+        signedIn: true,
+        readSettled: true,
+        readFailed: false,
+        onServer: false,
+      })
     ).toBe("browser");
   });
 
@@ -58,7 +63,12 @@ describe("decideMenuMembership", () => {
     // A deep link syncs the menu before the list lands; that is already an
     // answer about this menu, so it must never render as still checking.
     expect(
-      decideMenuMembership({ signedIn: true, readSettled: false, readFailed: false, onServer: true })
+      decideMenuMembership({
+        signedIn: true,
+        readSettled: false,
+        readFailed: false,
+        onServer: true,
+      })
     ).toBe("account");
   });
 

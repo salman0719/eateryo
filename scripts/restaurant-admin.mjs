@@ -115,10 +115,7 @@ async function main() {
 
   const url = process.env.DATABASE_URL;
   if (!url) {
-    fail(
-      "DATABASE_URL is not set. Put it in .env.local (the npm script loads it) and retry.",
-      2
-    );
+    fail("DATABASE_URL is not set. Put it in .env.local (the npm script loads it) and retry.", 2);
   }
   const sql = neon(url);
 

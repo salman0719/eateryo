@@ -5,11 +5,7 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { moveLocalMenusToAccount, type MoveReport } from "@/features/menus/move-to-account";
-import {
-  createRestaurant,
-  deleteRestaurant,
-  renameRestaurant,
-} from "@/features/tenancy/client";
+import { createRestaurant, deleteRestaurant, renameRestaurant } from "@/features/tenancy/client";
 import { useWorkspace } from "@/features/tenancy/workspace-context";
 
 /**
@@ -157,9 +153,7 @@ export function MoveToAccountPanel({
 
   return (
     <section className="bg-surface-base p-4 sm:p-5">
-      <h3 className="text-sm font-bold tracking-tight text-ink-900">
-        Menus saved in this browser
-      </h3>
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">Menus saved in this browser</h3>
       <p className="mt-1 text-xs leading-5 text-ink-500">
         Adds your {menuCount === 1 ? "saved menu" : `${menuCount} saved menus`} to your account so
         other devices see {menuCount === 1 ? "it" : "them"} too. This browser keeps its copies —

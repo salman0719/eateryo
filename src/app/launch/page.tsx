@@ -42,7 +42,7 @@ const WHAT_YOU_GET = [
 export default function LaunchPage() {
   return (
     <>
-      <SiteHeader />
+      <SiteHeader getStarted={false} />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <p className="inline-flex items-center rounded-full bg-warning-100 px-3 py-1 text-xs font-semibold text-warning-900">
           Free while it lasts — no payment step
@@ -70,7 +70,10 @@ export default function LaunchPage() {
           <h2 className="text-xl font-bold tracking-tight text-ink-900">What you get</h2>
           <ul className="mt-4 grid gap-4 sm:grid-cols-2">
             {WHAT_YOU_GET.map((item) => (
-              <li key={item.title} className="rounded-2xl border border-line-200 bg-surface-base p-4">
+              <li
+                key={item.title}
+                className="rounded-2xl border border-line-200 bg-surface-base p-4"
+              >
                 <h3 className="text-sm font-semibold text-ink-900">{item.title}</h3>
                 <p className="mt-1 text-sm text-ink-600">{item.body}</p>
               </li>
@@ -86,8 +89,8 @@ export default function LaunchPage() {
               order; money still changes hands at the counter, exactly as it does today.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">No diner accounts.</strong> A guest
-              types nothing but their table number. We never ask for a name, phone, or email.
+              <strong className="font-medium text-ink-800">No diner accounts.</strong> A guest types
+              nothing but their table number. We never ask for a name, phone, or email.
             </li>
             <li>
               <strong className="font-medium text-ink-800">No stored menu photos.</strong> Images
@@ -99,9 +102,9 @@ export default function LaunchPage() {
         <section className="mt-6 rounded-2xl border border-line-200 bg-surface-50 p-5">
           <h2 className="text-base font-semibold text-ink-900">Taking it step by step</h2>
           <p className="mt-1 text-sm text-ink-600">
-            The checklist above is the whole process, in order. If a step does not apply to you
-            yet, it stays open — nothing is marked done that we did not actually see. Printing is
-            the one exception, which is why you tick it yourself.
+            The checklist above is the whole process, in order. If a step does not apply to you yet,
+            it stays open — nothing is marked done that we did not actually see. Printing is the one
+            exception, which is why you tick it yourself.
           </p>
           <Link
             href="/"

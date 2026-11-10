@@ -210,15 +210,9 @@ describe("claim gate", () => {
   }
 
   it("reads a marker for another account as still loading", () => {
-    expect(
-      accountReadState({ accountKey, settledFor: null, failedFor: null })
-    ).toBe("loading");
-    expect(
-      accountReadState({ accountKey, settledFor: "user-b", failedFor: null })
-    ).toBe("loading");
-    expect(accountReadState({ accountKey, settledFor: accountKey, failedFor: null })).toBe(
-      "ready"
-    );
+    expect(accountReadState({ accountKey, settledFor: null, failedFor: null })).toBe("loading");
+    expect(accountReadState({ accountKey, settledFor: "user-b", failedFor: null })).toBe("loading");
+    expect(accountReadState({ accountKey, settledFor: accountKey, failedFor: null })).toBe("ready");
     expect(accountReadState({ accountKey, settledFor: null, failedFor: accountKey })).toBe(
       "failed"
     );
@@ -319,9 +313,9 @@ describe("claim gate", () => {
     expect(
       decideLocalDraftClaimSurface({ gate, signedIn: true, claim: claimInputs({ localCount: 0 }) })
     ).toBe("none");
-    expect(
-      decideLocalDraftClaimSurface({ gate, signedIn: false, claim: claimInputs() })
-    ).toBe("none");
+    expect(decideLocalDraftClaimSurface({ gate, signedIn: false, claim: claimInputs() })).toBe(
+      "none"
+    );
   });
 });
 
@@ -336,8 +330,22 @@ describe("resumeBannerReady", () => {
   const failed = { pending: false, incomplete: true };
 
   it("waits for the browser library, whatever else is known", () => {
-    expect(resumeBannerReady({ libraryLoading: true, gate: open, signedIn: true, accountMenusSettled: true })).toBe(false);
-    expect(resumeBannerReady({ libraryLoading: true, gate: open, signedIn: false, accountMenusSettled: false })).toBe(false);
+    expect(
+      resumeBannerReady({
+        libraryLoading: true,
+        gate: open,
+        signedIn: true,
+        accountMenusSettled: true,
+      })
+    ).toBe(false);
+    expect(
+      resumeBannerReady({
+        libraryLoading: true,
+        gate: open,
+        signedIn: false,
+        accountMenusSettled: false,
+      })
+    ).toBe(false);
   });
 
   it("waits while either account read is still in flight", () => {
@@ -353,24 +361,44 @@ describe("resumeBannerReady", () => {
 
   it("speaks signed out: the library is the whole truth", () => {
     expect(
-      resumeBannerReady({ libraryLoading: false, gate: open, signedIn: false, accountMenusSettled: false })
+      resumeBannerReady({
+        libraryLoading: false,
+        gate: open,
+        signedIn: false,
+        accountMenusSettled: false,
+      })
     ).toBe(true);
   });
 
   it("speaks for a signed-in account whose menu list answered", () => {
     expect(
-      resumeBannerReady({ libraryLoading: false, gate: open, signedIn: true, accountMenusSettled: true })
+      resumeBannerReady({
+        libraryLoading: false,
+        gate: open,
+        signedIn: true,
+        accountMenusSettled: true,
+      })
     ).toBe(true);
     // The restaurant read is not part of this banner's claim: it needs the
     // menu list to tell a draft from an account menu, and nothing more.
     expect(
-      resumeBannerReady({ libraryLoading: false, gate: failed, signedIn: true, accountMenusSettled: true })
+      resumeBannerReady({
+        libraryLoading: false,
+        gate: failed,
+        signedIn: true,
+        accountMenusSettled: true,
+      })
     ).toBe(true);
   });
 
   it("stays quiet when the menu list failed — it cannot tell an account menu from a draft", () => {
     expect(
-      resumeBannerReady({ libraryLoading: false, gate: failed, signedIn: true, accountMenusSettled: false })
+      resumeBannerReady({
+        libraryLoading: false,
+        gate: failed,
+        signedIn: true,
+        accountMenusSettled: false,
+      })
     ).toBe(false);
   });
 });

@@ -150,7 +150,8 @@ export function LibraryPanel({
       {secondMenuSuggestions.length > 0 && (
         <div className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3">
           <p className="text-sm text-ink-700">
-            Adding another? <span className="font-medium">Is it for a different time or service?</span>
+            Adding another?{" "}
+            <span className="font-medium">Is it for a different time or service?</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {secondMenuSuggestions.map((name) => (

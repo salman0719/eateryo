@@ -19,7 +19,11 @@ describe("TableOrderTabs closed menus", () => {
       ...base,
       menus: [{ menuId: "open-1", menuSlug: "lunch", title: "Lunch", doc }],
       closedMenus: [
-        { menuId: "closed-1", title: "Dinner", availability: [{ days: [5, 6], start: "18:00", end: "22:00" }] },
+        {
+          menuId: "closed-1",
+          title: "Dinner",
+          availability: [{ days: [5, 6], start: "18:00", end: "22:00" }],
+        },
       ],
     });
     // Open tab: selectable, with the All tab alongside.
@@ -43,7 +47,11 @@ describe("TableOrderTabs closed menus", () => {
       ...base,
       menus: [],
       closedMenus: [
-        { menuId: "closed-1", title: "Dinner", availability: [{ days: [5], start: "18:00", end: "22:00" }] },
+        {
+          menuId: "closed-1",
+          title: "Dinner",
+          availability: [{ days: [5], start: "18:00", end: "22:00" }],
+        },
       ],
     });
     // No navigation with one menu: no tabs, no search, no closed pill.

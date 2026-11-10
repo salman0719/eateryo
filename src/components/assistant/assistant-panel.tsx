@@ -166,7 +166,8 @@ export function AssistantPanel({
       if (
         proposalVisible &&
         !(await confirm({
-          message: "Send this? The proposed change on screen has not been saved and will be discarded.",
+          message:
+            "Send this? The proposed change on screen has not been saved and will be discarded.",
           confirmLabel: "Send",
         }))
       ) {
@@ -221,7 +222,18 @@ export function AssistantPanel({
         inputRef.current?.focus();
       }
     },
-    [sending, signedIn, turns, usage, configured, selectedMenu, proposalBusy, proposalVisible, proposalsEnabled, confirm]
+    [
+      sending,
+      signedIn,
+      turns,
+      usage,
+      configured,
+      selectedMenu,
+      proposalBusy,
+      proposalVisible,
+      proposalsEnabled,
+      confirm,
+    ]
   );
 
   const approve = useCallback(async () => {

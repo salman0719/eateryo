@@ -63,9 +63,9 @@ describe("publishMenuWithSetup", () => {
       jsonResponse({ error: { code: serverCode, message: "nope" } }, status)
     );
 
-    await expect(
-      publishMenuWithSetup("menu-1", { restaurantName: "Café" })
-    ).rejects.toMatchObject({ code: clientCode });
+    await expect(publishMenuWithSetup("menu-1", { restaurantName: "Café" })).rejects.toMatchObject({
+      code: clientCode,
+    });
   });
 
   it("maps a network failure to unavailable", async () => {
@@ -84,8 +84,8 @@ describe("publishMenuWithSetup", () => {
   it("rejects a malformed success payload", async () => {
     vi.stubGlobal("fetch", async () => jsonResponse({ unexpected: true }));
 
-    await expect(
-      publishMenuWithSetup("menu-1", { restaurantName: "Café" })
-    ).rejects.toMatchObject({ code: "unavailable" });
+    await expect(publishMenuWithSetup("menu-1", { restaurantName: "Café" })).rejects.toMatchObject({
+      code: "unavailable",
+    });
   });
 });

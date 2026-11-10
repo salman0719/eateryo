@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import {
-  getOrderAlertPrefs,
-  updateOrderAlertPrefsForOwner,
-} from "@/features/orders/alerts";
+import { getOrderAlertPrefs, updateOrderAlertPrefsForOwner } from "@/features/orders/alerts";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";

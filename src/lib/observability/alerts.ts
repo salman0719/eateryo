@@ -15,13 +15,7 @@
  * mode — a duplicate email beats a silent outage.
  */
 
-import {
-  errorFields,
-  logEvent,
-  redactValue,
-  scrubText,
-  type LogFields,
-} from "./log";
+import { errorFields, logEvent, redactValue, scrubText, type LogFields } from "./log";
 
 export interface OpsAlert {
   /** Human summary, used as the email subject. */
@@ -168,7 +162,13 @@ export async function alertOps(
     const response = await (deps.fetchImpl ?? fetch)("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [to], subject: email.subject, text: email.text, html: email.html }),
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: email.subject,
+        text: email.text,
+        html: email.html,
+      }),
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {

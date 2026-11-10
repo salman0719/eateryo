@@ -11,10 +11,7 @@ import {
 import { menuAvailabilitySchema } from "@/features/availability/schema";
 import { isMenuOpenAt } from "@/features/availability/open-at";
 import type { TenancyDb } from "@/features/tenancy/repo";
-import {
-  getPublishedMenuByPath,
-  type PublishedMenuPage,
-} from "@/features/publishing/repo";
+import { getPublishedMenuByPath, type PublishedMenuPage } from "@/features/publishing/repo";
 import { getRestaurantBySlug } from "@/features/tables/repo";
 import { menuDocumentSchema, type MenuDocument, type MenuItem } from "@/features/menu/schema";
 
@@ -227,10 +224,7 @@ function resolveOrderLine(items: Map<string, MenuItem>, request: OrderLineReques
     throw new OrderRepoError("invalid", "Every line needs a whole quantity of at least 1.");
   }
   if (request.quantity > MAX_LINE_QUANTITY) {
-    throw new OrderRepoError(
-      "invalid",
-      `A single line is limited to ${MAX_LINE_QUANTITY} items.`
-    );
+    throw new OrderRepoError("invalid", `A single line is limited to ${MAX_LINE_QUANTITY} items.`);
   }
   const item = items.get(request.menuItemId);
   if (!item) {
@@ -249,7 +243,7 @@ function resolveOrderLine(items: Map<string, MenuItem>, request: OrderLineReques
     throw new OrderRepoError("invalid", `“${item.name}” has no sizes to choose from.`);
   }
   const variant = variantName
-    ? item.variants.find((candidate) => candidate.name === variantName) ?? null
+    ? (item.variants.find((candidate) => candidate.name === variantName) ?? null)
     : null;
   const price = variant ? variant.price : item.price;
 
@@ -291,15 +285,16 @@ async function assertMenuOpen(db: TenancyDb, menuId: string, now: Date): Promise
  * snapshot* (the menu the diner saw), so a client cannot invent a name, a
  * price, or a total. Unpriced lines make the total `null`.
  */
-export async function placeOrderFromSlug(
-  db: TenancyDb,
-  input: PlaceOrderInput
-): Promise<Order> {
+export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput): Promise<Order> {
   const page = await getPublishedMenuByPath(db, input.restaurantSlug, input.slug);
   if (!page) {
     throw new OrderRepoError("menu_not_live", "This menu is not published.");
   }
-  const { tableLabel, note } = validateOrderEnvelope(input.tableLabel, input.note, input.lines.length);
+  const { tableLabel, note } = validateOrderEnvelope(
+    input.tableLabel,
+    input.note,
+    input.lines.length
+  );
   const openAt = input.now ?? new Date();
   await assertMenuOpen(db, page.menuId, openAt);
 
@@ -345,7 +340,10 @@ export async function placeOrderFromSlug(
   } catch (error) {
     // The Neon HTTP driver has no interactive transactions: compensate so a
     // half-written order can never appear on the board.
-    await db.delete(orderTable).where(eq(orderTable.id, row.id)).catch(() => undefined);
+    await db
+      .delete(orderTable)
+      .where(eq(orderTable.id, row.id))
+      .catch(() => undefined);
     throw error;
   }
 }
@@ -361,10 +359,7 @@ export async function placeOrderFromSlug(
  * ticket). The order row carries no single menu id — each line remembers
  * its own — and the display title joins the distinct menu titles.
  */
-export async function placeTableOrder(
-  db: TenancyDb,
-  input: PlaceTableOrderInput
-): Promise<Order> {
+export async function placeTableOrder(db: TenancyDb, input: PlaceTableOrderInput): Promise<Order> {
   const { tableLabel, note } = validateOrderEnvelope(
     input.tableLabel,
     input.note,
@@ -447,7 +442,10 @@ export async function placeTableOrder(
       .returning();
     return toOrder(row, insertedLines);
   } catch (error) {
-    await db.delete(orderTable).where(eq(orderTable.id, row.id)).catch(() => undefined);
+    await db
+      .delete(orderTable)
+      .where(eq(orderTable.id, row.id))
+      .catch(() => undefined);
     throw error;
   }
 }
@@ -458,7 +456,6 @@ function orderCurrency(docs: MenuDocument[]): string | null {
   if (distinct.size !== 1) return null;
   return docs[0]?.currency ?? null;
 }
-
 
 /**
  * Board query (owner or staff). Without `since` it returns the newest orders;

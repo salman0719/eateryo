@@ -30,9 +30,7 @@ export async function getLaunchSnapshot(
     .select({ id: menu.id, doc: menu.doc })
     .from(menu)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
-    .where(
-      and(eq(restaurantMembership.userId, userId), eq(menu.restaurantId, restaurantId))
-    );
+    .where(and(eq(restaurantMembership.userId, userId), eq(menu.restaurantId, restaurantId)));
 
   const publications = await db
     .select({

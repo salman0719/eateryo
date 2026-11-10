@@ -1,16 +1,18 @@
 "use client";
 
 /**
- * Export and delete, in Settings "Data & privacy" (Step 11, moved off
- * `/launch` in R0.5).
+ * Account export and account deletion, both rendered by Settings.
  *
- * Export is a plain JSON download of everything the account can see. Delete
- * requires typing the confirmation phrase, because it also removes the
- * restaurants the account created — menus, published pages, and order history
- * included — and there is no undo.
+ * Export is a neutral card ("Data & privacy") because it is a data right,
+ * not a hazard — it must not sit inside a red block. Deletion is the final
+ * danger zone on the page: it removes the account and every restaurant the
+ * account created, then signs out. Its confirm phrase is deliberate, because
+ * its blast radius is larger than deleting one café.
  *
- * The card renders nothing unless signed in, so it never shows dead buttons
- * to a visitor — Settings only mounts it for signed-in accounts anyway.
+ * Both cards self-gate on the session, so a signed-out visitor sees nothing
+ * rather than buttons whose APIs would 401. While the session is still
+ * resolving they render, exactly as before, because Settings only mounts
+ * them for a signed-in account.
  */
 
 import { useRouter } from "next/navigation";
@@ -22,25 +24,23 @@ import { authClient } from "@/lib/auth-client";
 
 const CONFIRM_PHRASE = "delete my account";
 
-export function DataControls() {
-  const router = useRouter();
-  const { data: session, isPending: sessionPending } = authClient.useSession();
-  const [busy, setBusy] = useState<"export" | "delete" | null>(null);
+function describeFailure(failure: unknown): string {
+  if (failure instanceof SyncError) return failure.message;
+  return failure instanceof Error ? failure.message : "Something went wrong. Try again.";
+}
+
+/** Export everything the account can see as a JSON download. */
+export function AccountExportCard() {
+  const { data: session, isPending } = authClient.useSession();
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
   // Below the hooks: a signed-out visitor (or a still-resolving session)
   // sees nothing rather than buttons whose APIs would 401.
-  if (!sessionPending && !session?.user) return null;
-
-  function describeFailure(failure: unknown): string {
-    if (failure instanceof SyncError) return failure.message;
-    return failure instanceof Error ? failure.message : "Something went wrong. Try again.";
-  }
+  if (!isPending && !session?.user) return null;
 
   async function handleExport() {
-    setBusy("export");
+    setBusy(true);
     setError(null);
     setMessage(null);
     try {
@@ -49,19 +49,62 @@ export function DataControls() {
     } catch (failure) {
       setError(describeFailure(failure));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   }
 
+  return (
+    <section id="data" className="rounded-2xl border border-line-200 bg-surface-base p-5">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">Data & privacy</h3>
+      <p className="mt-1 text-xs leading-5 text-ink-500">
+        Download everything this account can see as a JSON file.
+      </p>
+
+      <div className="mt-3">
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={busy}
+          className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+        >
+          {busy ? "Preparing…" : "Export my data"}
+        </button>
+      </div>
+
+      {message ? (
+        <p role="status" className="mt-3 text-sm text-success-800">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-danger-700">
+          {error}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * The last block on the Settings page. Nothing but page-level links belongs
+ * below it: every settings section is a reason to scroll past a destructive
+ * control, and this is the most destructive control in the product.
+ */
+export function AccountDangerZone() {
+  const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  // Same gate as the export card; hooks stay above the early return.
+  if (!isPending && !session?.user) return null;
+
   async function handleDelete() {
-    setBusy("delete");
+    setBusy(true);
     setError(null);
-    setMessage(null);
     try {
-      const result = await deleteAccount();
-      setMessage(
-        `Account deleted${result.restaurants > 0 ? `, along with ${result.restaurants} restaurant${result.restaurants === 1 ? "" : "s"}` : ""}.`
-      );
+      await deleteAccount();
       try {
         await authClient.signOut();
       } catch {
@@ -73,48 +116,23 @@ export function DataControls() {
       router.refresh();
     } catch (failure) {
       setError(describeFailure(failure));
-      setBusy(null);
+      setBusy(false);
     }
   }
 
   return (
-    <section id="data" className="rounded-2xl border border-line-200 bg-surface-base p-5">
-      <h3 className="text-sm font-bold tracking-tight text-ink-900">Data & privacy</h3>
-      <p className="mt-1 text-xs leading-5 text-ink-500">
-        Download everything as JSON, or delete the account and the restaurants it created.
+    <section className="rounded-2xl border border-danger-200 bg-danger-50 p-5">
+      <h3 className="text-sm font-bold tracking-tight text-danger-900">
+        Danger zone — delete your account
+      </h3>
+      <p className="mt-1 text-xs leading-5 text-danger-800">
+        Deleting the account also deletes every restaurant it created, with its menus, published
+        pages and order history. Export first if you want a copy. There is no undo.
       </p>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => void handleExport()}
-          disabled={busy !== null}
-          className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          {busy === "export" ? "Preparing…" : "Export my data"}
-        </button>
-        {confirming ? null : (
-          <button
-            type="button"
-            onClick={() => {
-              setConfirming(true);
-              setError(null);
-              setMessage(null);
-            }}
-            className="rounded-lg border border-danger-200 px-3 py-1.5 text-sm font-medium text-danger-700 hover:bg-danger-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
-          >
-            Delete my account
-          </button>
-        )}
-      </div>
-
       {confirming ? (
-        <div className="mt-3 rounded-xl border border-danger-200 bg-danger-50 p-3">
-          <p className="text-sm font-medium text-danger-900">
-            This deletes the account, its restaurants, menus, published pages, and order history.
-            Export first if you want a copy. There is no undo.
-          </p>
-          <label className="mt-2 block text-xs font-medium text-danger-900">
+        <div className="mt-3 rounded-xl border border-danger-200 bg-surface-base p-3">
+          <label className="block text-xs font-medium text-danger-900">
             Type “{CONFIRM_PHRASE}” to confirm
             <input
               type="text"
@@ -128,10 +146,10 @@ export function DataControls() {
             <button
               type="button"
               onClick={() => void handleDelete()}
-              disabled={busy !== null || confirmText.trim().toLowerCase() !== CONFIRM_PHRASE}
+              disabled={busy || confirmText.trim().toLowerCase() !== CONFIRM_PHRASE}
               className="rounded-lg bg-danger-700 px-3 py-1.5 text-sm font-semibold text-on-accent hover:bg-danger-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
             >
-              {busy === "delete" ? "Deleting…" : "Delete permanently"}
+              {busy ? "Deleting…" : "Delete permanently"}
             </button>
             <button
               type="button"
@@ -145,13 +163,19 @@ export function DataControls() {
             </button>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setConfirming(true);
+            setError(null);
+          }}
+          className="mt-3 rounded-lg border border-danger-200 bg-surface-base px-3 py-1.5 text-sm font-medium text-danger-700 hover:bg-danger-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-600"
+        >
+          Delete my account
+        </button>
+      )}
 
-      {message ? (
-        <p role="status" className="mt-3 text-sm text-success-800">
-          {message}
-        </p>
-      ) : null}
       {error ? (
         <p role="alert" className="mt-3 text-sm text-danger-700">
           {error}

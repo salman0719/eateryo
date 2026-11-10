@@ -37,7 +37,9 @@ function formatDays(days: number[]): string {
     else ranges.push([day, day]);
   }
   return ranges
-    .map(([first, last]) => (first === last ? DAY_NAMES[first] : `${DAY_NAMES[first]}–${DAY_NAMES[last]}`))
+    .map(([first, last]) =>
+      first === last ? DAY_NAMES[first] : `${DAY_NAMES[first]}–${DAY_NAMES[last]}`
+    )
     .join(", ");
 }
 
@@ -48,7 +50,8 @@ function formatDays(days: number[]): string {
  */
 export function formatAvailability(windows: MenuAvailability, maxLines = 4): string[] {
   const lines = windows.map(
-    (window) => `${formatDays(window.days)} ${formatWallClock(window.start)} – ${formatWallClock(window.end)}`
+    (window) =>
+      `${formatDays(window.days)} ${formatWallClock(window.start)} – ${formatWallClock(window.end)}`
   );
   if (lines.length <= maxLines) return lines;
   return [...lines.slice(0, maxLines), `+${lines.length - maxLines} more`];
