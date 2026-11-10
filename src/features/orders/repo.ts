@@ -371,7 +371,7 @@ async function insertLinesWithOptions(
       priceDeltaCents: pick.priceDeltaCents,
     }))
   );
-  let options = new Map<string, OrderLineOptionRow[]>();
+  const options = new Map<string, OrderLineOptionRow[]>();
   if (optionRows.length > 0) {
     const insertedOptions = await db.insert(orderLineOptionTable).values(optionRows).returning();
     for (const row of insertedOptions) {
