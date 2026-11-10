@@ -35,7 +35,7 @@ function navigateInApp(event: MouseEvent<HTMLAnchorElement>, href: string) {
 
 export function GuidanceCard({ title, steps, action }: GuidanceCardProps) {
   return (
-    <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+    <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
       <p className="font-medium text-ink-900">{title}</p>
       <ol className="mx-auto mt-3 max-w-md space-y-2 text-left">
         {steps.map((step, index) => (

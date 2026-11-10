@@ -1102,12 +1102,12 @@ export function MenuEditor({
         </div>
       )}
       {doc.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">No categories yet</p>
           <p className="mt-1 text-sm text-ink-600">Add a category below, then add items to it.</p>
         </div>
       ) : search.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
           <p className="mt-1 text-sm text-ink-600">
             {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
@@ -1209,7 +1209,7 @@ export function MenuEditor({
               <Collapse open={categoryOpen}>
                 <div id={categoryPanelId} className="p-4">
                   {items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-line-300 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
+                    <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
                       No items — add the first one below.
                     </p>
                   ) : (

@@ -198,7 +198,7 @@ export function LibraryPanel({
           ))}
         </div>
       ) : menus.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">
             {emptyTitle ??
               (hasHiddenMenus

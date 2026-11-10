@@ -320,7 +320,7 @@ export function AssistantPanel({
 
   if (!signedIn) {
     return (
-      <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+      <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
         <p className="font-medium text-ink-900">Sign in to use the assistant</p>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
           The assistant answers questions about Eateryo using your own restaurant and menu names. It
@@ -430,7 +430,7 @@ export function AssistantPanel({
       {!configured && (
         <p
           role="alert"
-          className="rounded-xl border border-line-300 bg-surface-100 px-4 py-3 text-sm text-ink-800"
+          className="rounded-xl border border-line-200 bg-surface-100 px-4 py-3 text-sm text-ink-800"
         >
           The assistant isn’t configured on this deployment yet. Ask an operator to finish the
           Workers AI setup; the rest of Eateryo works as usual.
