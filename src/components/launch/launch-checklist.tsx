@@ -98,7 +98,7 @@ function ChecklistSteps({
                 "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                 (step.done
                   ? "border-accent-700 bg-accent-700 text-on-accent"
-                  : "border-line-300 bg-surface-base text-ink-400")
+                  : "border-line-300 bg-surface-base text-ink-500")
               }
             >
               {step.done ? "✓" : index + 1}

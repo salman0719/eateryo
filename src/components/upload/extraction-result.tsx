@@ -154,7 +154,7 @@ function ReviewPriceInput({
             (event.target as HTMLInputElement).blur();
           }
         }}
-        className="w-28 rounded-lg border border-warning-300 bg-surface-base px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
+        className="w-28 rounded-lg border border-warning-300 bg-surface-base px-2 py-1 text-sm font-semibold text-ink-900 tabular-nums placeholder:font-normal placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
       />
     </label>
   );

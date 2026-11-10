@@ -208,7 +208,7 @@ export function MoveToAccountPanel({
             </button>
           </div>
           {suggestedName && nameDraft === null && (
-            <p className="mt-1 text-xs font-normal text-ink-400">
+            <p className="mt-1 text-xs font-normal text-ink-500">
               Suggested from your menu titles — change it if you like.
             </p>
           )}
