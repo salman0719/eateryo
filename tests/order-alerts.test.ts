@@ -119,6 +119,29 @@ describe("order alerts", () => {
       expect(content.html).toContain("https://cafe.test/orders");
     });
 
+    it("names picked add-ons in both bodies and escapes them", () => {
+      const content = built({
+        lines: [
+          {
+            menuItemId: "item-1",
+            name: "Burger",
+            variantName: null,
+            options: [
+              { groupName: "Toppings", choiceName: "Bacon", priceDelta: 1.5 },
+              { groupName: "Toppings", choiceName: "<b>Onions</b>", priceDelta: 0 },
+            ],
+            unitPrice: 11.5,
+            quantity: 1,
+            menuId: null,
+            menuTitle: null,
+          },
+        ],
+      });
+      expect(content.text).toContain("1× Burger + <b>Onions</b>, Bacon — USD 11.50");
+      expect(content.html).toContain("+ &lt;b&gt;Onions&lt;/b&gt;, Bacon");
+      expect(content.html).not.toContain("<b>Onions</b>");
+    });
+
     it("escapes item HTML and stays honest about unpriced lines", () => {
       const content = built({
         lines: [

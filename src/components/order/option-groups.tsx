@@ -12,6 +12,7 @@
 
 import { formatPriceDelta } from "@/features/menu/preview-utils";
 import type { OptionSelection } from "@/features/menu/option-groups";
+import type { OrderLineOption } from "@/features/orders/schema";
 
 interface OptionGroupLike {
   name: string;
@@ -55,6 +56,34 @@ export function toggleOptionSelection(
     );
   }
   return [...selections, { groupName, choiceName }];
+}
+
+/**
+ * One line's picks wherever an order is read back: the cart, the staff
+ * board, the owner preview. Names come from the order snapshot, so a later
+ * menu rename never rewrites what the kitchen saw.
+ */
+export function OrderLineOptions({
+  options,
+  currency,
+}: {
+  options: ReadonlyArray<OrderLineOption>;
+  currency: string | null;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <span className="ml-1 text-xs font-normal text-ink-500">
+      ·{" "}
+      {options
+        .map((option) => {
+          const delta = formatPriceDelta(option.priceDelta);
+          return delta
+            ? `${option.choiceName} ${delta}${currency ? ` ${currency}` : ""}`
+            : option.choiceName;
+        })
+        .join(", ")}
+    </span>
+  );
 }
 
 export function OptionGroupFields({

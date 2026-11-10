@@ -34,6 +34,7 @@ import { useOrderMonitor } from "@/features/orders/monitor";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { OrderLineOptions } from "@/components/order/option-groups";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -272,6 +273,7 @@ export function ServerOrdersBoard() {
                         {line.variantName && (
                           <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
                         )}
+                        <OrderLineOptions options={line.options} currency={order.currency} />
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-ink-500">
                         {line.unitPrice === null
