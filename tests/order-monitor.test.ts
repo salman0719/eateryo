@@ -29,6 +29,7 @@ function order(overrides: Partial<Order> & { id: string }): Order {
         menuItemId: "item-1",
         name: "Flat white",
         variantName: null,
+        options: [],
         unitPrice: 4.5,
         quantity: 1,
         menuId: null,

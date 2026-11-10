@@ -8,7 +8,7 @@
 import type { ExtractedMenu } from "@/lib/ai/extraction-schema";
 
 import { generateId, nowIso, resolveFirstMenuTitle } from "./menu-utils";
-import { SCHEMA_VERSION, type MenuDocument } from "./schema";
+import { menuOptionSchema, SCHEMA_VERSION, type MenuDocument } from "./schema";
 
 export interface ExtractionSource {
   provider?: string;
@@ -45,10 +45,12 @@ export function extractedMenuToDocument(
         available: item.available ?? null,
         dietaryLabels: [...item.dietaryLabels],
         variants: item.variants.map((v) => ({ name: v.name, price: v.price ?? null })),
-        options: item.options.map((o) => ({
-          name: o.name,
-          choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
-        })),
+        options: item.options.map((o) =>
+          menuOptionSchema.parse({
+            name: o.name,
+            choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
+          })
+        ),
         reviewNotes: [...item.reviewNotes],
         unpricedAccepted: false,
       })),

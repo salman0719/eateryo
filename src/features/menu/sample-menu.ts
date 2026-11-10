@@ -46,7 +46,17 @@ export function createSampleMenuDocument(): MenuDocument {
     price: 4.5,
     // Shown with a "(ve)" symbol on the sample menu.
     dietaryLabels: ["vegan"],
-    options: [{ name: "Size", choices: [{ name: "Regular", priceDelta: null }] }],
+    options: [
+      {
+        name: "Size",
+        required: false,
+        selection: "one",
+        min: 0,
+        max: null,
+        allowDuplicates: false,
+        choices: [{ name: "Regular", priceDelta: null }],
+      },
+    ],
   });
   doc = addItem(doc, breakfastId, {
     name: "Avocado Toast",
