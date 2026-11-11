@@ -252,7 +252,7 @@ function LocalOrdersBoard() {
                       key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
                       className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
                     >
-                      <span>
+                      <span className="min-w-0">
                         <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
                         {line.name}
                         {line.variantName && (
