@@ -361,7 +361,20 @@ async function insertLinesWithOptions(
 ): Promise<{ lines: OrderLineRow[]; options: Map<string, OrderLineOptionRow[]> }> {
   const insertedLines = await db
     .insert(orderLineTable)
-    .values(lines.map(({ options: _picks, ...line }) => ({ ...line, orderId })))
+    // Columns are picked explicitly: the line's `options` ride in the
+    // option table below, never in this row.
+    .values(
+      lines.map((line) => ({
+        orderId,
+        menuId: line.menuId,
+        menuTitle: line.menuTitle,
+        menuItemId: line.menuItemId,
+        name: line.name,
+        variantName: line.variantName,
+        unitPriceCents: line.unitPriceCents,
+        quantity: line.quantity,
+      }))
+    )
     .returning();
   const optionRows = insertedLines.flatMap((inserted, index) =>
     (lines[index]?.options ?? []).map((pick) => ({
