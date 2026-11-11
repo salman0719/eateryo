@@ -1314,11 +1314,17 @@ export function MenuEditor({
       {addPages.status === "added" && (
         <p
           role="status"
-          className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800"
+          className="flex items-start gap-2 rounded-xl border border-line-200 bg-surface-base px-4 py-3 text-sm text-ink-700"
         >
-          Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in {addPages.categories}{" "}
-          {addPages.categories === 1 ? "category" : "categories"} from the new pages. Repeats with
-          the existing menu appear in the duplicate review.
+          <span
+            aria-hidden="true"
+            className="mt-1.5 size-1.5 shrink-0 rounded-full bg-success-700"
+          />
+          <span>
+            Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in{" "}
+            {addPages.categories} {addPages.categories === 1 ? "category" : "categories"} from the
+            new pages. Repeats with the existing menu appear in the duplicate review.
+          </span>
         </p>
       )}
       {addPages.status === "error" && (

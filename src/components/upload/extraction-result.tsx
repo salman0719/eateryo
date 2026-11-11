@@ -306,7 +306,7 @@ export function ExtractionResult({
                   {dedupeDietaryLabels(item.dietaryLabels).map((label) => (
                     <span
                       key={label}
-                      className="rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-medium text-success-900"
+                      className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
                     >
                       {label}
                     </span>
@@ -330,7 +330,7 @@ export function ExtractionResult({
                       <button
                         type="button"
                         onClick={() => onResolveItem?.(loc, "looks-good")}
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-success-700 hover:text-success-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         ✓ Looks good
                       </button>
@@ -339,7 +339,7 @@ export function ExtractionResult({
                         type="button"
                         onClick={() => onResolveItem?.(loc, "leave-unpriced")}
                         title="Keeps the price blank — totals stay honestly blank for this item."
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-success-700 hover:text-success-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-700"
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         ✓ Leave unpriced
                       </button>
@@ -498,8 +498,10 @@ export function ExtractionResult({
             </p>
           )}
           {savedNotice && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-success-100 px-2.5 py-0.5 text-xs font-semibold text-success-900">
-              <span aria-hidden="true">✓</span>
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-100 px-2.5 py-0.5 text-xs font-semibold text-ink-900">
+              <span aria-hidden="true" className="text-success-700">
+                ✓
+              </span>
               {savedNotice}
             </p>
           )}

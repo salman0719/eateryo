@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { StatusChip } from "@/components/ui/status-chip";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuDocument } from "@/features/menu/schema";
@@ -70,16 +71,14 @@ interface PublishPanelProps {
   onStartWizard?: () => void;
 }
 
-const pill = "rounded-full px-2.5 py-0.5 text-[11px] font-semibold";
-
 function StatusPill({ status }: { status: PublicationStatus | null }) {
   if (!status) {
-    return <span className={`${pill} bg-surface-100 text-ink-600`}>Not published</span>;
+    return <StatusChip>Not published</StatusChip>;
   }
   if (!status.isLive) {
-    return <span className={`${pill} bg-warning-100 text-warning-900`}>Ordering paused</span>;
+    return <StatusChip tone="warning">Ordering paused</StatusChip>;
   }
-  return <span className={`${pill} bg-success-100 text-success-900`}>Ordering open</span>;
+  return <StatusChip tone="success">Ordering open</StatusChip>;
 }
 
 function formatDate(iso: string | null): string {
@@ -235,7 +234,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
       <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
-          <span className={`${pill} bg-surface-100 text-ink-600`}>Not checked</span>
+          <StatusChip>Not checked</StatusChip>
         </div>
         <p className="mt-2 text-xs leading-5 text-ink-600">
           We couldn&apos;t check your account just now, so we can&apos;t tell whether this menu is
