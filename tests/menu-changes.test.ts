@@ -149,11 +149,8 @@ describe("summarizeMenuChanges", () => {
           options: [
             {
               name: "Milk",
-              required: false,
-              selection: "one",
               min: 0,
-              max: null,
-              allowDuplicates: false,
+              max: 1,
               choices: [{ name: "Oat", priceDelta: 0 }],
             },
           ],
@@ -166,11 +163,8 @@ describe("summarizeMenuChanges", () => {
           options: [
             {
               name: "Milk",
-              required: true,
-              selection: "one",
-              min: 0,
-              max: null,
-              allowDuplicates: false,
+              min: 1,
+              max: 1,
               choices: [
                 { name: "Oat", priceDelta: 0.5 },
                 { name: "Soy", priceDelta: 0 },
@@ -178,11 +172,8 @@ describe("summarizeMenuChanges", () => {
             },
             {
               name: "Shots",
-              required: false,
-              selection: "many",
               min: 0,
               max: 2,
-              allowDuplicates: false,
               choices: [{ name: "Extra", priceDelta: 1 }],
             },
           ],

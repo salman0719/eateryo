@@ -27,11 +27,19 @@ interface ModifiersPanelProps {
   onClose?: () => void;
 }
 
-/** One-line shape of a template: "Required · Many · 4 choices". */
+/** One-line shape of a template: "Required · 1–3 · 4 choices". */
 function describeTemplate(template: MenuModifierTemplate): string {
-  const parts: string[] = [];
-  if (template.required) parts.push("Required");
-  parts.push(template.selection === "many" ? "Many" : "One");
+  const range =
+    template.max === null
+      ? template.min === 0
+        ? "Any number"
+        : `At least ${template.min}`
+      : template.min === template.max
+        ? template.min === 1
+          ? "One"
+          : `Exactly ${template.min}`
+        : `${template.min}–${template.max}`;
+  const parts: string[] = [template.min > 0 ? "Required" : "Optional", range];
   parts.push(`${template.choices.length} ${template.choices.length === 1 ? "choice" : "choices"}`);
   return parts.join(" · ");
 }

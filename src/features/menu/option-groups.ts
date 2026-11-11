@@ -1,11 +1,11 @@
 /**
  * Pure option-group rules for menu items (P1: sauces, toppings, add-ons).
  *
- * The canonical schema stores each group as name + rules + priced choices;
+ * The canonical schema stores each group as name + min/max + priced choices;
  * everything here reads that shape without touching storage, so the editor,
  * the diner page, and the server resolver all enforce the same contract:
- * - required groups must be answered before the dish can be ordered;
- * - "one" groups take a single choice, "many" groups take up to `max`;
+ * - min is the required switch: 0 means skippable, 1+ means pick that many;
+ * - max 1 renders radios (single pick), anything else checkboxes;
  * - deltas are summed onto the dish price; an unknown delta makes the line
  *   unpriced (never invented — totals stay honestly null downstream).
  *
@@ -22,11 +22,8 @@ export interface OptionSelection {
 
 interface OptionGroupLike {
   name: string;
-  required: boolean;
-  selection: "one" | "many";
   min: number;
   max: number | null;
-  allowDuplicates: boolean;
   choices: ReadonlyArray<{ name: string; priceDelta: number | null }>;
 }
 
@@ -77,29 +74,50 @@ export function validateOptionSelections(
     const key = trimmed(group.name);
     const picked = byGroup.get(key) ?? [];
     if (picked.length === 0) {
-      if (group.required) {
+      if (group.min > 0) {
         return group.choices.length === 0
           ? `“${group.name}” on “${item.name}” needs the owner's attention before it can be ordered.`
           : `Choose ${group.name} for “${item.name}”.`;
       }
       continue;
     }
-    if (group.selection === "one" && picked.length > 1) {
-      return `Choose only one ${group.name} for “${item.name}”.`;
-    }
-    if (!group.allowDuplicates && new Set(picked).size !== picked.length) {
+    // Every choice may be picked once: the picker toggles presence, so a
+    // repeat can only arrive from an API client and is always rejected.
+    if (new Set(picked).size !== picked.length) {
       return `“${group.name}” allows each choice once for “${item.name}”.`;
     }
-    const effective = group.allowDuplicates ? picked.length : new Set(picked).size;
-    const floor = group.required ? Math.max(1, group.min) : group.min;
-    if (effective < floor) {
-      return `Choose at least ${floor} ${group.name} for “${item.name}”.`;
+    const effective = new Set(picked).size;
+    if (effective < group.min) {
+      return group.min === group.max
+        ? `Choose ${group.min} ${group.name} for “${item.name}”.`
+        : `Choose at least ${group.min} ${group.name} for “${item.name}”.`;
     }
     if (group.max !== null && effective > group.max) {
       return `Choose at most ${group.max} ${group.name} for “${item.name}”.`;
     }
   }
   return null;
+}
+
+/**
+ * Owner-facing configuration problems: rule shapes no diner can ever
+ * satisfy, so the editor can warn before a typo silently closes a dish.
+ * The server still rejects these at order time (defense in depth for API
+ * orders) — this only moves the news earlier, to the person who can fix it.
+ * Empty means the group is orderable.
+ */ export function optionGroupConfigProblems(group: OptionGroupLike): string[] {
+  const problems: string[] = [];
+  if (group.max !== null && group.min > group.max) {
+    problems.push(
+      `Min ${group.min} is above Max ${group.max}: no pick count satisfies “${group.name}”.`
+    );
+  }
+  if (group.min > group.choices.length) {
+    problems.push(
+      `Min ${group.min} needs more choices than “${group.name}” has (${group.choices.length}).`
+    );
+  }
+  return problems;
 }
 
 /**

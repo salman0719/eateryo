@@ -10,6 +10,7 @@ import {
 import {
   formatSelectionsSummary,
   normalizeSelections,
+  optionGroupConfigProblems,
   optionsPriceDelta,
   priceWithOptions,
   selectionsKey,
@@ -18,8 +19,9 @@ import {
 import { addLine } from "@/features/orders/schema";
 
 /**
- * P1 option groups: the contract (required / one-vs-many / min-max /
- * duplicates) and the pure helpers every surface shares.
+ * P1 option groups: the contract (required / one-vs-many / min-max) and
+ * the pure helpers every surface shares. Repeats are always rejected: the
+ * picker toggles presence, so only an API client can send one.
  */
 
 function item(extra: Partial<MenuItem> = {}): MenuItem {
@@ -45,21 +47,48 @@ function group(input: unknown): MenuOption {
 }
 
 describe("menu option contract", () => {
-  it("defaults old documents to optional single-pick groups", () => {
+  it("defaults partial groups to optional, unbounded picks", () => {
     const parsed = item({
       options: [group({ name: "Sauce", choices: [{ name: "Mayo", priceDelta: 0 }] })],
     });
     expect(parsed.options).toEqual([
       {
         name: "Sauce",
-        required: false,
-        selection: "one",
         min: 0,
         max: null,
-        allowDuplicates: false,
         choices: [{ name: "Mayo", priceDelta: 0 }],
       },
     ]);
+  });
+
+  it("migrates legacy required/single-pick shapes with identical behavior", () => {
+    expect(
+      group({
+        name: "Sauce",
+        required: true,
+        selection: "one",
+        choices: [{ name: "Mayo", priceDelta: 0 }],
+      })
+    ).toEqual({
+      name: "Sauce",
+      min: 1,
+      max: 1,
+      choices: [{ name: "Mayo", priceDelta: 0 }],
+    });
+    expect(
+      group({
+        name: "Toppings",
+        required: false,
+        selection: "many",
+        max: 2,
+        choices: [{ name: "Bacon", priceDelta: 1 }],
+      })
+    ).toEqual({
+      name: "Toppings",
+      min: 0,
+      max: 2,
+      choices: [{ name: "Bacon", priceDelta: 1 }],
+    });
   });
 
   it("keeps documents without options valid", () => {
@@ -72,7 +101,8 @@ describe("validateOptionSelections", () => {
     options: [
       group({
         name: "Sauce",
-        required: true,
+        min: 1,
+        max: 1,
         choices: [
           { name: "Mayo", priceDelta: 0 },
           { name: "BBQ", priceDelta: 0.5 },
@@ -80,7 +110,7 @@ describe("validateOptionSelections", () => {
       }),
       group({
         name: "Toppings",
-        selection: "many",
+        min: 0,
         max: 2,
         choices: [
           { name: "Bacon", priceDelta: 1.5 },
@@ -91,11 +121,11 @@ describe("validateOptionSelections", () => {
     ],
   });
 
-  it("accepts a satisfied required group and skips the optional one", () => {
+  it("accepts a satisfied min-1 group and skips the optional one", () => {
     expect(validateOptionSelections(dish, [{ groupName: "Sauce", choiceName: "Mayo" }])).toBeNull();
   });
 
-  it("refuses a missing required group", () => {
+  it("refuses a skipped group with min above zero", () => {
     expect(validateOptionSelections(dish, [])).toMatch(/Sauce/);
   });
 
@@ -108,16 +138,16 @@ describe("validateOptionSelections", () => {
     );
   });
 
-  it("refuses two picks in a single-pick group", () => {
+  it("refuses two picks in a max-1 group", () => {
     expect(
       validateOptionSelections(dish, [
         { groupName: "Sauce", choiceName: "Mayo" },
         { groupName: "Sauce", choiceName: "BBQ" },
       ])
-    ).toMatch(/only one/);
+    ).toMatch(/at most 1/);
   });
 
-  it("enforces max and duplicate rules on multi-pick groups", () => {
+  it("enforces max and rejects repeated picks on multi-pick groups", () => {
     const sauce = { groupName: "Sauce", choiceName: "Mayo" };
     expect(
       validateOptionSelections(dish, [
@@ -147,13 +177,43 @@ describe("validateOptionSelections", () => {
   });
 });
 
+describe("configuration problems", () => {
+  const ok = group({
+    name: "Sauce",
+    min: 1,
+    max: 2,
+    choices: [
+      { name: "Mayo", priceDelta: 0 },
+      { name: "BBQ", priceDelta: 0 },
+      { name: "Ranch", priceDelta: 1 },
+    ],
+  });
+
+  it("reports nothing for an orderable group", () => {
+    expect(optionGroupConfigProblems(ok)).toEqual([]);
+    expect(optionGroupConfigProblems({ ...ok, min: 0, max: 1 })).toEqual([]);
+  });
+
+  it("flags a min above max", () => {
+    expect(optionGroupConfigProblems({ ...ok, min: 3, max: 2 })).toEqual([
+      expect.stringContaining("above Max 2"),
+    ]);
+  });
+
+  it("flags a min above the choice count", () => {
+    expect(optionGroupConfigProblems({ ...ok, min: 4, max: null })).toEqual([
+      expect.stringContaining("more choices"),
+    ]);
+  });
+});
+
 describe("pricing helpers", () => {
   const dish = item({
     options: [
       group({
         name: "Extras",
-        selection: "many",
-        allowDuplicates: true,
+        min: 0,
+        max: null,
         choices: [
           { name: "Bacon", priceDelta: 1.5 },
           { name: "Mystery", priceDelta: null },

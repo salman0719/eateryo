@@ -147,7 +147,7 @@ function boundLabel(bound: number | null): string {
  * Add-on changes for one item: groups and choices matched by name (extraction
  * produces names, not ids), one row per dish so a pizza rebuild stays one
  * line. Rule flips that change what the diner must or may pick are reported
- * like any other visible change — "now required" gates Add, after all.
+ * like any other visible change — a min crossing above zero gates Add.
  */
 function optionsDetail(before: MenuItem, after: MenuItem): string | null {
   const parts: string[] = [];
@@ -159,21 +159,23 @@ function optionsDetail(before: MenuItem, after: MenuItem): string | null {
       parts.push(`${group.name} added`);
       continue;
     }
-    if (previous.required !== group.required) {
-      parts.push(group.required ? `${group.name} now required` : `${group.name} now optional`);
-    }
-    if (previous.selection !== group.selection) {
-      parts.push(
-        group.selection === "many"
-          ? `${group.name} now takes several picks`
-          : `${group.name} now takes one pick`
-      );
-    }
     if (previous.min !== group.min) {
-      parts.push(`${group.name}: at least ${previous.min} → ${group.min}`);
+      if (previous.min === 0 && group.min > 0) {
+        parts.push(`${group.name} now required`);
+      } else if (previous.min > 0 && group.min === 0) {
+        parts.push(`${group.name} now optional`);
+      } else {
+        parts.push(`${group.name}: at least ${previous.min} → ${group.min}`);
+      }
     }
     if (previous.max !== group.max) {
-      parts.push(`${group.name}: at most ${boundLabel(previous.max)} → ${boundLabel(group.max)}`);
+      if (previous.max !== 1 && group.max === 1) {
+        parts.push(`${group.name} now takes one pick`);
+      } else if (previous.max === 1 && group.max !== 1) {
+        parts.push(`${group.name} no longer limited to one pick`);
+      } else {
+        parts.push(`${group.name}: at most ${boundLabel(previous.max)} → ${boundLabel(group.max)}`);
+      }
     }
     const previousChoices = new Map(
       previous.choices.map((choice) => [choice.name, choice.priceDelta])

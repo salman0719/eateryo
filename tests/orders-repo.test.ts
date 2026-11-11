@@ -71,8 +71,8 @@ describe("orders repo", () => {
               options: [
                 {
                   name: "Sauce",
-                  required: true,
-                  selection: "one",
+                  min: 1,
+                  max: 1,
                   choices: [
                     { name: "Mayo", priceDelta: 0 },
                     { name: "BBQ", priceDelta: 0.5 },
@@ -80,7 +80,7 @@ describe("orders repo", () => {
                 },
                 {
                   name: "Toppings",
-                  selection: "many",
+                  min: 0,
                   max: 2,
                   choices: [
                     { name: "Bacon", priceDelta: 1.5 },

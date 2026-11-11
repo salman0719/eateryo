@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 
+import { optionGroupConfigProblems } from "@/features/menu/option-groups";
 import type { MenuOption } from "@/features/menu/schema";
 
 import { CommitInput, CommitNumber } from "./fields";
@@ -33,6 +34,10 @@ export function OptionGroupForm({
   removeLabel,
   footer,
 }: OptionGroupFormProps) {
+  // Unsatisfiable rules (min above max, min a single-pick group can never
+  // reach) warn here, in both editors at once — the server would reject
+  // every order, so the owner hears it first, from the screen that can fix it.
+  const configProblems = optionGroupConfigProblems(group);
   return (
     <li className="rounded-lg border border-line-200 bg-surface-base p-2.5">
       <div className="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -45,33 +50,12 @@ export function OptionGroupForm({
           ✕
         </button>
       </div>
-      <div className="mt-2 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_90px_90px]">
-        <label className="flex items-center gap-2 rounded-lg border border-line-200 bg-surface-base px-2.5 py-2 text-xs text-ink-700">
-          <input
-            type="checkbox"
-            checked={group.required}
-            onChange={(event) => onChange({ ...group, required: event.target.checked })}
-            className="h-4 w-4 rounded accent-accent-700"
-          />
-          Required
-        </label>
-        <label className="text-xs text-ink-600">
-          Picks
-          <select
-            value={group.selection}
-            onChange={(event) =>
-              onChange({ ...group, selection: event.target.value as "one" | "many" })
-            }
-            className="mt-1 w-full rounded-lg border border-line-300 bg-surface-base px-2 py-1.5 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-          >
-            <option value="one">One</option>
-            <option value="many">Many</option>
-          </select>
-        </label>
+      <div className="mt-2 grid grid-cols-2 items-end gap-2">
         <CommitNumber
           label="Min"
           value={group.min}
-          placeholder="0"
+          integer
+          placeholder="0 — skippable"
           onCommit={(min) =>
             onChange({ ...group, min: min === null ? 0 : Math.max(0, Math.trunc(min)) })
           }
@@ -79,17 +63,34 @@ export function OptionGroupForm({
         <CommitNumber
           label="Max"
           value={group.max}
+          integer
           placeholder="No limit"
           onCommit={(max) =>
             onChange({ ...group, max: max === null ? null : Math.max(1, Math.trunc(max)) })
           }
         />
       </div>
+      {/* Min is the required switch, so the badge is derived, never set:
+          0 means the diner may skip, 1+ means they must pick that many. */}
+      <p className="mt-1 text-[11px] text-ink-500">
+        {group.min > 0 ? (
+          <>Required — diners must pick {group.min === 1 ? "one" : `at least ${group.min}`}.</>
+        ) : (
+          <>Optional — diners may skip this.</>
+        )}{" "}
+        {group.max === 1 ? "Shows as single-pick." : "Shows as multi-pick."}
+      </p>
       {group.choices.length === 0 && (
         <p className="mt-2 rounded-lg bg-warning-50 px-2.5 py-1.5 text-xs text-warning-900">
-          No choices yet — add at least one, or diners can never satisfy
-          {group.required ? " this required" : " this"} group.
+          No choices yet — add at least one, or diners can never satisfy this group.
         </p>
+      )}
+      {configProblems.length > 0 && (
+        <ul className="mt-2 space-y-1 rounded-lg bg-warning-50 px-2.5 py-1.5 text-xs text-warning-900">
+          {configProblems.map((problem) => (
+            <li key={problem}>{problem}</li>
+          ))}
+        </ul>
       )}
       <ul className="mt-2 space-y-2">
         {group.choices.map((choice, cIndex) => (
