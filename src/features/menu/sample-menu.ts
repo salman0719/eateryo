@@ -49,11 +49,8 @@ export function createSampleMenuDocument(): MenuDocument {
     options: [
       {
         name: "Size",
-        required: false,
-        selection: "one",
         min: 0,
         max: null,
-        allowDuplicates: false,
         choices: [{ name: "Regular", priceDelta: null }],
       },
     ],

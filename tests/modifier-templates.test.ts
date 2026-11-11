@@ -20,11 +20,8 @@ import type { MenuDocument } from "@/features/menu/schema";
 
 const SAUCES = {
   name: "Sauces",
-  required: false,
-  selection: "one",
   min: 0,
-  max: null,
-  allowDuplicates: false,
+  max: 1,
   choices: [
     { name: "Marinara", priceDelta: 0 },
     { name: "Pesto", priceDelta: 1.5 },
@@ -56,11 +53,8 @@ describe("modifier template library", () => {
     expect(doc.modifierTemplates).toHaveLength(1);
     expect(doc.modifierTemplates[0]).toMatchObject({
       name: "Toppings",
-      required: false,
-      selection: "one",
       min: 0,
       max: null,
-      allowDuplicates: false,
     });
   });
 
@@ -74,10 +68,10 @@ describe("modifier template library", () => {
     let doc = docWithPizzas();
     const target = allDishes(doc)[0];
     doc = applyModifierTemplate(doc, "Sauces", [target.itemId]);
-    doc = updateModifierTemplate(doc, "Sauces", { required: true });
-    expect(doc.modifierTemplates[0].required).toBe(true);
+    doc = updateModifierTemplate(doc, "Sauces", { min: 1 });
+    expect(doc.modifierTemplates[0].min).toBe(1);
     const dish = doc.categories[0].items[0];
-    expect(dish.options[0].required).toBe(false);
+    expect(dish.options[0].min).toBe(0);
   });
 
   it("rejects renames that collide and unknown names", () => {
@@ -102,9 +96,7 @@ describe("modifier template library", () => {
     const doc = createMenuDocument();
     expect(() => deleteModifierTemplate(doc, "Missing")).toThrow(/Unknown add-on set/);
     expect(() => modifierTemplateUsage(doc, "Missing")).toThrow(/Unknown add-on set/);
-    expect(() => applyModifierTemplate(doc, "Missing", ["i1"])).toThrow(
-      /Unknown add-on set/
-    );
+    expect(() => applyModifierTemplate(doc, "Missing", ["i1"])).toThrow(/Unknown add-on set/);
   });
 });
 
@@ -134,11 +126,11 @@ describe("apply and refresh", () => {
     let doc = docWithPizzas();
     const target = allDishes(doc)[0].itemId;
     doc = applyModifierTemplate(doc, "Sauces", [target]);
-    doc = updateModifierTemplate(doc, "Sauces", { required: true });
+    doc = updateModifierTemplate(doc, "Sauces", { min: 1 });
     doc = applyModifierTemplate(doc, "Sauces", [target]);
     const item = doc.categories[0].items[0];
     expect(item.options).toHaveLength(1);
-    expect(item.options[0].required).toBe(true);
+    expect(item.options[0].min).toBe(1);
   });
 
   it("refresh pushes the definition to every dish carrying the group", () => {

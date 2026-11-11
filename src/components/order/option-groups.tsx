@@ -16,8 +16,7 @@ import type { OrderLineOption } from "@/features/orders/schema";
 
 interface OptionGroupLike {
   name: string;
-  required: boolean;
-  selection: "one" | "many";
+  min: number;
   max: number | null;
   choices: ReadonlyArray<{ name: string; priceDelta: number | null }>;
 }
@@ -29,19 +28,21 @@ interface ItemWithGroups {
 }
 
 /**
- * Toggle one pick: single-pick groups replace the group's answer, multi-pick
- * groups add or remove the choice. Pure so the cart key and the Add-gate can
- * share the exact same picks the diner tapped.
+ * Toggle one pick: max-1 groups replace the group's answer, the rest add or
+ * remove the choice. An empty choice name clears the group — the None
+ * radio's path (radios cannot uncheck themselves). Pure so the cart key and
+ * the Add-gate share the exact same picks the diner tapped.
  */
 export function toggleOptionSelection(
   selections: ReadonlyArray<OptionSelection>,
-  group: Pick<OptionGroupLike, "name" | "selection">,
+  group: Pick<OptionGroupLike, "name" | "min" | "max">,
   choiceName: string
 ): OptionSelection[] {
   const groupName = group.name;
-  if (group.selection === "one") {
-    const current = selections.find((selection) => selection.groupName === groupName);
-    if (current?.choiceName === choiceName) return [...selections];
+  if (!choiceName.trim()) {
+    return selections.filter((selection) => selection.groupName !== groupName);
+  }
+  if (group.max === 1) {
     return [
       ...selections.filter((selection) => selection.groupName !== groupName),
       { groupName, choiceName },
@@ -102,7 +103,24 @@ export function OptionGroupFields({
     <div className="mt-2 flex flex-col gap-2">
       {item.options.map((group) => {
         const picked = selections.filter((selection) => selection.groupName === group.name);
-        const single = group.selection === "one";
+        // One widget follows the rule: max 1 renders radios, anything else
+        // checkboxes. Radios cannot uncheck, so an optional single-pick gets
+        // an explicit None.
+        const single = group.max === 1;
+        const skippable = group.min === 0;
+        // Cap reached: further ticks would only fail the Add check, so the
+        // unticked boxes go quiet while picked ones stay removable.
+        const atCap = !single && group.max !== null && picked.length >= group.max;
+        const range =
+          group.max === null
+            ? group.min > 1
+              ? `Pick at least ${group.min}`
+              : null
+            : single
+              ? skippable
+                ? "Pick one or none"
+                : "Pick one"
+              : `Pick ${group.min}–${group.max}`;
         return (
           <fieldset
             key={group.name}
@@ -110,18 +128,29 @@ export function OptionGroupFields({
           >
             <legend className="px-1 text-xs font-semibold text-ink-700">
               {group.name}
-              {group.required ? (
+              {group.min > 0 ? (
                 <span className="ml-1 text-accent-700">Required</span>
               ) : (
                 <span className="ml-1 font-normal text-ink-500">Optional</span>
               )}
-              {!single && group.max !== null && (
-                <span className="ml-1 font-normal text-ink-500">Pick up to {group.max}</span>
-              )}
+              {range && <span className="ml-1 font-normal text-ink-500">{range}</span>}
             </legend>
             <div className="flex flex-col gap-1">
+              {single && skippable && (
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 text-sm text-ink-800 hover:bg-surface-100">
+                  <input
+                    type="radio"
+                    name={`options-${item.id}-${group.name}`}
+                    checked={picked.length === 0}
+                    onChange={() => onToggle(group.name, "")}
+                    className="h-4 w-4 shrink-0 accent-accent-700"
+                  />
+                  <span className="min-w-0 flex-1 truncate">None</span>
+                </label>
+              )}
               {group.choices.map((choice) => {
                 const checked = picked.some((selection) => selection.choiceName === choice.name);
+                const disabled = atCap && !checked;
                 const delta = formatPriceDelta(choice.priceDelta);
                 const inputName = `options-${item.id}-${group.name}`;
                 return (
@@ -133,6 +162,7 @@ export function OptionGroupFields({
                       type={single ? "radio" : "checkbox"}
                       name={single ? inputName : undefined}
                       checked={checked}
+                      disabled={disabled}
                       onChange={() => onToggle(group.name, choice.name)}
                       className="h-4 w-4 shrink-0 accent-accent-700"
                     />
