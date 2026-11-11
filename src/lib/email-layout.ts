@@ -8,15 +8,16 @@
  * embedded: Gmail, every Outlook, Yahoo and AOL strip an inline `<svg>`, while a
  * linked `.svg` renders nearly everywhere — Gmail rasterises it server-side, and
  * only Word-engine Outlook shows nothing but the alt text. The URL carries a
- * digest of the colours the icon was generated with, because mail proxies cache
- * an image by URL and an unversioned one would keep serving the old tile after
- * a palette change.
+ * digest of the icon file the generator wrote, because mail proxies cache an
+ * image by URL: an unversioned one would keep serving the old tile after any
+ * change to the artwork, not just after a palette change.
  * Email clients do not resolve CSS variables, so every colour is resolved from
  * the theme instead of typed here: `themeColor` reads the values
  * `scripts/build-theme-tokens.mjs` generates from `src/app/theme.css`. A theme
  * change therefore reaches the mailbox, and this file holds no palette of its
  * own — `tests/theme-tokens.test.ts` fails if a hex literal creeps back in.
  */
+import { ICON_REVISION } from "@/lib/theme/theme-tokens";
 import { themeColor } from "@/lib/theme/tokens";
 
 /** Escape user-controlled text interpolated into email HTML. */
@@ -43,22 +44,12 @@ const ON_BRAND = themeColor("on-accent");
 const SURFACE_SOFT = themeColor("surface-50");
 
 /**
- * Short digest of the two colours baked into the generated icon (the tile and
- * the glyph). Not a security boundary — a cache key: same palette, same URL.
- */
-function iconRevision(): string {
-  const seed = `${themeColor("accent-700")}|${themeColor("on-accent")}`;
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = Math.imul(hash ^ seed.charCodeAt(index), 0x01000193) >>> 0;
-  }
-  return hash.toString(16).padStart(8, "0");
-}
-
-/**
  * Absolute, versioned URL of the app icon. A link in an email must be absolute,
  * and the origin is taken from the message's own action URL — the same host the
  * recipient is about to visit, so a dev link stays on the dev server.
+ *
+ * `v` is the digest of the icon file itself (see `scripts/build-theme-tokens.mjs`),
+ * so the cache key moves with the artwork and not merely with the palette.
  */
 export function emailIconUrl(url: string): string {
   let origin: string;
@@ -69,7 +60,7 @@ export function emailIconUrl(url: string): string {
     // same host as the rest of the message rather than pointing it at nothing.
     origin = url.replace(/\/+$/, "");
   }
-  return `${origin}/icon.svg?v=${iconRevision()}`;
+  return `${origin}/icon.svg?v=${ICON_REVISION}`;
 }
 
 /**
