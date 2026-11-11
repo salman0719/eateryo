@@ -374,7 +374,11 @@ export function LaunchChecklist() {
         <ChecklistSteps steps={steps} details onToggleCards={toggleCardsPrinted} />
 
         {allDone ? (
-          <p className="mt-4 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-900">
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-surface-100 px-3 py-2 text-xs text-ink-700">
+            <span
+              aria-hidden="true"
+              className="mt-1 size-1.5 shrink-0 rounded-full bg-success-700"
+            />
             That is the whole launch. New orders appear on the Orders tab, and the public page keeps
             showing your latest published menu.
           </p>

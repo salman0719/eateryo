@@ -505,24 +505,27 @@ export function AssistantPanel({
       {applied && (
         <div
           role="status"
-          className="rounded-2xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-900"
+          className="rounded-2xl border border-line-200 bg-surface-base px-4 py-3 text-sm text-ink-700"
         >
-          <p className="font-medium">Change saved to “{applied.title}”.</p>
-          <p className="mt-1 text-xs leading-5 text-success-800">
+          <p className="flex items-center gap-2 font-medium text-ink-900">
+            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success-700" />
+            Change saved to “{applied.title}”.
+          </p>
+          <p className="mt-1 text-xs leading-5 text-ink-600">
             The draft is updated. Diners keep seeing the published version until you publish
             changes.
           </p>
           <div className="mt-2 flex flex-wrap gap-3 text-xs font-medium">
             <a
               href={`/menus/${encodeURIComponent(applied.menuId)}`}
-              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-800"
+              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Open in editor
             </a>
             <button
               type="button"
               onClick={() => setApplied(null)}
-              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-success-800"
+              className="underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Dismiss
             </button>

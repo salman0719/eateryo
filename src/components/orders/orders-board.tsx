@@ -28,6 +28,7 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { authClient } from "@/lib/auth-client";
 import { GuidanceCard } from "@/components/ui/guidance-card";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
 import { OrdersSkeleton, ServerOrdersBoard } from "./server-orders-board";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -46,11 +47,14 @@ export function OrdersBoard() {
   return session?.user ? <ServerOrdersBoard /> : <LocalOrdersBoard />;
 }
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-  new: "bg-warning-100 text-warning-900",
-  preparing: "bg-info-100 text-info-900",
-  served: "bg-success-100 text-success-900",
-  cancelled: "bg-surface-200 text-ink-600",
+/* Status is a dot plus a word, never a wash: `served` used to wear a green
+   surface beside `new`'s amber one, which made a finished order look like a
+   brand-highlighted one. */
+const STATUS_TONES: Record<OrderStatus, StatusTone> = {
+  new: "warning",
+  preparing: "info",
+  served: "success",
+  cancelled: "neutral",
 };
 
 function formatTime(iso: string): string {
@@ -229,11 +233,9 @@ function LocalOrdersBoard() {
                       <p className="text-lg font-bold text-ink-900">
                         {formatTableLabel(order.tableLabel)}
                       </p>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status]}`}
-                      >
+                      <StatusChip tone={STATUS_TONES[order.status]}>
                         {orderStatusLabel(order.status)}
-                      </span>
+                      </StatusChip>
                       <span className="text-xs font-medium text-ink-500">
                         #{orderCode(order.id)} · {formatTime(order.createdAt)}
                       </span>
