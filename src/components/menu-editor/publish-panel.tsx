@@ -353,7 +353,7 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
             <>
               <p
                 role="status"
-                className="rounded-xl bg-warning-50 px-3 py-2 text-xs leading-5 text-warning-900"
+                className="rounded-xl border border-info-200 bg-info-50 px-3 py-2 text-xs leading-5 text-info-900"
               >
                 Draft changes are not on your tables yet — diners still see the last published
                 version until you press “Publish changes”.
