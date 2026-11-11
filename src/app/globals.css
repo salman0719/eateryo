@@ -258,6 +258,17 @@ html[data-sidebar="expanded"] .app-sidebar-brand {
   justify-content: flex-start;
 }
 
+/* Concept 7, "The Hidden Eat": the wordmark is the brand, so it is what the
+   column shows. The 72px rail has no room for it, and there the app-icon tile
+   takes over — the same drawn "eat", so the name is never said twice. */
+.app-sidebar-mark {
+  display: none;
+}
+
+html[data-sidebar="rail"] .app-sidebar .app-sidebar-mark {
+  display: block;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-sidebar {
     transition: none;

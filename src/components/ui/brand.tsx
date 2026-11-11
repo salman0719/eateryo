@@ -1,30 +1,75 @@
 /**
  * The brand lockup, in one place.
  *
- * The tile carrying an "E" and the word "Eateryo" were drawn separately in the
- * sidebar and in the content header, and the phone's brand bar would have been
- * a third copy. One component means a change to the mark or the name cannot
- * land in some surfaces and miss the others.
+ * Concept 7, "The Hidden Eat": there is no separate mark for the name, because
+ * the name already says "eat" — the first three letters carry the accent and
+ * the last four the ink, so the colour break is the identity. The artwork is
+ * drawn paths, not a font, so it renders the same in the app, in print and at
+ * any size.
  *
  * Every colour here is a role token, so a palette change re-colours the brand
- * without touching a component. The chosen identity (concept 7, "The Hidden
- * Eat", which splits the name into `eat` and `eryo`) is deliberately not
- * applied yet: the theme moves first, and then the drawn lockup replaces the
- * text below — in this file only.
+ * without touching this file. The 72px rail has no room for the wordmark, so
+ * there it shows the app-icon tile instead — the same drawn "eat", generated
+ * into `src/app/icon.svg` by `scripts/build-theme-tokens.mjs`; the CSS swap
+ * lives in `globals.css` (`.app-sidebar-mark`).
  */
+import type { ReactNode } from "react";
+
+/** `eat` — the food word, and the product. */
+function EatGlyph(): ReactNode {
+  return (
+    <>
+      <path d="M44 52A22 22 0 1 0 36.1 68.9" />
+      <path d="M22 52H43" />
+      <g transform="translate(56 0)">
+        <circle cx="22" cy="52" r="22" />
+        <path d="M44 30V74" />
+      </g>
+      <g transform="translate(112 0)">
+        <path d="M9 16V64Q9 74 19 74" />
+        <path d="M0 30H20" />
+      </g>
+    </>
+  );
+}
+
+/** `eryo` — the rest of the name. */
+function RestGlyph(): ReactNode {
+  return (
+    <>
+      <g transform="translate(144 0)">
+        <path d="M44 52A22 22 0 1 0 36.1 68.9" />
+        <path d="M22 52H43" />
+      </g>
+      <g transform="translate(200 0)">
+        <path d="M4.5 30V74" />
+        <path d="M4.5 48Q4.5 30 24 30" />
+      </g>
+      <g transform="translate(238 0)">
+        <path d="M2 30L20.5 62" />
+        <path d="M31 30L10 94" />
+      </g>
+      <g transform="translate(282 0)">
+        <circle cx="22" cy="52" r="22" />
+      </g>
+    </>
+  );
+}
+
 export function BrandLockup({
   tagline = null,
   truncate = false,
   labelClassName = "",
   className = "",
 }: {
-  /** The second line. Omit it for the mark and the name alone. */
+  /** The second line. Omit it for the wordmark alone. */
   tagline?: string | null;
-  /** Clip the two lines instead of letting them set the lockup's width. */
+  /** Clip the tagline instead of letting it set the lockup's width. */
   truncate?: boolean;
   /**
-   * Classes on the text block. The sidebar passes `app-sidebar-label`, the
-   * rule that hides the name once the column is a 72px rail.
+   * Classes on the wordmark block. The sidebar passes `app-sidebar-label`, the
+   * rule that swaps the wordmark for the app-icon tile once the column is a
+   * 72px rail.
    */
   labelClassName?: string;
   className?: string;
@@ -32,15 +77,39 @@ export function BrandLockup({
   const line = truncate ? "block truncate" : "block";
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
-      <span
-        aria-hidden="true"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-on-accent"
-      >
-        E
-      </span>
+      {/* Only the rail shows this tile; see `.app-sidebar-mark` in globals.css.
+          It carries the app icon, so the name in the wordmark would be said
+          twice wherever the column has room for both. */}
+      <svg aria-hidden="true" viewBox="0 0 112 112" className="app-sidebar-mark h-8 w-8 shrink-0">
+        <rect width="112" height="112" rx="24" className="fill-accent-700" />
+        <g
+          transform="translate(18 26) scale(0.576)"
+          className="stroke-on-accent"
+          strokeWidth={9}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        >
+          <EatGlyph />
+        </g>
+      </svg>
       <span className={`min-w-0 ${labelClassName}`}>
-        <span className={`${line} text-sm font-bold tracking-tight text-ink-900`}>Eateryo</span>
-        {tagline ? <span className={`${line} text-xs text-ink-500`}>{tagline}</span> : null}
+        <svg
+          role="img"
+          aria-label="Eateryo"
+          viewBox="-6 10 342 92"
+          className="block h-[18px] w-auto"
+        >
+          <g strokeWidth={9} strokeLinecap="round" strokeLinejoin="round" fill="none">
+            <g className="stroke-accent-700">
+              <EatGlyph />
+            </g>
+            <g className="stroke-ink-900">
+              <RestGlyph />
+            </g>
+          </g>
+        </svg>
+        {tagline ? <span className={`${line} mt-0.5 text-xs text-ink-500`}>{tagline}</span> : null}
       </span>
     </div>
   );
