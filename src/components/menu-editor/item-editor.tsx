@@ -335,7 +335,7 @@ export const ItemEditor = memo(function ItemEditor({
             {appliableTemplates.length > 0 && (
               <div className="mt-2 flex flex-wrap items-end gap-2">
                 <label className="min-w-[160px] flex-1 text-xs text-ink-600">
-                  Apply a reusable modifier
+                  Apply an add-on set
                   <select
                     value={applyPick}
                     onChange={(event) => setApplyPick(event.target.value)}
@@ -382,16 +382,16 @@ export const ItemEditor = memo(function ItemEditor({
                     footer={
                       inLibrary ? (
                         <p className="mt-2 text-[11px] text-ink-500">
-                          Saved in the reusable-modifiers library.
+                          Saved in the add-on sets library.
                         </p>
                       ) : (
                         <button
                           type="button"
-                          title="Copy this group into the library so other dishes can use it"
+                          title="Copy this group into the add-on sets so other dishes can use it"
                           onClick={() => actions.change(addModifierTemplate(doc, option))}
                           className={`${smallButton} mt-2`}
                         >
-                          Save as reusable modifier
+                          Save as add-on set
                         </button>
                       )
                     }

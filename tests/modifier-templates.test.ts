@@ -86,7 +86,7 @@ describe("modifier template library", () => {
     expect(() => updateModifierTemplate(doc, "Sauces", { name: "Toppings" })).toThrow(
       /already exists/
     );
-    expect(() => updateModifierTemplate(doc, "Missing", {})).toThrow(/Unknown modifier template/);
+    expect(() => updateModifierTemplate(doc, "Missing", {})).toThrow(/Unknown add-on set/);
   });
 
   it("deletes a template but leaves dish copies in place", () => {
@@ -100,10 +100,10 @@ describe("modifier template library", () => {
 
   it("throws for unknown template names", () => {
     const doc = createMenuDocument();
-    expect(() => deleteModifierTemplate(doc, "Missing")).toThrow(/Unknown modifier template/);
-    expect(() => modifierTemplateUsage(doc, "Missing")).toThrow(/Unknown modifier template/);
+    expect(() => deleteModifierTemplate(doc, "Missing")).toThrow(/Unknown add-on set/);
+    expect(() => modifierTemplateUsage(doc, "Missing")).toThrow(/Unknown add-on set/);
     expect(() => applyModifierTemplate(doc, "Missing", ["i1"])).toThrow(
-      /Unknown modifier template/
+      /Unknown add-on set/
     );
   });
 });
