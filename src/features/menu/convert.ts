@@ -55,6 +55,9 @@ export function extractedMenuToDocument(
         unpricedAccepted: false,
       })),
     })),
+    // Extraction produces dishes, never library definitions: the owner
+    // promotes a dish's group to a template from the editor.
+    modifierTemplates: [],
     source: {
       ...(source?.originalFileName ? { originalFileName: source.originalFileName } : {}),
       ...(originalTitle ? { originalTitle } : {}),

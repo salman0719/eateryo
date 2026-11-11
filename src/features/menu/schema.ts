@@ -147,6 +147,13 @@ export const menuDocumentSchema = z.object({
   title: z.string().min(1),
   currency: z.string().min(1).nullable(),
   categories: z.array(menuCategorySchema).default([]),
+  /**
+   * Reusable option-group definitions ("Pizza sauces", "Toppings").
+   * Applying a template copies the group onto dishes — dishes never
+   * reference templates, so old documents (field absent) stay valid and
+   * published snapshots keep working without resolving anything.
+   */
+  modifierTemplates: z.array(menuOptionSchema).default([]),
   source: menuSourceSchema.optional(),
   updatedAt: z.string().min(1),
 });
@@ -154,6 +161,8 @@ export const menuDocumentSchema = z.object({
 export type StoredMenuItemPhoto = z.infer<typeof storedMenuItemPhotoSchema>;
 export type MenuItemImage = z.infer<typeof menuItemImageSchema>;
 export type MenuVariant = z.infer<typeof menuVariantSchema>;
+/** A named option group kept in the library; same shape as a dish's group. */
+export type MenuModifierTemplate = z.infer<typeof menuOptionSchema>;
 export type MenuOptionChoice = z.infer<typeof menuOptionChoiceSchema>;
 export type MenuOption = z.infer<typeof menuOptionSchema>;
 export type MenuItem = z.infer<typeof menuItemSchema>;
