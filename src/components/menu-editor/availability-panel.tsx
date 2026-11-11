@@ -270,7 +270,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
         ) : (
           <span>{draftTimeZone ?? "UTC"}</span>
         )}
-        <span className="text-ink-400">— diners see the menu as open or closed in this zone.</span>
+        <span className="text-ink-500">— diners see the menu as open or closed in this zone.</span>
       </label>
 
       {draft.length > 0 && (

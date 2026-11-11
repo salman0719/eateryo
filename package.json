@@ -16,6 +16,8 @@
     "db:migrate": "node --env-file-if-exists=.env.local node_modules/drizzle-kit/bin.cjs migrate",
     "admin:restaurant": "node --env-file-if-exists=.env.local scripts/restaurant-admin.mjs",
     "photos:sweep": "node --env-file-if-exists=.env.local scripts/cleanup-dish-photos.mjs",
+    "theme:tokens": "node scripts/build-theme-tokens.mjs",
+    "theme:check": "node scripts/build-theme-tokens.mjs --check",
     "secrets:check": "node scripts/check-client-secrets.mjs"
   },
   "dependencies": {

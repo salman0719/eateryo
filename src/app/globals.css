@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "./theme.css";
 
-/* Light-only theme: every component hardcodes the warm light palette, so the
+/* Light-only theme: every component hardcodes the light palette, so the
    page must not flip to dark when the OS prefers dark — that produced
    near-black headings on a black body. Revisit if a real dark theme lands.
    Colours and font families live in `theme.css`. */
@@ -256,6 +256,17 @@ html[data-sidebar="expanded"] .app-sidebar-label {
 html[data-sidebar="expanded"] .app-sidebar-item,
 html[data-sidebar="expanded"] .app-sidebar-brand {
   justify-content: flex-start;
+}
+
+/* Concept 7, "The Hidden Eat": the wordmark is the brand, so it is what the
+   column shows. The 72px rail has no room for it, and there the app-icon tile
+   takes over — the same drawn "eat", so the name is never said twice. */
+.app-sidebar-mark {
+  display: none;
+}
+
+html[data-sidebar="rail"] .app-sidebar .app-sidebar-mark {
+  display: block;
 }
 
 @media (prefers-reduced-motion: reduce) {

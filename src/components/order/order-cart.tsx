@@ -152,7 +152,7 @@ export function OrderCartLines({
         rows={2}
         maxLength={280}
         placeholder="Allergies, no onions…"
-        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
+        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
       />
     </>
   );
@@ -209,7 +209,7 @@ export function OrderCartPanel({
       {subtitle && <p className="mt-0.5 truncate text-xs text-ink-500">{subtitle}</p>}
 
       {lines.length === 0 && (
-        <p className="mt-3 rounded-xl border border-dashed border-line-300 p-4 text-center text-sm text-ink-500">
+        <p className="mt-3 rounded-xl border border-dashed border-line-200 p-4 text-center text-sm text-ink-500">
           Nothing added yet.
         </p>
       )}

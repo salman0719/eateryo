@@ -85,7 +85,7 @@ export function TeamActivity({
               </p>
               <time
                 dateTime={event.createdAt}
-                className="text-[11px] text-ink-400"
+                className="text-[11px] text-ink-500"
                 title={new Date(event.createdAt).toLocaleString()}
               >
                 {formatWhen(event.createdAt)}

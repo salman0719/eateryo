@@ -35,12 +35,13 @@ import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-  new: "bg-warning-100 text-warning-900",
-  preparing: "bg-info-100 text-info-900",
-  served: "bg-success-100 text-success-900",
-  cancelled: "bg-surface-200 text-ink-600",
+const STATUS_TONES: Record<OrderStatus, StatusTone> = {
+  new: "warning",
+  preparing: "info",
+  served: "success",
+  cancelled: "neutral",
 };
 
 /**
@@ -244,12 +245,10 @@ export function ServerOrdersBoard() {
                       <p className="text-lg font-bold text-ink-900">
                         {formatTableLabel(order.tableLabel)}
                       </p>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status]}`}
-                      >
+                      <StatusChip tone={STATUS_TONES[order.status]}>
                         {orderStatusLabel(order.status)}
-                      </span>
-                      <span className="text-xs font-medium text-ink-400">
+                      </StatusChip>
+                      <span className="text-xs font-medium text-ink-500">
                         #{orderCode(order.id)} · {formatTime(order.createdAt)}
                       </span>
                     </div>
@@ -337,25 +336,19 @@ function ConnectionPill({
       : connection === "reconnecting"
         ? `Reconnecting…${lastSyncedAt ? ` last update ${formatTime(lastSyncedAt)}` : ""}`
         : "Connecting…";
-  const tone =
-    connection === "live"
-      ? "bg-success-50 text-success-800"
-      : connection === "reconnecting"
-        ? "bg-warning-100 text-warning-900"
-        : "bg-surface-100 text-ink-600";
   return (
     <span
       role="status"
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tone}`}
+      className="inline-flex items-center gap-1.5 rounded-full bg-surface-100 px-2.5 py-0.5 text-[11px] font-semibold text-ink-900"
     >
       <span
         aria-hidden="true"
         className={`h-1.5 w-1.5 rounded-full ${
           connection === "live"
-            ? "bg-success-600"
+            ? "bg-success-700"
             : connection === "reconnecting"
-              ? "animate-pulse bg-accent-600"
-              : "bg-surface-400"
+              ? "animate-pulse bg-warning-600"
+              : "bg-ink-400"
         }`}
       />
       {label}

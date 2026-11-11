@@ -369,7 +369,7 @@ export function PublishWizard({
                         value={form.restaurantName}
                         onChange={(event) => update({ restaurantName: event.target.value })}
                         placeholder="e.g. Sunny Side Café"
-                        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       />
                       <span className="text-xs font-normal text-ink-500">
                         You can rename it later in Settings.

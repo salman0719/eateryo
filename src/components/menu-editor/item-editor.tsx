@@ -457,7 +457,7 @@ export const ItemEditor = memo(function ItemEditor({
                 <button
                   type="button"
                   onClick={() => patch({ reviewNotes: [] })}
-                  className={`${smallButton} border-success-300 text-success-800 hover:border-success-700 hover:text-success-900`}
+                  className={`${smallButton} border-accent-300 text-accent-800 hover:border-accent-700 hover:text-accent-900`}
                 >
                   ✓ Looks good
                 </button>
@@ -466,7 +466,7 @@ export const ItemEditor = memo(function ItemEditor({
                   type="button"
                   onClick={() => patch({ reviewNotes: [], unpricedAccepted: true })}
                   title="Keeps the price blank — totals stay honestly blank for this item."
-                  className={`${smallButton} border-success-300 text-success-800 hover:border-success-700 hover:text-success-900`}
+                  className={`${smallButton} border-accent-300 text-accent-800 hover:border-accent-700 hover:text-accent-900`}
                 >
                   ✓ Leave unpriced
                 </button>
