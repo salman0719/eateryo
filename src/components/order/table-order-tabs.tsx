@@ -500,15 +500,6 @@ export function TableOrderTabs({
                         }))
                       }
                       onAdd={(item, picks) => addItem(menu, item, picks)}
-                      itemCount={(item, variantName, picks) =>
-                        lines.find(
-                          (line) =>
-                            line.menuId === menu.menuId &&
-                            line.menuItemId === item.id &&
-                            (line.variantName ?? null) === (variantName ?? null) &&
-                            selectionsKey(line.options) === selectionsKey(picks)
-                        )?.quantity ?? 0
-                      }
                     />
                   ))}
                 </div>

@@ -246,14 +246,6 @@ export function ServerTableOrder({
                 setVariantChoice((current) => ({ ...current, [itemId]: name }))
               }
               onAdd={addItem}
-              itemCount={(item, variantName, picks) =>
-                lines.find(
-                  (line) =>
-                    line.menuItemId === item.id &&
-                    (line.variantName ?? null) === (variantName ?? null) &&
-                    selectionsKey(line.options) === selectionsKey(picks)
-                )?.quantity ?? 0
-              }
             />
           ))}
         </div>
