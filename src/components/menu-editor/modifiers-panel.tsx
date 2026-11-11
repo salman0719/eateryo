@@ -23,6 +23,8 @@ interface ModifiersPanelProps {
   doc: MenuDocument;
   canManage: boolean;
   onChange: (next: MenuDocument) => void;
+  /** Shown as an ✕ beside the heading when the panel lives in a dialog. */
+  onClose?: () => void;
 }
 
 /** One-line shape of a template: "Required · Many · 4 choices". */
@@ -40,7 +42,7 @@ function describeTemplate(template: MenuModifierTemplate): string {
  * dishes never reference the template — so a later dish tweak can't leak
  * into its siblings, and deleting a template never rewrites a dish.
  */
-export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps) {
+export function ModifiersPanel({ doc, canManage, onChange, onClose }: ModifiersPanelProps) {
   const { confirm, dialog } = useConfirm();
   const [editingName, setEditingName] = useState<string | null>(null);
   const [applyingName, setApplyingName] = useState<string | null>(null);
@@ -181,6 +183,17 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h2 className="text-sm font-semibold text-ink-900">Add-on sets</h2>
+        <span className="flex-1" />
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close add-on sets"
+            className={smallButton}
+          >
+            ✕
+          </button>
+        )}
         <p className="text-xs text-ink-500">
           Define sauces and toppings once, apply them to many dishes. Applying copies the group —
           later dish tweaks stay on that dish until you push an update.

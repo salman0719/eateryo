@@ -198,6 +198,23 @@ export function MenuEditor({
 
   // Search box: pure client-side filter, see search.ts for the rules.
   const [query, setQuery] = useState("");
+  // Add-on sets live in a dialog off the header button, not as another
+  // workspace section: defining and applying sets is a detour, and the
+  // dishes stay visible behind it.
+  const [modifiersOpen, setModifiersOpen] = useState(false);
+  useEffect(() => {
+    if (!modifiersOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setModifiersOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [modifiersOpen]);
   const search = useMemo(() => searchMenu(doc, query), [doc, query]);
   const isFiltering = query.trim().length > 0;
 
@@ -574,6 +591,9 @@ export function MenuEditor({
         </>
       ) : mode === "edit" ? (
         <>
+          <button type="button" onClick={() => setModifiersOpen(true)} className={smallButton}>
+            Add-on sets
+          </button>
           <button type="button" onClick={() => changeMode("reorder")} className={smallButton}>
             ↕ Reorder
           </button>
@@ -974,7 +994,6 @@ export function MenuEditor({
           </ul>
         </section>
       )}
-      <ModifiersPanel doc={doc} canManage={canManage} onChange={onChange} />
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
         <label htmlFor="menu-search" className="sr-only">
           Search the menu
@@ -1363,6 +1382,30 @@ export function MenuEditor({
           </p>
         )}
       </div>
+      {modifiersOpen && canManage && (
+        <div
+          className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-scrim p-4 sm:items-center"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setModifiersOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add-on sets"
+            tabIndex={-1}
+            ref={(node) => node?.focus()}
+            className="w-full max-w-2xl focus:outline-none"
+          >
+            <ModifiersPanel
+              doc={doc}
+              canManage={canManage}
+              onChange={onChange}
+              onClose={() => setModifiersOpen(false)}
+            />
+          </div>
+        </div>
+      )}
       {dialog}
     </div>
   );
