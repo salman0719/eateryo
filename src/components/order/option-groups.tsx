@@ -72,6 +72,9 @@ export function toggleOptionSelection(
  * One line's picks wherever an order is read back: the cart, the staff
  * board, the owner preview. Names come from the order snapshot, so a later
  * menu rename never rewrites what the kitchen saw.
+ *
+ * Always its own wrapping line under the dish name — never inline in a
+ * truncating row, so a long pick list wraps instead of being cut off.
  */
 export function OrderLineOptions({
   options,
@@ -82,8 +85,7 @@ export function OrderLineOptions({
 }) {
   if (options.length === 0) return null;
   return (
-    <span className="ml-1 text-xs font-normal text-ink-500">
-      ·{" "}
+    <span className="mt-0.5 block text-xs font-normal text-ink-500">
       {options
         .map((option) => {
           const delta = formatPriceDelta(option.priceDelta);
