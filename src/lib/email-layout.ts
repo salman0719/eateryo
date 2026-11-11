@@ -2,9 +2,15 @@
  * Shared branded layout for Eateryo emails (server-only).
  *
  * All bodies use table layout + inline styles (email-client safe), system fonts
- * only, max ~520px. The "E" mark is the brand tile: `accent-700` with
- * `on-accent` on it.
+ * only, max ~520px.
  *
+ * The header mark is the app's own icon (`src/app/icon.svg`), linked and not
+ * embedded: Gmail, every Outlook, Yahoo and AOL strip an inline `<svg>`, while a
+ * linked `.svg` renders nearly everywhere — Gmail rasterises it server-side, and
+ * only Word-engine Outlook shows nothing but the alt text. The URL carries a
+ * digest of the colours the icon was generated with, because mail proxies cache
+ * an image by URL and an unversioned one would keep serving the old tile after
+ * a palette change.
  * Email clients do not resolve CSS variables, so every colour is resolved from
  * the theme instead of typed here: `themeColor` reads the values
  * `scripts/build-theme-tokens.mjs` generates from `src/app/theme.css`. A theme
@@ -36,13 +42,51 @@ const BRAND_DARK = themeColor("accent-900");
 const ON_BRAND = themeColor("on-accent");
 const SURFACE_SOFT = themeColor("surface-50");
 
-/** Centered "E" mark used in every email header. */
-export function emailLogoMark(accent: string = BRAND, markColor: string = ON_BRAND): string {
+/**
+ * Short digest of the two colours baked into the generated icon (the tile and
+ * the glyph). Not a security boundary — a cache key: same palette, same URL.
+ */
+function iconRevision(): string {
+  const seed = `${themeColor("accent-700")}|${themeColor("on-accent")}`;
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = Math.imul(hash ^ seed.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+/**
+ * Absolute, versioned URL of the app icon. A link in an email must be absolute,
+ * and the origin is taken from the message's own action URL — the same host the
+ * recipient is about to visit, so a dev link stays on the dev server.
+ */
+export function emailIconUrl(url: string): string {
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    // A relative action URL is already broken in email; keep the mark on the
+    // same host as the rest of the message rather than pointing it at nothing.
+    origin = url.replace(/\/+$/, "");
+  }
+  return `${origin}/icon.svg?v=${iconRevision()}`;
+}
+
+/**
+ * The brand mark in every email header: the app icon, linked.
+ *
+ * `alt` carries the name where nothing is drawn — Word-engine Outlook never
+ * renders a linked SVG and blocks images by default — so the name also stays a
+ * line of live text directly beneath the mark.
+ */
+export function emailLogoMark(url: string): string {
+  const src = escapeEmailHtml(emailIconUrl(url));
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
-    `<td align="center" style="width:48px;height:48px;background:${accent};border-radius:12px;` +
-    `font-family:Arial,sans-serif;font-size:26px;font-weight:bold;color:${markColor};line-height:48px">E</td>` +
-    `</tr></table>`
+    `<td align="center" width="48" height="48" style="width:48px;height:48px">` +
+    `<img src="${src}" width="48" height="48" alt="Eateryo" ` +
+    `style="display:block;width:48px;height:48px;border:0;outline:none;text-decoration:none" />` +
+    `</td></tr></table>`
   );
 }
 

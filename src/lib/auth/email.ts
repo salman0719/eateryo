@@ -33,7 +33,7 @@ export function buildMagicLinkEmail({ email, url }: MagicLinkEmail): {
     `If you didn't request this, you can ignore this email.\n`;
   const cardInner =
     `<tr><td align="center" style="padding:28px 28px 8px">` +
-    emailLogoMark() +
+    emailLogoMark(url) +
     `<p style="margin:12px 0 0;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:${EMAIL_COLORS.INK};letter-spacing:-.01em">Eateryo</p>` +
     `<p style="margin:2px 0 0;font-family:Arial,sans-serif;font-size:12px;color:${EMAIL_COLORS.MUTED}">Menus, tables, and orders in one place</p>` +
     `</td></tr>` +
@@ -126,7 +126,7 @@ export function buildInvitationEmail({
     `Signing in with this email address accepts the invitation. The link expires in 7 days.\n`;
   const cardInner =
     `<tr><td align="center" style="padding:28px 28px 8px">` +
-    emailLogoMark() +
+    emailLogoMark(url) +
     `<p style="margin:12px 0 0;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:${EMAIL_COLORS.INK}">Eateryo</p>` +
     `</td></tr>` +
     `<tr><td style="padding:12px 32px 0;font-family:Arial,sans-serif">` +

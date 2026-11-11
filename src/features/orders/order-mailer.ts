@@ -82,7 +82,7 @@ export function buildNewOrderEmail({ email, restaurantName, order, boardUrl }: N
     .join("");
   const cardInner =
     `<tr><td align=\"center\" style=\"padding:28px 28px 8px\">` +
-    emailLogoMark() +
+    emailLogoMark(boardUrl) +
     `<p style=\"margin:12px 0 0;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:${EMAIL_COLORS.INK}\">Eateryo</p>` +
     `</td></tr>` +
     `<tr><td style=\"padding:12px 32px 0;font-family:Arial,sans-serif\">` +
