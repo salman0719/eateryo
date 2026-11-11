@@ -40,28 +40,32 @@
   --color-accent-900: #263e35;
   --color-accent-950: #15231d;
 
-  /* Warning: caution, conflict, paused, draft and review states. Its own hue —
-     a yellow, where the accent runs from amber to rust — so a caution surface
-     can never be mistaken for a brand one, and retuning the brand never
-     repaints a warning. `-50`/`-100` are the washes, `-200`/`-300` the soft
-     border a container or pill draws, `-800`/`-900` the text tones (6.37 on
-     `-100`, 8.38 on `-50`). `-600` is the outline stop: a field marked only by
-     a caution border is a control boundary, not a divider, so it answers to
-     WCAG 1.4.11 — 3.75 on `surface-base`, 3.57 on `-50`, 3.25 on `-100`. The
-     older values were a byte-for-byte copy of the accent ramp, which is how a
-     warning border came to sit at 1.6:1 while a warning banner shared the
-     brand's exact hue. Never a primary action: a filled button is the accent. */
-  --color-warning-50: oklch(98.7% 0.026 102.212);
-  --color-warning-100: oklch(97.3% 0.071 103.193);
-  --color-warning-200: oklch(94.5% 0.129 101.54);
-  --color-warning-300: oklch(90.5% 0.182 98.111);
-  --color-warning-400: oklch(85.2% 0.199 91.936);
-  --color-warning-500: oklch(79.5% 0.184 86.047);
-  --color-warning-600: oklch(62% 0.15 70);
-  --color-warning-700: oklch(55.4% 0.135 66.442);
-  --color-warning-800: oklch(47.6% 0.114 61.907);
-  --color-warning-900: oklch(42.1% 0.095 57.708);
-  --color-warning-950: oklch(28.6% 0.066 53.813);
+  /* Warning: caution, conflict and review states. Gold, not lemon — the old
+     ramp ran at hue ~100 with chroma up to 0.20, which on a mint page was the
+     loudest thing on screen and read as the brand's accent rather than as a
+     caution. Hue now sits at 85–88 in the washes and slides to 66 by `-900`, so
+     a caution surface is warm without being acidic. It stays ~81° from the
+     accent at 169° and ~61° from danger at 27°, so the three never read as the
+     same family. Never a primary action: a
+     filled button is the accent. Never a *notice* either: information gets
+     `info`, which is why the "we found a menu saved here" banner and the
+     draft-changes strip are blue.
+
+     Ratios: `-800` is 6.70 on `-50` and 6.28 on `-100`; `-900` is 8.58 and 8.04;
+     `-950` is 14.15 and 13.26. `-600` is the outline stop — a caution border
+     marks a control boundary, so WCAG 1.4.11 applies: 3.74 on `surface-base`,
+     3.56 on `-50`, 3.43 on the page, 3.25 on `-100`. */
+  --color-warning-50: oklch(98.5% 0.028 88);
+  --color-warning-100: oklch(96.5% 0.055 88);
+  --color-warning-200: oklch(92.5% 0.095 85);
+  --color-warning-300: oklch(86% 0.125 80);
+  --color-warning-400: oklch(80% 0.135 78);
+  --color-warning-500: oklch(73% 0.13 76);
+  --color-warning-600: oklch(62% 0.128 72);
+  --color-warning-700: oklch(55% 0.115 70);
+  --color-warning-800: oklch(47% 0.1 68);
+  --color-warning-900: oklch(41% 0.085 66);
+  --color-warning-950: oklch(28% 0.06 62);
 
   /* Danger: errors and destructive actions. */
   --color-danger-50: oklch(97.1% 0.013 17.38);

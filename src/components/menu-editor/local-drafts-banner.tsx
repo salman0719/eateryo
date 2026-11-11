@@ -46,17 +46,17 @@ export function LocalDraftsOffer({
       <section
         aria-label="Menus from this browser"
         data-print-hide
-        className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3"
+        className="rounded-2xl border border-info-200 bg-info-50 px-4 py-3"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-warning-800 uppercase">
+            <p className="text-xs font-semibold tracking-wide text-info-900 uppercase">
               From this browser
             </p>
-            <p className="mt-1 text-sm font-semibold text-warning-950">
+            <p className="mt-1 text-sm font-semibold text-info-950">
               We found {menuCountLabel(count)} saved here.
             </p>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-warning-900">
+            <p className="mt-1 max-w-xl text-xs leading-5 text-info-900">
               Add {count === 1 ? "it" : "them"} to your account so other devices and your public
               link can use {count === 1 ? "it" : "them"}. This browser keeps a synced copy for
               offline use.
@@ -64,12 +64,12 @@ export function LocalDraftsOffer({
           </div>
           <div className="flex flex-wrap items-end gap-2">
             {restaurants.length > 1 && (
-              <label className="flex flex-col gap-1 text-xs font-medium text-warning-900">
+              <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
                 Add to
                 <select
                   value={target?.id ?? ""}
                   onChange={(event) => setTargetId(event.target.value)}
-                  className="rounded-lg border border-warning-600 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   {restaurants.map((restaurant) => (
                     <option key={restaurant.id} value={restaurant.id}>
@@ -93,7 +93,7 @@ export function LocalDraftsOffer({
               type="button"
               onClick={onDismiss}
               disabled={busy}
-              className="rounded-full border border-warning-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:border-accent-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="rounded-full border border-line-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Not now
             </button>

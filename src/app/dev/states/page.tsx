@@ -42,8 +42,10 @@ export default function StatusStatesDevPage() {
             <p className="mt-2 text-sm leading-6 text-ink-600">
               The danger, warning, success and info roles in the places they actually appear. Fills
               belong to accent and danger; success is a dot and a word, never a surface. Captions
-              name the recipe, so a role that feels wrong here is wrong in the app too. This page is
-              unlinked and returns 404 in production.
+              name the recipe, so a role that feels wrong here is wrong in the app too. Caution is a
+              gold ramp — hue 88 in the washes sliding to 66, not the lemon it used to be — and
+              information never wears it: that is what the blue role is for. This page is unlinked
+              and returns 404 in production.
             </p>
           </header>
 
@@ -88,7 +90,7 @@ export default function StatusStatesDevPage() {
                     Request a new link
                   </span>
                 </div>
-                <Caption>invitation banner · warning-50 / 200 / 300 / 900</Caption>
+                <Caption>invitation banner · gold ramp · warning-50 / 200 / 300 / 900</Caption>
               </article>
 
               <article className="rounded-2xl border border-line-200 bg-surface-base p-4">
