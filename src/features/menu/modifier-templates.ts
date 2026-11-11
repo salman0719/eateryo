@@ -48,7 +48,7 @@ function findTemplate(doc: MenuDocument, name: string): MenuModifierTemplate | u
 
 function requireTemplate(doc: MenuDocument, name: string): MenuModifierTemplate {
   const template = findTemplate(doc, name);
-  if (!template) throw new Error(`Unknown modifier template: ${name}`);
+  if (!template) throw new Error(`Unknown add-on set: ${name}`);
   return template;
 }
 
@@ -84,7 +84,7 @@ export function addModifierTemplate(doc: MenuDocument, input: unknown): MenuDocu
   const parsed = menuOptionSchema.parse(input);
   const name = requireName(parsed.name);
   if (findTemplate(doc, name))
-    throw new Error(`A modifier template named “${name}” already exists.`);
+    throw new Error(`An add-on set named “${name}” already exists.`);
   const next = clone(doc);
   next.modifierTemplates.push({ ...parsed, name });
   next.updatedAt = nowIso();
@@ -110,7 +110,7 @@ export function updateModifierTemplate(
   });
   merged.name = requireName(merged.name);
   if (merged.name !== name && findTemplate(doc, merged.name)) {
-    throw new Error(`A modifier template named “${merged.name}” already exists.`);
+    throw new Error(`An add-on set named “${merged.name}” already exists.`);
   }
   const next = clone(doc);
   const index = next.modifierTemplates.findIndex((template) => template.name === name);

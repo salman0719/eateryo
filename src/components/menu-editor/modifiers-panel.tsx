@@ -74,7 +74,7 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
 
   function handleAdd() {
     try {
-      const base = "New modifier";
+      const base = "New add-on set";
       let name = base;
       let n = 2;
       while (templates.some((template) => template.name === name)) name = `${base} ${n++}`;
@@ -88,7 +88,7 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
       setNotice(null);
       setError(null);
     } catch (thrown) {
-      fail(thrown instanceof Error ? thrown.message : "Could not add the modifier.");
+      fail(thrown instanceof Error ? thrown.message : "Could not add the set.");
     }
   }
 
@@ -97,8 +97,8 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
     const ok = await confirm({
       message:
         used > 0
-          ? `Delete the “${name}” template? The ${used} ${used === 1 ? "dish" : "dishes"} already using it keep their copies.`
-          : `Delete the “${name}” template?`,
+          ? `Delete the “${name}” set? The ${used} ${used === 1 ? "dish" : "dishes"} already using it keep their copies.`
+          : `Delete the “${name}” set?`,
       confirmLabel: "Delete",
       destructive: true,
     });
@@ -109,7 +109,7 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
       if (applyingName === name) setApplyingName(null);
       report(`Deleted “${name}”. Dish copies were left in place.`);
     } catch (thrown) {
-      fail(thrown instanceof Error ? thrown.message : "Could not delete the modifier.");
+      fail(thrown instanceof Error ? thrown.message : "Could not delete the set.");
     }
   }
 
@@ -159,7 +159,7 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
         ids.length === 1 ? `“${name}” added to 1 dish.` : `“${name}” added to ${ids.length} dishes.`
       );
     } catch (thrown) {
-      fail(thrown instanceof Error ? thrown.message : "Could not apply the modifier.");
+      fail(thrown instanceof Error ? thrown.message : "Could not apply the set.");
     }
   }
 
@@ -170,17 +170,17 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
       if (nextName !== previousName) setEditingName(nextName);
       setError(null);
     } catch (thrown) {
-      fail(thrown instanceof Error ? thrown.message : "Could not save the modifier.");
+      fail(thrown instanceof Error ? thrown.message : "Could not save the set.");
     }
   }
 
   return (
     <section
-      aria-label="Reusable modifiers"
+      aria-label="Add-on sets"
       className="rounded-2xl border border-line-200 bg-surface-base p-4"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="text-sm font-semibold text-ink-900">Reusable modifiers</h2>
+        <h2 className="text-sm font-semibold text-ink-900">Add-on sets</h2>
         <p className="text-xs text-ink-500">
           Define sauces and toppings once, apply them to many dishes. Applying copies the group —
           later dish tweaks stay on that dish until you push an update.
@@ -262,7 +262,7 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
                         group={template}
                         onChange={(next) => handleTemplateChange(template.name, next)}
                         onRemove={() => void handleDelete(template.name)}
-                        removeLabel={`Delete modifier ${template.name}`}
+                        removeLabel={`Delete add-on set ${template.name}`}
                       />
                     </ul>
                   </div>
@@ -336,7 +336,7 @@ export function ModifiersPanel({ doc, canManage, onChange }: ModifiersPanelProps
         </ul>
       )}
       <button type="button" onClick={handleAdd} className={`${smallButton} mt-3`}>
-        + New modifier
+        + New add-on set
       </button>
       {dialog}
     </section>
