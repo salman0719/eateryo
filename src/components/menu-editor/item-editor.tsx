@@ -407,11 +407,8 @@ export const ItemEditor = memo(function ItemEditor({
                     ...item.options,
                     {
                       name: "New option",
-                      required: false,
-                      selection: "one",
                       min: 0,
                       max: null,
-                      allowDuplicates: false,
                       // A group is never left empty: an empty group is a dead
                       // end the diner cannot satisfy, so it arrives with one
                       // choice to rename and price.
