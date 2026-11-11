@@ -86,14 +86,20 @@ export function OrderLineOptions({
   if (options.length === 0) return null;
   return (
     <span className="mt-0.5 block text-xs font-normal text-ink-500">
-      {options
-        .map((option) => {
-          const delta = formatPriceDelta(option.priceDelta);
-          return delta
-            ? `${option.choiceName} ${delta}${currency ? ` ${currency}` : ""}`
-            : option.choiceName;
-        })
-        .join(", ")}
+      {options.map((option, index) => {
+        const delta = formatPriceDelta(option.priceDelta);
+        const text = delta
+          ? `${option.choiceName} ${delta}${currency ? ` ${currency}` : ""}`
+          : option.choiceName;
+        // One pick never breaks across lines: the number and its currency
+        // stay together, and wrapping happens at the commas between picks.
+        return (
+          <span key={`${option.groupName}-${option.choiceName}`} className="whitespace-nowrap">
+            {index > 0 ? ", " : null}
+            {text}
+          </span>
+        );
+      })}
     </span>
   );
 }
