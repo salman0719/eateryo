@@ -17,6 +17,7 @@ import { itemImageCopy } from "@/features/item-images/ref";
 
 import { CommitInput, CommitNumber, CommitTags } from "./fields";
 import { ItemImagePanel } from "./item-image-panel";
+import { OptionGroupForm } from "./option-group-form";
 
 interface ItemEditorProps {
   doc: MenuDocument;
@@ -325,183 +326,17 @@ export const ItemEditor = memo(function ItemEditor({
             )}
             <ul className="mt-2 space-y-3">
               {item.options.map((option, oIndex) => (
-                <li
+                <OptionGroupForm
                   key={`${option.name}-${oIndex}`}
-                  className="rounded-lg border border-line-200 bg-surface-base p-2.5"
-                >
-                  <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-                    <CommitInput
-                      label="Option group"
-                      value={option.name}
-                      onCommit={(name) =>
-                        patch({
-                          options: item.options.map((o, i) =>
-                            i === oIndex ? { ...o, name: name.trim() } : o
-                          ),
-                        })
-                      }
-                    />
-                    <button
-                      type="button"
-                      aria-label={`Remove option group ${option.name}`}
-                      onClick={() =>
-                        patch({ options: item.options.filter((_, i) => i !== oIndex) })
-                      }
-                      className={smallButton}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 items-end gap-2 sm:grid-cols-[1fr_1fr_90px_90px]">
-                    <label className="flex items-center gap-2 rounded-lg border border-line-200 bg-surface-base px-2.5 py-2 text-xs text-ink-700">
-                      <input
-                        type="checkbox"
-                        checked={option.required}
-                        onChange={(event) =>
-                          patch({
-                            options: item.options.map((o, i) =>
-                              i === oIndex ? { ...o, required: event.target.checked } : o
-                            ),
-                          })
-                        }
-                        className="h-4 w-4 rounded accent-accent-700"
-                      />
-                      Required
-                    </label>
-                    <label className="text-xs text-ink-600">
-                      Picks
-                      <select
-                        value={option.selection}
-                        onChange={(event) =>
-                          patch({
-                            options: item.options.map((o, i) =>
-                              i === oIndex
-                                ? { ...o, selection: event.target.value as "one" | "many" }
-                                : o
-                            ),
-                          })
-                        }
-                        className="mt-1 w-full rounded-lg border border-line-300 bg-surface-base px-2 py-1.5 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                      >
-                        <option value="one">One</option>
-                        <option value="many">Many</option>
-                      </select>
-                    </label>
-                    <CommitNumber
-                      label="Min"
-                      value={option.min}
-                      placeholder="0"
-                      onCommit={(min) =>
-                        patch({
-                          options: item.options.map((o, i) =>
-                            i === oIndex
-                              ? { ...o, min: min === null ? 0 : Math.max(0, Math.trunc(min)) }
-                              : o
-                          ),
-                        })
-                      }
-                    />
-                    <CommitNumber
-                      label="Max"
-                      value={option.max}
-                      placeholder="No limit"
-                      onCommit={(max) =>
-                        patch({
-                          options: item.options.map((o, i) =>
-                            i === oIndex
-                              ? { ...o, max: max === null ? null : Math.max(1, Math.trunc(max)) }
-                              : o
-                          ),
-                        })
-                      }
-                    />
-                  </div>
-                  {option.choices.length === 0 && (
-                    <p className="mt-2 rounded-lg bg-warning-50 px-2.5 py-1.5 text-xs text-warning-900">
-                      No choices yet — add at least one, or diners can never satisfy
-                      {option.required ? " this required" : " this"} group.
-                    </p>
-                  )}
-                  <ul className="mt-2 space-y-2">
-                    {option.choices.map((choice, cIndex) => (
-                      <li
-                        key={`${choice.name}-${cIndex}`}
-                        className="grid grid-cols-1 items-end gap-2 pl-3 sm:grid-cols-[1fr_110px_auto]"
-                      >
-                        <CommitInput
-                          label="Choice"
-                          value={choice.name}
-                          onCommit={(name) =>
-                            patch({
-                              options: item.options.map((o, i) =>
-                                i === oIndex
-                                  ? {
-                                      ...o,
-                                      choices: o.choices.map((c, j) =>
-                                        j === cIndex ? { ...c, name: name.trim() } : c
-                                      ),
-                                    }
-                                  : o
-                              ),
-                            })
-                          }
-                        />
-                        <CommitNumber
-                          label="Extra"
-                          value={choice.priceDelta}
-                          onCommit={(priceDelta) =>
-                            patch({
-                              options: item.options.map((o, i) =>
-                                i === oIndex
-                                  ? {
-                                      ...o,
-                                      choices: o.choices.map((c, j) =>
-                                        j === cIndex ? { ...c, priceDelta } : c
-                                      ),
-                                    }
-                                  : o
-                              ),
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          aria-label={`Remove choice ${choice.name}`}
-                          onClick={() =>
-                            patch({
-                              options: item.options.map((o, i) =>
-                                i === oIndex
-                                  ? { ...o, choices: o.choices.filter((_, j) => j !== cIndex) }
-                                  : o
-                              ),
-                            })
-                          }
-                          className={smallButton}
-                        >
-                          ✕
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      patch({
-                        options: item.options.map((o, i) =>
-                          i === oIndex
-                            ? {
-                                ...o,
-                                choices: [...o.choices, { name: "New choice", priceDelta: null }],
-                              }
-                            : o
-                        ),
-                      })
-                    }
-                    className={`${smallButton} mt-2`}
-                  >
-                    + Add choice
-                  </button>
-                </li>
+                  group={option}
+                  onChange={(next) =>
+                    patch({
+                      options: item.options.map((o, i) => (i === oIndex ? next : o)),
+                    })
+                  }
+                  onRemove={() => patch({ options: item.options.filter((_, i) => i !== oIndex) })}
+                  removeLabel={`Remove option group ${option.name}`}
+                />
               ))}
             </ul>
             <button
