@@ -25,8 +25,9 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { ClampedDescription } from "./clamped-description";
+import { CustomizeSheet } from "./customize-sheet";
 import { MenuItemPhoto } from "./menu-item-photo";
-import { OptionGroupFields, toggleOptionSelection } from "./option-groups";
+import { toggleOptionSelection } from "./option-groups";
 
 /**
  * Loading placeholder for the diner-facing order surfaces: a menu card in
@@ -92,13 +93,28 @@ export function OrderShell({
   );
 }
 
+/**
+ * One quiet line under a customizable dish: what the Add tap will ask for.
+ * Required groups are named (the diner cannot skip them); otherwise the row
+ * just says add-ons exist, and the sheet carries the detail.
+ */
+function CustomizableHint({ item }: { item: MenuItem }) {
+  const required = item.options.filter((group) => group.min > 0);
+  return (
+    <p className="mt-1 text-xs text-ink-500">
+      {required.length > 0
+        ? `Requires ${required.map((group) => group.name).join(", ")}`
+        : "Add-ons available"}
+    </p>
+  );
+}
+
 export function OrderMenuSection({
   category,
   currency,
   variantChoice,
   onVariantChange,
   onAdd,
-  itemCount,
 }: {
   category: MenuCategory;
   currency: string | null;
@@ -106,11 +122,6 @@ export function OrderMenuSection({
   onVariantChange: (itemId: string, name: string) => void;
   /** Add a dish with the diner's current picks for its option groups. */
   onAdd: (item: MenuItem, selections: OptionSelection[]) => void;
-  /**
-   * Quantity of this exact item + variant + picks already in the cart
-   * (0 when absent). Picks distinguish two combinations of one dish.
-   */
-  itemCount?: (item: MenuItem, variantName: string | null, selections: OptionSelection[]) => number;
 }) {
   // Per-item confirmation: pops on every tap, gone ~2s later. A fresh tap
   // dismisses the visible pop instantly and replays it, so rapid taps
@@ -123,6 +134,8 @@ export function OrderMenuSection({
   const [optionChoice, setOptionChoice] = useState<Record<string, OptionSelection[]>>({});
   /** Add-gate message per dish (a required group left unanswered). */
   const [optionError, setOptionError] = useState<Record<string, string | null>>({});
+  /** Dish whose groups are open in the customizer sheet (null: shut). */
+  const [customizingId, setCustomizingId] = useState<string | null>(null);
   useEffect(
     () => () => {
       for (const timer of Object.values(flashTimers.current)) clearTimeout(timer);
@@ -137,6 +150,45 @@ export function OrderMenuSection({
       return next;
     });
   }
+  function togglePick(item: MenuItem, groupName: string, choiceName: string) {
+    const group = item.options.find((candidate) => candidate.name === groupName);
+    if (!group) return;
+    setOptionChoice((current) => ({
+      ...current,
+      [item.id]: toggleOptionSelection(current[item.id] ?? [], group, choiceName),
+    }));
+    setOptionError((current) => ({ ...current, [item.id]: null }));
+  }
+  function confirmCustomizing(item: MenuItem, picks: OptionSelection[]) {
+    const problem = validateOptionSelections(item, picks);
+    if (problem) {
+      setOptionError((current) => ({ ...current, [item.id]: problem }));
+      return;
+    }
+    onAdd(item, picks);
+    bumpFlash(item.id);
+    // A confirmed add starts blank next time: the cart holds the record, so
+    // the row and the sheet never echo the last configuration.
+    setOptionChoice((current) => {
+      if (!(item.id in current)) return current;
+      const next = { ...current };
+      delete next[item.id];
+      return next;
+    });
+    setOptionError((current) => ({ ...current, [item.id]: null }));
+    setCustomizingId(null);
+  }
+  const customizing =
+    customizingId === null
+      ? null
+      : (category.items.find((candidate) => candidate.id === customizingId) ?? null);
+  const customizingVariantName = customizing
+    ? (variantChoice[customizing.id] ?? customizing.variants[0]?.name ?? null)
+    : null;
+  const customizingPrice = customizing
+    ? (customizing.variants.find((candidate) => candidate.name === customizingVariantName)?.price ??
+      customizing.price)
+    : null;
   function bumpFlash(itemId: string) {
     // Drop the visible pop first so the replay starts from a clean mount.
     hideFlash(itemId);
@@ -174,9 +226,14 @@ export function OrderMenuSection({
           const price = variant ? variant.price : item.price;
           const picks = optionChoice[item.id] ?? [];
           const livePrice = priceWithOptions(price, item, picks);
-          const inCart = itemCount?.(item, variantName, picks) ?? 0;
+          // The button always starts a NEW add at the shown price — it never
+          // reports cart contents. Counts live in the cart (sticky bar, side
+          // panel, sheet) alone, so reopening a row or the sheet cannot read
+          // as a lost order, and plain and customizable dishes label alike.
+          // Unpriced keeps the bare label: nothing is invented.
+          const addLabel =
+            livePrice === null ? "Add" : `Add · ${formatPreviewPrice(livePrice, null, currency)}`;
           const tick = flash[item.id] ?? 0;
-          const pickError = optionError[item.id] ?? null;
           return (
             <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-3">
@@ -195,6 +252,7 @@ export function OrderMenuSection({
                   {item.description && (
                     <ClampedDescription text={item.description} name={item.name} />
                   )}
+                  {item.options.length > 0 && <CustomizableHint item={item} />}
                   {dietaryLabels.length > 0 && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {dietaryLabels.map((label) => (
@@ -212,28 +270,6 @@ export function OrderMenuSection({
                   {formatPreviewPrice(livePrice, null, currency)}
                 </p>
               </div>
-
-              {item.options.length > 0 && (
-                <OptionGroupFields
-                  item={item}
-                  currency={currency}
-                  selections={picks}
-                  onToggle={(groupName, choiceName) => {
-                    const group = item.options.find((candidate) => candidate.name === groupName);
-                    if (!group) return;
-                    setOptionChoice((current) => ({
-                      ...current,
-                      [item.id]: toggleOptionSelection(current[item.id] ?? [], group, choiceName),
-                    }));
-                    setOptionError((current) => ({ ...current, [item.id]: null }));
-                  }}
-                />
-              )}
-              {pickError && (
-                <p role="alert" className="mt-1 text-xs text-danger-800">
-                  {pickError}
-                </p>
-              )}
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {item.variants.length > 0 && (
@@ -269,18 +305,19 @@ export function OrderMenuSection({
                     type="button"
                     disabled={soldOut}
                     onClick={() => {
-                      const problem =
-                        item.options.length > 0 ? validateOptionSelections(item, picks) : null;
-                      if (problem) {
-                        setOptionError((current) => ({ ...current, [item.id]: problem }));
+                      // Plain dishes add straight from the row. Customizable
+                      // ones open the sheet: the picking and the Add-gate live
+                      // there now, not in the menu list.
+                      if (item.options.length === 0) {
+                        onAdd(item, picks);
+                        bumpFlash(item.id);
                         return;
                       }
-                      onAdd(item, picks);
-                      bumpFlash(item.id);
+                      setCustomizingId(item.id);
                     }}
                     className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {inCart > 0 ? `Add · ${inCart}` : "Add"}
+                    {addLabel}
                   </button>
                 </span>
               </div>
@@ -288,6 +325,19 @@ export function OrderMenuSection({
           );
         })}
       </ul>
+      {customizing && (
+        <CustomizeSheet
+          item={customizing}
+          variantName={customizingVariantName}
+          basePrice={customizingPrice}
+          currency={currency}
+          picks={optionChoice[customizing.id] ?? []}
+          error={optionError[customizing.id] ?? null}
+          onToggle={(groupName, choiceName) => togglePick(customizing, groupName, choiceName)}
+          onConfirm={() => confirmCustomizing(customizing, optionChoice[customizing.id] ?? [])}
+          onClose={() => setCustomizingId(null)}
+        />
+      )}
     </section>
   );
 }
