@@ -82,6 +82,7 @@ export function createMenuDocument(input?: {
     title: input?.title?.trim() ? input.title.trim() : "Untitled menu",
     currency: input?.currency ?? null,
     categories: [],
+    modifierTemplates: [],
     updatedAt: nowIso(),
   };
 }
