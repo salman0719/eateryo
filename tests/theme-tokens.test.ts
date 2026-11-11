@@ -1,10 +1,12 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 import { emailIconUrl, emailLogoMark } from "@/lib/email-layout";
+import { ICON_REVISION } from "@/lib/theme/theme-tokens";
 import { themeColor } from "@/lib/theme/tokens";
 
 /**
@@ -17,6 +19,8 @@ import { themeColor } from "@/lib/theme/tokens";
  */
 const script = fileURLToPath(new URL("../scripts/build-theme-tokens.mjs", import.meta.url));
 const emailLayout = readFileSync(new URL("../src/lib/email-layout.ts", import.meta.url), "utf8");
+const iconFile = readFileSync(new URL("../src/app/icon.svg", import.meta.url), "utf8");
+const iconDigest = () => createHash("sha256").update(iconFile, "utf8").digest("hex").slice(0, 8);
 
 describe("generated theme tokens", () => {
   it("match theme.css and the icon on disk", () => {
@@ -46,17 +50,17 @@ describe("generated theme tokens", () => {
     const html = emailLogoMark("https://eateryo.test/api/auth/verify?token=abc");
     expect(html).not.toContain("<svg");
     expect(html).toContain('alt="Eateryo"');
-    expect(html).toContain('src="https://eateryo.test/icon.svg?v=');
+    expect(html).toContain(`src="https://eateryo.test/icon.svg?v=${ICON_REVISION}"`);
     expect(html).toContain('width="48"');
 
     // Only the origin survives: an email link cannot be relative, and the
     // action URL's own host is the one the recipient is about to visit.
-    expect(emailIconUrl("https://eateryo.test/invitations/token-1")).toMatch(
-      /^https:\/\/eateryo\.test\/icon\.svg\?v=[0-9a-f]{8}$/
+    expect(emailIconUrl("https://eateryo.test/invitations/token-1")).toBe(
+      `https://eateryo.test/icon.svg?v=${ICON_REVISION}`
     );
-    // The revision is a cache key for the palette: same theme, same URL.
-    expect(emailIconUrl("https://a.test/x").split("icon.svg")[1]).toBe(
-      emailIconUrl("https://b.test/y").split("icon.svg")[1]
-    );
+
+    // The key is a digest of the icon actually served, so redrawing the glyph
+    // busts it too — not only a palette change.
+    expect(ICON_REVISION).toBe(iconDigest());
   });
 });

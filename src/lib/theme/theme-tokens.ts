@@ -100,3 +100,10 @@ export const THEME_TOKENS = {
   "warning-900": "#69400b",
   "warning-950": "#3d2104",
 } as const;
+
+/**
+ * SHA-256 of the generated `src/app/icon.svg`, first eight characters. It
+ * travels in the icon's URL inside emails: a redraw or a recolour changes these
+ * bytes, so a mail proxy fetches the new tile instead of its cached raster.
+ */
+export const ICON_REVISION = "c5effd68";

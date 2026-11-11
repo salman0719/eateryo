@@ -10,7 +10,8 @@
  *
  * This script resolves the `@theme` tokens to sRGB and writes:
  *
- * - `src/lib/theme/theme-tokens.ts` — the values as a typed module
+ * - `src/lib/theme/theme-tokens.ts` — the values as a typed module, plus a
+ *   digest of the icon it wrote (the cache key emails append to its URL)
  * - `src/app/icon.svg` — the tile, drawn with `accent-700` + `on-accent`
  *
  * Both outputs are committed files, written only when this script is run by
@@ -19,6 +20,7 @@
  * suite) fails when they are stale, so a forgotten run cannot ship an icon or
  * an email in the previous palette.
  */
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -110,7 +112,7 @@ export function buildThemeTokens(css) {
   return Object.fromEntries(Object.entries(tokens).sort(([a], [b]) => a.localeCompare(b)));
 }
 
-export function renderTokensModule(tokens) {
+export function renderTokensModule(tokens, iconDigest) {
   // Prettier unquotes identifier keys (`quoteProps: as-needed`), so emit them
   // the same way: the generated file must already be what `format:check` wants.
   const key = (name) => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : `"${name}"`);
@@ -127,6 +129,13 @@ export function renderTokensModule(tokens) {
 export const THEME_TOKENS = {
 ${entries}
 } as const;
+
+/**
+ * SHA-256 of the generated \`src/app/icon.svg\`, first eight characters. It
+ * travels in the icon's URL inside emails: a redraw or a recolour changes these
+ * bytes, so a mail proxy fetches the new tile instead of its cached raster.
+ */
+export const ICON_REVISION = "${iconDigest}";
 `;
 }
 
@@ -154,13 +163,23 @@ export function renderIconSvg(tokens) {
 `;
 }
 
+/**
+ * Cache key for the icon, taken from the file itself. A redraw, a different
+ * corner radius or a recolour all change these bytes, so the URL the emails
+ * carry changes with them; eight hex characters is plenty for that.
+ */
+export function iconRevision(svg) {
+  return createHash("sha256").update(svg, "utf8").digest("hex").slice(0, 8);
+}
+
 /** What both files should contain right now. Pure: nothing is written. */
 export function buildOutputs(css = readThemeCss()) {
   const tokens = buildThemeTokens(css);
+  const icon = renderIconSvg(tokens);
   return {
     tokens,
-    [TOKENS_FILE]: renderTokensModule(tokens),
-    [ICON_FILE]: renderIconSvg(tokens),
+    [TOKENS_FILE]: renderTokensModule(tokens, iconRevision(icon)),
+    [ICON_FILE]: icon,
   };
 }
 
