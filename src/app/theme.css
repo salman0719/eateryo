@@ -20,25 +20,25 @@
  * colour.
  */
 @theme {
-  /* Accent: brand actions, primary buttons, links, focus rings. Rust, not
-     amber: the ramp runs from a warm paper wash to a brick `-700` fill, ~30° of
-     hue away from the caution yellow, so "click this" and "read this warning"
-     are never the same family. It carries white text at `-700` (5.03) and `-800`
-     (8.02), `-900` on the `-50` wash (8.73), and its fill clears the 3:1 a focus
-     ring needs on every surface. Still separate from danger: that stays a pure
-     red at ~27°, where this is a brown-red at ~38°, and the destructive colour
-     only ever appears on destruction. */
-  --color-accent-50: oklch(98% 0.016 73.684);
-  --color-accent-100: oklch(95.4% 0.038 75.164);
-  --color-accent-200: oklch(90.1% 0.076 70.697);
-  --color-accent-300: oklch(83.7% 0.128 66.29);
-  --color-accent-400: oklch(75% 0.183 55.934);
-  --color-accent-500: oklch(70.5% 0.213 47.604);
-  --color-accent-600: oklch(64.6% 0.222 41.116);
-  --color-accent-700: oklch(55.3% 0.195 38.402);
-  --color-accent-800: oklch(47% 0.157 37.304);
-  --color-accent-900: oklch(40.8% 0.123 38.172);
-  --color-accent-950: oklch(26.6% 0.079 36.259);
+  /* Accent: brand actions, primary buttons, links, focus rings. Eucalyptus —
+     the ramp climbs from a pale wash to a deep spruce `-700` fill at hue 169°,
+     well apart from the caution ramp and ~142° from danger at ~27°, so "click
+     this", "read this warning" and "something broke" are three different
+     families. It carries white text at `-700` (4.86) and `-800` (7.53), `-900`
+     on the `-50` wash (11.04), and its fill clears the 3:1 a focus ring needs
+     (4.62 on a card, 4.45 on the page paper). Danger stays a pure red and only
+     ever appears on destruction. */
+  --color-accent-50: #f7fbf9;
+  --color-accent-100: #dfe8e4;
+  --color-accent-200: #c4d5ce;
+  --color-accent-300: #a7c4b8;
+  --color-accent-400: #89b3a3;
+  --color-accent-500: #70a18f;
+  --color-accent-600: #5c8e7c;
+  --color-accent-700: #4f7a6a;
+  --color-accent-800: #3a5b4f;
+  --color-accent-900: #263e35;
+  --color-accent-950: #15231d;
 
   /* Warning: caution, conflict, paused, draft and review states. Its own hue —
      a yellow, where the accent runs from amber to rust — so a caution surface
@@ -76,7 +76,15 @@
   --color-danger-900: oklch(39.6% 0.141 25.723);
   --color-danger-950: oklch(25.8% 0.092 26.042);
 
-  /* Success: live, published, confirmed. */
+  /* Success: live, published, confirmed — a signal, never a surface. The accent
+     is a green too, so a success *fill* beside an accent fill reads as a rival
+     primary action (ΔE 0.115), and this cannot be fixed inside the hue family:
+     moving the accent from 169° to 186° takes that only to 0.117, because OKLab
+     distance here is chroma, not hue. So `success` appears as a dot, a 3px rule or
+     inline text (`-700`/`-800`), and a status chip is `surface-100` with `ink-900`
+     words and a 6px dot of this ramp (`ui/status-chip.tsx`). The ramp stays
+     because a dot and a glyph still need a vivid tone; a fill or a wash is the
+     accent's job. */
   --color-success-50: oklch(97.9% 0.021 166.113);
   --color-success-100: oklch(95% 0.052 163.051);
   --color-success-200: oklch(90.5% 0.093 164.15);
@@ -111,17 +119,17 @@
      At 2.59 it used to paint 10-11px captions, placeholders and timestamps:
      the one stop that sat under the 4.5 text floor. `-300` and lighter are the
      inverse fill's tones (12.2 on `surface-900`), where the ladder turns over. */
-  --color-ink-50: oklch(98.5% 0.001 106.423);
-  --color-ink-100: oklch(97% 0.001 106.424);
-  --color-ink-200: oklch(92.3% 0.003 48.717);
-  --color-ink-300: oklch(86.9% 0.005 56.366);
-  --color-ink-400: oklch(63% 0.012 57);
-  --color-ink-500: oklch(55.3% 0.013 58.071);
-  --color-ink-600: oklch(44.4% 0.011 73.639);
-  --color-ink-700: oklch(37.4% 0.01 67.558);
-  --color-ink-800: oklch(26.8% 0.007 34.298);
-  --color-ink-900: oklch(21.6% 0.006 56.043);
-  --color-ink-950: oklch(14.7% 0.004 49.25);
+  --color-ink-50: #f9fafa;
+  --color-ink-100: #d9dad9;
+  --color-ink-200: #b8bbba;
+  --color-ink-300: #989d9b;
+  --color-ink-400: #75827d;
+  --color-ink-500: #586661;
+  --color-ink-600: #3f4a46;
+  --color-ink-700: #353f3c;
+  --color-ink-800: #2e3432;
+  --color-ink-900: #252a28;
+  --color-ink-950: #1d201f;
 
   /* Surface: fills — the page, cards, insets, chips, and the inverse bar. Its
      own ramp, tuned apart from ink: a fill only has to be told apart from the
@@ -133,17 +141,17 @@
      stock the sheet scrims are mixed from. `-50` stays pale on purpose: ink-500
      sits on it in the sidebar hover row and a disabled field, so deeper paper
      would spend their 4.5:1. */
-  --color-surface-50: oklch(98.2% 0.005 76);
-  --color-surface-100: oklch(95.2% 0.008 74);
-  --color-surface-200: oklch(91.5% 0.01 71);
-  --color-surface-300: oklch(86.5% 0.012 68);
-  --color-surface-400: oklch(70.8% 0.01 66);
-  --color-surface-500: oklch(55.2% 0.01 64);
-  --color-surface-600: oklch(44% 0.008 62);
-  --color-surface-700: oklch(36% 0.006 60);
-  --color-surface-800: oklch(27% 0.005 58);
-  --color-surface-900: oklch(20% 0.004 56);
-  --color-surface-950: oklch(13% 0.003 55);
+  --color-surface-50: #f7faf9;
+  --color-surface-100: #ebf0ee;
+  --color-surface-200: #dee5e2;
+  --color-surface-300: #cdd5d2;
+  --color-surface-400: #9ca2a0;
+  --color-surface-500: #6e7471;
+  --color-surface-600: #4f5452;
+  --color-surface-700: #3b3e3d;
+  --color-surface-800: #252726;
+  --color-surface-900: #151616;
+  --color-surface-950: #070807;
 
   /* Line: borders, dividers, rings, outlines — its own ramp, not a copy of the
      neutrals, because a border answers to a different rule than text. `line-200`
@@ -154,17 +162,17 @@
      phone bezel). A container never uses 300: at that weight a dashed empty-state
      box reads as something to press. The one exception is the printed QR card,
      which keeps 300 for its cut line on paper. */
-  --color-line-50: oklch(98% 0.004 72);
-  --color-line-100: oklch(94.5% 0.008 70);
-  --color-line-200: oklch(89% 0.013 67);
-  --color-line-300: oklch(63% 0.02 64);
-  --color-line-400: oklch(56% 0.021 63);
-  --color-line-500: oklch(47% 0.02 61);
-  --color-line-600: oklch(38% 0.017 58);
-  --color-line-700: oklch(30% 0.014 56);
-  --color-line-800: oklch(24% 0.01 54);
-  --color-line-900: oklch(20% 0.008 52);
-  --color-line-950: oklch(13.5% 0.006 50);
+  --color-line-50: #f8fbfa;
+  --color-line-100: #d1d5d4;
+  --color-line-200: #abb1af;
+  --color-line-300: #858f8b;
+  --color-line-400: #747e7a;
+  --color-line-500: #646d69;
+  --color-line-600: #555d59;
+  --color-line-700: #464c4a;
+  --color-line-800: #383d3b;
+  --color-line-900: #2b2e2d;
+  --color-line-950: #1d201f;
 
   /* Single-value roles: the card base, text on a filled control, and the
      overlay behind a sheet. */
@@ -173,7 +181,7 @@
   --color-scrim: oklch(0% 0 0 / 0.35);
 
   /* Page chrome. */
-  --color-background: #faf8f5;
+  --color-background: #f2f6f4;
   --color-foreground: #1c1917;
   --color-selection: #fcd9a8;
 
