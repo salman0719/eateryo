@@ -222,7 +222,7 @@ export function AppSidebar({
               title={section.label}
               className={`${itemBase} min-h-[40px] px-2.5 py-1.5 ${
                 active
-                  ? "bg-accent-50 text-accent-900"
+                  ? "bg-accent-100 font-semibold text-accent-900"
                   : "text-ink-600 hover:bg-surface-50 hover:text-ink-900"
               }`}
             >
