@@ -184,10 +184,14 @@
   --color-on-accent: oklch(100% 0 0);
   --color-scrim: oklch(0% 0 0 / 0.35);
 
-  /* Page chrome. */
+  /* Page chrome. Body text is `ink-900` itself, so a paragraph and a
+     `text-ink-900` heading are the same black rather than two neighbours, one
+     warm and one cool. Selection is a mid accent wash: it has to be seen over
+     a card and over the page paper (1.53 on white, 1.72 on the paper) while the
+     words inside it keep their contrast (9.55 for `ink-900`). */
   --color-background: #f2f6f4;
-  --color-foreground: #1c1917;
-  --color-selection: #fcd9a8;
+  --color-foreground: #252a28;
+  --color-selection: #c4d5ce;
 
   /* Type. The family is loaded in `src/app/layout.tsx` via next/font; to swap
      the typeface change that import only — these variable names stay put. */

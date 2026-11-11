@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "./theme.css";
 
-/* Light-only theme: every component hardcodes the warm light palette, so the
+/* Light-only theme: every component hardcodes the light palette, so the
    page must not flip to dark when the OS prefers dark — that produced
    near-black headings on a black body. Revisit if a real dark theme lands.
    Colours and font families live in `theme.css`. */
