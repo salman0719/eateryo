@@ -64,6 +64,8 @@ a one-off investigation.
 
 - `npm run lint`
 - `npm run format:check` (Prettier, no writes; fix with `npm run format`)
+- `npm run theme:check` (cheap: fails if the generated icon or token module is
+  stale; regenerate with `npm run theme:tokens` when `theme.css` changes)
 - `npm run typecheck`
 - `npm run test`
 - `npm run build`
@@ -156,6 +158,15 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.
+- `scripts/build-theme-tokens.mjs`, `src/lib/theme/tokens.ts` — the two
+  surfaces that cannot read a CSS variable, the app icon and the HTML emails,
+  take their colours from the theme: the script resolves `theme.css` into
+  `src/lib/theme/theme-tokens.ts` and `src/app/icon.svg`. Both are committed
+  files, written only when the script is run: a colour change runs
+  `npm run theme:tokens` deliberately and commits the two with the theme.
+  `npm run theme:check` (in the gate list) fails when they are stale. Never
+  hand-edit them; `tests/theme-tokens.test.ts` catches that, and fails if a hex
+  literal returns to `src/lib/email-layout.ts`.
 - `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
   the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
   shared by capture and the publish wizard. Signing in is a gate inside

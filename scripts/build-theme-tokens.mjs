@@ -1,0 +1,200 @@
+#!/usr/bin/env node
+/**
+ * One source of truth for the brand, outside CSS.
+ *
+ * `src/app/theme.css` owns every colour. Two surfaces cannot read a CSS
+ * variable: the app icon is an SVG file, and email clients strip variables
+ * from HTML. Both used to repeat palette literals by hand, which is how the
+ * favicon and the mail still carried the rust-era amber after the app moved to
+ * eucalyptus.
+ *
+ * This script resolves the `@theme` tokens to sRGB and writes:
+ *
+ * - `src/lib/theme/theme-tokens.ts` — the values as a typed module
+ * - `src/app/icon.svg` — the tile, drawn with `accent-700` + `on-accent`
+ *
+ * Both outputs are committed files, written only when this script is run by
+ * hand: a colour change runs `npm run theme:tokens` and commits the two with
+ * the theme. `npm run theme:check` (`--check`, in the gate set and in the test
+ * suite) fails when they are stale, so a forgotten run cannot ship an icon or
+ * an email in the previous palette.
+ */
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+export const THEME_CSS = path.join(ROOT, "src/app/theme.css");
+export const TOKENS_FILE = path.join(ROOT, "src/lib/theme/theme-tokens.ts");
+export const ICON_FILE = path.join(ROOT, "src/app/icon.svg");
+
+export function readThemeCss() {
+  return readFileSync(THEME_CSS, "utf8");
+}
+
+/** The body of the first at-rule whose prelude starts with `head`. */
+function atRuleBody(source, head) {
+  const at = source.indexOf(head);
+  if (at < 0) throw new Error(`build-theme-tokens: no ${head} rule in theme.css`);
+  const open = source.indexOf("{", at);
+  let depth = 0;
+  for (let i = open; i < source.length; i += 1) {
+    if (source[i] === "{") depth += 1;
+    else if (source[i] === "}") {
+      depth -= 1;
+      if (depth === 0) return source.slice(open + 1, i);
+    }
+  }
+  throw new Error("build-theme-tokens: unbalanced braces in theme.css");
+}
+
+const clamp01 = (value) => Math.min(1, Math.max(0, value));
+
+function channel(value) {
+  const encoded = value <= 0.0031308 ? 12.92 * value : 1.055 * value ** (1 / 2.4) - 0.055;
+  return Math.round(clamp01(encoded) * 255);
+}
+
+/**
+ * OKLCH → sRGB. Same matrices as the CSS spec; the theme defines most ramps in
+ * OKLCH, and satori/email clients only understand hex.
+ */
+function oklchToRgb(lightness, chroma, hue) {
+  const radians = (hue * Math.PI) / 180;
+  const a = chroma * Math.cos(radians);
+  const b = chroma * Math.sin(radians);
+
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+
+  return [
+    channel(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    channel(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    channel(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
+  ];
+}
+
+const hex2 = (value) => value.toString(16).padStart(2, "0");
+
+/** A token value as CSS an email client can render: `#rrggbb` or `rgba(…)`. */
+function toCss(value, name) {
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value);
+  if (hex) {
+    const digits = hex[1].length === 3 ? hex[1].replace(/./g, (d) => d + d) : hex[1];
+    return `#${digits.toLowerCase()}`;
+  }
+
+  const oklch = /^oklch\(\s*([\d.]+)(%?)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+)(%?))?\s*\)$/.exec(
+    value
+  );
+  if (!oklch) throw new Error(`build-theme-tokens: cannot resolve --color-${name}: ${value}`);
+
+  const lightness = oklch[2] === "%" ? Number(oklch[1]) / 100 : Number(oklch[1]);
+  const [r, g, b] = oklchToRgb(lightness, Number(oklch[3]), Number(oklch[4]));
+  const alpha = oklch[5] === undefined ? null : Number(oklch[5]) / (oklch[6] === "%" ? 100 : 1);
+
+  return alpha === null || alpha === 1
+    ? `#${hex2(r)}${hex2(g)}${hex2(b)}`
+    : `rgba(${r}, ${g}, ${b}, ${Number(alpha.toFixed(3))})`;
+}
+
+/** Every `--color-*` in the `@theme` block, resolved and sorted. */
+export function buildThemeTokens(css) {
+  const tokens = {};
+  for (const match of atRuleBody(css, "@theme").matchAll(/--color-([a-z0-9-]+):\s*([^;]+);/g)) {
+    tokens[match[1]] = toCss(match[2].trim(), match[1]);
+  }
+  const count = Object.keys(tokens).length;
+  if (count < 20) throw new Error(`build-theme-tokens: only resolved ${count} tokens`);
+  return Object.fromEntries(Object.entries(tokens).sort(([a], [b]) => a.localeCompare(b)));
+}
+
+export function renderTokensModule(tokens) {
+  // Prettier unquotes identifier keys (`quoteProps: as-needed`), so emit them
+  // the same way: the generated file must already be what `format:check` wants.
+  const key = (name) => (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : `"${name}"`);
+  const entries = Object.entries(tokens)
+    .map(([name, value]) => `  ${key(name)}: "${value}",`)
+    .join("\n");
+
+  return `/**
+ * Generated by \`scripts/build-theme-tokens.mjs\` from \`src/app/theme.css\`.
+ * Do not edit by hand: run \`npm run theme:tokens\` when the theme changes and
+ * commit the result with it. These are the same role tokens the app renders,
+ * resolved to values an SVG file or an email client can read.
+ */
+export const THEME_TOKENS = {
+${entries}
+} as const;
+`;
+}
+
+export function renderIconSvg(tokens) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Eateryo">
+  <!-- Generated by scripts/build-theme-tokens.mjs from src/app/theme.css. -->
+  <rect width="64" height="64" rx="14" fill="${tokens["accent-700"]}" />
+  <rect x="21" y="17" width="7" height="30" rx="1.5" fill="${tokens["on-accent"]}" />
+  <rect x="21" y="17" width="22" height="7" rx="1.5" fill="${tokens["on-accent"]}" />
+  <rect x="21" y="28.5" width="18" height="7" rx="1.5" fill="${tokens["on-accent"]}" />
+  <rect x="21" y="40" width="22" height="7" rx="1.5" fill="${tokens["on-accent"]}" />
+</svg>
+`;
+}
+
+/** What both files should contain right now. Pure: nothing is written. */
+export function buildOutputs(css = readThemeCss()) {
+  const tokens = buildThemeTokens(css);
+  return {
+    tokens,
+    [TOKENS_FILE]: renderTokensModule(tokens),
+    [ICON_FILE]: renderIconSvg(tokens),
+  };
+}
+
+function writeIfChanged(file, content) {
+  let current = null;
+  try {
+    current = readFileSync(file, "utf8");
+  } catch {
+    // Missing is a change.
+  }
+  if (current === content) return false;
+  writeFileSync(file, content, "utf8");
+  return true;
+}
+
+function main() {
+  const { tokens, ...files } = buildOutputs();
+  const stale = Object.entries(files).filter(([file, content]) => {
+    try {
+      return readFileSync(file, "utf8") !== content;
+    } catch {
+      return true;
+    }
+  });
+
+  if (process.argv.includes("--check")) {
+    if (stale.length === 0) {
+      console.log(`theme tokens: ${Object.keys(tokens).length} roles, current`);
+      return;
+    }
+    console.error(
+      `theme tokens: stale - run \`npm run theme:tokens\`: ${stale
+        .map(([file]) => path.relative(ROOT, file))
+        .join(", ")}`
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const changed = Object.entries(files).filter(([file, content]) => writeIfChanged(file, content));
+  const summary = changed.map(([file]) => path.relative(ROOT, file)).join(", ");
+  console.log(
+    changed.length === 0
+      ? `theme tokens: ${Object.keys(tokens).length} roles, already current`
+      : `theme tokens: ${Object.keys(tokens).length} roles, updated ${summary}`
+  );
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main();
