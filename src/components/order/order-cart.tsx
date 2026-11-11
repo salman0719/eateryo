@@ -104,8 +104,8 @@ export function OrderCartLines({
                         {line.variantName}
                       </span>
                     )}
-                    <OrderLineOptions options={line.options} currency={currency} />
                   </span>
+                  <OrderLineOptions options={line.options} currency={currency} />
                   {showMenuBadges && line.menuTitle && (
                     <span className="mt-0.5 inline-block rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                       {line.menuTitle.trim() || "Menu"}
