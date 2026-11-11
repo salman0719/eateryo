@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { MenuOption } from "@/features/menu/schema";
 
 import { CommitInput, CommitNumber } from "./fields";
@@ -15,6 +17,8 @@ interface OptionGroupFormProps {
   onRemove: () => void;
   /** Accessible label for the remove button, naming the group. */
   removeLabel: string;
+  /** Optional row under the choices (e.g. the dish form's save-as-template). */
+  footer?: ReactNode;
 }
 
 /**
@@ -22,7 +26,13 @@ interface OptionGroupFormProps {
  * reusable-modifiers panel so the two can never drift: a template edits
  * exactly what a dish's copy edits.
  */
-export function OptionGroupForm({ group, onChange, onRemove, removeLabel }: OptionGroupFormProps) {
+export function OptionGroupForm({
+  group,
+  onChange,
+  onRemove,
+  removeLabel,
+  footer,
+}: OptionGroupFormProps) {
   return (
     <li className="rounded-lg border border-line-200 bg-surface-base p-2.5">
       <div className="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -134,6 +144,7 @@ export function OptionGroupForm({ group, onChange, onRemove, removeLabel }: Opti
       >
         + Add choice
       </button>
+      {footer}
     </li>
   );
 }
