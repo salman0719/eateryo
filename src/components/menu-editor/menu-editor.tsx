@@ -62,6 +62,7 @@ import { PhoneFrame } from "@/components/ui/phone-frame";
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
 import { ItemEditor, type ItemActions } from "./item-editor";
+import { ModifiersPanel } from "./modifiers-panel";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
 export interface SaveState {
@@ -973,6 +974,7 @@ export function MenuEditor({
           </ul>
         </section>
       )}
+      <ModifiersPanel doc={doc} canManage={canManage} onChange={onChange} />
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
         <label htmlFor="menu-search" className="sr-only">
           Search the menu
