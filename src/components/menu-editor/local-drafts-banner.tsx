@@ -69,7 +69,7 @@ export function LocalDraftsOffer({
                 <select
                   value={target?.id ?? ""}
                   onChange={(event) => setTargetId(event.target.value)}
-                  className="rounded-lg border border-warning-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  className="rounded-lg border border-warning-600 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   {restaurants.map((restaurant) => (
                     <option key={restaurant.id} value={restaurant.id}>
