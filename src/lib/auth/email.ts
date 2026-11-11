@@ -132,12 +132,12 @@ export function buildInvitationEmail({
     `<tr><td style="padding:12px 32px 0;font-family:Arial,sans-serif">` +
     `<h1 style="margin:0 0 8px;font-size:22px;line-height:1.25;color:${EMAIL_COLORS.INK}">You\u2019re invited</h1>` +
     `<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:${EMAIL_COLORS.BODY_TEXT}"><strong>${escapeEmailHtml(inviterName)}</strong> invited you to join <strong>${escapeEmailHtml(restaurantName)}</strong> on Eateryo as <strong>${escapeEmailHtml(roleLabel)}</strong>.</p>` +
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fafaf9;border:1px solid ${EMAIL_COLORS.CARD_BORDER};border-radius:12px">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${EMAIL_COLORS.SURFACE_SOFT};border:1px solid ${EMAIL_COLORS.CARD_BORDER};border-radius:12px">` +
     `<tr><td style="padding:14px 16px;font-family:Arial,sans-serif">` +
     `<p style="margin:0;font-size:15px;font-weight:bold;color:${EMAIL_COLORS.INK}">${escapeEmailHtml(restaurantName)}</p>` +
     `<p style="margin:4px 0 0;font-size:12px;color:${EMAIL_COLORS.MUTED}">Invited by ${escapeEmailHtml(inviterName)} &middot; for ${escapeEmailHtml(email)}</p>` +
     `</td><td align="right" style="padding:14px 16px;font-family:Arial,sans-serif">` +
-    `<span style="display:inline-block;font-size:12px;font-weight:bold;color:${EMAIL_COLORS.AMBER_DARK};background:${EMAIL_COLORS.AMBER_BG};border:1px solid ${EMAIL_COLORS.AMBER_BORDER};border-radius:999px;padding:4px 12px">${roleBadge}</span>` +
+    `<span style="display:inline-block;font-size:12px;font-weight:bold;color:${EMAIL_COLORS.BRAND_DARK};background:${EMAIL_COLORS.BRAND_BG};border:1px solid ${EMAIL_COLORS.BRAND_BORDER};border-radius:999px;padding:4px 12px">${roleBadge}</span>` +
     `</td></tr></table>` +
     `</td></tr>` +
     `<tr><td align="center" style="padding:22px 32px 4px">` +

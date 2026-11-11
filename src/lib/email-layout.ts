@@ -1,10 +1,17 @@
 /**
  * Shared branded layout for Eateryo emails (server-only).
  *
- * All bodies use table layout + inline styles (email-client safe),
- * system fonts only, max ~520px. Logo is the "E" in a rounded amber
- * square (#b45309), matching site-header.tsx + icon.svg.
+ * All bodies use table layout + inline styles (email-client safe), system fonts
+ * only, max ~520px. The "E" mark is the brand tile: `accent-700` with
+ * `on-accent` on it.
+ *
+ * Email clients do not resolve CSS variables, so every colour is resolved from
+ * the theme instead of typed here: `themeColor` reads the values
+ * `scripts/build-theme-tokens.mjs` generates from `src/app/theme.css`. A theme
+ * change therefore reaches the mailbox, and this file holds no palette of its
+ * own — `tests/theme-tokens.test.ts` fails if a hex literal creeps back in.
  */
+import { themeColor } from "@/lib/theme/tokens";
 
 /** Escape user-controlled text interpolated into email HTML. */
 export function escapeEmailHtml(value: string): string {
@@ -15,23 +22,22 @@ export function escapeEmailHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/* Email clients do not resolve our CSS variables, so these literals repeat the
-   role values on purpose: ink, surface, line, accent and warning. Keep them in
-   sync with `theme.css` by hand when a role value changes. */
-const OUTER_BG = "#f5f4f2";
-const CARD_BG = "#ffffff";
-const CARD_BORDER = "#e7e5e4";
-const INK = "#1c1917";
-const BODY_TEXT = "#44403c";
-const MUTED = "#78716c";
-const FAINT = "#a8a29e";
-const AMBER = "#b45309";
-const AMBER_BG = "#fef3c7";
-const AMBER_BORDER = "#fde68a";
-const AMBER_DARK = "#92400e";
+const OUTER_BG = themeColor("background");
+const CARD_BG = themeColor("surface-base");
+const CARD_BORDER = themeColor("line-200");
+const INK = themeColor("ink-900");
+const BODY_TEXT = themeColor("ink-700");
+const MUTED = themeColor("ink-600");
+const FAINT = themeColor("ink-500");
+const BRAND = themeColor("accent-700");
+const BRAND_BG = themeColor("accent-50");
+const BRAND_BORDER = themeColor("accent-200");
+const BRAND_DARK = themeColor("accent-900");
+const ON_BRAND = themeColor("on-accent");
+const SURFACE_SOFT = themeColor("surface-50");
 
 /** Centered "E" mark used in every email header. */
-export function emailLogoMark(accent: string = AMBER, markColor = "#ffffff"): string {
+export function emailLogoMark(accent: string = BRAND, markColor: string = ON_BRAND): string {
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
     `<td align="center" style="width:48px;height:48px;background:${accent};border-radius:12px;` +
@@ -80,16 +86,16 @@ export function emailPage(options: {
   );
 }
 
-/** Primary amber call-to-action button (with Outlook VML fallback). */
+/** Primary brand call-to-action button (with Outlook VML fallback). */
 export function emailCtaButton(label: string, url: string): string {
   const safeUrl = escapeEmailHtml(url);
   const safeLabel = escapeEmailHtml(label);
   return (
     `<!--[if mso]><v:roundrect href="${safeUrl}" style="width:240px;height:48px" ` +
-    `arcsize="25%" fillcolor="${AMBER}" stroke="f">` +
-    `<center style="color:#ffffff;font-family:Arial;font-size:16px;font-weight:bold">${safeLabel}</center>` +
+    `arcsize="25%" fillcolor="${BRAND}" stroke="f">` +
+    `<center style="color:${ON_BRAND};font-family:Arial;font-size:16px;font-weight:bold">${safeLabel}</center>` +
     `</v:roundrect><![endif]--><!--[if !mso]><!-- -->` +
-    `<a href="${safeUrl}" style="display:inline-block;background:${AMBER};color:#ffffff;` +
+    `<a href="${safeUrl}" style="display:inline-block;background:${BRAND};color:${ON_BRAND};` +
     `text-decoration:none;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;` +
     `padding:14px 40px;border-radius:12px">${safeLabel}</a><!--<![endif]-->`
   );
@@ -100,7 +106,7 @@ export function emailFallbackLink(url: string): string {
   const safeUrl = escapeEmailHtml(url);
   return (
     `<p style="margin:12px 0 0;font-size:12px;word-break:break-all">` +
-    `<a href="${safeUrl}" style="color:${AMBER};text-decoration:underline">${safeUrl}</a></p>`
+    `<a href="${safeUrl}" style="color:${BRAND};text-decoration:underline">${safeUrl}</a></p>`
   );
 }
 
@@ -109,9 +115,10 @@ export const EMAIL_COLORS = {
   BODY_TEXT,
   MUTED,
   FAINT,
-  AMBER,
-  AMBER_BG,
-  AMBER_BORDER,
-  AMBER_DARK,
+  BRAND,
+  BRAND_BG,
+  BRAND_BORDER,
+  BRAND_DARK,
   CARD_BORDER,
+  SURFACE_SOFT,
 };
