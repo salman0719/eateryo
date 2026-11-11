@@ -110,10 +110,10 @@ export function OrderAlertsCard({
               placeholder="Blank means every owner"
               autoComplete="email"
               disabled={!canManage}
-              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:bg-surface-50 disabled:text-ink-500"
+              className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:bg-surface-50 disabled:text-ink-500"
             />
           </label>
-          <p className="-mt-1 text-[11px] leading-4 text-ink-400">
+          <p className="-mt-1 text-[11px] leading-4 text-ink-500">
             Blank sends to every owner&apos;s account email — fill it to route orders to one address
             instead (the till, a manager…).
           </p>

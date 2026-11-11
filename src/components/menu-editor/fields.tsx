@@ -29,6 +29,9 @@ interface CommitInputProps {
 
 const baseInput =
   "w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
+  // The browser's own placeholder is the field's text at half opacity (3.4:1);
+  // name the faint-text tone instead so it clears 4.5:1 like every other label.
+  "placeholder:text-ink-500 " +
   // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
   "resize-none focus:border-accent-700 focus:outline-none sm:resize-y";
 
@@ -184,7 +187,8 @@ export function CommitTags({
         <ul className="mb-1.5 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
             <li key={tag}>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-success-900">
+              {/* A tag is content, not a status: neutral chip, no hue. */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink-700">
                 {tag}
                 <button
                   type="button"
@@ -195,7 +199,7 @@ export function CommitTags({
                     event.preventDefault();
                     commit(tags.filter((candidate) => candidate !== tag));
                   }}
-                  className="rounded-full px-1 leading-none text-success-900/70 hover:text-success-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-700"
+                  className="rounded-full px-1 leading-none text-ink-500 hover:text-ink-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-700"
                 >
                   ✕
                 </button>

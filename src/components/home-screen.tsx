@@ -3264,7 +3264,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   }}
                   aria-current={screen === tab.id ? "page" : undefined}
                   className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                    screen === tab.id ? "text-warning-800" : "text-ink-500"
+                    screen === tab.id ? "text-accent-700" : "text-ink-500"
                   }`}
                 >
                   {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
@@ -3281,7 +3281,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   aria-expanded={moreOpen}
                   aria-current={screenInMore ? "page" : undefined}
                   className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                    moreOpen || screenInMore ? "text-warning-800" : "text-ink-500"
+                    moreOpen || screenInMore ? "text-accent-700" : "text-ink-500"
                   }`}
                 >
                   <span aria-hidden="true" className="flex h-[22px] items-center">

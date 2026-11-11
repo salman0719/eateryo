@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusChip } from "@/components/ui/status-chip";
 import type { MenuSummary } from "@/features/menu/storage";
 import type { RestaurantOption } from "@/features/tenancy/client";
 
@@ -198,7 +199,7 @@ export function LibraryPanel({
           ))}
         </div>
       ) : menus.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">
             {emptyTitle ??
               (hasHiddenMenus
@@ -262,15 +263,9 @@ export function LibraryPanel({
                         {formatDate(menu.updatedAt)}
                       </span>
                       {accountMode && (
-                        <span
-                          className={
-                            menu.onServer
-                              ? "whitespace-nowrap rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-semibold text-success-900"
-                              : "whitespace-nowrap rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-semibold text-warning-900"
-                          }
-                        >
+                        <StatusChip size="sm" tone={menu.onServer ? "success" : "warning"}>
                           {menu.onServer ? "On your account" : "This browser only"}
-                        </span>
+                        </StatusChip>
                       )}
                       {menu.canWrite === false && (
                         <span className="whitespace-nowrap rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-700">

@@ -674,7 +674,7 @@ export function MenuEditor({
                           >
                             <span
                               aria-hidden="true"
-                              className="w-6 shrink-0 text-right text-xs text-ink-400"
+                              className="w-6 shrink-0 text-right text-xs text-ink-500"
                             >
                               {index + 1}
                             </span>
@@ -850,7 +850,7 @@ export function MenuEditor({
               <p className="mt-2 text-xs text-ink-500">
                 {sourceLabel}
                 {doc.source?.originalFileName && (
-                  <span className="text-ink-400"> · {doc.source.originalFileName}</span>
+                  <span className="text-ink-500"> · {doc.source.originalFileName}</span>
                 )}
               </p>
             ))}
@@ -986,7 +986,7 @@ export function MenuEditor({
             if (event.key === "Escape" && query) setQuery("");
           }}
           placeholder="Search items, descriptions, or categories…"
-          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-700 focus:outline-none"
+          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
         />
         {isFiltering && (
           <button type="button" onClick={() => setQuery("")} className={smallButton}>
@@ -1102,12 +1102,12 @@ export function MenuEditor({
         </div>
       )}
       {doc.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">No categories yet</p>
           <p className="mt-1 text-sm text-ink-600">Add a category below, then add items to it.</p>
         </div>
       ) : search.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
           <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
           <p className="mt-1 text-sm text-ink-600">
             {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
@@ -1209,7 +1209,7 @@ export function MenuEditor({
               <Collapse open={categoryOpen}>
                 <div id={categoryPanelId} className="p-4">
                   {items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-line-300 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
+                    <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
                       No items — add the first one below.
                     </p>
                   ) : (
@@ -1314,11 +1314,17 @@ export function MenuEditor({
       {addPages.status === "added" && (
         <p
           role="status"
-          className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-800"
+          className="flex items-start gap-2 rounded-xl border border-line-200 bg-surface-base px-4 py-3 text-sm text-ink-700"
         >
-          Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in {addPages.categories}{" "}
-          {addPages.categories === 1 ? "category" : "categories"} from the new pages. Repeats with
-          the existing menu appear in the duplicate review.
+          <span
+            aria-hidden="true"
+            className="mt-1.5 size-1.5 shrink-0 rounded-full bg-success-700"
+          />
+          <span>
+            Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in{" "}
+            {addPages.categories} {addPages.categories === 1 ? "category" : "categories"} from the
+            new pages. Repeats with the existing menu appear in the duplicate review.
+          </span>
         </p>
       )}
       {addPages.status === "error" && (

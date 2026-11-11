@@ -98,7 +98,7 @@ function ChecklistSteps({
                 "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold " +
                 (step.done
                   ? "border-accent-700 bg-accent-700 text-on-accent"
-                  : "border-line-300 bg-surface-base text-ink-400")
+                  : "border-line-300 bg-surface-base text-ink-500")
               }
             >
               {step.done ? "✓" : index + 1}
@@ -374,7 +374,11 @@ export function LaunchChecklist() {
         <ChecklistSteps steps={steps} details onToggleCards={toggleCardsPrinted} />
 
         {allDone ? (
-          <p className="mt-4 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-900">
+          <p className="mt-4 flex items-start gap-2 rounded-lg bg-surface-100 px-3 py-2 text-xs text-ink-700">
+            <span
+              aria-hidden="true"
+              className="mt-1 size-1.5 shrink-0 rounded-full bg-success-700"
+            />
             That is the whole launch. New orders appear on the Orders tab, and the public page keeps
             showing your latest published menu.
           </p>
