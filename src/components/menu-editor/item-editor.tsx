@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 
 import { Collapse } from "@/components/ui/collapse";
 import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
@@ -18,6 +18,7 @@ import { itemImageCopy } from "@/features/item-images/ref";
 import { CommitInput, CommitNumber, CommitTags } from "./fields";
 import { ItemImagePanel } from "./item-image-panel";
 import { OptionGroupForm } from "./option-group-form";
+import { addModifierTemplate } from "@/features/menu/modifier-templates";
 
 interface ItemEditorProps {
   doc: MenuDocument;
@@ -105,6 +106,13 @@ export const ItemEditor = memo(function ItemEditor({
   function patch(patch: Parameters<typeof updateItem>[3]) {
     actions.change(updateItem(doc, categoryId, item.id, patch));
   }
+
+  // Library templates not already on this dish, offered for one-tap apply.
+  const appliableTemplates = doc.modifierTemplates.filter(
+    (template) => !item.options.some((group) => group.name === template.name)
+  );
+  const [applyPick, setApplyPick] = useState("");
+  const pickedTemplate = appliableTemplates.find((template) => template.name === applyPick);
 
   return (
     <li
@@ -324,20 +332,72 @@ export const ItemEditor = memo(function ItemEditor({
                 None — add a group if the menu shows choices.
               </p>
             )}
+            {appliableTemplates.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <label className="min-w-[160px] flex-1 text-xs text-ink-600">
+                  Apply a reusable modifier
+                  <select
+                    value={applyPick}
+                    onChange={(event) => setApplyPick(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-line-300 bg-surface-base px-2 py-1.5 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                  >
+                    <option value="">Choose…</option>
+                    {appliableTemplates.map((template) => (
+                      <option key={template.name} value={template.name}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={!pickedTemplate}
+                  onClick={() => {
+                    if (!pickedTemplate) return;
+                    patch({ options: [...item.options, pickedTemplate] });
+                    setApplyPick("");
+                  }}
+                  className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
             <ul className="mt-2 space-y-3">
-              {item.options.map((option, oIndex) => (
-                <OptionGroupForm
-                  key={`${option.name}-${oIndex}`}
-                  group={option}
-                  onChange={(next) =>
-                    patch({
-                      options: item.options.map((o, i) => (i === oIndex ? next : o)),
-                    })
-                  }
-                  onRemove={() => patch({ options: item.options.filter((_, i) => i !== oIndex) })}
-                  removeLabel={`Remove option group ${option.name}`}
-                />
-              ))}
+              {item.options.map((option, oIndex) => {
+                const inLibrary = doc.modifierTemplates.some(
+                  (template) => template.name === option.name
+                );
+                return (
+                  <OptionGroupForm
+                    key={`${option.name}-${oIndex}`}
+                    group={option}
+                    onChange={(next) =>
+                      patch({
+                        options: item.options.map((o, i) => (i === oIndex ? next : o)),
+                      })
+                    }
+                    onRemove={() => patch({ options: item.options.filter((_, i) => i !== oIndex) })}
+                    removeLabel={`Remove option group ${option.name}`}
+                    footer={
+                      inLibrary ? (
+                        <p className="mt-2 text-[11px] text-ink-500">
+                          Saved in the reusable-modifiers library.
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          title="Copy this group into the library so other dishes can use it"
+                          onClick={() => actions.change(addModifierTemplate(doc, option))}
+                          className={`${smallButton} mt-2`}
+                        >
+                          Save as reusable modifier
+                        </button>
+                      )
+                    }
+                  />
+                );
+              })}
             </ul>
             <button
               type="button"
