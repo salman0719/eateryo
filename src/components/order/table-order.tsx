@@ -17,6 +17,7 @@ import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import {
   addLine,
   orderCode,
+  orderItemCountLabel,
   orderTotal,
   setLineQuantity,
   type Order,
@@ -218,7 +219,7 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
           </p>
           <p className="mt-2 text-sm text-ink-600">
-            {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
+            {orderItemCountLabel(placed.lines)} ·{" "}
             {formatTotal(placed.currency, orderTotal(placed.lines))}
           </p>
           <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
