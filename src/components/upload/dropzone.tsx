@@ -61,7 +61,7 @@ export function Dropzone({ onSelect, disabled = false }: DropzoneProps) {
         stroke="currentColor"
         strokeWidth="1.5"
         aria-hidden="true"
-        className="text-warning-800"
+        className="text-accent-700"
       >
         <path
           strokeLinecap="round"
