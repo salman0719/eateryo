@@ -83,8 +83,7 @@ export function dishesMissingTemplate(doc: MenuDocument, name: string): Template
 export function addModifierTemplate(doc: MenuDocument, input: unknown): MenuDocument {
   const parsed = menuOptionSchema.parse(input);
   const name = requireName(parsed.name);
-  if (findTemplate(doc, name))
-    throw new Error(`An add-on set named “${name}” already exists.`);
+  if (findTemplate(doc, name)) throw new Error(`An add-on set named “${name}” already exists.`);
   const next = clone(doc);
   next.modifierTemplates.push({ ...parsed, name });
   next.updatedAt = nowIso();
