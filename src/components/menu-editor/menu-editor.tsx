@@ -525,11 +525,20 @@ export function MenuEditor({
     }
   }
 
+  // The way out of edit mode is the library; the way out of preview and
+  // reorder is edit — so the leading button is "Back to edit" there, in the
+  // same spot, rather than an "All menus" that skips the workspace.
   const headerRow = (
     <div data-print-hide className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <button type="button" onClick={onBack} className={smallButton}>
-        ← All menus
-      </button>
+      {mode === "edit" ? (
+        <button type="button" onClick={onBack} className={smallButton}>
+          ← All menus
+        </button>
+      ) : (
+        <button type="button" onClick={() => changeMode("edit")} className={primaryButton}>
+          ← Back to edit
+        </button>
+      )}
       {undoLabel && (
         <button
           type="button"
@@ -580,11 +589,7 @@ export function MenuEditor({
             Preview order page
           </button>
         </>
-      ) : (
-        <button type="button" onClick={() => changeMode("edit")} className={primaryButton}>
-          ← Back to edit
-        </button>
-      )}
+      ) : null}
     </div>
   );
 
@@ -859,6 +864,7 @@ export function MenuEditor({
               {imageUrl && <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>}
               <div className="flex items-stretch gap-3">
                 {imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- source image is a local blob object URL, which the optimizer cannot handle
                   <img
                     src={imageUrl}
                     alt="Original uploaded menu"

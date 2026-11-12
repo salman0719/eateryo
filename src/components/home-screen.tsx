@@ -56,7 +56,6 @@ import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
   cacheMenu,
-  createMenu,
   deleteMenu,
   getImage,
   getMenu,
@@ -157,7 +156,12 @@ import {
   membershipFlag,
   type MenuMembership,
 } from "@/features/menus/membership";
-import { docForRoutedMenu } from "@/features/menus/routed-doc";
+import {
+  docForRoutedMenu,
+  forgetPendingNewMenu,
+  isPendingNewMenu,
+  rememberPendingNewMenu,
+} from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -659,6 +663,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       } catch {
         if (cancelled) return;
         openedRouteMenuRef.current = null;
+        // A refresh before the first change: the URL names a menu that was
+        // never saved, so there is nothing to report — back quietly.
+        if (route.screen === "editor" && menuId && isPendingNewMenu(menuId)) {
+          forgetPendingNewMenu(menuId);
+          navigateToRef.current?.({ screen: "library" }, true);
+          return;
+        }
         // A dead publish link holds its URL with an explainer card — the
         // draft is in another browser, and the library can't show that.
         if (route.screen === "editor" && route.mode === "publish") {
@@ -701,7 +712,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             clearTimeout(saveTimer.current);
             saveTimer.current = null;
           }
-          if (!storageDownRef.current) {
+          // A menu with no changes was never created: persisting it here
+          // would mint exactly the phantom the transient flow avoids.
+          if (!storageDownRef.current && JSON.stringify(openDoc) !== lastSavedRef.current) {
             void saveMenu(openDoc).catch(() => undefined);
           }
         }
@@ -791,6 +804,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // Chain onto a merge left over from the previous café instead of letting
     // the dedupe swallow this one (001).
     void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mergeAccountMenus is intentionally render-scoped: listing it would re-run this café-keyed effect every render, and the mergedCafeRef key guard already dedupes repeat runs
   }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
 
   function replaceServerIds(next: ReadonlySet<string>) {
@@ -1155,6 +1169,15 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * browser": the latter is false for every account menu (003).
    */
   function storageSaveState(id: string): SaveState {
+    // A menu that has never changed has never been saved: saying "Saved"
+    // would promise a row the library does not have.
+    if (isPendingNewMenu(id)) {
+      return {
+        kind: "saved",
+        message: "Not saved yet",
+        detail: "Your first change saves it in this browser.",
+      };
+    }
     if (serverBaseRef.current) return savedState("Saved to your account.");
     const membership = decideMenuMembership({
       signedIn: signedInRef.current,
@@ -1182,6 +1205,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
 
   /** Every editor change flows through here: update state + debounced save. */
   function handleDocChange(next: MenuDocument) {
+    // The first change retires the pending marker: whatever happens next,
+    // this menu is a real draft and resolves like one.
+    forgetPendingNewMenu(next.id);
     setActiveDoc(next);
     docRef.current = next;
     if (storageDownRef.current) {
@@ -1365,6 +1391,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           menuAccessRef.current.get(localDoc.id) === "local" ||
           (originNow != null && originNow.accountId === accountKeyRef.current);
         setMenuAccessFor(localDoc.id, localDraft ? "local" : "none");
+        // The server finding nothing is expected for a menu that was never
+        // saved — it is not news, so the status keeps saying so.
+        if (isPendingNewMenu(localDoc.id)) {
+          setSaveState({
+            kind: "saved",
+            message: "Not saved yet",
+            detail: "Your first change saves it in this browser.",
+          });
+          return;
+        }
         setSaveState(
           localDraft
             ? savedState("Saved in this browser — not in your account yet.")
@@ -1468,18 +1504,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // first, honest numbering after) and rename inline in the editor.
     const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
     const title = suggestedTitle?.trim() ? suggestedTitle.trim() : fallback;
-    const doc = storageDownRef.current
-      ? createMenuDocument({ title })
-      : await createMenu(title).catch((error: unknown) => {
-          setLibraryError(
-            error instanceof StorageError ? error.message : "Could not create a menu."
-          );
-          return null;
-        });
-    if (!doc) return;
-    const newMenuActor = signedInRef.current ? accountKeyRef.current : null;
-    if (newMenuActor) await stampDraftOrigin(doc.id, newMenuActor, "");
-    if (!storageDownRef.current) await refreshLibrary();
+    // The menu is created by its first change, not by this tap: it lives in
+    // memory until an edit persists it through the normal autosave path, so
+    // going back now leaves no row, no banner, nothing to finish. The marker
+    // tells a refresh that the URL may name an unsaved menu, so it lands
+    // back in the library quietly instead of reporting it missing.
+    const doc = createMenuDocument({ title });
+    rememberPendingNewMenu(doc.id);
     await openDoc(doc, null, true, "local");
   }
 
@@ -2705,13 +2736,27 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * The left column belongs to the account. A visitor with nothing in the
    * library gets the entry page instead of a one-row menu, and the brand row
    * takes over the name and `/sign-in` at every width.
+   *
+   * Nothing is assumed while the session or the library is still answering:
+   * `hasWorkingSet` is not a fact until IndexedDB has been read, and the
+   * session is not settled until its read answers, so the column stays off
+   * until both are known instead of flashing account chrome at a visitor.
    */
-  const showShellColumn = shellColumnVisible({
-    sessionState,
-    hasWorkingSet: libraryMenus.length > 0,
-  });
+  const showShellColumn =
+    !sessionPending &&
+    !libraryLoading &&
+    shellColumnVisible({
+      sessionState,
+      hasWorkingSet: libraryMenus.length > 0,
+    });
   /** Nav waits for the membership read: no provisional tabs, no empty bar. */
   const navReady = !sessionPending && !accountAccessPending;
+  /**
+   * Capture's first frame waits for the same two answers as the column:
+   * rendering the page before they land flashes the plain working layout
+   * at a visitor whose entry composition arrives a moment later.
+   */
+  const shellReady = !sessionPending && !libraryLoading;
   /** The More sheet owns the current screen (and so shows as pressed). */
   const screenInMore = moreRows.some((row) => row.id === screen);
   const canGetStarted = signedIn && accountCan("settings.manage");
@@ -2818,13 +2863,15 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         <div className="flex w-full flex-1">
           {showShellColumn ? (
             <AppSidebar
-              sections={sessionPending ? [] : navSections}
+              sections={navReady ? navSections : []}
               activeSection={sectionForScreen(screen)}
               sessionPending={sessionPending}
+              sectionsPending={!navReady}
               signedIn={signedIn}
               email={email}
               onNavigate={(section) => navigateTo({ screen: section })}
               onSignOut={() => void authClient.signOut()}
+              onHome={() => navigateTo({ screen: "capture" })}
               outline={sidebarOutline}
               outlineKey={sidebarOutlineKey}
               onOutlineSelect={scrollToMenuSection}
@@ -2841,6 +2888,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               signedIn={signedIn}
               sessionPending={sessionPending}
               className={showShellColumn ? "sm:hidden" : undefined}
+              onHome={() => navigateTo({ screen: "capture" })}
             />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the
@@ -2928,7 +2976,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-warning-950">
-                            📍 Finish publishing your menu →
+                            Finish publishing your menu →
                           </p>
                           <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
                             {localOnlyCount === 1
@@ -3137,7 +3185,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 </>
               )}
 
-              {screen === "capture" && (
+              {screen === "capture" && !shellReady && pages.length === 0 && result === null && (
+                <div role="status" aria-busy="true" className="flex flex-col gap-4">
+                  <span className="sr-only">Loading…</span>
+                  <Skeleton className="h-9 w-2/3 max-w-md" />
+                  <Skeleton className="h-5 w-full max-w-xl" />
+                  <Skeleton className="h-40 w-full" />
+                </div>
+              )}
+
+              {screen === "capture" && (shellReady || pages.length > 0 || result !== null) && (
                 <CapturePage
                   signedIn={signedIn}
                   sessionPending={sessionPending}

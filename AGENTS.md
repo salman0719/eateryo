@@ -134,9 +134,10 @@ errors, or add lint/type suppressions just to make checks pass.
   The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
   drops it once the session has settled as signed out with nothing in the
   library, because a column holding the single row "Capture" reads as a broken
-  menu, not as a front door. It stays while the session is unanswered — an
-  unanswered read may be an owner (015) — and for a visitor holding drafts,
-  whose My menus is a real destination. The brand wrapper inside it must stay a
+  menu, not as a front door. It stays off while the session or the library is
+  still answering — an unanswered read is neither signed in nor signed out,
+  so the shell holds a neutral placeholder instead of guessing — and for a
+  visitor holding drafts, whose My menus is a real destination. The brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
@@ -320,7 +321,13 @@ errors, or add lint/type suppressions just to make checks pass.
   noindex) with
   `src/components/order/` (`order-menu.tsx` shared UI, `order-sheet.tsx` the
   shared cart sheet, `server-table-order.tsx`, `table-order.tsx` for local
-  mode, `table-order-tabs.tsx` for the multi-menu landing); staff board
+  mode, `table-order-tabs.tsx` for the multi-menu landing and
+  `table-landing.tsx` the landing screen that owns it). The confirmation every
+  flow ends on is its own module, `order-received.tsx`: it is a different
+  screen from the ordering page (nothing may say "2 menus are open" after the
+  order is in), it never borrows that page's chrome, and it is where the
+  receipt (status, timing) will grow. Flows hand it an `Order` and their own
+  footnote; they never render the receipt's markup. Staff board
   `src/components/orders/server-orders-board.tsx` (5 s polling with backoff
   and a visible reconnect state) behind the session switch in
   `orders-board.tsx`. Tests: `tests/orders-repo.test.ts`,
