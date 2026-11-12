@@ -33,7 +33,16 @@ const memberOptionSchema = z.object({
 
 export type MemberOption = z.infer<typeof memberOptionSchema>;
 
-const listEnvelope = z.object({ restaurants: z.array(restaurantOptionSchema) });
+const listEnvelope = z.object({
+  restaurants: z.array(restaurantOptionSchema),
+  /**
+   * Whose list this is. Required: the shell may start this read before the
+   * session read names the account, and only a named answer can be filed
+   * safely. A response without it fails to parse, which sends the shell back
+   * to its account-keyed read instead of keeping an unattributable answer.
+   */
+  accountId: z.string().min(1),
+});
 const restaurantEnvelope = z.object({ restaurant: restaurantOptionSchema });
 const membersEnvelope = z.object({ members: z.array(memberOptionSchema) });
 const memberEnvelope = z.object({ member: memberOptionSchema });
@@ -178,13 +187,24 @@ async function requestJson<T>(
   }
 }
 
+/**
+ * The caller's restaurants plus the account the server answered for. The
+ * shell starts this read alongside the session read, so the answer can arrive
+ * before it knows whose account to file it under; the envelope says.
+ */
+export async function fetchRestaurantsForAccount(): Promise<{
+  accountId: string;
+  restaurants: RestaurantOption[];
+}> {
+  return requestJson("/api/restaurants", undefined, (payload) => {
+    const envelope = listEnvelope.parse(payload);
+    return { accountId: envelope.accountId, restaurants: envelope.restaurants };
+  });
+}
+
 /** The caller's restaurants (with their role), for pickers and headings. */
 export async function fetchRestaurants(): Promise<RestaurantOption[]> {
-  return requestJson(
-    "/api/restaurants",
-    undefined,
-    (payload) => listEnvelope.parse(payload).restaurants
-  );
+  return (await fetchRestaurantsForAccount()).restaurants;
 }
 
 /** Create a restaurant; the caller becomes its owner. */
