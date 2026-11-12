@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -13,7 +14,7 @@ import {
 import { decideSessionState, type SessionState } from "@/features/session/state";
 import { authClient } from "@/lib/auth-client";
 
-import { fetchRestaurants, type RestaurantOption } from "./client";
+import { fetchRestaurants, fetchRestaurantsForAccount, type RestaurantOption } from "./client";
 import type { Capability } from "./permissions";
 import {
   browserStorage,
@@ -134,8 +135,58 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // say "couldn't check", not "no café".
   const [read, setRead] = useState<RestaurantRead>({ for: null, list: null, failed: false });
   const [readAttempt, setReadAttempt] = useState(0);
+  /**
+   * The reads are serial by default — the session says which account to ask
+   * for — and that serial pair is what made the shell's capabilities arrive a
+   * round trip late, with the sidebar's rows held in place while they did.
+   *
+   * The endpoint is gated by the same cookie as the session read, so it can
+   * answer before the client knows who is asking; the envelope names the
+   * account, which is what makes an early answer safe to keep: it is filed
+   * under that account and adopted only when the session agrees. A signed-out
+   * visitor pays one wasted 401 per cold load of the shell, and the failed
+   * attempt records nothing, so the settled signed-out pass never mistakes it
+   * for "couldn't check".
+   */
+  const prefetched = useRef(false);
+  const readInFlight = useRef<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sessionState !== "unknown" || prefetched.current) return;
+    prefetched.current = true;
+    readInFlight.current = "prefetch";
+    void (async () => {
+      try {
+        const answer = await fetchRestaurantsForAccount();
+        if (!alive.current) return;
+        setRead({ for: answer.accountId, list: answer.restaurants, failed: false });
+      } catch {
+        // Nobody to attribute a failure to: the account-keyed read below owns
+        // the answer, and its failure is the one the UI is allowed to report.
+      } finally {
+        if (readInFlight.current === "prefetch") readInFlight.current = null;
+        // Whoever was waiting on this early read has to look again, whatever
+        // it settled as — including the failure that recorded nothing.
+        if (alive.current) setReadAttempt((attempt) => attempt + 1);
+      }
+    })();
+  }, [sessionState]);
+
   useEffect(() => {
     if (!signedIn || !accountKey) return;
+    if (read.for === accountKey && !read.failed) return;
+    // An early read is already on the wire and will file itself under the
+    // account the server names; asking again would be the round trip this
+    // exists to avoid.
+    if (readInFlight.current === "prefetch") return;
+    readInFlight.current = accountKey;
     let cancelled = false;
     void (async () => {
       try {
@@ -145,12 +196,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       } catch {
         if (cancelled) return;
         setRead({ for: accountKey, list: [], failed: true });
+      } finally {
+        if (!cancelled) readInFlight.current = null;
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [accountKey, readAttempt, signedIn]);
+  }, [accountKey, read, readAttempt, signedIn]);
+
+  // A settled signed-out session ends the list's life: whoever signs in next
+  // must ask again rather than see what the previous session could see. The
+  // unanswered session is not this — that read may be the one on the wire.
+  useEffect(() => {
+    if (signedIn || sessionState !== "signed-out") return;
+    void Promise.resolve().then(() =>
+      setRead((current) =>
+        current.for === null ? current : { for: null, list: null, failed: false }
+      )
+    );
+  }, [sessionState, signedIn]);
 
   // The acting membership is a device preference, not server state: read it
   // once per account and never reuse another account's choice.
