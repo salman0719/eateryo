@@ -201,7 +201,7 @@ export function ServerTableOrder({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
+            <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
               {restaurantName} · {formatTableLabel(tableLabel)}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-ink-900">
