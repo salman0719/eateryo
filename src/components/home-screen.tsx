@@ -2945,7 +2945,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-warning-950">
-                            📍 Finish publishing your menu →
+                            Finish publishing your menu →
                           </p>
                           <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
                             {localOnlyCount === 1
