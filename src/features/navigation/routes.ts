@@ -238,17 +238,19 @@ export function availableSections(access: SectionAccess): AppSection[] {
  * door, so a settled visitor gets the page instead and `brand-bar.tsx` carries
  * the name and `/sign-in`.
  *
- * Two cases keep it besides an account: a visitor with anonymous drafts, for
- * whom My menus is a real destination, and a session that has not answered.
- * `unknown` keeps it because an unanswered read may be an owner, and hanging
- * the shell's chrome on a guess is exactly what 015 was about.
+ * One case keeps it besides an account: a visitor with anonymous drafts, for
+ * whom My menus is a real destination. An unanswered session keeps nothing:
+ * the column is the account's, so rendering it before the read settles
+ * flashes account chrome at a fresh visitor (and a settled visitor's entry
+ * at nobody yet known). The shell holds a neutral placeholder until the
+ * session and the library have both answered instead of guessing either way.
  */
 export function shellColumnVisible(input: {
   sessionState: SessionState;
   hasWorkingSet: boolean;
 }): boolean {
   if (input.sessionState === "signed-in") return true;
-  if (input.sessionState === "unknown") return true;
+  if (input.sessionState === "unknown") return false;
   return input.hasWorkingSet;
 }
 

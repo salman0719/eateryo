@@ -2705,13 +2705,27 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * The left column belongs to the account. A visitor with nothing in the
    * library gets the entry page instead of a one-row menu, and the brand row
    * takes over the name and `/sign-in` at every width.
+   *
+   * Nothing is assumed while the session or the library is still answering:
+   * `hasWorkingSet` is not a fact until IndexedDB has been read, and the
+   * session is not settled until its read answers, so the column stays off
+   * until both are known instead of flashing account chrome at a visitor.
    */
-  const showShellColumn = shellColumnVisible({
-    sessionState,
-    hasWorkingSet: libraryMenus.length > 0,
-  });
+  const showShellColumn =
+    !sessionPending &&
+    !libraryLoading &&
+    shellColumnVisible({
+      sessionState,
+      hasWorkingSet: libraryMenus.length > 0,
+    });
   /** Nav waits for the membership read: no provisional tabs, no empty bar. */
   const navReady = !sessionPending && !accountAccessPending;
+  /**
+   * Capture's first frame waits for the same two answers as the column:
+   * rendering the page before they land flashes the plain working layout
+   * at a visitor whose entry composition arrives a moment later.
+   */
+  const shellReady = !sessionPending && !libraryLoading;
   /** The More sheet owns the current screen (and so shows as pressed). */
   const screenInMore = moreRows.some((row) => row.id === screen);
   const canGetStarted = signedIn && accountCan("settings.manage");
@@ -3137,7 +3151,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 </>
               )}
 
-              {screen === "capture" && (
+              {screen === "capture" && !shellReady && pages.length === 0 && result === null && (
+                <div role="status" aria-busy="true" className="flex flex-col gap-4">
+                  <span className="sr-only">Loading…</span>
+                  <Skeleton className="h-9 w-2/3 max-w-md" />
+                  <Skeleton className="h-5 w-full max-w-xl" />
+                  <Skeleton className="h-40 w-full" />
+                </div>
+              )}
+
+              {screen === "capture" && (shellReady || pages.length > 0 || result !== null) && (
                 <CapturePage
                   signedIn={signedIn}
                   sessionPending={sessionPending}

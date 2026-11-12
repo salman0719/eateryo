@@ -134,9 +134,10 @@ errors, or add lint/type suppressions just to make checks pass.
   The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
   drops it once the session has settled as signed out with nothing in the
   library, because a column holding the single row "Capture" reads as a broken
-  menu, not as a front door. It stays while the session is unanswered — an
-  unanswered read may be an owner (015) — and for a visitor holding drafts,
-  whose My menus is a real destination. The brand wrapper inside it must stay a
+  menu, not as a front door. It stays off while the session or the library is
+  still answering — an unanswered read is neither signed in nor signed out,
+  so the shell holds a neutral placeholder instead of guessing — and for a
+  visitor holding drafts, whose My menus is a real destination. The brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).

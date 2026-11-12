@@ -63,7 +63,8 @@ describe("shellColumnVisible", () => {
     expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: true })).toBe(true);
   });
 
-  it("keeps it while the session is unanswered", () => {
-    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: false })).toBe(true);
+  it("hides it while the session is unanswered", () => {
+    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: false })).toBe(false);
+    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: true })).toBe(false);
   });
 });
