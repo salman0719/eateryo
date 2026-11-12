@@ -791,6 +791,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // Chain onto a merge left over from the previous café instead of letting
     // the dedupe swallow this one (001).
     void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mergeAccountMenus is intentionally render-scoped: listing it would re-run this café-keyed effect every render, and the mergedCafeRef key guard already dedupes repeat runs
   }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
 
   function replaceServerIds(next: ReadonlySet<string>) {
