@@ -23,8 +23,6 @@ import { searchMenu, type SearchMatch } from "@/features/menu/search";
 import { placeOrder } from "@/features/orders/client";
 import {
   addLine,
-  orderCode,
-  orderItemCountLabel,
   orderTotal,
   setLineQuantity,
   type Order,
@@ -34,7 +32,7 @@ import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
-import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import { OrderMenuSection, StickyCartBar, formatOrderTotal } from "./order-menu";
 import { OrderSheet } from "./order-sheet";
 
 /** One open menu on the table landing (serializable for the client). */
@@ -72,6 +70,12 @@ interface TableOrderTabsProps {
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
+  /**
+   * The order was accepted. The caller owns the confirmation screen — this
+   * component only orders, so the receipt stays one file (`order-received.tsx`)
+   * instead of a section of every flow.
+   */
+  onPlaced: (order: Order) => void;
 }
 
 function menuLabel(menu: { title: string }): string {
@@ -84,6 +88,7 @@ export function TableOrderTabs({
   tableLabel,
   menus,
   closedMenus,
+  onPlaced,
 }: TableOrderTabsProps) {
   const [activeTab, setActiveTab] = useState<string>(ALL_TAB);
   const [query, setQuery] = useState("");
@@ -94,7 +99,6 @@ export function TableOrderTabs({
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [placed, setPlaced] = useState<Order | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const viewOrderButton = useRef<HTMLButtonElement | null>(null);
   /** Wide screens keep the order in its own column; phones raise the sheet. */
@@ -270,7 +274,7 @@ export function TableOrderTabs({
         }),
         website: honeypot,
       });
-      setPlaced(order);
+      onPlaced(order);
       setLines([]);
       setNote("");
       setSheetOpen(false);
@@ -325,36 +329,6 @@ export function TableOrderTabs({
       </button>
     </>
   );
-
-  if (placed) {
-    return (
-      <OrderShell tableLabel={tableLabel}>
-        <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-success-800 uppercase">
-            Order received
-          </p>
-          <p className="mt-3 text-2xl font-bold text-ink-900">
-            #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
-          </p>
-          <p className="mt-2 text-sm text-ink-600">
-            {orderItemCountLabel(placed.lines)} ·{" "}
-            {formatOrderTotal(placed.currency, orderTotal(placed.lines))}
-          </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
-            The kitchen sees this on their board right away. The total is confirmed when your order
-            is prepared.
-          </p>
-          <button
-            type="button"
-            onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
-          >
-            Order something else
-          </button>
-        </div>
-      </OrderShell>
-    );
-  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">

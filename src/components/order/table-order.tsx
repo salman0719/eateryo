@@ -16,8 +16,6 @@ import { useEffect, useRef, useState } from "react";
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import {
   addLine,
-  orderCode,
-  orderItemCountLabel,
   orderTotal,
   setLineQuantity,
   type Order,
@@ -35,6 +33,7 @@ import {
   StickyCartBar,
   formatOrderTotal as formatTotal,
 } from "./order-menu";
+import { OrderReceived } from "./order-received";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderSheet } from "./order-sheet";
 
@@ -211,28 +210,11 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
   if (placed) {
     return (
       <Shell tableLabel={tableLabel}>
-        <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-success-800 uppercase">
-            Order received
-          </p>
-          <p className="mt-3 text-2xl font-bold text-ink-900">
-            #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
-          </p>
-          <p className="mt-2 text-sm text-ink-600">
-            {orderItemCountLabel(placed.lines)} ·{" "}
-            {formatTotal(placed.currency, orderTotal(placed.lines))}
-          </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
-            Saved in this browser for staff to pick up. Nothing has been sent to a server.
-          </p>
-          <button
-            type="button"
-            onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
-          >
-            Order something else
-          </button>
-        </div>
+        <OrderReceived
+          order={placed}
+          footnote="Saved in this browser for staff to pick up. Nothing has been sent to a server."
+          onOrderAgain={() => setPlaced(null)}
+        />
       </Shell>
     );
   }
