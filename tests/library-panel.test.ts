@@ -34,6 +34,7 @@ function render(
     menus?: LibraryMenu[];
     loading?: boolean;
     accountMode?: boolean;
+    canCreate?: boolean;
     withMoveTarget?: boolean;
   } = {}
 ): string {
@@ -42,6 +43,7 @@ function render(
       menus: overrides.menus ?? [menu()],
       loading: overrides.loading ?? false,
       accountMode: overrides.accountMode ?? false,
+      canCreate: overrides.canCreate ?? true,
       ownedRestaurants: overrides.withMoveTarget ? restaurants : [],
       onMoveToAccount: overrides.withMoveTarget ? async () => null : undefined,
       unavailable: false,
@@ -102,5 +104,14 @@ describe("LibraryPanel loading", () => {
     expect(html).toContain("Loading your menus");
     expect(html).not.toContain("No saved menus yet");
     expect(html).not.toContain("This browser only");
+  });
+});
+
+describe("LibraryPanel creation", () => {
+  it("hides the creation controls from a membership that only reads", () => {
+    const html = render({ canCreate: false });
+    expect(html).toContain("Lunch");
+    expect(html).not.toContain("+ New menu");
+    expect(html).not.toContain("Adding another?");
   });
 });

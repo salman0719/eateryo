@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 
 import { SiteFooter } from "@/components/layout/site-footer";
-import { SiteHeader } from "@/components/layout/site-header";
 import { HomeScreen } from "@/components/home-screen";
 import { Skeleton } from "@/components/ui/skeleton";
 import { parseAppRoute } from "@/features/navigation/routes";
@@ -27,34 +26,45 @@ async function MenuPathContent({ params }: { params: Promise<{ path: string[] }>
   return <HomeScreen initialRoute={parseAppRoute(`/menus/${path.join("/")}`)} />;
 }
 
+/**
+ * The placeholder uses the same shell geometry as `HomeScreen` (a sidebar
+ * column plus the content column) rather than the old top header, so the
+ * streamed editor does not shift the page when it arrives. The column keeps
+ * `app-sidebar`, so its width follows the saved rail/expanded choice too.
+ */
 function MenuPathLoading() {
   return (
-    <div className="flex min-h-full flex-1 flex-col">
-      <SiteHeader />
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8">
-        <div role="status" aria-busy="true" className="flex flex-col gap-4">
-          <span className="sr-only">Opening menu…</span>
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-8 w-28 rounded-full" />
-            <Skeleton className="h-4 w-40" />
-          </div>
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-stone-200 bg-white p-5">
-              <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-                <Skeleton className="h-9" />
-                <Skeleton className="h-9" />
+    <div className="flex w-full flex-1">
+      <aside
+        aria-hidden="true"
+        className="app-sidebar hidden h-screen shrink-0 self-start border-r border-line-200 bg-surface-base sm:block"
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
+          <div role="status" aria-busy="true" className="flex flex-col gap-4">
+            <span className="sr-only">Opening menu…</span>
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-8 w-28 rounded-full" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+                <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+                  <Skeleton className="h-9" />
+                  <Skeleton className="h-9" />
+                </div>
+                <Skeleton className="mt-3 h-28" />
               </div>
-              <Skeleton className="mt-3 h-28" />
-            </div>
-            <div className="rounded-2xl border border-stone-200 bg-white p-4">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="mt-2 h-3 w-3/5" />
-              <Skeleton className="mt-4 h-9" />
+              <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="mt-2 h-3 w-3/5" />
+                <Skeleton className="mt-4 h-9" />
+              </div>
             </div>
           </div>
-        </div>
-      </main>
-      <SiteFooter />
+        </main>
+        <SiteFooter />
+      </div>
     </div>
   );
 }

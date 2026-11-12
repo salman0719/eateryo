@@ -28,6 +28,7 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { authClient } from "@/lib/auth-client";
 import { GuidanceCard } from "@/components/ui/guidance-card";
+import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
 import { OrdersSkeleton, ServerOrdersBoard } from "./server-orders-board";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -46,11 +47,14 @@ export function OrdersBoard() {
   return session?.user ? <ServerOrdersBoard /> : <LocalOrdersBoard />;
 }
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-  new: "bg-amber-100 text-amber-900",
-  preparing: "bg-sky-100 text-sky-900",
-  served: "bg-green-100 text-green-900",
-  cancelled: "bg-stone-200 text-stone-600",
+/* Status is a dot plus a word, never a wash: `served` used to wear a green
+   surface beside `new`'s amber one, which made a finished order look like a
+   brand-highlighted one. */
+const STATUS_TONES: Record<OrderStatus, StatusTone> = {
+  new: "warning",
+  preparing: "info",
+  served: "success",
+  cancelled: "neutral",
 };
 
 function formatTime(iso: string): string {
@@ -173,8 +177,8 @@ function LocalOrdersBoard() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-stone-900">Orders</h2>
-          <p className="mt-1 text-sm text-stone-600">
+          <h2 className="text-xl font-bold text-ink-900">Orders</h2>
+          <p className="mt-1 text-sm text-ink-600">
             {orders.length === 0
               ? "Orders placed from table QR codes appear here."
               : `${activeCount} active · ${openCount} new · updated automatically`}
@@ -183,20 +187,23 @@ function LocalOrdersBoard() {
         <button
           type="button"
           onClick={() => void refresh()}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
         >
           Refresh
         </button>
       </div>
 
       {error && (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p
+          role="alert"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+        >
           {error}
         </p>
       )}
 
       {corruptCount > 0 && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
           {corruptCount} stored {corruptCount === 1 ? "order is" : "orders are"} unreadable and
           cannot be shown. They can be cleared by deleting the app&apos;s browser data.
         </p>
@@ -219,53 +226,55 @@ function LocalOrdersBoard() {
             const total = orderTotal(order.lines);
             const canAdvance = nextOrderStatus(order.status) !== order.status;
             return (
-              <li key={order.id} className="rounded-2xl border border-stone-200 bg-white p-4">
+              <li key={order.id} className="rounded-2xl border border-line-200 bg-surface-base p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-bold text-stone-900">
+                      <p className="text-lg font-bold text-ink-900">
                         {formatTableLabel(order.tableLabel)}
                       </p>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status]}`}
-                      >
+                      <StatusChip tone={STATUS_TONES[order.status]}>
                         {orderStatusLabel(order.status)}
-                      </span>
-                      <span className="text-xs font-medium text-stone-400">
+                      </StatusChip>
+                      <span className="text-xs font-medium text-ink-500">
                         #{orderCode(order.id)} · {formatTime(order.createdAt)}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-xs text-stone-500">{order.menuTitle}</p>
+                    <p className="mt-0.5 text-xs text-ink-500">{order.menuTitle}</p>
                   </div>
-                  <p className="text-sm font-semibold tabular-nums text-stone-900">
+                  <p className="text-sm font-semibold tabular-nums text-ink-900">
                     {formatPreviewPrice(total, null, order.currency)}
                   </p>
                 </div>
 
-                <ul className="mt-3 space-y-1 border-t border-stone-100 pt-3">
+                <ul className="mt-3 space-y-1 border-t border-line-100 pt-3">
                   {order.lines.map((line, index) => (
                     <li
                       key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
-                      className="flex items-baseline justify-between gap-3 text-sm text-stone-700"
+                      className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
                     >
                       <span>
-                        <span className="font-medium text-stone-900">{line.quantity}×</span>{" "}
+                        <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
                         {line.name}
                         {line.variantName && (
-                          <span className="ml-1 text-xs text-stone-500">{line.variantName}</span>
+                          <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
                         )}
                       </span>
-                      <span className="shrink-0 text-xs tabular-nums text-stone-500">
+                      <span className="shrink-0 text-xs tabular-nums text-ink-500">
                         {line.unitPrice === null
                           ? "no price"
-                          : formatPreviewPrice(line.unitPrice * line.quantity, null, order.currency)}
+                          : formatPreviewPrice(
+                              line.unitPrice * line.quantity,
+                              null,
+                              order.currency
+                            )}
                       </span>
                     </li>
                   ))}
                 </ul>
 
                 {order.note && (
-                  <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <p className="mt-2 rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-900">
                     Note: {order.note}
                   </p>
                 )}
@@ -276,7 +285,7 @@ function LocalOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => void advance(order)}
-                      className="rounded-full bg-amber-700 px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 disabled:opacity-50"
+                      className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:opacity-50"
                     >
                       Mark {orderStatusLabel(nextOrderStatus(order.status)).toLowerCase()}
                     </button>
@@ -286,7 +295,7 @@ function LocalOrdersBoard() {
                       type="button"
                       disabled={busyId === order.id}
                       onClick={() => void cancel(order)}
-                      className="rounded-full border border-stone-300 px-3.5 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 disabled:opacity-50"
+                      className="rounded-full border border-line-300 px-3.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
                     >
                       Cancel
                     </button>
@@ -296,7 +305,7 @@ function LocalOrdersBoard() {
                     type="button"
                     disabled={busyId === order.id}
                     onClick={() => void remove(order)}
-                    className="text-xs font-medium text-stone-500 underline hover:text-red-800 disabled:opacity-50"
+                    className="text-xs font-medium text-ink-500 underline hover:text-danger-800 disabled:opacity-50"
                   >
                     Delete
                   </button>

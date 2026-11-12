@@ -115,10 +115,10 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
     return (
       <section
         aria-label="Opening times"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-line-200 bg-surface-base p-4"
       >
-        <h2 className="text-sm font-bold text-stone-900">Opening times</h2>
-        <p className="mt-1 text-xs leading-5 text-stone-600">
+        <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
+        <p className="mt-1 text-xs leading-5 text-ink-600">
           Opening hours are set once this menu is on your account, because that is the version its
           table page shows. Publish the menu first — until then it is served all day.
         </p>
@@ -131,9 +131,9 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
       <section
         aria-label="Opening times"
         aria-busy="true"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-line-200 bg-surface-base p-4"
       >
-        <h2 className="text-sm font-bold text-stone-900">Opening times</h2>
+        <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
         <div role="status" className="mt-2 flex flex-col gap-2">
           <span className="sr-only">Loading opening times…</span>
           <Skeleton className="h-9 w-full" />
@@ -147,10 +147,10 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
     return (
       <section
         aria-label="Opening times"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-line-200 bg-surface-base p-4"
       >
-        <h2 className="text-sm font-bold text-stone-900">Opening times</h2>
-        <p role="alert" className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
+        <p role="alert" className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {loadError ?? "Could not load opening times."}
         </p>
         <button
@@ -173,7 +173,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                 setStatus("error");
               });
           }}
-          className="mt-2 rounded-full border border-stone-300 px-3 py-1 text-xs font-medium text-stone-600 transition-colors hover:border-amber-700 hover:text-amber-900"
+          className="mt-2 rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900"
         >
           Retry
         </button>
@@ -185,16 +185,16 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
     return (
       <section
         aria-label="Opening times"
-        className="rounded-2xl border border-stone-200 bg-white p-4"
+        className="rounded-2xl border border-line-200 bg-surface-base p-4"
       >
-        <h2 className="text-sm font-bold text-stone-900">Opening times</h2>
-        <p className="mt-1 text-xs text-stone-500">Times are in {timeZone ?? "UTC"}.</p>
+        <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
+        <p className="mt-1 text-xs text-ink-500">Times are in {timeZone ?? "UTC"}.</p>
         {windows.length === 0 ? (
-          <p className="mt-1 text-xs text-stone-600">Always open — no restricted hours.</p>
+          <p className="mt-1 text-xs text-ink-600">Always open — no restricted hours.</p>
         ) : (
           <ul className="mt-2 space-y-1">
             {windows.map((window, index) => (
-              <li key={index} className="text-xs text-stone-700">
+              <li key={index} className="text-xs text-ink-700">
                 {formatWindow(window)}
               </li>
             ))}
@@ -234,18 +234,18 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
   return (
     <section
       aria-label="Opening times"
-      className="rounded-2xl border border-stone-200 bg-white p-4"
+      className="rounded-2xl border border-line-200 bg-surface-base p-4"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="text-sm font-bold text-stone-900">Opening times</h2>
-        <p className="text-xs text-stone-500">
+        <h2 className="text-sm font-bold text-ink-900">Opening times</h2>
+        <p className="text-xs text-ink-500">
           {draft.length === 0
             ? "Always open — the table page shows this menu all day."
             : "Only these hours show on the table page. Takes effect right away, no republish needed."}
         </p>
       </div>
 
-      <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-600">
+      <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-600">
         Times are in
         {ZONE_CHOICES ? (
           <select
@@ -255,7 +255,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
               setSaveError(null);
               setSavedTick(false);
             }}
-            className="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+            className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-accent-700 focus:outline-none"
           >
             <option value="UTC">UTC</option>
             {draftTimeZone && !ZONE_CHOICES.includes(draftTimeZone) && (
@@ -270,15 +270,13 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
         ) : (
           <span>{draftTimeZone ?? "UTC"}</span>
         )}
-        <span className="text-stone-400">
-          — diners see the menu as open or closed in this zone.
-        </span>
+        <span className="text-ink-500">— diners see the menu as open or closed in this zone.</span>
       </label>
 
       {draft.length > 0 && (
         <ul className="mt-3 space-y-3">
           {draft.map((window, index) => (
-            <li key={index} className="rounded-xl border border-stone-200 p-3">
+            <li key={index} className="rounded-xl border border-line-200 p-3">
               <div
                 className="flex flex-wrap items-center gap-1.5"
                 role="group"
@@ -300,8 +298,8 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                       }}
                       className={`h-8 w-8 rounded-full text-xs font-semibold transition-colors ${
                         on
-                          ? "bg-amber-800 text-white"
-                          : "border border-stone-300 text-stone-500 hover:border-amber-700 hover:text-amber-900"
+                          ? "bg-accent-800 text-on-accent"
+                          : "border border-line-300 text-ink-500 hover:border-accent-700 hover:text-accent-900"
                       }`}
                     >
                       {label[0]}
@@ -316,13 +314,13 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                     setSaveError(null);
                     setSavedTick(false);
                   }}
-                  className="text-xs font-medium text-stone-500 underline hover:text-red-800"
+                  className="text-xs font-medium text-ink-500 underline hover:text-danger-800"
                 >
                   Remove
                 </button>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <label className="text-xs text-stone-600">
+                <label className="text-xs text-ink-600">
                   Opens{" "}
                   <input
                     type="time"
@@ -330,10 +328,10 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                     onChange={(event) =>
                       updateWindow(index, { ...window, start: event.target.value })
                     }
-                    className="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+                    className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-accent-700 focus:outline-none"
                   />
                 </label>
-                <label className="text-xs text-stone-600">
+                <label className="text-xs text-ink-600">
                   Closes{" "}
                   <input
                     type="time"
@@ -341,11 +339,11 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
                     onChange={(event) =>
                       updateWindow(index, { ...window, end: event.target.value })
                     }
-                    className="rounded-lg border border-stone-300 px-2 py-1 text-xs focus:border-amber-700 focus:outline-none"
+                    className="rounded-lg border border-line-300 px-2 py-1 text-xs focus:border-accent-700 focus:outline-none"
                   />
                 </label>
                 {window.end <= window.start && (
-                  <span className="text-[11px] font-medium text-stone-500">runs past midnight</span>
+                  <span className="text-[11px] font-medium text-ink-500">runs past midnight</span>
                 )}
               </div>
             </li>
@@ -354,7 +352,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
       )}
 
       {!validation.success && (
-        <p role="alert" className="mt-2 text-xs text-red-800">
+        <p role="alert" className="mt-2 text-xs text-danger-800">
           {validation.error.issues[0]?.message ?? "Those hours are not valid."}
         </p>
       )}
@@ -368,7 +366,7 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
             setSavedTick(false);
           }}
           disabled={draft.length >= 28}
-          className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-40"
         >
           Add hours
         </button>
@@ -380,14 +378,14 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
               setSaveError(null);
               setSavedTick(false);
             }}
-            className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900"
+            className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
           >
             Always open
           </button>
         )}
         <span className="flex-1" />
         {savedTick && !dirty && (
-          <span role="status" className="text-xs font-medium text-green-800">
+          <span role="status" className="text-xs font-medium text-success-800">
             Saved
           </span>
         )}
@@ -395,14 +393,14 @@ export function AvailabilityPanel({ menuId, syncMode, canManage = true }: Availa
           type="button"
           onClick={() => void handleSave()}
           disabled={!dirty || !validation.success || saving}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save hours"}
         </button>
       </div>
 
       {saveError && (
-        <p role="alert" className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-2 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {saveError}
         </p>
       )}

@@ -147,9 +147,7 @@ describe("POST /api/orders", () => {
   });
 
   it("refuses an unpublished menu and unknown items", async () => {
-    const missing = await placeOrderRoute(
-      orderRequest(bodyWithLine({ slug: "not-live" }))
-    );
+    const missing = await placeOrderRoute(orderRequest(bodyWithLine({ slug: "not-live" })));
     expect(missing.status).toBe(404);
     expect((await missing.json()).error.code).toBe("menu_not_live");
 
@@ -181,8 +179,8 @@ describe("POST /api/orders", () => {
     });
     await createMenuForUser(holder.db!, ownerId, dosRestaurantId, dosDoc);
     await publishMenuForUser(holder.db!, ownerId, "menu-api-dos");
-    const publicationRows = await holder.db!
-      .select({ slug: publishedMenu.slug })
+    const publicationRows = await holder
+      .db!.select({ slug: publishedMenu.slug })
       .from(publishedMenu)
       .where(eq(publishedMenu.menuId, "menu-api-dos"));
     // The identical title claims the slug inside this café, not globally.
@@ -210,8 +208,8 @@ describe("POST /api/orders", () => {
     expect(res.status).toBe(201);
     // The order lands on the café the diner's link names — never the one
     // that happened to publish the slug first.
-    const rows = await holder.db!
-      .select({ restaurantId: orderTable.restaurantId })
+    const rows = await holder
+      .db!.select({ restaurantId: orderTable.restaurantId })
       .from(orderTable);
     expect(rows[0].restaurantId).toBe(dosRestaurantId);
   });
@@ -229,7 +227,9 @@ describe("POST /api/orders", () => {
   });
 
   it("rejects an oversized payload before parsing it", async () => {
-    const res = await placeOrderRoute(orderRequest(bodyWithLine(), undefined, { "content-length": "99999" }));
+    const res = await placeOrderRoute(
+      orderRequest(bodyWithLine(), undefined, { "content-length": "99999" })
+    );
     expect(res.status).toBe(413);
     expect((await res.json()).error.code).toBe("payload_too_large");
   });
@@ -238,21 +238,15 @@ describe("POST /api/orders", () => {
     const line = sampleLine();
     const ip = "203.0.113.9";
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const res = await placeOrderRoute(
-        orderRequest(bodyWithLine({ lines: [line] }), ip)
-      );
+      const res = await placeOrderRoute(orderRequest(bodyWithLine({ lines: [line] }), ip));
       expect(res.status).toBe(201);
     }
-    const blocked = await placeOrderRoute(
-      orderRequest(bodyWithLine({ lines: [line] }), ip)
-    );
+    const blocked = await placeOrderRoute(orderRequest(bodyWithLine({ lines: [line] }), ip));
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("Retry-After")).toBe("60");
     expect((await blocked.json()).error.code).toBe("rate_limited");
     // Another address is unaffected.
-    const other = await placeOrderRoute(
-      orderRequest(bodyWithLine({ lines: [line] }))
-    );
+    const other = await placeOrderRoute(orderRequest(bodyWithLine({ lines: [line] })));
     expect(other.status).toBe(201);
   });
 });
@@ -260,11 +254,7 @@ describe("POST /api/orders", () => {
 describe("GET /api/orders", () => {
   async function placeOne(): Promise<string> {
     holder.userId = null;
-    const res = await placeOrderRoute(
-      orderRequest(
-        bodyWithLine({ lines: [sampleLine()] })
-      )
-    );
+    const res = await placeOrderRoute(orderRequest(bodyWithLine({ lines: [sampleLine()] })));
     holder.userId = ownerId;
     return (await res.json()).order.id;
   }
@@ -308,7 +298,9 @@ describe("GET /api/orders", () => {
     const outsider = await seedUser(holder.db!, "orders-api-outsider@cafe.test", "Outsider");
     await createRestaurant(holder.db!, outsider, "Other Café");
     holder.userId = outsider;
-    expect((await (await getOrders(new Request("http://test.local/api/orders"))).json()).orders).toHaveLength(0);
+    expect(
+      (await (await getOrders(new Request("http://test.local/api/orders"))).json()).orders
+    ).toHaveLength(0);
     const foreign = await getOrders(
       new Request(`http://test.local/api/orders?restaurantId=${restaurantId}`)
     );
@@ -360,9 +352,7 @@ describe("POST /api/orders from a table QR", () => {
   it("places one combined ticket across two menus", async () => {
     const { barItem } = await setupTableMenus();
     const res = await placeOrderRoute(
-      orderRequest(
-        tableBody([{ ...sampleLine(), menuSlug: "cafe-api-orders" }, barItem])
-      )
+      orderRequest(tableBody([{ ...sampleLine(), menuSlug: "cafe-api-orders" }, barItem]))
     );
     expect(res.status).toBe(201);
     const { order } = await res.json();
@@ -387,14 +377,10 @@ describe("POST /api/orders from a table QR", () => {
     expect(missingMenu.status).toBe(400);
     expect((await missingMenu.json()).error.code).toBe("invalid_body");
 
-    const strayMenu = await placeOrderRoute(
-      orderRequest(bodyWithLine({ lines: [line] }))
-    );
+    const strayMenu = await placeOrderRoute(orderRequest(bodyWithLine({ lines: [line] })));
     expect(strayMenu.status).toBe(400);
 
-    const neither = await placeOrderRoute(
-      orderRequest({ tableLabel: "3", lines: [sampleLine()] })
-    );
+    const neither = await placeOrderRoute(orderRequest({ tableLabel: "3", lines: [sampleLine()] }));
     expect(neither.status).toBe(400);
   });
 
@@ -415,11 +401,7 @@ describe("POST /api/orders from a table QR", () => {
 describe("PATCH /api/orders/[orderId]", () => {
   async function placeOne() {
     holder.userId = null;
-    const res = await placeOrderRoute(
-      orderRequest(
-        bodyWithLine({ lines: [sampleLine()] })
-      )
-    );
+    const res = await placeOrderRoute(orderRequest(bodyWithLine({ lines: [sampleLine()] })));
     holder.userId = ownerId;
     return (await res.json()).order as { id: string; updatedAt: string };
   }
@@ -447,10 +429,7 @@ describe("PATCH /api/orders/[orderId]", () => {
     const placed = await placeOne();
     // Skipping a step is not a valid transition (new may only go to preparing
     // or cancelled); the same status is an idempotent retry, not an error.
-    const skipped = await patchOrder(
-      patchRequest({ status: "served" }),
-      orderParams(placed.id)
-    );
+    const skipped = await patchOrder(patchRequest({ status: "served" }), orderParams(placed.id));
     expect(skipped.status).toBe(400);
 
     const unknown = await patchOrder(patchRequest({ status: "served" }), orderParams("nope"));

@@ -34,18 +34,18 @@ export function MonitorToasts({
         <div
           key={id}
           role="alert"
-          className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-stone-900 py-3 pr-2 pl-4 text-white shadow-xl"
+          className="pointer-events-auto flex items-center gap-3 rounded-2xl bg-surface-900 py-3 pr-2 pl-4 text-on-accent shadow-xl"
         >
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+            className="min-w-0 flex-1 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
           >
             <p className="text-sm font-bold">
               🔔 New order · {formatTableLabel(order.tableLabel)}{" "}
-              <span className="font-medium text-amber-300">#{orderCode(order.id)}</span>
+              <span className="font-medium text-accent-300">#{orderCode(order.id)}</span>
             </p>
-            <p className="truncate text-xs text-stone-300">
+            <p className="truncate text-xs text-ink-300">
               {order.lines
                 .slice(0, 2)
                 .map((line) => `${line.quantity}× ${line.name}`)
@@ -57,7 +57,7 @@ export function MonitorToasts({
             type="button"
             onClick={() => onDismiss(id)}
             aria-label="Dismiss"
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-lg text-stone-300 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl text-lg text-ink-300 hover:text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
           >
             ×
           </button>

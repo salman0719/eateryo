@@ -526,10 +526,13 @@ describe("POST /api/assistant with a menu", () => {
     const ownerId = await seedUser();
     const { menu, restaurantId } = await seedMenu(ownerId);
     const staffId = await seedUser("staff@cafe.test");
+    // This test is about the help surface, not visibility: grant the draft
+    // read so the staff caller still reaches the menu context.
     await holder.db!.insert(restaurantMembership).values({
       restaurantId,
       userId: staffId,
       role: "staff",
+      permissions: ["menus.read", "menus.read_draft", "assistant.use"],
     });
     holder.userId = staffId;
     fetchMock.mockResolvedValueOnce(chatResponse("Open the menu from My menus."));

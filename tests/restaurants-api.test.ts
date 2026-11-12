@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST as createRestaurantRoute } from "@/app/api/restaurants/route";
+import {
+  GET as listRestaurantsRoute,
+  POST as createRestaurantRoute,
+} from "@/app/api/restaurants/route";
 import {
   DELETE as deleteRestaurant,
   PATCH as renameRestaurant,
@@ -89,6 +92,37 @@ beforeEach(async () => {
   holder.db = await initTestDb();
   holder.userId = null;
 }, 30_000);
+
+/**
+ * The shell starts this read alongside the session read, so the answer can
+ * arrive before the client knows which account asked. It therefore has to
+ * name the account itself — an unattributable list would let one account's
+ * cafés be filed under another's.
+ */
+describe("GET /api/restaurants", () => {
+  it("returns 401 and no account id when signed out", async () => {
+    const res = await listRestaurantsRoute();
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      error: { code: "unauthorized", message: expect.any(String) },
+    });
+  });
+
+  it("names the account the list belongs to", async () => {
+    const { seedUser } = await import("./helpers/pg-test-db");
+    const userId = await seedUser(holder.db!, "owner@cafe.test", "Owner");
+    await createRestaurant(holder.db!, userId, "My cafe");
+    holder.userId = userId;
+
+    const res = await listRestaurantsRoute();
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.accountId).toBe(userId);
+    expect(body.restaurants.map((item: { name: string }) => item.name)).toEqual(["My cafe"]);
+    // Personalized data is never cached, whatever the client does with it.
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+});
 
 describe("POST /api/restaurants", () => {
   it("returns 401 with the shared error shape when signed out", async () => {
@@ -209,7 +243,11 @@ describe("PATCH /api/restaurants/[restaurantId]", () => {
     // Personalized data must never be cached.
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     const payload = await res.json();
-    expect(payload.restaurant).toMatchObject({ id: created.id, name: "Sunny Side Café", role: "owner" });
+    expect(payload.restaurant).toMatchObject({
+      id: created.id,
+      name: "Sunny Side Café",
+      role: "owner",
+    });
 
     const fetched = await getRestaurantForUser(holder.db!, userId, created.id);
     expect(fetched).toMatchObject({ name: "Sunny Side Café" });
@@ -313,15 +351,19 @@ describe("GET /api/restaurants/[restaurantId]/members", () => {
     const owner = await seedUser(holder.db!, "owner@cafe.test", "Owner");
     const created = await createRestaurant(holder.db!, owner, "My cafe");
 
-    const anonymous = await listMembers(asRequest("/api/restaurants/x/members"),
-      restaurantParams(created.id));
+    const anonymous = await listMembers(
+      asRequest("/api/restaurants/x/members"),
+      restaurantParams(created.id)
+    );
     expect(anonymous.status).toBe(401);
     expect((await anonymous.json()).error.code).toBe("unauthorized");
 
     const outsider = await seedUser(holder.db!, "outsider@cafe.test", "Outsider");
     holder.userId = outsider;
-    const denied = await listMembers(asRequest("/api/restaurants/x/members"),
-      restaurantParams(created.id));
+    const denied = await listMembers(
+      asRequest("/api/restaurants/x/members"),
+      restaurantParams(created.id)
+    );
     expect(denied.status).toBe(404);
     expect((await denied.json()).error.code).toBe("not_found");
   });

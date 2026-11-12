@@ -2,7 +2,24 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { moreSheetRows, phoneTabs } from "@/features/navigation/routes";
+import {
+  availableSections,
+  moreSheetRows,
+  phoneTabs,
+  type SectionAccess,
+} from "@/features/navigation/routes";
+import { CAPABILITIES } from "@/features/tenancy/permissions";
+
+/** Every capability, as an owner holds them. */
+function ownerSections(overrides: Partial<SectionAccess> = {}) {
+  return availableSections({
+    signedIn: true,
+    can: (capability) => CAPABILITIES.includes(capability),
+    assistantEnabled: false,
+    hasWorkingSet: false,
+    ...overrides,
+  });
+}
 
 /**
  * R0.6 — regression guards for the R0 phone-nav decisions. There is no
@@ -28,45 +45,46 @@ import { UsagePanel } from "@/components/settings/usage-panel";
 
 describe("phoneTabs", () => {
   it("pins Capture, My menus, and Orders in that order", () => {
-    expect(phoneTabs().map((tab) => tab.id)).toEqual(["capture", "library", "orders"]);
+    expect(phoneTabs(ownerSections()).map((tab) => tab.id)).toEqual([
+      "capture",
+      "library",
+      "orders",
+    ]);
   });
 
   it("keeps Tables out of the bar — it lives in the More sheet", () => {
-    expect(phoneTabs().map((tab) => tab.id)).not.toContain("tables");
+    expect(phoneTabs(ownerSections()).map((tab) => tab.id)).not.toContain("tables");
   });
 });
 
 describe("moreSheetRows", () => {
   it("leads with Tables so tables are promoted over orders everywhere", () => {
-    for (const options of [
-      { signedIn: false, assistantEnabled: false },
-      { signedIn: true, assistantEnabled: false },
-      { signedIn: true, assistantEnabled: true },
-    ]) {
-      expect(moreSheetRows(options)[0]?.id).toBe("tables");
-    }
+    expect(moreSheetRows(ownerSections())[0]?.id).toBe("tables");
+    expect(moreSheetRows(ownerSections({ assistantEnabled: true }))[0]?.id).toBe("tables");
   });
 
   it("ends with Settings and names Usage in its blurb", () => {
-    const rows = moreSheetRows({ signedIn: true, assistantEnabled: false });
+    const rows = moreSheetRows(ownerSections());
     expect(rows[rows.length - 1]).toMatchObject({ id: "settings" });
     expect(rows[rows.length - 1]?.why).toContain("Usage");
   });
 
   it("never shows the Assistant signed out, whatever the flag says", () => {
     for (const assistantEnabled of [false, true]) {
-      const rows = moreSheetRows({ signedIn: false, assistantEnabled });
+      const rows = moreSheetRows(
+        ownerSections({ signedIn: false, assistantEnabled, hasWorkingSet: true })
+      );
       expect(rows.map((row) => row.id)).not.toContain("assistant");
     }
   });
 
   it("hides the Assistant from signed-in accounts while the flag is off", () => {
-    const rows = moreSheetRows({ signedIn: true, assistantEnabled: false });
+    const rows = moreSheetRows(ownerSections({ assistantEnabled: false }));
     expect(rows.map((row) => row.id)).not.toContain("assistant");
   });
 
   it("shows the Assistant to signed-in accounts once the flag is on", () => {
-    const rows = moreSheetRows({ signedIn: true, assistantEnabled: true });
+    const rows = moreSheetRows(ownerSections({ assistantEnabled: true }));
     expect(rows.map((row) => row.id)).toContain("assistant");
   });
 });
@@ -74,6 +92,6 @@ describe("moreSheetRows", () => {
 describe("UsagePanel signed-out gate", () => {
   it("renders nothing without a session", () => {
     sessionState.user = null;
-    expect(renderToStaticMarkup(createElement(UsagePanel))).toBe("");
+    expect(renderToStaticMarkup(createElement(UsagePanel, { restaurantId: "cafe-1" }))).toBe("");
   });
 });

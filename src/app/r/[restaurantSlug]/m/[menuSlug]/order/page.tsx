@@ -25,12 +25,10 @@ import { getDb } from "@/lib/db";
  * data, so the route is a shell plus streamed content.
  */
 
-const loadPublishedMenu = cache(
-  async (restaurantSlug: string, menuSlug: string) => {
-    if (!isSlug(restaurantSlug) || !isSlug(menuSlug)) return null;
-    return getPublishedMenuByPath(getDb(), restaurantSlug, menuSlug);
-  }
-);
+const loadPublishedMenu = cache(async (restaurantSlug: string, menuSlug: string) => {
+  if (!isSlug(restaurantSlug) || !isSlug(menuSlug)) return null;
+  return getPublishedMenuByPath(getDb(), restaurantSlug, menuSlug);
+});
 
 export async function generateMetadata({
   params,
@@ -83,11 +81,11 @@ async function TableOrderLink({
   if (!tableLabel) {
     return (
       <OrderShell>
-        <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
-          <p className="text-lg font-semibold text-stone-900">This table link is incomplete</p>
-          <p className="mt-2 text-sm leading-6 text-stone-600">
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
+          <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
+          <p className="mt-2 text-sm leading-6 text-ink-600">
             A table link includes the table number, like{" "}
-            <code className="rounded bg-stone-100 px-1.5 py-0.5 text-xs">
+            <code className="rounded bg-surface-100 px-1.5 py-0.5 text-xs">
               /r/{page.restaurantSlug}/m/{page.slug}/order?table=3
             </code>
             . Ask staff for a fresh QR code.

@@ -36,12 +36,11 @@ export interface NewOrderEmail {
 }
 
 /** Pure branded new-order body, asserted in tests and reused by the sender. */
-export function buildNewOrderEmail({
-  email,
-  restaurantName,
-  order,
-  boardUrl,
-}: NewOrderEmail): { subject: string; text: string; html: string } {
+export function buildNewOrderEmail({ email, restaurantName, order, boardUrl }: NewOrderEmail): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const table = formatTableLabel(order.tableLabel);
   const code = orderCode(order.id);
   const subject = `New order · ${table} — ${restaurantName}`;
@@ -69,7 +68,9 @@ export function buildNewOrderEmail({
       (line) =>
         `<tr><td style=\"padding:7px 0;font-family:Arial,sans-serif;font-size:13px;line-height:1.5;color:${EMAIL_COLORS.BODY_TEXT}\">` +
         `<strong>${line.quantity}×</strong> ${escapeEmailHtml(line.name)}` +
-        (line.variantName ? ` <span style=\"color:${EMAIL_COLORS.MUTED}\">${escapeEmailHtml(line.variantName)}</span>` : "") +
+        (line.variantName
+          ? ` <span style=\"color:${EMAIL_COLORS.MUTED}\">${escapeEmailHtml(line.variantName)}</span>`
+          : "") +
         `</td><td align=\"right\" style=\"padding:7px 0;font-family:Arial,sans-serif;font-size:13px;color:${EMAIL_COLORS.BODY_TEXT}\">` +
         (line.unitPrice === null
           ? "no price"
@@ -81,7 +82,7 @@ export function buildNewOrderEmail({
     .join("");
   const cardInner =
     `<tr><td align=\"center\" style=\"padding:28px 28px 8px\">` +
-    emailLogoMark() +
+    emailLogoMark(boardUrl) +
     `<p style=\"margin:12px 0 0;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:${EMAIL_COLORS.INK}\">Eateryo</p>` +
     `</td></tr>` +
     `<tr><td style=\"padding:12px 32px 0;font-family:Arial,sans-serif\">` +
@@ -89,7 +90,7 @@ export function buildNewOrderEmail({
     `<p style=\"margin:0;font-size:13px;line-height:1.6;color:${EMAIL_COLORS.MUTED}\">${escapeEmailHtml(restaurantName)} &middot; order <strong>#${escapeEmailHtml(code)}</strong> &middot; ${escapeEmailHtml(order.menuTitle)}</p>` +
     `</td></tr>` +
     `<tr><td style=\"padding:14px 32px 0;font-family:Arial,sans-serif\">` +
-    `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fafaf9;border:1px solid ${EMAIL_COLORS.CARD_BORDER};border-radius:12px\">` +
+    `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:${EMAIL_COLORS.SURFACE_SOFT};border:1px solid ${EMAIL_COLORS.CARD_BORDER};border-radius:12px\">` +
     `<tr><td style=\"padding:14px 16px\">` +
     `<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">${lineRows}</table>` +
     `<p style=\"margin:10px 0 0;font-size:13px;font-weight:bold;color:${EMAIL_COLORS.INK}\">${escapeEmailHtml(totalLine)}</p>` +
@@ -152,12 +153,7 @@ export async function sendNewOrderEmail(input: NewOrderEmail): Promise<void> {
   }
 }
 
-export type OrderEmailSkip =
-  | "disabled"
-  | "no_recipient"
-  | "duplicate"
-  | "digest"
-  | "failed";
+export type OrderEmailSkip = "disabled" | "no_recipient" | "duplicate" | "digest" | "failed";
 
 export type OrderEmailOutcome = { mailed: true } | { mailed: false; skipped: OrderEmailSkip };
 
@@ -200,10 +196,7 @@ export async function maybeEmailNewOrder(
     logEvent("info", "orders.email_sent", { orderId: order.id, restaurantId });
     return { mailed: true };
   } catch (error) {
-    return fail(
-      "failed",
-      error instanceof Error ? error.message : "unknown send failure"
-    );
+    return fail("failed", error instanceof Error ? error.message : "unknown send failure");
   }
 }
 

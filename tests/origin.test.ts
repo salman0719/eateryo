@@ -16,28 +16,20 @@ describe("isSameOriginRequest", () => {
 
   it("allows a matching origin, with or without a port", () => {
     expect(
-      isSameOriginRequest(
-        request({ host: "eateryo.example", origin: "https://eateryo.example" })
-      )
+      isSameOriginRequest(request({ host: "eateryo.example", origin: "https://eateryo.example" }))
     ).toBe(true);
     expect(
-      isSameOriginRequest(
-        request({ host: "localhost:3200", origin: "http://localhost:3200" })
-      )
+      isSameOriginRequest(request({ host: "localhost:3200", origin: "http://localhost:3200" }))
     ).toBe(true);
   });
 
   it("refuses another origin", () => {
     expect(
-      isSameOriginRequest(
-        request({ host: "eateryo.example", origin: "https://evil.example" })
-      )
+      isSameOriginRequest(request({ host: "eateryo.example", origin: "https://evil.example" }))
     ).toBe(false);
     // Same site name, different port is still another origin.
     expect(
-      isSameOriginRequest(
-        request({ host: "localhost:3200", origin: "http://localhost:9999" })
-      )
+      isSameOriginRequest(request({ host: "localhost:3200", origin: "http://localhost:9999" }))
     ).toBe(false);
   });
 
@@ -76,7 +68,9 @@ describe("isSameOriginRequest", () => {
 
 describe("rejectCrossOrigin", () => {
   it("returns null for same-origin and a 403 envelope for others", async () => {
-    expect(rejectCrossOrigin(request({ host: "t.example", origin: "https://t.example" }))).toBeNull();
+    expect(
+      rejectCrossOrigin(request({ host: "t.example", origin: "https://t.example" }))
+    ).toBeNull();
 
     const response = rejectCrossOrigin(
       request({ host: "t.example", origin: "https://evil.example" })

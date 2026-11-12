@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET as listAudit } from "@/app/api/restaurants/[restaurantId]/audit/route";
-import { addMemberForOwner, createRestaurant, updateMemberRoleForOwner } from "@/features/tenancy/repo";
+import {
+  addMemberForOwner,
+  createRestaurant,
+  updateMemberRoleForOwner,
+} from "@/features/tenancy/repo";
 import type { TestDb } from "./helpers/pg-test-db";
 
 /**

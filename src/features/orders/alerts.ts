@@ -7,6 +7,7 @@ import {
   user as userTable,
 } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import { can, getMembershipAccess } from "@/features/tenancy/policy";
 
 /**
  * New-order email alerts (R0.4, report 5 tier 3): per-restaurant preference,
@@ -71,17 +72,8 @@ export async function updateOrderAlertPrefsForOwner(
   restaurantId: string,
   prefs: { enabled: boolean; email: string | null }
 ): Promise<OrderAlertPrefs | null> {
-  const membership = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.restaurantId, restaurantId),
-        eq(restaurantMembership.userId, userId)
-      )
-    )
-    .limit(1);
-  if (membership[0]?.role !== "owner") return null;
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return null;
   const updated = await db
     .update(restaurantTable)
     .set({ orderAlertsEnabled: prefs.enabled, orderAlertEmail: prefs.email })
@@ -92,10 +84,7 @@ export async function updateOrderAlertPrefsForOwner(
 }
 
 /** Account emails of every owner — the default recipients. Internal use. */
-export async function listOwnerEmails(
-  db: TenancyDb,
-  restaurantId: string
-): Promise<string[]> {
+export async function listOwnerEmails(db: TenancyDb, restaurantId: string): Promise<string[]> {
   const rows = await db
     .select({ email: userTable.email })
     .from(restaurantMembership)
@@ -110,8 +99,7 @@ export async function listOwnerEmails(
 }
 
 export type OrderEmailAttempt =
-  | { mailed: true }
-  | { mailed: false; reason: "duplicate" | "digest" };
+  { mailed: true } | { mailed: false; reason: "duplicate" | "digest" };
 
 /**
  * Idempotent send gate: records the email for this order, or refuses with
@@ -130,10 +118,7 @@ export async function recordOrderEmailAttempt(
     .select({ id: orderEmailLog.id })
     .from(orderEmailLog)
     .where(
-      and(
-        eq(orderEmailLog.restaurantId, restaurantId),
-        gte(orderEmailLog.sentAt, windowStart)
-      )
+      and(eq(orderEmailLog.restaurantId, restaurantId), gte(orderEmailLog.sentAt, windowStart))
     );
   if (recent.length >= ORDER_EMAIL_DIGEST_THRESHOLD) {
     return { mailed: false, reason: "digest" };

@@ -30,7 +30,6 @@ const errorEnvelope = z.object({
   }),
 });
 
-
 /** A help answer, or a proposal the owner can review (A2). */
 const assistantTurnSchema = assistantReplySchema.extend({
   outcome: z.enum(["answer", "propose", "clarify", "refuse"]).optional(),

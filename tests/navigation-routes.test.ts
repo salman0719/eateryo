@@ -4,6 +4,7 @@ import {
   appRouteHref,
   menuIdFromPathname,
   parseAppRoute,
+  sectionForScreen,
   signOutLandingRoute,
   unresolvableMenuMessage,
 } from "../src/features/navigation/routes";
@@ -68,9 +69,9 @@ describe("application routes", () => {
     const message = unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "publish" });
     expect(message).toContain("without your draft");
     expect(message).toContain("original browser");
-    expect(
-      unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })
-    ).toContain("deleted or moved");
+    expect(unresolvableMenuMessage({ screen: "editor", menuId: "m-1", mode: "edit" })).toContain(
+      "deleted or moved"
+    );
     expect(unresolvableMenuMessage({ screen: "library" })).toContain("deleted or moved");
   });
 
@@ -80,6 +81,13 @@ describe("application routes", () => {
     expect(signOutLandingRoute({ wasSignedIn: true, signedIn: false })).toEqual({
       screen: "capture",
     });
+  });
+
+  it("keeps an open menu under My menus in the sidebar", () => {
+    expect(sectionForScreen("capture")).toBe("capture");
+    expect(sectionForScreen("editor")).toBe("library");
+    expect(sectionForScreen("item")).toBe("library");
+    expect(sectionForScreen("settings")).toBe("settings");
   });
 
   it("round-trips every supported route and URL-encodes menu ids", () => {

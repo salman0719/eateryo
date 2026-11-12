@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -43,7 +36,7 @@ export function useConfirm() {
           return { ...options, resolve };
         });
       }),
-    [],
+    []
   );
 
   const answer = useCallback((ok: boolean) => {
@@ -72,7 +65,7 @@ function ConfirmDialog({
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
-    () => false,
+    () => false
   );
 
   // Focus the panel on open and return focus to whatever had it before.
@@ -112,16 +105,16 @@ function ConfirmDialog({
         aria-label={cancelLabel}
         tabIndex={-1}
         onClick={() => onAnswer(false)}
-        className="absolute inset-0 bg-stone-900/40"
+        className="absolute inset-0 bg-surface-900/40"
       />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        className="relative w-full max-w-sm rounded-2xl bg-surface-base p-5 shadow-xl"
       >
-        <p id={titleId} className="text-sm text-stone-800">
+        <p id={titleId} className="text-sm text-ink-800">
           {message}
         </p>
         <div className="mt-5 flex justify-end gap-2">
@@ -129,7 +122,7 @@ function ConfirmDialog({
             ref={cancelRef}
             type="button"
             onClick={() => onAnswer(false)}
-            className="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-stone-500"
+            className="rounded-full border border-line-300 px-4 py-2 text-sm font-medium text-ink-700 hover:border-line-500"
           >
             {cancelLabel}
           </button>
@@ -138,8 +131,8 @@ function ConfirmDialog({
             onClick={() => onAnswer(true)}
             className={
               destructive
-                ? "rounded-full bg-red-800 px-4 py-2 text-sm font-medium text-white hover:bg-red-900"
-                : "rounded-full bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-700"
+                ? "rounded-full bg-danger-800 px-4 py-2 text-sm font-medium text-on-accent hover:bg-danger-900"
+                : "rounded-full bg-surface-900 px-4 py-2 text-sm font-medium text-on-accent hover:bg-surface-700"
             }
           >
             {confirmLabel}
@@ -147,6 +140,6 @@ function ConfirmDialog({
         </div>
       </div>
     </div>,
-    document.body,
+    document.body
   );
 }

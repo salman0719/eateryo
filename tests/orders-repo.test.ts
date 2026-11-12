@@ -209,7 +209,9 @@ describe("orders repo", () => {
       updateOrderStatusForStaff(db, ownerA, placed.id, "preparing")
     ).rejects.toMatchObject({ code: "invalid" });
     // Same status is a safe retry, not an error.
-    expect((await updateOrderStatusForStaff(db, ownerA, placed.id, "served")).status).toBe("served");
+    expect((await updateOrderStatusForStaff(db, ownerA, placed.id, "served")).status).toBe(
+      "served"
+    );
   });
 
   it("refuses a stale status write and reports the current order", async () => {
@@ -260,7 +262,10 @@ describe("orders repo", () => {
     const placed = await place([{ menuItemId: "item-flat", quantity: 1 }]);
     await createRestaurant(db, ownerB, "Café B");
 
-    expect(await listOrdersForStaff(db, ownerB)).toEqual({ orders: [], serverTime: expect.any(String) });
+    expect(await listOrdersForStaff(db, ownerB)).toEqual({
+      orders: [],
+      serverTime: expect.any(String),
+    });
     expect(await getOrderForStaff(db, ownerB, placed.id)).toBeNull();
     await expect(
       updateOrderStatusForStaff(db, ownerB, placed.id, "preparing")
@@ -283,8 +288,8 @@ describe("orders repo", () => {
     expect(results.filter((result) => result.allowed)).toHaveLength(12);
     expect(results[12]).toMatchObject({ allowed: false, count: 13 });
     // A different bucket (another window or caller) starts fresh.
-    expect(
-      (await consumeOrderRateLimit(db, "order:bucket-b:minute-1", now, 12)).allowed
-    ).toBe(true);
+    expect((await consumeOrderRateLimit(db, "order:bucket-b:minute-1", now, 12)).allowed).toBe(
+      true
+    );
   });
 });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPreviewPrice, formatPriceDelta } from "../src/features/menu/preview-utils";
+import {
+  formatItemPrice,
+  formatPreviewPrice,
+  formatPreviewPriceList,
+  formatPriceDelta,
+} from "../src/features/menu/preview-utils";
 
 describe("formatPreviewPrice", () => {
   it("renders an em dash for an unknown price instead of inventing one", () => {
@@ -36,5 +41,52 @@ describe("formatPriceDelta", () => {
 
   it("returns an empty string for unknown deltas (nothing invented)", () => {
     expect(formatPriceDelta(null)).toBe("");
+  });
+});
+
+describe("formatPreviewPriceList", () => {
+  it("states the currency once and separates each size with a pipe", () => {
+    expect(formatPreviewPriceList([4.5, 6, 8], "USD", null)).toBe("USD 4.50 | 6.00 | 8.00");
+  });
+
+  it("keeps an unread size's em dash in place instead of dropping it", () => {
+    expect(formatPreviewPriceList([4.5, null, 8], null, "EUR")).toBe("EUR 4.50 | — | 8.00");
+  });
+
+  it("prints no currency when not a single size is priced", () => {
+    expect(formatPreviewPriceList([null, null], "USD", null)).toBe("— | —");
+  });
+
+  it("matches the single-price wording for one amount", () => {
+    expect(formatPreviewPriceList([4.5], null, "USD")).toBe("USD 4.50");
+    expect(formatPreviewPriceList([], "USD", null)).toBe("—");
+  });
+});
+
+describe("formatItemPrice", () => {
+  const item = {
+    price: null,
+    currency: null,
+    variants: [
+      { name: "Small", price: 3 },
+      { name: "Large", price: 5 },
+    ],
+  };
+
+  it("lists every size's price for a per-size dish", () => {
+    expect(formatItemPrice(item, "USD")).toBe("USD 3.00 | 5.00");
+  });
+
+  it("uses the dish's own price when its variants carry none", () => {
+    expect(
+      formatItemPrice(
+        { price: 4.5, currency: null, variants: [{ name: "Small", price: null }] },
+        "USD"
+      )
+    ).toBe("USD 4.50");
+  });
+
+  it("still renders one honest em dash when nothing is priced", () => {
+    expect(formatItemPrice({ price: null, currency: null, variants: [] }, "USD")).toBe("—");
   });
 });

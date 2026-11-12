@@ -91,9 +91,7 @@ describe("suggestDietaryLabels", () => {
   });
 
   it("caps the row", () => {
-    expect(suggestDietaryLabels(vocabulary, { query: "free", limit: 1 })).toEqual([
-      "gluten-free",
-    ]);
+    expect(suggestDietaryLabels(vocabulary, { query: "free", limit: 1 })).toEqual(["gluten-free"]);
     expect(suggestDietaryLabels(vocabulary, { limit: 2 })).toEqual(["vegan", "vegetarian"]);
   });
 });

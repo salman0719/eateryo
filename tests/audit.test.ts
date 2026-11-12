@@ -44,7 +44,13 @@ describe("team audit trail", () => {
     await revokeInvitationForOwner(db, owner, place.id, reissued!.id);
 
     const invitee = await seedUser(db, "invitee@audit.test", "Invitee");
-    const second = await createInvitationForOwner(db, owner, place.id, "invitee@audit.test", "owner");
+    const second = await createInvitationForOwner(
+      db,
+      owner,
+      place.id,
+      "invitee@audit.test",
+      "owner"
+    );
     await acceptInvitation(db, {
       token: second.token,
       userId: invitee,
@@ -161,7 +167,12 @@ describe("describeAuditEvent", () => {
       "Ada revoked the invitation for bo@cafe.test."
     );
     expect(
-      describeAuditEvent({ ...base, action: "invitation_accepted", targetName: "Bo", detail: "owner" })
+      describeAuditEvent({
+        ...base,
+        action: "invitation_accepted",
+        targetName: "Bo",
+        detail: "owner",
+      })
     ).toBe("Bo accepted the invitation and joined as an owner.");
     expect(describeAuditEvent({ ...base, action: "member_added", detail: "owner" })).toBe(
       "Ada added bo@cafe.test as an owner."
@@ -189,8 +200,8 @@ describe("describeAuditEvent", () => {
         detail: null,
       })
     ).toBe("Someone removed a teammate.");
-    expect(
-      describeAuditEvent({ ...base, action: "member_role_changed", detail: null })
-    ).toBe("Ada changed bo@cafe.test's role from one role to another.");
+    expect(describeAuditEvent({ ...base, action: "member_role_changed", detail: null })).toBe(
+      "Ada changed bo@cafe.test's role from one role to another."
+    );
   });
 });

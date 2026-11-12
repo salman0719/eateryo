@@ -9,6 +9,7 @@ import {
 } from "@/lib/db/schema";
 import type { RestaurantRole } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import { accessFromMembership, can } from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { ensureRestaurantSlug } from "@/features/tables/repo";
 
@@ -42,11 +43,7 @@ import { slugCandidates, slugifyMenuTitle } from "./slug";
  */
 
 export type PublicationRepoErrorCode =
-  | "not_found"
-  | "forbidden"
-  | "invalid"
-  | "slug_taken"
-  | "not_published";
+  "not_found" | "forbidden" | "invalid" | "slug_taken" | "not_published";
 
 export class PublicationRepoError extends Error {
   readonly code: PublicationRepoErrorCode;
@@ -82,6 +79,7 @@ interface MenuWithRole {
   doc: unknown;
   updatedAt: Date;
   role: RestaurantRole;
+  permissions: string[] | null;
 }
 
 async function loadMenuWithRole(
@@ -96,6 +94,7 @@ async function loadMenuWithRole(
       doc: menu.doc,
       updatedAt: menu.updatedAt,
       role: restaurantMembership.role,
+      permissions: restaurantMembership.permissions,
     })
     .from(menu)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
@@ -206,7 +205,10 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const candidate = error as { code?: unknown; message?: unknown; cause?: unknown };
   if (candidate.code === "23505") return true;
-  if (typeof candidate.message === "string" && /duplicate key|unique constraint/i.test(candidate.message)) {
+  if (
+    typeof candidate.message === "string" &&
+    /duplicate key|unique constraint/i.test(candidate.message)
+  ) {
     return true;
   }
   return candidate.cause !== error && isUniqueViolation(candidate.cause);
@@ -277,7 +279,7 @@ export async function publishMenuForUser(
 ): Promise<PublicationStatus> {
   const menuRow = await loadMenuWithRole(db, userId, menuId);
   if (!menuRow) throw new PublicationRepoError("not_found", "That menu does not exist.");
-  if (menuRow.role !== "owner") {
+  if (!can(accessFromMembership(menuRow), "menus.publish")) {
     throw new PublicationRepoError("forbidden", "Only the restaurant owner can publish this menu.");
   }
 
@@ -359,8 +361,11 @@ export async function unpublishMenuForUser(
 ): Promise<PublicationStatus> {
   const menuRow = await loadMenuWithRole(db, userId, menuId);
   if (!menuRow) throw new PublicationRepoError("not_found", "That menu does not exist.");
-  if (menuRow.role !== "owner") {
-    throw new PublicationRepoError("forbidden", "Only the restaurant owner can unpublish this menu.");
+  if (!can(accessFromMembership(menuRow), "menus.publish")) {
+    throw new PublicationRepoError(
+      "forbidden",
+      "Only the restaurant owner can unpublish this menu."
+    );
   }
   const existing = await db
     .select({ id: publishedMenu.id })

@@ -39,12 +39,12 @@ interface ProposalReviewProps {
 function ChangeRow({ change }: { change: ProposalChange }) {
   return (
     <div className="grid gap-0.5 text-xs sm:grid-cols-[7.5rem_1fr]">
-      <dt className="font-medium text-stone-600">{change.label}</dt>
-      <dd className="text-stone-800">
+      <dt className="font-medium text-ink-600">{change.label}</dt>
+      <dd className="text-ink-800">
         {change.before !== null && (
           <>
-            <span className="text-stone-500 line-through">{change.before}</span>
-            <span aria-hidden="true" className="px-1 text-stone-400">
+            <span className="text-ink-500 line-through">{change.before}</span>
+            <span aria-hidden="true" className="px-1 text-ink-400">
               →
             </span>
           </>
@@ -108,7 +108,7 @@ function PriceField({
   }
 
   return (
-    <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-stone-600">
+    <label className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-ink-600">
       <span>Price</span>
       <span className="flex items-center gap-1.5">
         <input
@@ -126,18 +126,18 @@ function PriceField({
           }}
           aria-label="Proposed price"
           aria-invalid={error !== null}
-          className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-stone-900 focus:border-amber-700 focus:outline-none disabled:bg-stone-100 ${
-            error ? "border-red-500" : "border-stone-300"
+          className={`w-24 rounded-lg border px-2 py-1 text-sm font-normal text-ink-900 focus:border-accent-700 focus:outline-none disabled:bg-surface-100 ${
+            error ? "border-danger-500" : "border-line-300"
           }`}
         />
-        {currency && <span className="font-normal text-stone-500">{currency}</span>}
+        {currency && <span className="font-normal text-ink-500">{currency}</span>}
       </span>
       {error && (
-        <span role="alert" className="font-normal text-red-700">
+        <span role="alert" className="font-normal text-danger-700">
           {error}
         </span>
       )}
-      <span className="font-normal text-stone-500">You can correct this before approving.</span>
+      <span className="font-normal text-ink-500">You can correct this before approving.</span>
     </label>
   );
 }
@@ -171,24 +171,24 @@ export function ProposalReview({
     <section
       aria-labelledby="proposal-heading"
       aria-busy={busy}
-      className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"
+      className="rounded-2xl border border-warning-200 bg-surface-base p-4 shadow-sm"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h2 id="proposal-heading" className="text-sm font-semibold text-stone-900">
+        <h2 id="proposal-heading" className="text-sm font-semibold text-ink-900">
           Proposed change
         </h2>
-        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
+        <span className="rounded-full bg-warning-100 px-2.5 py-0.5 text-[11px] font-semibold text-warning-900">
           Not saved yet
         </span>
         <span className="flex-1" />
-        <span className="text-xs text-stone-500">{menuTitle}</span>
+        <span className="text-xs text-ink-500">{menuTitle}</span>
       </div>
-      <p className="mt-1 text-xs leading-5 text-stone-600">
+      <p className="mt-1 text-xs leading-5 text-ink-600">
         This diff is computed from your menu, not from the assistant&rsquo;s description. Nothing is
         written until you approve.
       </p>
 
-      <p className="mt-2 text-xs text-stone-500">
+      <p className="mt-2 text-xs text-ink-500">
         {proposal.preview.before.items} → {proposal.preview.after.items} items ·{" "}
         {proposal.preview.before.categories} → {proposal.preview.after.categories} categories
       </p>
@@ -202,9 +202,9 @@ export function ProposalReview({
           return (
             <li
               key={`${operation.op}-${index}`}
-              className="rounded-xl border border-stone-200 bg-stone-50 p-3"
+              className="rounded-xl border border-line-200 bg-surface-50 p-3"
             >
-              <p className="text-sm font-medium text-stone-900">
+              <p className="text-sm font-medium text-ink-900">
                 {preview?.summary ?? operation.op.replaceAll("_", " ")}
               </p>
               {preview && preview.changes.length > 0 && (
@@ -235,7 +235,7 @@ export function ProposalReview({
       {stale && (
         <div
           role="alert"
-          className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900"
+          className="mt-3 rounded-xl border border-warning-300 bg-warning-50 px-3 py-2.5 text-xs leading-5 text-warning-900"
         >
           <p className="font-semibold">This menu changed after the preview</p>
           <p className="mt-0.5">
@@ -246,13 +246,13 @@ export function ProposalReview({
             <button
               type="button"
               onClick={onReviewAgain}
-              className="rounded-full bg-amber-800 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800"
+              className="rounded-full bg-accent-800 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-800"
             >
               Review again
             </button>
             <a
               href={editorHref}
-              className="rounded-full border border-amber-700 px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Open editor
             </a>
@@ -261,7 +261,7 @@ export function ProposalReview({
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}
@@ -271,7 +271,7 @@ export function ProposalReview({
           type="button"
           onClick={onApprove}
           disabled={approveDisabled}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:bg-stone-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:bg-surface-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           {busy ? "Saving…" : "Approve and save"}
         </button>
@@ -279,19 +279,19 @@ export function ProposalReview({
           type="button"
           onClick={onDiscard}
           disabled={busy}
-          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:border-stone-400 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-line-400 hover:bg-surface-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Discard
         </button>
         <a
           href={editorHref}
-          className="text-xs font-medium text-amber-800 underline underline-offset-2 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+          className="text-xs font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
         >
           Edit in editor
         </a>
       </div>
 
-      <p className="mt-2 text-xs text-stone-500">
+      <p className="mt-2 text-xs text-ink-500">
         This changes your draft only — diners keep seeing the published version until you publish
         changes.
       </p>

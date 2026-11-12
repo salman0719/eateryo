@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+import { BrandLockup } from "@/components/ui/brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
@@ -33,7 +34,7 @@ export function OrderSkeleton({ label }: { label: string }) {
     <div
       role="status"
       aria-busy="true"
-      className="rounded-2xl border border-stone-200 bg-white p-6"
+      className="rounded-2xl border border-line-200 bg-surface-base p-6"
     >
       <span className="sr-only">{label}</span>
       <Skeleton className="h-6 w-1/2" />
@@ -63,20 +64,9 @@ export function OrderShell({
   return (
     <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4 px-4 py-6">
       <header className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-700 text-base font-bold text-white"
-          >
-            E
-          </span>
-          <div>
-            <p className="text-sm font-bold tracking-tight text-stone-900">Eateryo</p>
-            <p className="text-xs text-stone-500">Order from your table</p>
-          </div>
-        </div>
+        <BrandLockup tagline="Order from your table" />
         {tableLabel && (
-          <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-900">
+          <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
             {formatTableLabel(tableLabel)}
           </span>
         )}
@@ -141,12 +131,12 @@ export function OrderMenuSection({
   return (
     <section
       aria-label={category.name}
-      className="overflow-hidden rounded-2xl border border-stone-200 bg-white"
+      className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
     >
-      <h2 className="border-b border-stone-100 bg-stone-50 px-5 py-2.5 text-sm font-bold tracking-wide text-stone-800 uppercase">
+      <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
         {category.name}
       </h2>
-      <ul className="divide-y divide-stone-100">
+      <ul className="divide-y divide-line-100">
         {category.items.map((item) => {
           const soldOut = item.available === false;
           // One chip per diet: an older document (or a CSV import) can hold the
@@ -165,10 +155,10 @@ export function OrderMenuSection({
               <div className="flex items-start justify-between gap-3">
                 <MenuItemPhoto item={item} />
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 font-medium text-stone-900">
+                  <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>
                     {soldOut && (
-                      <span className="shrink-0 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
+                      <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                         Sold out
                       </span>
                     )}
@@ -183,7 +173,7 @@ export function OrderMenuSection({
                       {dietaryLabels.map((label) => (
                         <span
                           key={label}
-                          className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-medium text-green-900"
+                          className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
                         >
                           {label}
                         </span>
@@ -191,19 +181,19 @@ export function OrderMenuSection({
                     </div>
                   )}
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-stone-900">
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
                   {formatPreviewPrice(price, null, currency)}
                 </p>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {item.variants.length > 0 && (
-                  <label className="text-xs text-stone-600">
+                  <label className="text-xs text-ink-600">
                     <span className="sr-only">Size for {item.name}</span>
                     <select
                       value={variant?.name ?? ""}
                       onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs text-stone-700 focus:border-amber-700 focus:outline-none"
+                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
                     >
                       {item.variants.map((option) => (
                         <option key={option.name} value={option.name}>
@@ -221,7 +211,7 @@ export function OrderMenuSection({
                     <span
                       key={tick}
                       aria-hidden="true"
-                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-green-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-white shadow"
+                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
                     >
                       Added ✓
                     </span>
@@ -233,7 +223,7 @@ export function OrderMenuSection({
                       onAdd(item);
                       bumpFlash(item.id);
                     }}
-                    className="rounded-full bg-stone-900 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:bg-stone-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {inCart > 0 ? `Add · ${inCart}` : "Add"}
                   </button>
@@ -292,8 +282,8 @@ export function StickyCartBar({
 
   const inner = (
     <div className="mx-auto flex w-full items-center gap-3">
-      <p className="min-w-0 flex-1 truncate text-sm text-stone-700">
-        <span className="font-bold text-stone-900">
+      <p className="min-w-0 flex-1 truncate text-sm text-ink-700">
+        <span className="font-bold text-ink-900">
           {itemCount} {itemCount === 1 ? "item" : "items"}
         </span>{" "}
         · {formatOrderTotal(currency, total)}
@@ -302,7 +292,7 @@ export function StickyCartBar({
         ref={buttonRef}
         type="button"
         onClick={onViewOrder}
-        className="shrink-0 rounded-full bg-amber-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 active:scale-95"
+        className="shrink-0 rounded-full bg-accent-700 px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 active:scale-95"
       >
         View order
       </button>
@@ -312,7 +302,7 @@ export function StickyCartBar({
   if (contained) {
     return (
       <div
-        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur"
+        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {inner}
@@ -324,7 +314,7 @@ export function StickyCartBar({
     <>
       <div aria-hidden="true" className="h-16" />
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200 bg-white/95 px-4 pt-3 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-full max-w-4xl">{inner}</div>

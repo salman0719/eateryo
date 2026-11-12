@@ -36,8 +36,8 @@ export function JourneySteps({
               className={[
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-xs",
                 status === "upcoming"
-                  ? "border border-stone-300 bg-white text-stone-600"
-                  : "bg-amber-700 text-white",
+                  ? "border border-line-300 bg-surface-base text-ink-600"
+                  : "bg-accent-700 text-on-accent",
               ].join(" ")}
             >
               {status === "done" ? (
@@ -53,10 +53,10 @@ export function JourneySteps({
               className={[
                 "text-[11px] leading-tight sm:text-sm",
                 status === "current"
-                  ? "font-semibold text-stone-900"
+                  ? "font-semibold text-ink-900"
                   : status === "done"
-                    ? "font-medium text-stone-700"
-                    : "font-medium text-stone-600",
+                    ? "font-medium text-ink-700"
+                    : "font-medium text-ink-600",
               ].join(" ")}
             >
               {label}
@@ -64,7 +64,7 @@ export function JourneySteps({
             {index < JOURNEY_STEPS.length - 1 && (
               <span
                 aria-hidden="true"
-                className={`h-px flex-1 ${index < current ? "bg-amber-300" : "bg-stone-200"}`}
+                className={`h-px flex-1 ${index < current ? "bg-accent-300" : "bg-surface-200"}`}
               />
             )}
           </li>

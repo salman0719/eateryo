@@ -156,6 +156,13 @@ export const restaurantMembership = pgTable(
     role: text("role", { enum: ["owner", "staff"] })
       .notNull()
       .$defaultFn(() => "owner" as RestaurantRole),
+    /**
+     * Explicit capability grant for this membership (see
+     * `src/features/tenancy/permissions.ts`). Empty means "the role's
+     * defaults", so existing rows need no backfill; a non-empty array is the
+     * member's full staff grant. Owners always hold every capability.
+     */
+    permissions: text("permissions").array().notNull().default([]),
     createdAt: createdAt(),
   },
   (t) => ({
@@ -468,10 +475,7 @@ export const orderEmailLog = pgTable(
   },
   (t) => ({
     orderUnique: uniqueIndex("order_email_log_order_unique").on(t.orderId),
-    restaurantSentIdx: index("order_email_log_restaurant_sent_idx").on(
-      t.restaurantId,
-      t.sentAt
-    ),
+    restaurantSentIdx: index("order_email_log_restaurant_sent_idx").on(t.restaurantId, t.sentAt),
   })
 );
 

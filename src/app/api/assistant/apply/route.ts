@@ -4,6 +4,7 @@ import { applyProposalOperations, ProposalApplyError } from "@/features/assistan
 import { applyProposalRequestSchema } from "@/features/assistant/proposal";
 import { resolveFeatureContext } from "@/features/flags/server";
 import { getMenuWithRoleForUser, MenuRepoError, updateMenuForUser } from "@/features/menus/repo";
+import { can } from "@/features/tenancy/policy";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logEvent, requestIdFrom } from "@/lib/observability/log";
@@ -117,7 +118,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return errorResponse("server_db_unavailable", PUBLIC_MESSAGES.db_unavailable, 503);
   }
 
-  if (loaded.role !== "owner") {
+  if (!can(loaded.access, "menus.write")) {
     logEvent("warn", "assistant.apply_forbidden", { requestId, userId, menuId });
     return errorResponse("forbidden", PUBLIC_MESSAGES.forbidden, 403);
   }

@@ -4,6 +4,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { restaurant, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole, RestaurantWithRole } from "@/lib/db/schema";
 import { recordAuditEvent } from "./audit";
+import { accessFromMembership, can, getMembershipAccess, type MembershipAccess } from "./policy";
 
 /**
  * Tenancy repository — every function is scoped by `userId` so a signed-in
@@ -27,18 +28,36 @@ const restaurantColumns = {
 } as const;
 const membershipSelect = (db: TenancyDb) =>
   db
-    .select({ ...restaurantColumns, role: restaurantMembership.role })
+    .select({
+      ...restaurantColumns,
+      role: restaurantMembership.role,
+      permissions: restaurantMembership.permissions,
+    })
     .from(restaurant)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, restaurant.id));
+
+/** A restaurant row plus the caller's resolved capabilities in it. */
+export type RestaurantWithAccess = RestaurantWithRole & { access: MembershipAccess };
+
+function withAccess(
+  row: RestaurantWithRole & { permissions: readonly string[] | null }
+): RestaurantWithAccess {
+  const { permissions, ...rest } = row;
+  return {
+    ...rest,
+    access: accessFromMembership({ role: row.role, permissions }),
+  };
+}
 
 /** All restaurants the user is owner or staff of, oldest first. */
 export async function listRestaurantsForUser(
   db: TenancyDb,
   userId: string
-): Promise<RestaurantWithRole[]> {
-  return membershipSelect(db)
+): Promise<RestaurantWithAccess[]> {
+  const rows = await membershipSelect(db)
     .where(eq(restaurantMembership.userId, userId))
     .orderBy(asc(restaurant.createdAt));
+  return rows.map(withAccess);
 }
 
 /** One restaurant the user belongs to, or null (no leak of other tenants). */
@@ -46,11 +65,11 @@ export async function getRestaurantForUser(
   db: TenancyDb,
   userId: string,
   restaurantId: string
-): Promise<RestaurantWithRole | null> {
+): Promise<RestaurantWithAccess | null> {
   const rows = await membershipSelect(db).where(
     and(eq(restaurantMembership.userId, userId), eq(restaurant.id, restaurantId))
   );
-  return rows[0] ?? null;
+  return rows[0] ? withAccess(rows[0]) : null;
 }
 
 /**
@@ -65,11 +84,11 @@ export async function getRestaurantForUser(
 export async function getOwnedRestaurantForUser(
   db: TenancyDb,
   userId: string
-): Promise<RestaurantWithRole | null> {
+): Promise<RestaurantWithAccess | null> {
   const rows = await membershipSelect(db).where(
     and(eq(restaurantMembership.userId, userId), eq(restaurantMembership.role, "owner"))
   );
-  return rows[0] ?? null;
+  return rows[0] ? withAccess(rows[0]) : null;
 }
 
 /**
@@ -114,16 +133,16 @@ export async function renameRestaurantForOwner(
   userId: string,
   restaurantId: string,
   name: string
-): Promise<RestaurantWithRole | null> {
-  const role = await ownerRoleOf(db, userId, restaurantId);
-  if (role !== "owner") return null;
+): Promise<RestaurantWithAccess | null> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return null;
   const updated = await db
     .update(restaurant)
     .set({ name })
     .where(eq(restaurant.id, restaurantId))
     .returning(restaurantColumns);
   const row = updated[0];
-  return row ? { ...row, role } : null;
+  return row ? { ...row, role: access.role, access } : null;
 }
 
 /** Owner-only delete (memberships cascade). False when not allowed / unknown. */
@@ -132,8 +151,8 @@ export async function deleteRestaurantForOwner(
   userId: string,
   restaurantId: string
 ): Promise<boolean> {
-  const role = await ownerRoleOf(db, userId, restaurantId);
-  if (role !== "owner") return false;
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return false;
   const deleted = await db
     .delete(restaurant)
     .where(eq(restaurant.id, restaurantId))
@@ -186,17 +205,12 @@ const memberSelect = (db: TenancyDb) =>
  * Owner gate for member management. Non-members get `not_found` (ids stay
  * unprobeable across tenants), staff gets `forbidden`.
  */
-async function requireOwner(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<"owner"> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) throw new TenancyRepoError("not_found", "That restaurant does not exist.");
-  if (role !== "owner") {
+async function requireOwner(db: TenancyDb, userId: string, restaurantId: string): Promise<void> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) throw new TenancyRepoError("not_found", "That restaurant does not exist.");
+  if (!can(access, "team.manage")) {
     throw new TenancyRepoError("forbidden", "Only the restaurant owner can manage members.");
   }
-  return "owner";
 }
 
 /**
@@ -248,7 +262,10 @@ export async function addMemberForOwner(
     );
   }
   if (await getMember(db, restaurantId, target.id)) {
-    throw new TenancyRepoError("already_member", "That account already belongs to this restaurant.");
+    throw new TenancyRepoError(
+      "already_member",
+      "That account already belongs to this restaurant."
+    );
   }
   // An account owns at most one café (006); they can still join as staff.
   if (role === "owner" && (await ownsAnyRestaurant(db, target.id))) {
@@ -262,7 +279,10 @@ export async function addMemberForOwner(
     await db.insert(restaurantMembership).values({ restaurantId, userId: target.id, role });
   } catch {
     // Unique (restaurant, user) index — a concurrent add won the race.
-    throw new TenancyRepoError("already_member", "That account already belongs to this restaurant.");
+    throw new TenancyRepoError(
+      "already_member",
+      "That account already belongs to this restaurant."
+    );
   }
   await recordAuditEvent(db, {
     restaurantId,
@@ -329,7 +349,8 @@ export async function updateMemberRoleForOwner(
       );
   }
   const changed = await getMember(db, restaurantId, targetUserId);
-  if (!changed) throw new TenancyRepoError("not_found", "That member does not belong to this restaurant.");
+  if (!changed)
+    throw new TenancyRepoError("not_found", "That member does not belong to this restaurant.");
   await recordAuditEvent(db, {
     restaurantId,
     actorUserId: userId,
@@ -395,30 +416,4 @@ async function getMember(
     )
   );
   return rows[0] ?? null;
-}
-
-/** The caller's role in the restaurant, or null if they are not a member. */
-async function roleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<RestaurantRole | null> {
-  const rows = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.userId, userId),
-        eq(restaurantMembership.restaurantId, restaurantId)
-      )
-    );
-  return rows[0]?.role ?? null;
-}
-
-async function ownerRoleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<"owner" | null> {
-  return (await roleOf(db, userId, restaurantId)) === "owner" ? "owner" : null;
 }

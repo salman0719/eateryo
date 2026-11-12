@@ -3,6 +3,14 @@
 This file is the single source of truth for automated contributors.
 Read it before making any change.
 
+## Local, per-machine notes
+
+If `local/MEMORY.md` exists in this checkout, read it before starting work and
+follow it. It holds per-machine preferences — commit wording, tool habits,
+workflow notes — and lives in the gitignored `local/` sandbox, so **its absence
+is normal, not an error**. It may add personal preference on top of this file;
+it never relaxes the security, scope, or tenancy rules below.
+
 ## Project
 
 Eateryo — see `PLAN.md` for mission, stack, and the Phase 1
@@ -22,9 +30,6 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 
 ## Critical commit rules
 
-- NEVER add "Co-authored-by", "Co-Authored-By", "Generated with", "Generated-by",
-  or any AI attribution trailer or line to any commit message, PR description,
-  or code comment. This is a hard rule with no exceptions.
 - Keep commits small, focused, and easy to review.
 - Do not commit secrets. Never commit `.env.local` or any real API key.
 
@@ -38,9 +43,29 @@ schedules them**, and nothing outside `PHASE-2.md`'s scope.
 - Do NOT add shadcn/ui (user decision). Use Tailwind + small local primitives.
 - Do not add dependencies unless they materially reduce effort or improve reliability.
 
+## Local workspace (`local/`)
+
+`local/` is the research and experiment sandbox. `local/README.md` is the only
+tracked file there; read it before starting research, a spike, a prototype, or
+a one-off investigation.
+
+- Look for an existing topic folder first and reuse the one whose purpose fits.
+- Create a kebab-case folder only when none fits, and add it to the README's
+  folder index in the same change.
+- Keep the root of `local/` for the README and genuinely cross-topic files;
+  put one-off scripts and outputs in a topic folder.
+- Deliverables are HTML, not Markdown-only. Markdown is for source notes and
+  folder READMEs.
+- A serious finding may live there, but anything that changes a product or
+  roadmap decision must also be promoted into tracked repo docs or the issue
+  log. Nothing under `local/` except its README is committed.
+
 ## Quality gates (run before finishing)
 
 - `npm run lint`
+- `npm run format:check` (Prettier, no writes; fix with `npm run format`)
+- `npm run theme:check` (cheap: fails if the generated icon or token module is
+  stale; regenerate with `npm run theme:tokens` when `theme.css` changes)
 - `npm run typecheck`
 - `npm run test`
 - `npm run build`
@@ -53,6 +78,17 @@ errors, or add lint/type suppressions just to make checks pass.
 ## Stack rules
 
 - Next.js App Router + TypeScript strict + Tailwind CSS.
+- Colour usage: components name the role tokens in `src/app/theme.css` —
+  `ink` (text), `surface` (backgrounds), `line` (borders, dividers, rings),
+  `accent` (brand actions, focus rings, links), `warning` (caution and
+  draft/paused/review states, never a primary action), `danger`, `success`, `info`,
+  `on-accent` (text on a filled control), `scrim` (the overlay behind a sheet).
+  Never add raw palette utilities (`text-stone-<shade>`,
+  `bg-white`, `border-amber-<shade>`) in new or edited code; name a role token
+  instead. A colour that genuinely
+  cannot belong to a role is allowed on the bespoke component alone, with a
+  comment saying why no category applies. Token values change in `theme.css`
+  only — never inline in a component.
 - Zod for AI output, stored records, and imported files.
 - Image extraction vendors (Gemini, Groq) only via the server-side route
   (`src/app/api/extract-menu/route.ts`). Keys live in `GEMINI_API_KEY` /
@@ -88,6 +124,50 @@ errors, or add lint/type suppressions just to make checks pass.
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
   serves only the Tables tab — the menu editor's Table QR mode is removed.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
+- `src/components/layout/app-sidebar.tsx`, `sidebar-preference.ts` — the app's
+  left column: destinations from `availableSections` (signed-out gating included),
+  the open menu's outline in the edit workspace, the account, and a
+  rail/expanded toggle whose choice is remembered. Widths are CSS driven by
+  `data-sidebar` on `<html>`, set before paint by the boot script in
+  `layout.tsx` so a saved choice never flashes. The app shell has no desktop
+  header; `site-header.tsx` stays for content pages (launch, legal, dev).
+  The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
+  drops it once the session has settled as signed out with nothing in the
+  library, because a column holding the single row "Capture" reads as a broken
+  menu, not as a front door. It stays off while the session or the library is
+  still answering — an unanswered read is neither signed in nor signed out,
+  so the shell holds a neutral placeholder instead of guessing — and for a
+  visitor holding drafts, whose My menus is a real destination. The brand wrapper inside it must stay a
+  flex container — the rail centres it with `justify-content` alone, so a
+  block wrapper puts the tile at the padding edge while the icons below stay
+  centred (`tests/sidebar-brand.test.ts` holds that).
+- `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
+  one brand lockup (tile + name, role tokens only) and the row that carries it
+  wherever the column is absent: below `sm` always, and at every width for a
+  visitor. Signed out it is the only sign-in path there is — the sidebar's
+  account block is desktop-only and the More sheet is signed-in only — so it
+  carries `/sign-in` itself, and it shows nothing extra while the session is
+  unanswered. The chosen identity (concept 7, "The Hidden Eat") is not applied
+  yet: the theme landed first, then the drawn lockup replaces the text in
+  `brand.tsx` only.
+- `src/components/pages/capture-page.tsx` — the capture screen, and therefore
+  the front door. Signed out with an empty page it renders the entry
+  composition (one promise, the photo field, three claims the app actually
+  keeps; two columns from `lg`, one on a phone so the field is never below the
+  fold). The moment a photo exists — or the visitor is known to be signed in —
+  it returns to the plain working layout, and an owner never sees the entry.
+- `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
+  plus the role ramps components use; the Theme Studio edits this file. Colour
+  and font decisions belong here, never inline in a component.
+- `scripts/build-theme-tokens.mjs`, `src/lib/theme/tokens.ts` — the two
+  surfaces that cannot read a CSS variable, the app icon and the HTML emails,
+  take their colours from the theme: the script resolves `theme.css` into
+  `src/lib/theme/theme-tokens.ts` and `src/app/icon.svg`. Both are committed
+  files, written only when the script is run: a colour change runs
+  `npm run theme:tokens` deliberately and commits the two with the theme.
+  `npm run theme:check` (in the gate list) fails when they are stale. Never
+  hand-edit them; `tests/theme-tokens.test.ts` catches that, and fails if a hex
+  literal returns to `src/lib/email-layout.ts`.
 - `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
   the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
   shared by capture and the publish wizard. Signing in is a gate inside
@@ -95,6 +175,15 @@ errors, or add lint/type suppressions just to make checks pass.
   wizard continues it only when the flow came through review
   (`rememberPublishJourney`), so a plain library deep link gets a heading
   instead of a tracker with a false "3 done".
+- `src/components/ui/icons.tsx` — the hand-drawn icon set (no icon
+  dependency): stroked 24-grid glyphs that inherit `currentColor` and are
+  `aria-hidden`, so the control around them carries the label. Starts with
+  `ChevronUpIcon`/`ChevronDownIcon` for the editor's disclosures.
+- `src/components/ui/collapse.tsx` — the disclosure animation: a one-row CSS
+  grid whose track goes 0fr ↔ 1fr, so both directions animate, a mid-flight
+  toggle retargets instead of jumping, and nothing is measured; content stays
+  mounted and `inert` while shut, and reduced motion snaps. The wrapper must
+  stay layout-neutral — padding and borders belong on the content inside.
 - `src/lib/motion/height-reveal.ts`, `src/components/ui/height-reveal.tsx` —
   reusable height-reveal animation: measures the rendered content and
   animates the wrapper 0 → that height with WAAPI, retargets mid-flight, then
@@ -107,6 +196,21 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
   session guard, sign-in page
+- `src/lib/auth/dev-sign-in.ts`, `src/app/api/dev/magic-link/` — the
+  `DEV_SIGN_IN_BYPASS=1` local shortcut: the auth instance parks the freshly
+  minted link instead of emailing it and the sign-in page offers it as an
+  explicit button, so the browser still walks the real verification route.
+  Every surface that offers a magic link reads the parked link back through
+  `src/components/auth/dev-sign-in-link.tsx` (`useDevSignInLink` +
+  `DevSignInPanel`); a surface that only calls `signIn.magicLink` claims an
+  email was sent while the link sits unread in the store — the invitation
+  page did exactly that until 2026-11-09.
+  Off in production whatever the variable says (the flag check returns false
+  for `NODE_ENV=production`), never a direct session insert, one read per
+  link for the address that asked, five-minute window. The store sits on
+  `globalThis` because each route entrypoint is its own module instance: a
+  module-level one is empty in the route that reads it, which made every dev
+  sign-in report an expired link. Tests: `tests/dev-sign-in.test.ts`
 - `src/features/session/state.ts` — the pure tri-state session read
   (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
   matrix; a page load whose session has not answered is **never** treated as
@@ -114,6 +218,13 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/features/tenancy/repo.ts`, `src/app/api/restaurants/` —
   ownership-scoped restaurant repository + API (session id only);
   `src/features/tenancy/client.ts` — typed browser client for it
+- `src/features/tenancy/workspace.ts`,
+  `src/components/layout/workspace-switcher.tsx` — the one membership the
+  shell acts in. One sign-in can hold an owner café and a staff café, so the
+  shell asks only the active membership's capabilities (never a union), and
+  Settings/Tables follow the same café instead of keeping a second picker;
+  the choice is a per-account device preference. Tests:
+  `tests/tenancy-workspace.test.ts`.
 - `src/features/tenancy/invitations.ts`, `invite-mailer.ts`,
   `src/app/api/invitations/`, `src/app/invitations/[token]/` — one-time
   email invitations: hash-only tokens, email-match accept, 7-day expiry,
@@ -150,7 +261,7 @@ errors, or add lint/type suppressions just to make checks pass.
   surfaces (save status, publish hint, Table ordering card, storage footnote)
   render placeholders with the wait announced only to screen readers, so no
   sentence is printed and then retracted. `unreachable` is the read that
-  settled by *failing*: those surfaces say the account couldn't be checked and
+  settled by _failing_: those surfaces say the account couldn't be checked and
   offer **Try again**, the save status never claims browser-only, and the
   café-creating flow stays off because it would mint tenancy on a guess (016).
   Tests: `tests/menu-membership.test.ts`, `tests/editor-membership.test.ts`.
@@ -210,7 +321,13 @@ errors, or add lint/type suppressions just to make checks pass.
   noindex) with
   `src/components/order/` (`order-menu.tsx` shared UI, `order-sheet.tsx` the
   shared cart sheet, `server-table-order.tsx`, `table-order.tsx` for local
-  mode, `table-order-tabs.tsx` for the multi-menu landing); staff board
+  mode, `table-order-tabs.tsx` for the multi-menu landing and
+  `table-landing.tsx` the landing screen that owns it). The confirmation every
+  flow ends on is its own module, `order-received.tsx`: it is a different
+  screen from the ordering page (nothing may say "2 menus are open" after the
+  order is in), it never borrows that page's chrome, and it is where the
+  receipt (status, timing) will grow. Flows hand it an `Order` and their own
+  footnote; they never render the receipt's markup. Staff board
   `src/components/orders/server-orders-board.tsx` (5 s polling with backoff
   and a visible reconnect state) behind the session switch in
   `orders-board.tsx`. Tests: `tests/orders-repo.test.ts`,
@@ -233,7 +350,8 @@ errors, or add lint/type suppressions just to make checks pass.
   `repo.ts` (record/summarize/count), `client.ts`; `src/app/api/usage/`
 - `src/features/launch/` — onboarding snapshot (`repo.ts`), pure checklist
   derivation (`steps.ts`), schemas + client; `/api/launch`, page `/launch`,
-  UI in `src/components/launch/` (checklist, usage panel, data controls)
+  UI in `src/components/launch/` (checklist, plus the account export card and
+  the account danger zone, both rendered by Settings)
 - `src/features/retention/` — Step 11 retention: `schema.ts` (window config),
   `repo.ts` (`purgeOldOrders`, `buildAccountExport`, `deleteAccountForUser`,
   `isCronAuthorized`), `client.ts`; routes `/api/account` (DELETE),

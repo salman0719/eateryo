@@ -23,12 +23,17 @@ interface CommitInputProps {
   placeholder?: string;
   multiline?: boolean;
   inputClassName?: string;
+  /** Keep the label for screen readers only, when the field is a heading. */
+  hideLabel?: boolean;
 }
 
 const baseInput =
-  "w-full rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 " +
+  "w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 " +
+  // The browser's own placeholder is the field's text at half opacity (3.4:1);
+  // name the faint-text tone instead so it clears 4.5:1 like every other label.
+  "placeholder:text-ink-500 " +
   // Textareas get no resize handle on touch (undraggable); desktop keeps vertical resize.
-  "resize-none focus:border-amber-700 focus:outline-none sm:resize-y";
+  "resize-none focus:border-accent-700 focus:outline-none sm:resize-y";
 
 export function CommitInput({
   label,
@@ -38,6 +43,7 @@ export function CommitInput({
   placeholder,
   multiline,
   inputClassName,
+  hideLabel = false,
 }: CommitInputProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,14 +91,16 @@ export function CommitInput({
         (event.target as HTMLElement).blur();
       }
     },
-    className: [baseInput, error ? "border-red-500" : "", inputClassName ?? ""].join(" "),
+    className: [baseInput, error ? "border-danger-500" : "", inputClassName ?? ""].join(" "),
   };
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-stone-500">{label}</span>
+      <span className={hideLabel ? "sr-only" : "mb-1 block text-xs font-medium text-ink-500"}>
+        {label}
+      </span>
       {multiline ? <textarea rows={2} {...shared} /> : <input type="text" {...shared} />}
-      {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
+      {error && <span className="mt-0.5 block text-xs text-danger-700">{error}</span>}
     </label>
   );
 }
@@ -115,10 +123,10 @@ interface CommitTagsProps {
 function KeyHint({ glyph, children }: { glyph: string; children: string }) {
   return (
     <span className="inline-flex items-center gap-1 whitespace-nowrap">
-      <span className="font-semibold text-stone-700">{children}</span>
+      <span className="font-semibold text-ink-700">{children}</span>
       <kbd
         aria-hidden="true"
-        className="rounded border border-stone-300 bg-white px-1 py-px font-sans text-[10px] leading-none text-stone-500"
+        className="rounded border border-line-300 bg-surface-base px-1 py-px font-sans text-[10px] leading-none text-ink-500"
       >
         {glyph}
       </kbd>
@@ -163,9 +171,9 @@ export function CommitTags({
           marks where the instruction starts, and the muted hint keeps the
           bold key names from reading as more of the field's name. */}
       <span className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-        <span className="font-medium text-stone-700">{label}</span>
-        <span aria-hidden="true" className="h-3 w-px self-center bg-stone-300" />
-        <span className="inline-flex flex-wrap items-center gap-x-1 text-[11px] text-stone-500">
+        <span className="font-medium text-ink-700">{label}</span>
+        <span aria-hidden="true" className="h-3 w-px self-center bg-surface-300" />
+        <span className="inline-flex flex-wrap items-center gap-x-1 text-[11px] text-ink-500">
           <span>Press</span>
           <KeyHint glyph="⏎">Enter</KeyHint>
           <span>,</span>
@@ -179,7 +187,8 @@ export function CommitTags({
         <ul className="mb-1.5 flex flex-wrap gap-1.5">
           {tags.map((tag) => (
             <li key={tag}>
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-green-900">
+              {/* A tag is content, not a status: neutral chip, no hue. */}
+              <span className="inline-flex items-center gap-1 rounded-full bg-surface-100 py-0.5 pr-1 pl-2.5 text-xs font-medium text-ink-700">
                 {tag}
                 <button
                   type="button"
@@ -190,7 +199,7 @@ export function CommitTags({
                     event.preventDefault();
                     commit(tags.filter((candidate) => candidate !== tag));
                   }}
-                  className="rounded-full px-1 leading-none text-green-900/70 hover:text-green-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-700"
+                  className="rounded-full px-1 leading-none text-ink-500 hover:text-ink-800 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent-700"
                 >
                   ✕
                 </button>
@@ -238,7 +247,7 @@ export function CommitTags({
       />
       {offered.length > 0 && (
         <div data-suggestion-row className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-stone-500">
+          <span className="text-[11px] text-ink-500">
             {draft.trim() ? "Matching" : "Already used"}:
           </span>
           {offered.map((candidate) => (
@@ -256,14 +265,14 @@ export function CommitTags({
               // The click adds it: for the mouse, and for Enter or Space on the
               // focused button, which is what a button is expected to do.
               onClick={() => commit([...tags, candidate])}
-              className="rounded-full border border-dashed border-stone-300 px-2 py-0.5 text-[11px] text-stone-600 hover:border-amber-700 hover:text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-dashed border-line-300 px-2 py-0.5 text-[11px] text-ink-600 hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               + {candidate}
             </button>
           ))}
         </div>
       )}
-      {hint && <span className="mt-1 block text-[11px] text-stone-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-[11px] text-ink-500">{hint}</span>}
     </div>
   );
 }
@@ -312,7 +321,7 @@ export function CommitNumber({
 
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-medium text-stone-500">{label}</span>
+      <span className="mb-1 block text-xs font-medium text-ink-500">{label}</span>
       <input
         type="number"
         min="0"
@@ -334,9 +343,9 @@ export function CommitNumber({
             (event.target as HTMLElement).blur();
           }
         }}
-        className={[baseInput, error ? "border-red-500" : "", inputClassName ?? ""].join(" ")}
+        className={[baseInput, error ? "border-danger-500" : "", inputClassName ?? ""].join(" ")}
       />
-      {error && <span className="mt-0.5 block text-xs text-red-700">{error}</span>}
+      {error && <span className="mt-0.5 block text-xs text-danger-700">{error}</span>}
     </label>
   );
 }

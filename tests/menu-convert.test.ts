@@ -70,7 +70,11 @@ describe("extractedMenuToDocument", () => {
     // A café name on the photo is the café, not the menu: the menu is the
     // main one (and its address becomes /m/main-menu), while the café name
     // survives as provenance for the onboarding suggestion.
-    const cafe = extractedMenuToDocument({ title: "Pizza Tabrabane", currency: null, categories: [] });
+    const cafe = extractedMenuToDocument({
+      title: "Pizza Tabrabane",
+      currency: null,
+      categories: [],
+    });
     expect(cafe.title).toBe("Main Menu");
     expect(cafe.source?.originalTitle).toBe("Pizza Tabrabane");
 
@@ -148,10 +152,11 @@ describe("appendExtractionToDocument", () => {
   it("appends categories without touching the existing document", () => {
     const doc = base();
     const before = JSON.parse(JSON.stringify(doc.categories[0]));
-    const { doc: merged, addedItems, addedCategories } = appendExtractionToDocument(
-      doc,
-      extraPage()
-    );
+    const {
+      doc: merged,
+      addedItems,
+      addedCategories,
+    } = appendExtractionToDocument(doc, extraPage());
     expect(() => menuDocumentSchema.parse(merged)).not.toThrow();
     // Existing content is byte-identical; the menu title stands.
     expect(merged.categories[0]).toEqual(before);
@@ -181,7 +186,11 @@ describe("appendExtractionToDocument", () => {
 
   it("handles an empty later extraction as a no-op with zero counts", () => {
     const doc = base();
-    const { doc: merged, addedItems, addedCategories } = appendExtractionToDocument(doc, {
+    const {
+      doc: merged,
+      addedItems,
+      addedCategories,
+    } = appendExtractionToDocument(doc, {
       title: null,
       currency: null,
       categories: [],

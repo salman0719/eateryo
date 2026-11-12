@@ -123,12 +123,9 @@ export async function prepareImageForUpload(file: File): Promise<PreparedImage> 
   // Re-wrap only when the declared type disagrees with the real bytes, so the
   // server and provider see the honest MIME type.
   const blob =
-    file.type === decision.mimeType
-      ? file
-      : new Blob([file], { type: decision.mimeType });
+    file.type === decision.mimeType ? file : new Blob([file], { type: decision.mimeType });
   const filename =
-    (file.name || "menu").split(".").pop()!.toLowerCase() ===
-    extensionFor(decision.mimeType)
+    (file.name || "menu").split(".").pop()!.toLowerCase() === extensionFor(decision.mimeType)
       ? file.name
       : replaceExtension(file.name, extensionFor(decision.mimeType));
   return { blob, mimeType: decision.mimeType, filename };

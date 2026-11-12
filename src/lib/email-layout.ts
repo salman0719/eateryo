@@ -1,10 +1,24 @@
 /**
  * Shared branded layout for Eateryo emails (server-only).
  *
- * All bodies use table layout + inline styles (email-client safe),
- * system fonts only, max ~520px. Logo is the "E" in a rounded amber
- * square (#b45309), matching site-header.tsx + icon.svg.
+ * All bodies use table layout + inline styles (email-client safe), system fonts
+ * only, max ~520px.
+ *
+ * The header mark is the app's own icon (`src/app/icon.svg`), linked and not
+ * embedded: Gmail, every Outlook, Yahoo and AOL strip an inline `<svg>`, while a
+ * linked `.svg` renders nearly everywhere — Gmail rasterises it server-side, and
+ * only Word-engine Outlook shows nothing but the alt text. The URL carries a
+ * digest of the icon file the generator wrote, because mail proxies cache an
+ * image by URL: an unversioned one would keep serving the old tile after any
+ * change to the artwork, not just after a palette change.
+ * Email clients do not resolve CSS variables, so every colour is resolved from
+ * the theme instead of typed here: `themeColor` reads the values
+ * `scripts/build-theme-tokens.mjs` generates from `src/app/theme.css`. A theme
+ * change therefore reaches the mailbox, and this file holds no palette of its
+ * own — `tests/theme-tokens.test.ts` fails if a hex literal creeps back in.
  */
+import { ICON_REVISION } from "@/lib/theme/theme-tokens";
+import { themeColor } from "@/lib/theme/tokens";
 
 /** Escape user-controlled text interpolated into email HTML. */
 export function escapeEmailHtml(value: string): string {
@@ -15,25 +29,55 @@ export function escapeEmailHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-const OUTER_BG = "#f5f4f2";
-const CARD_BG = "#ffffff";
-const CARD_BORDER = "#e7e5e4";
-const INK = "#1c1917";
-const BODY_TEXT = "#44403c";
-const MUTED = "#78716c";
-const FAINT = "#a8a29e";
-const AMBER = "#b45309";
-const AMBER_BG = "#fef3c7";
-const AMBER_BORDER = "#fde68a";
-const AMBER_DARK = "#92400e";
+const OUTER_BG = themeColor("background");
+const CARD_BG = themeColor("surface-base");
+const CARD_BORDER = themeColor("line-200");
+const INK = themeColor("ink-900");
+const BODY_TEXT = themeColor("ink-700");
+const MUTED = themeColor("ink-600");
+const FAINT = themeColor("ink-500");
+const BRAND = themeColor("accent-700");
+const BRAND_BG = themeColor("accent-50");
+const BRAND_BORDER = themeColor("accent-200");
+const BRAND_DARK = themeColor("accent-900");
+const ON_BRAND = themeColor("on-accent");
+const SURFACE_SOFT = themeColor("surface-50");
 
-/** Centered "E" mark used in every email header. */
-export function emailLogoMark(accent: string = AMBER, markColor = "#ffffff"): string {
+/**
+ * Absolute, versioned URL of the app icon. A link in an email must be absolute,
+ * and the origin is taken from the message's own action URL — the same host the
+ * recipient is about to visit, so a dev link stays on the dev server.
+ *
+ * `v` is the digest of the icon file itself (see `scripts/build-theme-tokens.mjs`),
+ * so the cache key moves with the artwork and not merely with the palette.
+ */
+export function emailIconUrl(url: string): string {
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    // A relative action URL is already broken in email; keep the mark on the
+    // same host as the rest of the message rather than pointing it at nothing.
+    origin = url.replace(/\/+$/, "");
+  }
+  return `${origin}/icon.svg?v=${ICON_REVISION}`;
+}
+
+/**
+ * The brand mark in every email header: the app icon, linked.
+ *
+ * `alt` carries the name where nothing is drawn — Word-engine Outlook never
+ * renders a linked SVG and blocks images by default — so the name also stays a
+ * line of live text directly beneath the mark.
+ */
+export function emailLogoMark(url: string): string {
+  const src = escapeEmailHtml(emailIconUrl(url));
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0"><tr>` +
-    `<td align="center" style="width:48px;height:48px;background:${accent};border-radius:12px;` +
-    `font-family:Arial,sans-serif;font-size:26px;font-weight:bold;color:${markColor};line-height:48px">E</td>` +
-    `</tr></table>`
+    `<td align="center" width="48" height="48" style="width:48px;height:48px">` +
+    `<img src="${src}" width="48" height="48" alt="Eateryo" ` +
+    `style="display:block;width:48px;height:48px;border:0;outline:none;text-decoration:none" />` +
+    `</td></tr></table>`
   );
 }
 
@@ -77,16 +121,16 @@ export function emailPage(options: {
   );
 }
 
-/** Primary amber call-to-action button (with Outlook VML fallback). */
+/** Primary brand call-to-action button (with Outlook VML fallback). */
 export function emailCtaButton(label: string, url: string): string {
   const safeUrl = escapeEmailHtml(url);
   const safeLabel = escapeEmailHtml(label);
   return (
     `<!--[if mso]><v:roundrect href="${safeUrl}" style="width:240px;height:48px" ` +
-    `arcsize="25%" fillcolor="${AMBER}" stroke="f">` +
-    `<center style="color:#ffffff;font-family:Arial;font-size:16px;font-weight:bold">${safeLabel}</center>` +
+    `arcsize="25%" fillcolor="${BRAND}" stroke="f">` +
+    `<center style="color:${ON_BRAND};font-family:Arial;font-size:16px;font-weight:bold">${safeLabel}</center>` +
     `</v:roundrect><![endif]--><!--[if !mso]><!-- -->` +
-    `<a href="${safeUrl}" style="display:inline-block;background:${AMBER};color:#ffffff;` +
+    `<a href="${safeUrl}" style="display:inline-block;background:${BRAND};color:${ON_BRAND};` +
     `text-decoration:none;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;` +
     `padding:14px 40px;border-radius:12px">${safeLabel}</a><!--<![endif]-->`
   );
@@ -97,7 +141,7 @@ export function emailFallbackLink(url: string): string {
   const safeUrl = escapeEmailHtml(url);
   return (
     `<p style="margin:12px 0 0;font-size:12px;word-break:break-all">` +
-    `<a href="${safeUrl}" style="color:${AMBER};text-decoration:underline">${safeUrl}</a></p>`
+    `<a href="${safeUrl}" style="color:${BRAND};text-decoration:underline">${safeUrl}</a></p>`
   );
 }
 
@@ -106,9 +150,10 @@ export const EMAIL_COLORS = {
   BODY_TEXT,
   MUTED,
   FAINT,
-  AMBER,
-  AMBER_BG,
-  AMBER_BORDER,
-  AMBER_DARK,
+  BRAND,
+  BRAND_BG,
+  BRAND_BORDER,
+  BRAND_DARK,
   CARD_BORDER,
+  SURFACE_SOFT,
 };

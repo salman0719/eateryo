@@ -20,10 +20,7 @@ import type { ProviderName, ProviderUsage } from "@/lib/ai/provider";
 export const PROVIDER_NAMES: readonly ProviderName[] = ["gemini", "groq"];
 
 /** Env var names per vendor; names only, never values. */
-export const PROVIDER_RATE_ENV: Record<
-  ProviderName,
-  { input: string; output: string }
-> = {
+export const PROVIDER_RATE_ENV: Record<ProviderName, { input: string; output: string }> = {
   gemini: {
     input: "GEMINI_INPUT_USD_PER_MTOK",
     output: "GEMINI_OUTPUT_USD_PER_MTOK",
@@ -75,8 +72,7 @@ export function costMicros(usage: ProviderUsage, rates: TokenRates | null): numb
   if (!rates) return null;
   if (usage.inputTokens === null || usage.outputTokens === null) return null;
   return Math.round(
-    usage.inputTokens * rates.inputUsdPerMillion +
-      usage.outputTokens * rates.outputUsdPerMillion
+    usage.inputTokens * rates.inputUsdPerMillion + usage.outputTokens * rates.outputUsdPerMillion
   );
 }
 

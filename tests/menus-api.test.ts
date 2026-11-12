@@ -112,13 +112,18 @@ describe("GET /api/menus", () => {
     expect(payload.menus).toHaveLength(1);
     expect(payload.menus[0].restaurantId).toBe(restaurantId);
     expect(typeof payload.menus[0].title).toBe("string");
+    // The list itself carries the caller's capabilities (commit 4 envelope).
+    expect(payload.menus[0].access.role).toBe("owner");
+    expect(payload.menus[0].access.capabilities).toContain("menus.write");
   });
 });
 
 describe("POST /api/menus", () => {
   it("rejects an invalid body with 400 and a field message", async () => {
     holder.userId = "u1";
-    const res = await createMenu(jsonRequest("/api/menus", "POST", { restaurantId: "", doc: null }));
+    const res = await createMenu(
+      jsonRequest("/api/menus", "POST", { restaurantId: "", doc: null })
+    );
     expect(res.status).toBe(400);
     const payload = await res.json();
     expect(payload.error.code).toBe("invalid_body");
@@ -134,9 +139,7 @@ describe("GET/PUT /api/menus/[menuId]", () => {
     const { id: restaurantId } = await createRestaurant(holder.db!, userId, "Sunny Side Café");
     const doc = createSampleMenuDocument();
 
-    const createdRes = await createMenu(
-      jsonRequest("/api/menus", "POST", { restaurantId, doc })
-    );
+    const createdRes = await createMenu(jsonRequest("/api/menus", "POST", { restaurantId, doc }));
     expect(createdRes.status).toBe(201);
     const { menu } = await createdRes.json();
 
@@ -189,7 +192,9 @@ describe("GET/PUT /api/menus/[menuId]", () => {
     const { menu } = await createdRes.json();
 
     holder.userId = await seedUser(holder.db!, "stranger@cafe.test", "Stranger");
-    expect((await getMenu(asRequest(`/api/menus/${menu.id}`), menuParams(menu.id))).status).toBe(404);
+    expect((await getMenu(asRequest(`/api/menus/${menu.id}`), menuParams(menu.id))).status).toBe(
+      404
+    );
     expect(
       (
         await deleteMenu(
@@ -217,6 +222,8 @@ describe("DELETE /api/menus/[menuId]", () => {
       menuParams(menu.id)
     );
     expect(delRes.status).toBe(204);
-    expect((await getMenu(asRequest(`/api/menus/${menu.id}`), menuParams(menu.id))).status).toBe(404);
+    expect((await getMenu(asRequest(`/api/menus/${menu.id}`), menuParams(menu.id))).status).toBe(
+      404
+    );
   });
 });

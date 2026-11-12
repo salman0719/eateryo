@@ -128,14 +128,22 @@ export function isItemFlagged(
 
 /** Owner reviewed the AI notes and the data is right — drop the notes.
  * Never invents a price; a null price stays flagged unless accepted. */
-export function confirmItemReviewed(doc: MenuDocument, categoryId: string, itemId: string): MenuDocument {
+export function confirmItemReviewed(
+  doc: MenuDocument,
+  categoryId: string,
+  itemId: string
+): MenuDocument {
   return updateItem(doc, categoryId, itemId, { reviewNotes: [] });
 }
 
 /** Owner confirms this item is intentionally unpriced (e.g. market price).
  * Clears the notes and stops the null price from flagging. Prices stay
  * null — totals stay honestly null downstream. */
-export function acceptItemUnpriced(doc: MenuDocument, categoryId: string, itemId: string): MenuDocument {
+export function acceptItemUnpriced(
+  doc: MenuDocument,
+  categoryId: string,
+  itemId: string
+): MenuDocument {
   return updateItem(doc, categoryId, itemId, { reviewNotes: [], unpricedAccepted: true });
 }
 
@@ -222,6 +230,32 @@ export function deleteItem(doc: MenuDocument, categoryId: string, itemId: string
   const index = category.items.findIndex((i) => i.id === itemId);
   if (index === -1) throw new Error(`Unknown item id: ${itemId} in category ${categoryId}`);
   category.items.splice(index, 1);
+  return finalize(next);
+}
+
+/**
+ * Delete several items at once (bulk delete).
+ *
+ * `itemIds` are item ids (unique within a document); repeated ids are
+ * ignored, unknown ids throw, and an empty selection returns the document
+ * unchanged. Callers confirm with the user first.
+ */
+export function deleteItems(doc: MenuDocument, itemIds: ReadonlyArray<string>): MenuDocument {
+  if (itemIds.length === 0) return doc;
+  const next = clone(doc);
+  const wanted = new Set(itemIds);
+  const found = new Set<string>();
+  for (const category of next.categories) {
+    const staying: MenuItem[] = [];
+    for (const item of category.items) {
+      if (wanted.has(item.id)) found.add(item.id);
+      else staying.push(item);
+    }
+    category.items = staying;
+  }
+  for (const id of wanted) {
+    if (!found.has(id)) throw new Error(`Unknown item id: ${id}`);
+  }
   return finalize(next);
 }
 
@@ -444,7 +478,11 @@ function restaurantNameCandidate(title: string): string | null {
     }
   }
   candidate = candidate.replace(/(\s+|^)menu$/i, "").trim();
-  if (!candidate) candidate = title.trim().replace(/(\s+|^)menu$/i, "").trim();
+  if (!candidate)
+    candidate = title
+      .trim()
+      .replace(/(\s+|^)menu$/i, "")
+      .trim();
   if (GENERIC_NAME_WORDS.has(candidate.toLowerCase())) return null;
   // "Lunch Menu" names a menu, not a place: never offer it as a café name.
   // Checked after the split, so "My Café — Lunch" still yields "My Café".
@@ -471,7 +509,12 @@ export const SECOND_MENU_SUGGESTIONS = [
 /** Titles the product treats as "the photo missed it" placeholders. */
 export function isPlaceholderMenuTitle(title: string): boolean {
   const normalized = title.trim().toLowerCase();
-  return normalized === "" || normalized === "untitled" || normalized === "untitled menu" || normalized === "menu";
+  return (
+    normalized === "" ||
+    normalized === "untitled" ||
+    normalized === "untitled menu" ||
+    normalized === "menu"
+  );
 }
 
 /**
