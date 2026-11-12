@@ -10,10 +10,15 @@ import { launchStatusSchema, type LaunchStatus } from "./schema";
 
 const launchEnvelope = z.object({ launch: launchStatusSchema });
 
-export async function fetchLaunchStatus(): Promise<LaunchStatus> {
+/**
+ * One café's checklist. The caller passes the membership the shell is acting
+ * in; the API answers 404 for a café on another account and 403 for a shift.
+ */
+export async function fetchLaunchStatus(restaurantId: string): Promise<LaunchStatus> {
   let response: Response;
+  const query = new URLSearchParams({ restaurantId }).toString();
   try {
-    response = await fetch("/api/launch", { cache: "no-store" });
+    response = await fetch(`/api/launch?${query}`, { cache: "no-store" });
   } catch {
     throw new SyncError("unavailable", "Could not reach the server. Check your connection.");
   }
@@ -27,6 +32,9 @@ export async function fetchLaunchStatus(): Promise<LaunchStatus> {
 
   if (response.status === 401) {
     throw new SyncError("unauthorized", "Sign in to see your checklist.");
+  }
+  if (response.status === 404) {
+    throw new SyncError("not_found", "That café is not on this account.");
   }
   if (!response.ok) {
     throw new SyncError("unavailable", "Could not load your checklist. Try again in a moment.");

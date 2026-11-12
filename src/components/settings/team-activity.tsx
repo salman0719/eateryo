@@ -40,14 +40,14 @@ export function TeamActivity({
   }, [restaurantId, refreshKey]);
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5">
-      <h3 className="text-sm font-bold tracking-tight text-stone-900">Team activity</h3>
-      <p className="mt-1 text-xs leading-5 text-stone-500">
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+      <h3 className="text-sm font-bold tracking-tight text-ink-900">Team activity</h3>
+      <p className="mt-1 text-xs leading-5 text-ink-500">
         Who invited, changed roles for, or removed someone — most recent first.
       </p>
 
       {failed && (
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-ink-500">
           Could not load team activity. The changes themselves still applied.
         </p>
       )}
@@ -58,7 +58,7 @@ export function TeamActivity({
           {[0, 1, 2].map((row) => (
             <div
               key={row}
-              className="flex items-baseline justify-between gap-3 border-b border-stone-100 pb-2 last:border-b-0 last:pb-0"
+              className="flex items-baseline justify-between gap-3 border-b border-line-100 pb-2 last:border-b-0 last:pb-0"
             >
               <Skeleton className="h-3 flex-1" />
               <Skeleton className="h-3 w-12 shrink-0" />
@@ -68,7 +68,7 @@ export function TeamActivity({
       )}
 
       {!failed && events !== null && events.length === 0 && (
-        <p className="mt-3 text-xs text-stone-500">
+        <p className="mt-3 text-xs text-ink-500">
           No team changes yet. Invitations, role changes and removals will appear here.
         </p>
       )}
@@ -78,14 +78,14 @@ export function TeamActivity({
           {events.map((event) => (
             <li
               key={event.id}
-              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-stone-100 pb-2 last:border-b-0 last:pb-0"
+              className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line-100 pb-2 last:border-b-0 last:pb-0"
             >
-              <p className="min-w-0 flex-1 text-xs leading-5 text-stone-700">
+              <p className="min-w-0 flex-1 text-xs leading-5 text-ink-700">
                 {describeAuditEvent(event)}
               </p>
               <time
                 dateTime={event.createdAt}
-                className="text-[11px] text-stone-400"
+                className="text-[11px] text-ink-500"
                 title={new Date(event.createdAt).toLocaleString()}
               >
                 {formatWhen(event.createdAt)}

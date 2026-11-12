@@ -7,6 +7,7 @@ import { getDb } from "@/lib/db";
 import { schema } from "@/lib/db/schema";
 
 import { sendMagicLinkEmail } from "./email";
+import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
 
 /** Magic links are single-use and expire fast (PHASE-2.md §3.6). */
 const MAGIC_LINK_EXPIRES_IN_SECONDS = 5 * 60;
@@ -47,7 +48,12 @@ export function createAuth(options: CreateAuthOptions) {
     },
     plugins: [
       magicLink({
-        sendMagicLink: options.sendMagicLink ?? sendMagicLinkEmail,
+        // DEV_SIGN_IN_BYPASS=1 in a local `.env.local` parks the link for the
+        // dev route to show instead of emailing it; `isDevSignInEnabled()` is
+        // false in production, so deployed builds always use the real sender.
+        sendMagicLink:
+          options.sendMagicLink ??
+          (isDevSignInEnabled() ? captureDevSignInLink : sendMagicLinkEmail),
         expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
       }),
       // Must stay last: re-applies Set-Cookie headers in the Next.js handler.
@@ -58,16 +64,26 @@ export function createAuth(options: CreateAuthOptions) {
 
 export type Auth = ReturnType<typeof createAuth>;
 
-let cached: Auth | undefined;
+/**
+ * One instance per base URL. In development the auth route passes the
+ * request's loopback origin, so a dev server on 3100 is not refused as an
+ * "invalid origin" against BETTER_AUTH_URL (commonly 3200) and the emailed
+ * link points back at the port actually in use. Production passes nothing
+ * and always uses the configured URL.
+ */
+const instances = new Map<string, Auth>();
 
 /**
  * Lazy singleton for app code. Creating it needs DATABASE_URL, so it must
  * only be called inside request handlers — never at module import time
  * (keeps `next build` and signed-out local mode DB-free).
  */
-export function getAuth(): Auth {
-  if (!cached) {
-    cached = createAuth({ db: getDb() });
-  }
-  return cached;
+export function getAuth(baseURL?: string): Auth {
+  const resolved = baseURL ?? process.env.BETTER_AUTH_URL;
+  const key = resolved ?? "default";
+  const existing = instances.get(key);
+  if (existing) return existing;
+  const auth = createAuth({ db: getDb(), baseURL: resolved });
+  instances.set(key, auth);
+  return auth;
 }

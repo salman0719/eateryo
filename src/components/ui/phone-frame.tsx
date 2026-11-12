@@ -42,12 +42,12 @@ export function PhoneFrame({
 
   return (
     <figure aria-label={label} className={`mx-auto w-full ${widthClass}`}>
-      <div className="rounded-[2.4rem] border-[10px] border-stone-900 bg-stone-900 shadow-xl">
-        <div className="relative overflow-hidden rounded-[1.7rem] bg-white">
+      <div className="rounded-[2.4rem] border-[10px] border-line-900 bg-surface-900 shadow-xl">
+        <div className="relative overflow-hidden rounded-[1.7rem] bg-surface-base">
           <div className={`phone-scroll relative overflow-y-auto ${heightClass}`}>
             <div
               aria-hidden="true"
-              className="sticky top-0 z-10 mx-auto h-5 w-24 rounded-b-2xl bg-stone-900"
+              className="sticky top-0 z-10 mx-auto h-5 w-24 rounded-b-2xl bg-surface-900"
             />
             {/* Edge to edge: the framed content is the diner's page, and its
                 sticky bar should reach the screen edges, not float inside a pad. */}
@@ -61,7 +61,7 @@ export function PhoneFrame({
           <div ref={setLayer} className="pointer-events-none absolute inset-0 z-30" />
         </div>
       </div>
-      <figcaption className="mt-2 text-center text-[11px] text-stone-500">{label}</figcaption>
+      <figcaption className="mt-2 text-center text-[11px] text-ink-500">{label}</figcaption>
     </figure>
   );
 }

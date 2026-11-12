@@ -125,9 +125,27 @@ export function setLineQuantity(
   return next;
 }
 
+/**
+ * What a diner counts after ordering: dishes, not cart rows. Two of the same
+ * dish is one line in the cart and two items on the ticket, so the summary
+ * never says "lines" at somebody holding a plate.
+ */
+export function orderItemCount(lines: readonly OrderLine[]): number {
+  return lines.reduce((sum, line) => sum + line.quantity, 0);
+}
+
+/** `1 item` / `3 items` — the summary's count for a diner. */
+export function orderItemCountLabel(lines: readonly OrderLine[]): string {
+  const count = orderItemCount(lines);
+  return `${count} ${count === 1 ? "item" : "items"}`;
+}
+
 /** Short human-facing code derived from the id (e.g. "Order #4F2A9C"). */
 export function orderCode(id: string): string {
-  const compact = id.replace(/[^a-z0-9]/gi, "").slice(-6).toUpperCase();
+  const compact = id
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(-6)
+    .toUpperCase();
   return compact || "ORDER";
 }
 

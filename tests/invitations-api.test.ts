@@ -279,11 +279,15 @@ describe("pending invitations API", () => {
     expect(newToken).not.toBe(oldToken);
 
     // The previous link is dead; the new one resolves.
-    const stale = await getInvitation(asRequest(`/api/invitations/${oldToken}`),
-      invitationParams(oldToken));
+    const stale = await getInvitation(
+      asRequest(`/api/invitations/${oldToken}`),
+      invitationParams(oldToken)
+    );
     expect(stale.status).toBe(404);
-    const fresh = await getInvitation(asRequest(`/api/invitations/${newToken}`),
-      invitationParams(newToken));
+    const fresh = await getInvitation(
+      asRequest(`/api/invitations/${newToken}`),
+      invitationParams(newToken)
+    );
     expect(fresh.status).toBe(200);
 
     // Re-sending replaces the row, so the panel re-reads the list (and its

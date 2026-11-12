@@ -23,7 +23,6 @@ import { searchMenu, type SearchMatch } from "@/features/menu/search";
 import { placeOrder } from "@/features/orders/client";
 import {
   addLine,
-  orderCode,
   orderTotal,
   setLineQuantity,
   type Order,
@@ -33,7 +32,7 @@ import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
-import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import { OrderMenuSection, StickyCartBar, formatOrderTotal } from "./order-menu";
 import { OrderSheet } from "./order-sheet";
 
 /** One open menu on the table landing (serializable for the client). */
@@ -71,6 +70,12 @@ interface TableOrderTabsProps {
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
+  /**
+   * The order was accepted. The caller owns the confirmation screen — this
+   * component only orders, so the receipt stays one file (`order-received.tsx`)
+   * instead of a section of every flow.
+   */
+  onPlaced: (order: Order) => void;
 }
 
 function menuLabel(menu: { title: string }): string {
@@ -83,6 +88,7 @@ export function TableOrderTabs({
   tableLabel,
   menus,
   closedMenus,
+  onPlaced,
 }: TableOrderTabsProps) {
   const [activeTab, setActiveTab] = useState<string>(ALL_TAB);
   const [query, setQuery] = useState("");
@@ -93,7 +99,6 @@ export function TableOrderTabs({
   const [honeypot, setHoneypot] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [placed, setPlaced] = useState<Order | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const viewOrderButton = useRef<HTMLButtonElement | null>(null);
   /** Wide screens keep the order in its own column; phones raise the sheet. */
@@ -269,7 +274,7 @@ export function TableOrderTabs({
         }),
         website: honeypot,
       });
-      setPlaced(order);
+      onPlaced(order);
       setLines([]);
       setNote("");
       setSheetOpen(false);
@@ -288,7 +293,7 @@ export function TableOrderTabs({
     }
   }
 
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   /**
    * What sits under the cart's total — one node for the phone sheet and the
@@ -297,19 +302,19 @@ export function TableOrderTabs({
   const orderFooter = (
     <>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-600">Total</p>
-        <p className="text-lg font-bold tabular-nums text-stone-900">
+        <p className="text-sm font-medium text-ink-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-ink-900">
           {formatOrderTotal(cartCurrency, total)}
         </p>
       </div>
       {lines.length > 0 && total === null && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-warning-800">
           Some items have no price on the menu, so no total is shown. Staff confirm the price.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}
@@ -318,42 +323,12 @@ export function TableOrderTabs({
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void sendOrder()}
-        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order to the kitchen"}
       </button>
     </>
   );
-
-  if (placed) {
-    return (
-      <OrderShell tableLabel={tableLabel}>
-        <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
-            Order received
-          </p>
-          <p className="mt-3 text-2xl font-bold text-stone-900">
-            #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
-          </p>
-          <p className="mt-2 text-sm text-stone-600">
-            {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
-            {formatOrderTotal(placed.currency, orderTotal(placed.lines))}
-          </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-stone-500">
-            The kitchen sees this on their board right away. The total is confirmed when your order
-            is prepared.
-          </p>
-          <button
-            type="button"
-            onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
-          >
-            Order something else
-          </button>
-        </div>
-      </OrderShell>
-    );
-  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -396,10 +371,10 @@ export function TableOrderTabs({
             )}
             {onlyClosedMenu ? (
               <div>
-                <p className="text-sm font-semibold text-stone-900">
+                <p className="text-sm font-semibold text-ink-900">
                   {menuLabel(onlyClosedMenu)} is closed right now
                 </p>
-                <p className="mt-1 text-sm leading-6 text-stone-600">
+                <p className="mt-1 text-sm leading-6 text-ink-600">
                   Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
                 </p>
               </div>
@@ -416,11 +391,11 @@ export function TableOrderTabs({
                         ? "Search dishes…"
                         : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
-                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-amber-700 focus:outline-none"
+                    className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
                   />
                 </label>
                 {searching && (
-                  <p className="mt-2 text-xs text-stone-500" role="status">
+                  <p className="mt-2 text-xs text-ink-500" role="status">
                     {visibleCount === 0
                       ? `No dishes match “${query.trim()}”.`
                       : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
@@ -428,7 +403,7 @@ export function TableOrderTabs({
                 )}
               </>
             ) : (
-              <p className="mt-2 text-xs text-stone-500">
+              <p className="mt-2 text-xs text-ink-500">
                 Nothing to order at the moment — tap a menu to see when it opens.
               </p>
             )}
@@ -436,8 +411,8 @@ export function TableOrderTabs({
 
           {menus.length === 0 ? (
             <div className={`${frame} p-8 text-center`}>
-              <p className="text-lg font-semibold text-stone-900">Nothing is open right now</p>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              <p className="text-lg font-semibold text-ink-900">Nothing is open right now</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 {singleMenu
                   ? "The kitchen is between services — opening hours are shown above."
                   : "Every menu is between services — tap one above to see when it opens."}
@@ -445,8 +420,8 @@ export function TableOrderTabs({
             </div>
           ) : visibleCount === 0 ? (
             <div className={`${frame} p-8 text-center`}>
-              <p className="text-lg font-semibold text-stone-900">No dishes match</p>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-stone-600">
+              <p className="text-lg font-semibold text-ink-900">No dishes match</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
                 Nothing on {activeTab === ALL_TAB ? "these menus" : "this menu"} matches “
                 {query.trim()}”. Try a shorter search,{" "}
                 {singleMenu ? "or clear it to browse the whole menu." : "or browse the tabs above."}
@@ -457,7 +432,7 @@ export function TableOrderTabs({
               result.categories.length === 0 ? null : (
                 <div key={menu.menuId} className="flex flex-col gap-4">
                   {activeTab === ALL_TAB && menus.length > 1 && (
-                    <h2 className="px-1 text-sm font-bold tracking-wider text-stone-500 uppercase">
+                    <h2 className="px-1 text-sm font-bold tracking-wider text-ink-500 uppercase">
                       {menuLabel(menu)}
                     </h2>
                   )}
@@ -556,7 +531,7 @@ export function TableOrderTabs({
           >
             <div
               role="tooltip"
-              className="w-max max-w-[16rem] rounded-xl bg-stone-900 px-3 py-2 text-left text-xs leading-5 text-white shadow-lg"
+              className="w-max max-w-[16rem] rounded-xl bg-surface-900 px-3 py-2 text-left text-xs leading-5 text-on-accent shadow-lg"
             >
               <span className="font-semibold">{menuLabel(infoMenu)}</span> is closed right now. Open{" "}
               {formatAvailability(infoMenu.availability).join("; ")}.
@@ -591,8 +566,8 @@ function TabButton({
       onClick={onClick}
       className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
-          ? "bg-stone-900 text-white"
-          : "border border-stone-300 text-stone-700 hover:border-amber-700 hover:text-amber-900"
+          ? "bg-surface-900 text-on-accent"
+          : "border border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
       }`}
     >
       {label}
@@ -643,8 +618,8 @@ function ClosedTabButton({
       }}
       className={`shrink-0 cursor-not-allowed rounded-full border border-dashed px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         show
-          ? "border-stone-400 bg-white text-stone-600"
-          : "border-stone-300 bg-stone-50 text-stone-400"
+          ? "border-line-400 bg-surface-base text-ink-600"
+          : "border-line-300 bg-surface-50 text-ink-400"
       }`}
     >
       {label}

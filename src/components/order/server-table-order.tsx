@@ -20,7 +20,6 @@ import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { placeOrder } from "@/features/orders/client";
 import {
   addLine,
-  orderCode,
   orderTotal,
   setLineQuantity,
   type Order,
@@ -31,6 +30,7 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import { OrderReceived } from "./order-received";
 import { OrderSheet } from "./order-sheet";
 
 interface ServerTableOrderProps {
@@ -64,7 +64,7 @@ export function ServerTableOrder({
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const frame = "rounded-2xl border border-stone-200 bg-white";
+  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   function chosenVariantName(item: MenuItem): string | null {
     if (item.variants.length === 0) return null;
@@ -131,29 +131,12 @@ export function ServerTableOrder({
   if (placed) {
     return (
       <OrderShell tableLabel={tableLabel}>
-        <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-green-800 uppercase">
-            Order received
-          </p>
-          <p className="mt-3 text-2xl font-bold text-stone-900">
-            #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
-          </p>
-          <p className="mt-2 text-sm text-stone-600">
-            {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
-            {formatOrderTotal(placed.currency, orderTotal(placed.lines))}
-          </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-stone-500">
-            The kitchen sees this on their board right away. The total is confirmed when your order
-            is prepared.
-          </p>
-          <button
-            type="button"
-            onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800"
-          >
-            Order something else
-          </button>
-        </div>
+        <OrderReceived
+          order={placed}
+          restaurantName={restaurantName}
+          footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+          onOrderAgain={() => setPlaced(null)}
+        />
       </OrderShell>
     );
   }
@@ -167,19 +150,19 @@ export function ServerTableOrder({
   const orderFooter = (
     <>
       <div className="flex items-baseline justify-between">
-        <p className="text-sm font-medium text-stone-600">Total</p>
-        <p className="text-lg font-bold tabular-nums text-stone-900">
+        <p className="text-sm font-medium text-ink-600">Total</p>
+        <p className="text-lg font-bold tabular-nums text-ink-900">
           {formatOrderTotal(doc.currency, total)}
         </p>
       </div>
       {lines.length > 0 && total === null && (
-        <p className="mt-1 text-xs text-amber-800">
+        <p className="mt-1 text-xs text-warning-800">
           Some items have no price on the menu, so no total is shown. Staff confirm the price.
         </p>
       )}
 
       {error && (
-        <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-800">
+        <p role="alert" className="mt-3 rounded-xl bg-danger-50 px-3 py-2 text-xs text-danger-800">
           {error}
         </p>
       )}
@@ -188,7 +171,7 @@ export function ServerTableOrder({
         type="button"
         disabled={submitting || lines.length === 0}
         onClick={() => void sendOrder()}
-        className="mt-3 w-full rounded-full bg-amber-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-3 w-full rounded-full bg-accent-700 px-4 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {submitting ? "Sending…" : "Send order to the kitchen"}
       </button>
@@ -200,13 +183,13 @@ export function ServerTableOrder({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-amber-800 uppercase">
+            <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
               {restaurantName} · {formatTableLabel(tableLabel)}
             </p>
-            <h1 className="mt-1 text-2xl font-bold text-stone-900">
+            <h1 className="mt-1 text-2xl font-bold text-ink-900">
               {doc.title.trim() || "Untitled menu"}
             </h1>
-            <p className="mt-1 text-sm text-stone-600">
+            <p className="mt-1 text-sm text-ink-600">
               Tap a dish to add it. No account or app needed.
             </p>
           </div>

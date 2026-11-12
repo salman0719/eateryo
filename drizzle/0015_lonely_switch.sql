@@ -1,0 +1,1 @@
+ALTER TABLE "restaurant_membership" ADD COLUMN "permissions" text[] DEFAULT '{}' NOT NULL;

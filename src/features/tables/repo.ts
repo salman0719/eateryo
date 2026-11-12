@@ -8,6 +8,7 @@ import {
   restaurantMembership,
 } from "@/lib/db/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
+import { accessFromMembership, can, getMembershipAccess } from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { menuSlugSchema } from "@/features/publishing/schema";
 import { isSlug, slugCandidates, slugifyMenuTitle } from "@/features/publishing/slug";
@@ -100,6 +101,29 @@ export async function getRestaurantTimeZoneForMenu(
 }
 
 /**
+ * Opening windows for any member of the restaurant. This is operational
+ * information, not draft menu content: it stays readable even when the
+ * caller may not see the unpublished document itself.
+ */
+export async function getMenuAvailabilityForUser(
+  db: TenancyDb,
+  userId: string,
+  menuId: string
+): Promise<{ availability: MenuAvailability; restaurantId: string }> {
+  const rows = await db
+    .select({ availability: menu.availability, restaurantId: menu.restaurantId })
+    .from(menu)
+    .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
+    .where(and(eq(menu.id, menuId), eq(restaurantMembership.userId, userId)));
+  const row = rows[0];
+  if (!row) throw new TableRepoError("not_found", "That menu does not exist.");
+  return {
+    availability: parseAvailability(menuId, row.availability),
+    restaurantId: row.restaurantId,
+  };
+}
+
+/**
  * Owner-only: replace a menu's opening windows (empty = always open), and
  * optionally the zone those wall-clock times are written in. `timeZone`
  * of `undefined` leaves the stored zone untouched, `null` clears it (the
@@ -118,13 +142,14 @@ export async function setMenuAvailabilityForUser(
       id: menu.id,
       restaurantId: menu.restaurantId,
       role: restaurantMembership.role,
+      permissions: restaurantMembership.permissions,
     })
     .from(menu)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
     .where(and(eq(menu.id, menuId), eq(restaurantMembership.userId, userId)));
   const row = rows[0];
   if (!row) throw new TableRepoError("not_found", "That menu does not exist.");
-  if (row.role !== "owner") {
+  if (!can(accessFromMembership(row), "menus.write")) {
     throw new TableRepoError("forbidden", "Only the restaurant owner can set opening times.");
   }
   const parsed = menuAvailabilitySchema.safeParse(windows);
@@ -142,10 +167,7 @@ export async function setMenuAvailabilityForUser(
   // and never shows up as "unpublished changes".
   await db.update(menu).set({ availability: parsed.data }).where(eq(menu.id, menuId));
   if (timeZone !== undefined) {
-    await db
-      .update(restaurant)
-      .set({ timeZone })
-      .where(eq(restaurant.id, row.restaurantId));
+    await db.update(restaurant).set({ timeZone }).where(eq(restaurant.id, row.restaurantId));
   }
   return {
     availability: parsed.data,
@@ -158,7 +180,10 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const candidate = error as { code?: unknown; message?: unknown; cause?: unknown };
   if (candidate.code === "23505") return true;
-  if (typeof candidate.message === "string" && /duplicate key|unique constraint/i.test(candidate.message)) {
+  if (
+    typeof candidate.message === "string" &&
+    /duplicate key|unique constraint/i.test(candidate.message)
+  ) {
     return true;
   }
   return candidate.cause !== error && isUniqueViolation(candidate.cause);
@@ -171,9 +196,9 @@ export async function setRestaurantSlugForUser(
   restaurantId: string,
   slug: string
 ): Promise<{ id: string; name: string; slug: string }> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) throw new TableRepoError("not_found", "That restaurant does not exist.");
-  if (role !== "owner") {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) throw new TableRepoError("not_found", "That restaurant does not exist.");
+  if (!can(access, "tables.link")) {
     throw new TableRepoError("forbidden", "Only the restaurant owner can change its link.");
   }
   const parsed = menuSlugSchema.safeParse(slug);
@@ -255,9 +280,9 @@ export async function ensureRestaurantSlugForUser(
   userId: string,
   restaurantId: string
 ): Promise<{ id: string; name: string; slug: string }> {
-  const role = await roleOf(db, userId, restaurantId);
-  if (role === null) throw new TableRepoError("not_found", "That restaurant does not exist.");
-  if (role !== "owner") {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) throw new TableRepoError("not_found", "That restaurant does not exist.");
+  if (!can(access, "tables.link")) {
     throw new TableRepoError("forbidden", "Only the restaurant owner can change its link.");
   }
   return ensureRestaurantSlug(db, restaurantId);
@@ -273,23 +298,6 @@ async function restaurantSlugTakenByAnother(
     .from(restaurant)
     .where(eq(restaurant.slug, slug));
   return rows.some((row) => row.id !== restaurantId);
-}
-
-async function roleOf(
-  db: TenancyDb,
-  userId: string,
-  restaurantId: string
-): Promise<"owner" | "staff" | null> {
-  const rows = await db
-    .select({ role: restaurantMembership.role })
-    .from(restaurantMembership)
-    .where(
-      and(
-        eq(restaurantMembership.userId, userId),
-        eq(restaurantMembership.restaurantId, restaurantId)
-      )
-    );
-  return rows[0]?.role ?? null;
 }
 
 /** Public: a restaurant by its `/r/<slug>` address, or null. */
@@ -384,6 +392,60 @@ export async function listOpenMenusForRestaurantSlug(
     menus,
     closedMenus,
   };
+}
+
+/** One live menu's printable address inside its café. */
+export interface PublishedMenuLink {
+  menuId: string;
+  title: string;
+  /** The menu's own segment in `/r/<café>/m/<menu>`. */
+  slug: string;
+  publishedAt: string;
+}
+
+/**
+ * The café's live menus and their addresses — what the Tables tab prints
+ * cards from. Publishing is private until it is live, so only rows with a
+ * live revision are listed.
+ *
+ * No membership check: callers resolve the workspace (and its
+ * `tables.print`/`tables.link` capability) before calling, the same contract
+ * as `ensureRestaurantSlug`.
+ */
+export async function listPublishedMenuLinksForRestaurant(
+  db: TenancyDb,
+  restaurantId: string
+): Promise<PublishedMenuLink[]> {
+  const rows = await db
+    .select({
+      menuId: menu.id,
+      title: menu.title,
+      slug: publishedMenu.slug,
+      publishedAt: publishedMenu.publishedAt,
+    })
+    .from(publishedMenu)
+    .innerJoin(menu, eq(menu.id, publishedMenu.menuId))
+    .where(
+      and(
+        eq(publishedMenu.restaurantId, restaurantId),
+        isNotNull(publishedMenu.publishedAt),
+        isNotNull(publishedMenu.liveRevisionId)
+      )
+    )
+    .orderBy(asc(menu.title), asc(menu.id));
+
+  return rows.flatMap((row) =>
+    row.publishedAt
+      ? [
+          {
+            menuId: row.menuId,
+            title: row.title,
+            slug: row.slug,
+            publishedAt: row.publishedAt.toISOString(),
+          },
+        ]
+      : []
+  );
 }
 
 /** Public table-landing path for a restaurant slug — the QR target shape. */

@@ -7,7 +7,14 @@ import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 
 const doc = createSampleMenuDocument();
 
-const base = { restaurantName: "Cafe", restaurantSlug: "cafe", tableLabel: "3" };
+const base = {
+  restaurantName: "Cafe",
+  restaurantSlug: "cafe",
+  tableLabel: "3",
+  // Ordering is all this component does; the confirmation lives in its own
+  // screen, so nothing is placed in these renders.
+  onPlaced: () => undefined,
+};
 
 function render(props: Parameters<typeof TableOrderTabs>[0]) {
   return renderToStaticMarkup(createElement(TableOrderTabs, props));
@@ -19,7 +26,11 @@ describe("TableOrderTabs closed menus", () => {
       ...base,
       menus: [{ menuId: "open-1", menuSlug: "lunch", title: "Lunch", doc }],
       closedMenus: [
-        { menuId: "closed-1", title: "Dinner", availability: [{ days: [5, 6], start: "18:00", end: "22:00" }] },
+        {
+          menuId: "closed-1",
+          title: "Dinner",
+          availability: [{ days: [5, 6], start: "18:00", end: "22:00" }],
+        },
       ],
     });
     // Open tab: selectable, with the All tab alongside.
@@ -43,7 +54,11 @@ describe("TableOrderTabs closed menus", () => {
       ...base,
       menus: [],
       closedMenus: [
-        { menuId: "closed-1", title: "Dinner", availability: [{ days: [5], start: "18:00", end: "22:00" }] },
+        {
+          menuId: "closed-1",
+          title: "Dinner",
+          availability: [{ days: [5], start: "18:00", end: "22:00" }],
+        },
       ],
     });
     // No navigation with one menu: no tabs, no search, no closed pill.

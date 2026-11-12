@@ -34,8 +34,7 @@ describe("menuAvailabilitySchema", () => {
       menuAvailabilitySchema.safeParse([{ days: [1], start: "9am", end: "17:00" }]).success
     ).toBe(false);
     expect(
-      menuAvailabilitySchema.safeParse([{ days: [1, 1], start: "09:00", end: "17:00" }])
-        .success
+      menuAvailabilitySchema.safeParse([{ days: [1, 1], start: "09:00", end: "17:00" }]).success
     ).toBe(false);
     expect(
       menuAvailabilitySchema.safeParse([{ days: [7], start: "09:00", end: "17:00" }]).success
@@ -95,9 +94,9 @@ describe("isMenuOpenAt", () => {
     expect(isMenuOpenAt(lunch, MON_NOON_UTC)).toBe(true);
     expect(isMenuOpenAt(lunch, MON_NOON_UTC, "America/New_York")).toBe(false);
     // 16:00 UTC Monday is 12:00 in New York — inside the same window.
-    expect(
-      isMenuOpenAt(lunch, new Date("2026-10-19T16:00:00.000Z"), "America/New_York")
-    ).toBe(true);
+    expect(isMenuOpenAt(lunch, new Date("2026-10-19T16:00:00.000Z"), "America/New_York")).toBe(
+      true
+    );
   });
 
   it("falls back to UTC for an unknown time zone instead of throwing", () => {
@@ -115,15 +114,15 @@ describe("formatAvailability", () => {
   });
 
   it("compresses consecutive weekdays into ranges", () => {
-    expect(
-      formatAvailability([{ days: [1, 2, 3, 4, 5], start: "11:30", end: "14:30" }])
-    ).toEqual(["Mon–Fri 11:30 am – 2:30 pm"]);
+    expect(formatAvailability([{ days: [1, 2, 3, 4, 5], start: "11:30", end: "14:30" }])).toEqual([
+      "Mon–Fri 11:30 am – 2:30 pm",
+    ]);
     expect(formatAvailability([{ days: [0, 6], start: "18:00", end: "22:00" }])).toEqual([
       "Sun, Sat 6:00 pm – 10:00 pm",
     ]);
-    expect(formatAvailability([{ days: [0, 1, 2, 3, 4, 5, 6], start: "08:00", end: "18:00" }])).toEqual([
-      "Every day 8:00 am – 6:00 pm",
-    ]);
+    expect(
+      formatAvailability([{ days: [0, 1, 2, 3, 4, 5, 6], start: "08:00", end: "18:00" }])
+    ).toEqual(["Every day 8:00 am – 6:00 pm"]);
   });
 
   it("keeps overnight windows exactly as written", () => {

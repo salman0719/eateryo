@@ -222,9 +222,7 @@ export async function POST(request: Request) {
 
 function requireUser(): Promise<string | NextResponse> {
   return getSessionUserId()
-    .then((userId) =>
-      userId ?? errorResponse("unauthorized", "Sign in to continue.", 401)
-    )
+    .then((userId) => userId ?? errorResponse("unauthorized", "Sign in to continue.", 401))
     .catch(() =>
       errorResponse(
         "server_db_unavailable",

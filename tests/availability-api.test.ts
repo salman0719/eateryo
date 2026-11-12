@@ -4,10 +4,7 @@ import {
   GET as getAvailability,
   PUT as putAvailability,
 } from "@/app/api/menus/[menuId]/availability/route";
-import {
-  GET as getSlug,
-  PUT as putSlug,
-} from "@/app/api/restaurants/[restaurantId]/slug/route";
+import { GET as getSlug, PUT as putSlug } from "@/app/api/restaurants/[restaurantId]/slug/route";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
@@ -75,7 +72,9 @@ beforeEach(async () => {
   ownerId = await seedUser(holder.db, "avail-api-owner@cafe.test", "Owner");
   staffId = await seedUser(holder.db, "avail-api-staff@cafe.test", "Staff");
   restaurantId = (await createRestaurant(holder.db, ownerId, "Café Avail")).id;
-  await holder.db.insert(restaurantMembership).values({ restaurantId, userId: staffId, role: "staff" });
+  await holder.db
+    .insert(restaurantMembership)
+    .values({ restaurantId, userId: staffId, role: "staff" });
   await createMenuForUser(holder.db, ownerId, restaurantId, sampleDoc());
   holder.userId = ownerId;
 }, 30_000);
@@ -95,13 +94,17 @@ describe("GET /api/menus/[menuId]/availability", () => {
 
   it("lets staff read but hides other tenants behind 404", async () => {
     holder.userId = staffId;
-    expect((await getAvailability(new Request("http://test.local"), menuParams(menuId))).status).toBe(200);
+    expect(
+      (await getAvailability(new Request("http://test.local"), menuParams(menuId))).status
+    ).toBe(200);
 
     const { seedUser } = await import("./helpers/pg-test-db");
     const outsider = await seedUser(holder.db!, "avail-outsider@cafe.test", "Outsider");
     await createRestaurant(holder.db!, outsider, "Other Café");
     holder.userId = outsider;
-    expect((await getAvailability(new Request("http://test.local"), menuParams(menuId))).status).toBe(404);
+    expect(
+      (await getAvailability(new Request("http://test.local"), menuParams(menuId))).status
+    ).toBe(404);
   });
 });
 
@@ -159,13 +162,17 @@ describe("PUT /api/menus/[menuId]/availability", () => {
 
   it("refuses staff writes and other tenants", async () => {
     holder.userId = staffId;
-    expect((await putAvailability(jsonRequest({ windows: lunch }), menuParams(menuId))).status).toBe(403);
+    expect(
+      (await putAvailability(jsonRequest({ windows: lunch }), menuParams(menuId))).status
+    ).toBe(403);
 
     const { seedUser } = await import("./helpers/pg-test-db");
     const outsider = await seedUser(holder.db!, "avail-outsider-2@cafe.test", "Outsider");
     await createRestaurant(holder.db!, outsider, "Other Café 2");
     holder.userId = outsider;
-    expect((await putAvailability(jsonRequest({ windows: lunch }), menuParams(menuId))).status).toBe(404);
+    expect(
+      (await putAvailability(jsonRequest({ windows: lunch }), menuParams(menuId))).status
+    ).toBe(404);
   });
 });
 
@@ -189,7 +196,9 @@ describe("GET /api/restaurants/[restaurantId]/slug", () => {
     const outsider = await seedUser(holder.db!, "avail-outsider-3@cafe.test", "Outsider");
     await createRestaurant(holder.db!, outsider, "Other Café 3");
     holder.userId = outsider;
-    expect((await getSlug(new Request("http://test.local"), restaurantParams(restaurantId))).status).toBe(404);
+    expect(
+      (await getSlug(new Request("http://test.local"), restaurantParams(restaurantId))).status
+    ).toBe(404);
   });
 });
 

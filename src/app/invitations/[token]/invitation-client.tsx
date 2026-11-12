@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { DevSignInPanel, useDevSignInLink } from "@/components/auth/dev-sign-in-link";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   acceptInvitation,
@@ -21,7 +22,7 @@ export function InvitationSkeleton() {
     <div role="status" aria-busy="true" className="flex flex-col gap-6">
       <span className="sr-only">Loading the invitation…</span>
       <Skeleton className="h-4 w-4/5" />
-      <div className="rounded-lg border border-stone-200 bg-white p-4">
+      <div className="rounded-lg border border-line-200 bg-surface-base p-4">
         <Skeleton className="h-3 w-2/3" />
         <Skeleton className="mt-2 h-3 w-1/2" />
       </div>
@@ -33,7 +34,7 @@ export function InvitationSkeleton() {
 type SignInState =
   | { kind: "idle" }
   | { kind: "sending" }
-  | { kind: "sent" }
+  | { kind: "sent"; email: string; sentAt: number }
   | { kind: "error"; message: string };
 
 /**
@@ -45,11 +46,22 @@ type SignInState =
  * this page. The server refuses acceptance from any other account, so this
  * page only explains what happened.
  *
+ * With `DEV_SIGN_IN_BYPASS=1` locally the server parks the sign-in link
+ * instead of emailing it, so this page reads it back and shows it — otherwise
+ * it would say "check your email" about a message that was never sent. The
+ * server page passes `devSignIn`, which is false in production.
+ *
  * The token arrives as a prop from the server page: reading route params in
  * a client component blocks prerendering (Next 16 flags useParams outside
  * Suspense), and the page has nothing to render until it has the token.
  */
-export function InvitationClient({ token }: { token: string }) {
+export function InvitationClient({
+  token,
+  devSignIn = false,
+}: {
+  token: string;
+  devSignIn?: boolean;
+}) {
   const { data: session, isPending: sessionPending } = authClient.useSession();
 
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
@@ -58,6 +70,12 @@ export function InvitationClient({ token }: { token: string }) {
   const [accepted, setAccepted] = useState<{ name: string; role: "owner" | "staff" } | null>(null);
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [signIn, setSignIn] = useState<SignInState>({ kind: "idle" });
+
+  const dev = useDevSignInLink({
+    enabled: devSignIn,
+    email: signIn.kind === "sent" ? signIn.email : null,
+    requestKey: signIn.kind === "sent" ? signIn.sentAt : null,
+  });
 
   useEffect(() => {
     if (!token) return;
@@ -102,7 +120,7 @@ export function InvitationClient({ token }: { token: string }) {
       });
       return;
     }
-    setSignIn({ kind: "sent" });
+    setSignIn({ kind: "sent", email, sentAt: Date.now() });
   }
 
   async function handleSwitchAccount(email: string) {
@@ -127,21 +145,37 @@ export function InvitationClient({ token }: { token: string }) {
     }
   }
 
+  // The dev shortcut replaces the "check your email" copy wherever it would
+  // otherwise be a lie; both sign-in entry points on this page share it.
+  const pendingDevLink =
+    signIn.kind === "sent" && devSignIn ? (
+      <DevSignInPanel
+        email={signIn.email}
+        url={dev.url}
+        settling={dev.settling}
+        onReset={() => setSignIn({ kind: "idle" })}
+        resetLabel="Try again"
+      />
+    ) : null;
+
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-stone-900">Team invitation</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-ink-900">Team invitation</h1>
         {invitation && (
-          <p className="mt-2 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-ink-600">
             You&apos;ve been invited to join{" "}
-            <span className="font-medium text-stone-900">{invitation.restaurantName}</span> as{" "}
+            <span className="font-medium text-ink-900">{invitation.restaurantName}</span> as{" "}
             {invitation.role === "owner" ? "an owner" : "staff"}.
           </p>
         )}
       </div>
 
       {loadError && (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p
+          role="alert"
+          className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800"
+        >
           {loadError}
         </p>
       )}
@@ -149,18 +183,18 @@ export function InvitationClient({ token }: { token: string }) {
       {!invitation && !loadError && <InvitationSkeleton />}
 
       {invitation && (
-        <div className="rounded-lg border border-stone-200 bg-white p-4 text-sm text-stone-700">
+        <div className="rounded-lg border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
           <p>
-            Invited email: <span className="font-medium text-stone-900">{invitation.email}</span>
+            Invited email: <span className="font-medium text-ink-900">{invitation.email}</span>
           </p>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-ink-500">
             The link expires {new Date(invitation.expiresAt).toLocaleString()}.
           </p>
         </div>
       )}
 
       {invitation && invitation.status !== "pending" && !accepted && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <p className="rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
           {invitation.status === "expired" ? (
             "This invitation has expired — ask the restaurant owner to send a new one."
           ) : (
@@ -168,7 +202,7 @@ export function InvitationClient({ token }: { token: string }) {
               This invitation has already been accepted.{" "}
               <Link
                 href={invitation.role === "staff" ? "/orders" : "/menus"}
-                className="font-medium underline underline-offset-2 hover:text-amber-950"
+                className="font-medium underline underline-offset-2 hover:text-accent-950"
               >
                 {invitation.role === "staff" ? "Open the order board" : "Go to My menus"}
               </Link>
@@ -178,21 +212,24 @@ export function InvitationClient({ token }: { token: string }) {
       )}
 
       {accepted && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          <p className="font-medium">You&apos;re in</p>
+        <div className="rounded-lg border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
+          <p className="flex items-center gap-2 font-medium text-ink-900">
+            <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success-700" />
+            You&apos;re in
+          </p>
           <p className="mt-1">
             You joined {accepted.name} as {accepted.role === "owner" ? "an owner" : "staff"}.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Link
               href={accepted.role === "staff" ? "/orders" : "/menus"}
-              className="inline-block rounded-full bg-emerald-800 px-4 py-1.5 text-sm font-semibold text-white hover:bg-emerald-900"
+              className="inline-block rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent hover:bg-accent-800"
             >
               {accepted.role === "staff" ? "Open the order board" : "Go to My menus"}
             </Link>
             <Link
               href={accepted.role === "staff" ? "/menus" : "/orders"}
-              className="text-xs font-medium underline underline-offset-2 hover:text-emerald-950"
+              className="text-xs font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900"
             >
               {accepted.role === "staff" ? "Go to My menus" : "Open the order board"}
             </Link>
@@ -201,7 +238,10 @@ export function InvitationClient({ token }: { token: string }) {
       )}
 
       {acceptError && (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+        <p
+          role="alert"
+          className="rounded-lg border border-danger-200 bg-danger-50 p-4 text-sm text-danger-800"
+        >
           {acceptError}
         </p>
       )}
@@ -211,16 +251,24 @@ export function InvitationClient({ token }: { token: string }) {
           {!signedEmail && (
             <div className="flex flex-col gap-3">
               {signIn.kind === "sent" ? (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-                  <p className="font-medium">Check your email</p>
-                  <p className="mt-1">
-                    We sent a one-time sign-in link to {invitation.email}. Open it on this device,
-                    then accept the invitation.
-                  </p>
-                </div>
+                (pendingDevLink ?? (
+                  <div className="rounded-lg border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
+                    <p className="flex items-center gap-2 font-medium text-ink-900">
+                      <span
+                        aria-hidden="true"
+                        className="size-1.5 shrink-0 rounded-full bg-success-700"
+                      />
+                      Check your email
+                    </p>
+                    <p className="mt-1">
+                      We sent a one-time sign-in link to {invitation.email}. Open it on this device,
+                      then accept the invitation.
+                    </p>
+                  </div>
+                ))
               ) : (
                 <>
-                  <p className="text-sm text-stone-600">
+                  <p className="text-sm text-ink-600">
                     Sign in with <span className="font-medium">{invitation.email}</span> to accept.
                     We&apos;ll email a one-time link — no password.
                   </p>
@@ -228,14 +276,14 @@ export function InvitationClient({ token }: { token: string }) {
                     type="button"
                     disabled={signIn.kind === "sending"}
                     onClick={() => void sendSignInLink(invitation.email)}
-                    className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {signIn.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
                   </button>
                 </>
               )}
               {signIn.kind === "error" && (
-                <p role="alert" className="text-sm text-red-800">
+                <p role="alert" className="text-sm text-danger-800">
                   {signIn.message}
                 </p>
               )}
@@ -247,40 +295,41 @@ export function InvitationClient({ token }: { token: string }) {
               type="button"
               disabled={accepting}
               onClick={() => void handleAccept()}
-              className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {accepting ? "Accepting…" : "Accept invitation"}
             </button>
           )}
 
           {signedEmail && !emailMatches && (
-            <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <div className="flex flex-col gap-3 rounded-lg border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
               <p>
-                You&apos;re signed in as <span className="font-medium">{signedEmail}</span>, but this
-                invitation is for <span className="font-medium">{invitation.email}</span>.
+                You&apos;re signed in as <span className="font-medium">{signedEmail}</span>, but
+                this invitation is for <span className="font-medium">{invitation.email}</span>.
               </p>
               <button
                 type="button"
                 disabled={signIn.kind === "sending"}
                 onClick={() => void handleSwitchAccount(invitation.email)}
-                className="self-start rounded-full border border-amber-700 px-4 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="self-start rounded-full border border-accent-700 px-4 py-1.5 text-sm font-semibold text-accent-900 hover:bg-accent-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {signIn.kind === "sending"
                   ? "Sending…"
                   : `Sign in with ${invitation.email} instead`}
               </button>
-              {signIn.kind === "sent" && (
-                <p className="text-xs">
-                  Check that inbox for the sign-in link, then accept the invitation.
-                </p>
-              )}
+              {signIn.kind === "sent" &&
+                (pendingDevLink ?? (
+                  <p className="text-xs">
+                    Check that inbox for the sign-in link, then accept the invitation.
+                  </p>
+                ))}
             </div>
           )}
         </>
       )}
 
-      <p className="text-sm text-stone-500">
-        <Link href="/" className="underline underline-offset-2 hover:text-stone-800">
+      <p className="text-sm text-ink-500">
+        <Link href="/" className="underline underline-offset-2 hover:text-ink-800">
           Back to the editor
         </Link>
       </p>

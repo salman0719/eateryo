@@ -52,18 +52,13 @@ export const menuOptionSchema = z.object({
  * `javascript:`/`data:` address or a plain-http origin.
  */
 export const storedMenuItemPhotoSchema = z.object({
-  url: z
-    .string()
-    .refine(
-      (value) => {
-        try {
-          return new URL(value).protocol === "https:";
-        } catch {
-          return false;
-        }
-      },
-      "Photo URLs must be absolute https URLs."
-    ),
+  url: z.string().refine((value) => {
+    try {
+      return new URL(value).protocol === "https:";
+    } catch {
+      return false;
+    }
+  }, "Photo URLs must be absolute https URLs."),
   /** UploadThing file key — the handle for this stored object. */
   key: z.string().min(1),
   /** Real pixel size of this copy, so the page reserves space while it loads. */

@@ -2,11 +2,9 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
+import { DevSignInPanel, useDevSignInLink } from "@/components/auth/dev-sign-in-link";
 import { authClient } from "@/lib/auth-client";
-import {
-  linkExpiryCopy,
-  type WizardLinkSent,
-} from "@/features/publishing/wizard-state";
+import { linkExpiryCopy, type WizardLinkSent } from "@/features/publishing/wizard-state";
 
 type Status =
   | { kind: "idle" }
@@ -57,6 +55,7 @@ export function MagicLinkForm({
   initialSent,
   onSent,
   onSentCleared,
+  devSignIn = false,
 }: {
   /** Same-origin path the emailed link returns to. */
   callbackURL: string;
@@ -66,10 +65,18 @@ export function MagicLinkForm({
   onSent?: (sent: WizardLinkSent) => void;
   /** The sent panel was dismissed (forget the stored request). */
   onSentCleared?: () => void;
+  /**
+   * Development shortcut: read the one-time link back from the server and
+   * offer it here instead of waiting for an email. The server only answers
+   * when `DEV_SIGN_IN_BYPASS` is on outside production; off by default.
+   */
+  devSignIn?: boolean;
 }) {
   const [email, setEmail] = useState(initialSent?.email ?? "");
   const [status, setStatus] = useState<Status>(() =>
-    initialSent ? { kind: "sent", email: initialSent.email, sentAt: initialSent.sentAt } : { kind: "idle" }
+    initialSent
+      ? { kind: "sent", email: initialSent.email, sentAt: initialSent.sentAt }
+      : { kind: "idle" }
   );
   const [linkError, setLinkError] = useState<boolean>(readLinkErrorParam);
   const inputId = useId();
@@ -99,6 +106,15 @@ export function MagicLinkForm({
     onSentCleared?.();
   }, [linkError, onSentCleared]);
 
+  // Dev bypass: the server parked the link instead of emailing it. Read it
+  // back once per request and show it, rather than sending anyone to an inbox
+  // that received nothing.
+  const dev = useDevSignInLink({
+    enabled: devSignIn,
+    email: status.kind === "sent" ? status.email : null,
+    requestKey: status.kind === "sent" ? status.sentAt : null,
+  });
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setStatus({ kind: "sending" });
@@ -124,10 +140,24 @@ export function MagicLinkForm({
   }
 
   if (status.kind === "sent") {
+    if (devSignIn) {
+      return (
+        <DevSignInPanel
+          email={status.email}
+          url={dev.url}
+          settling={dev.settling}
+          onReset={resetToIdle}
+        />
+      );
+    }
+
     const expiry = linkExpiryCopy(status.sentAt, now ?? status.sentAt);
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-        <p className="font-medium">Check your email</p>
+      <div className="rounded-xl border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
+        <p className="flex items-center gap-2 font-medium text-ink-900">
+          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success-700" />
+          Check your email
+        </p>
         <p className="mt-1">
           We sent a one-time sign-in link to <span className="font-medium">{status.email}</span>.{" "}
           {expiry.expired
@@ -136,7 +166,7 @@ export function MagicLinkForm({
         </p>
         <button
           type="button"
-          className="mt-3 font-medium underline underline-offset-2 hover:text-emerald-950"
+          className="mt-3 font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900"
           onClick={resetToIdle}
         >
           {expiry.expired ? "Send a fresh link" : "Use a different email"}
@@ -150,13 +180,13 @@ export function MagicLinkForm({
       {linkError ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800"
         >
-          That sign-in link didn&apos;t work — it may have expired or been used already.
-          Send yourself a fresh one below.
+          That sign-in link didn&apos;t work — it may have expired or been used already. Send
+          yourself a fresh one below.
         </p>
       ) : null}
-      <label htmlFor={inputId} className="text-sm font-medium text-stone-700">
+      <label htmlFor={inputId} className="text-sm font-medium text-ink-700">
         Email address
       </label>
       <input
@@ -167,12 +197,12 @@ export function MagicLinkForm({
         placeholder="you@cafe.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        className="rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-amber-600 focus:outline-none focus:ring-1 focus:ring-amber-600"
+        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600"
       />
       {status.kind === "error" ? (
         <p
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-lg border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-800"
         >
           {status.message}
         </p>
@@ -180,7 +210,7 @@ export function MagicLinkForm({
       <button
         type="submit"
         disabled={status.kind === "sending"}
-        className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+        className="rounded-lg bg-accent-700 px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
       >
         {status.kind === "sending" ? "Sending…" : "Email me a sign-in link"}
       </button>

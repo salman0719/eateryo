@@ -45,17 +45,18 @@ export function LocalDraftsOffer({
     <HeightReveal>
       <section
         aria-label="Menus from this browser"
-        className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3"
+        data-print-hide
+        className="rounded-2xl border border-info-200 bg-info-50 px-4 py-3"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-wide text-amber-800 uppercase">
+            <p className="text-xs font-semibold tracking-wide text-info-900 uppercase">
               From this browser
             </p>
-            <p className="mt-1 text-sm font-semibold text-amber-950">
+            <p className="mt-1 text-sm font-semibold text-info-950">
               We found {menuCountLabel(count)} saved here.
             </p>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-amber-900">
+            <p className="mt-1 max-w-xl text-xs leading-5 text-info-900">
               Add {count === 1 ? "it" : "them"} to your account so other devices and your public
               link can use {count === 1 ? "it" : "them"}. This browser keeps a synced copy for
               offline use.
@@ -63,12 +64,12 @@ export function LocalDraftsOffer({
           </div>
           <div className="flex flex-wrap items-end gap-2">
             {restaurants.length > 1 && (
-              <label className="flex flex-col gap-1 text-xs font-medium text-amber-900">
+              <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
                 Add to
                 <select
                   value={target?.id ?? ""}
                   onChange={(event) => setTargetId(event.target.value)}
-                  className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                  className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
                   {restaurants.map((restaurant) => (
                     <option key={restaurant.id} value={restaurant.id}>
@@ -84,7 +85,7 @@ export function LocalDraftsOffer({
                 if (target) onAdd(target.id);
               }}
               disabled={busy || !target}
-              className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               {busy ? "Adding…" : count === 1 ? "Add to account" : `Add all ${count} to account`}
             </button>
@@ -92,7 +93,7 @@ export function LocalDraftsOffer({
               type="button"
               onClick={onDismiss}
               disabled={busy}
-              className="rounded-full border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:border-amber-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+              className="rounded-full border border-line-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Not now
             </button>
@@ -119,22 +120,24 @@ export function LocalDraftsNotice({
       <section
         role="status"
         aria-label="Menus from this browser"
-        className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+        data-print-hide
+        className="rounded-2xl border border-line-200 bg-surface-base px-4 py-3"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-emerald-950">
+            <p className="flex items-center gap-2 text-sm font-semibold text-ink-900">
+              <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success-700" />
               {nothingImported
                 ? "Those browser menus are already on your account"
                 : `Added ${menuCountLabel(notice.imported)} from this browser`}
             </p>
-            <p className="mt-1 max-w-xl text-xs leading-5 text-emerald-900">
+            <p className="mt-1 max-w-xl text-xs leading-5 text-ink-600">
               {nothingImported
                 ? `“${notice.restaurantName}” already holds them. This browser keeps a synced copy for offline use too.`
                 : `They're now on your account under “${notice.restaurantName}” and work on your other devices. This browser keeps a synced copy for offline use.`}
             </p>
             {notice.failed > 0 && (
-              <p className="mt-1 text-xs font-medium leading-5 text-amber-900">
+              <p className="mt-1 text-xs font-medium leading-5 text-warning-900">
                 {menuCountLabel(notice.failed)} could not be added. Open My menus and use “Import
                 from this browser” to try again.
               </p>
@@ -144,14 +147,14 @@ export function LocalDraftsNotice({
             <button
               type="button"
               onClick={onOpenLibrary}
-              className="rounded-full border border-emerald-300 bg-white px-3 py-1.5 text-xs font-medium text-emerald-900 transition-colors hover:border-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              className="rounded-full border border-line-300 bg-surface-base px-3 py-1.5 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Open My menus
             </button>
             <button
               type="button"
               onClick={onDismiss}
-              className="text-xs font-medium text-emerald-900 underline underline-offset-2 hover:text-emerald-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              className="text-xs font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Dismiss
             </button>

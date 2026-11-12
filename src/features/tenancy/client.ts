@@ -7,13 +7,18 @@
 
 import { z } from "zod";
 
-import { SyncError, type SyncErrorCode } from "@/features/menus/sync";
+import { membershipAccessSchema, SyncError, type SyncErrorCode } from "@/features/menus/sync";
 
 /** All we need to pick a move target or show a restaurant name. */
 const restaurantOptionSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   role: z.enum(["owner", "staff"]),
+  /**
+   * The server's capability answer for this membership. Optional so an older
+   * or stubbed response still parses; callers fall back to the role defaults.
+   */
+  access: membershipAccessSchema.optional(),
 });
 
 export type RestaurantOption = z.infer<typeof restaurantOptionSchema>;
@@ -28,7 +33,16 @@ const memberOptionSchema = z.object({
 
 export type MemberOption = z.infer<typeof memberOptionSchema>;
 
-const listEnvelope = z.object({ restaurants: z.array(restaurantOptionSchema) });
+const listEnvelope = z.object({
+  restaurants: z.array(restaurantOptionSchema),
+  /**
+   * Whose list this is. Required: the shell may start this read before the
+   * session read names the account, and only a named answer can be filed
+   * safely. A response without it fails to parse, which sends the shell back
+   * to its account-keyed read instead of keeping an unattributable answer.
+   */
+  accountId: z.string().min(1),
+});
 const restaurantEnvelope = z.object({ restaurant: restaurantOptionSchema });
 const membersEnvelope = z.object({ members: z.array(memberOptionSchema) });
 const memberEnvelope = z.object({ member: memberOptionSchema });
@@ -173,11 +187,24 @@ async function requestJson<T>(
   }
 }
 
+/**
+ * The caller's restaurants plus the account the server answered for. The
+ * shell starts this read alongside the session read, so the answer can arrive
+ * before it knows whose account to file it under; the envelope says.
+ */
+export async function fetchRestaurantsForAccount(): Promise<{
+  accountId: string;
+  restaurants: RestaurantOption[];
+}> {
+  return requestJson("/api/restaurants", undefined, (payload) => {
+    const envelope = listEnvelope.parse(payload);
+    return { accountId: envelope.accountId, restaurants: envelope.restaurants };
+  });
+}
+
 /** The caller's restaurants (with their role), for pickers and headings. */
 export async function fetchRestaurants(): Promise<RestaurantOption[]> {
-  return requestJson("/api/restaurants", undefined, (payload) =>
-    listEnvelope.parse(payload).restaurants
-  );
+  return (await fetchRestaurantsForAccount()).restaurants;
 }
 
 /** Create a restaurant; the caller becomes its owner. */
@@ -211,7 +238,11 @@ export async function renameRestaurant(id: string, name: string): Promise<Restau
  * deleted too — the UI must warn about that before calling.
  */
 export async function deleteRestaurant(id: string): Promise<void> {
-  await requestJson(`/api/restaurants/${encodeURIComponent(id)}`, { method: "DELETE" }, () => undefined);
+  await requestJson(
+    `/api/restaurants/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+    () => undefined
+  );
 }
 
 const memberPath = (id: string, memberUserId?: string) =>
@@ -226,8 +257,10 @@ const invitationPath = (id: string, invitationId?: string) =>
 
 /** The team list (any member of the restaurant). */
 export async function fetchMembers(restaurantId: string): Promise<MemberOption[]> {
-  return requestJson(memberPath(restaurantId), undefined, (payload) =>
-    membersEnvelope.parse(payload).members
+  return requestJson(
+    memberPath(restaurantId),
+    undefined,
+    (payload) => membersEnvelope.parse(payload).members
   );
 }
 
@@ -255,15 +288,14 @@ export async function addMember(
 }
 
 export type AddMemberResult =
-  | { kind: "member"; member: MemberOption }
-  | { kind: "invitation"; invitation: InvitationSummary };
+  { kind: "member"; member: MemberOption } | { kind: "invitation"; invitation: InvitationSummary };
 
 /** Pending invitations for the owner's team panel. */
-export async function fetchPendingInvitations(
-  restaurantId: string
-): Promise<PendingInvitation[]> {
-  return requestJson(invitationPath(restaurantId), undefined, (payload) =>
-    pendingInvitationsEnvelope.parse(payload).invitations
+export async function fetchPendingInvitations(restaurantId: string): Promise<PendingInvitation[]> {
+  return requestJson(
+    invitationPath(restaurantId),
+    undefined,
+    (payload) => pendingInvitationsEnvelope.parse(payload).invitations
   );
 }
 
@@ -280,11 +312,12 @@ export async function resendInvitation(
 }
 
 /** Owner-only: revoke a pending invitation. */
-export async function revokeInvitation(
-  restaurantId: string,
-  invitationId: string
-): Promise<void> {
-  await requestJson(invitationPath(restaurantId, invitationId), { method: "DELETE" }, () => undefined);
+export async function revokeInvitation(restaurantId: string, invitationId: string): Promise<void> {
+  await requestJson(
+    invitationPath(restaurantId, invitationId),
+    { method: "DELETE" },
+    () => undefined
+  );
 }
 
 /** Recent team activity (any member of the restaurant). */
@@ -298,8 +331,10 @@ export async function fetchAuditEvents(restaurantId: string): Promise<AuditEvent
 
 /** Public invitation details for the accept page (token holder only). */
 export async function fetchInvitation(token: string): Promise<InvitationDetails> {
-  return requestJson(`/api/invitations/${encodeURIComponent(token)}`, undefined, (payload) =>
-    invitationDetailsEnvelope.parse(payload).invitation
+  return requestJson(
+    `/api/invitations/${encodeURIComponent(token)}`,
+    undefined,
+    (payload) => invitationDetailsEnvelope.parse(payload).invitation
   );
 }
 

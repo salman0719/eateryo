@@ -1,24 +1,31 @@
 @import "tailwindcss";
+@import "./theme.css";
 
-/* Light-only theme: every component hardcodes the warm light palette, so the
+/* Light-only theme: every component hardcodes the light palette, so the
    page must not flip to dark when the OS prefers dark — that produced
-   near-black headings on a black body. Revisit if a real dark theme lands. */
-:root {
-  --background: #faf8f5;
-  --foreground: #1c1917;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+   near-black headings on a black body. Revisit if a real dark theme lands.
+   Colours and font families live in `theme.css`. */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}
+
+/* One pointer for every control. Tailwind's preflight leaves buttons on the
+   UA default (`cursor: default` in Chrome), so nothing clickable advertised
+   itself. A base-layer rule fixes every button, tab and label-driven control
+   at once; a component that needs another cursor (a disabled control's
+   `cursor-not-allowed`, a drag handle's `cursor-grab`) still wins from the
+   utilities layer, because that layer comes after this one. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
 }
 
 /* Diner order list: the "Added" confirmation that pops above the Add
@@ -65,11 +72,11 @@ body {
 @keyframes eateryo-attention-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(180, 83, 9, 0.65);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-700) 65%, transparent);
     transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 0 9px rgba(180, 83, 9, 0);
+    box-shadow: 0 0 0 9px transparent;
     transform: scale(1.05);
   }
 }
@@ -81,10 +88,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .attention-pulse {
     animation: none;
-    outline: 3px solid #b45309;
+    outline: 3px solid var(--color-accent-700);
     outline-offset: 2px;
   }
-}/* R0 mobile floor: 16px form text stops iOS focus-zoom; coarse-pointer
+} /* R0 mobile floor: 16px form text stops iOS focus-zoom; coarse-pointer
 targets get a 44px minimum so phone taps land; secondary copy never drops
 below 12px on phones (print keeps its 10px QR captions — this is screen-only). */
 @media (max-width: 640px) {
@@ -122,7 +129,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
 }
 
 ::selection {
-  background: #fcd9a8;
+  background: var(--color-selection);
 }
 
 /* Phone-preview scrollbar (src/components/ui/phone-frame.tsx): the frame's
@@ -147,7 +154,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   @supports not selector(::-webkit-scrollbar) {
     .phone-scroll {
       scrollbar-width: thin;
-      scrollbar-color: rgba(120, 113, 108, 0.4) transparent;
+      scrollbar-color: color-mix(in srgb, var(--color-line-500) 40%, transparent) transparent;
     }
   }
 
@@ -163,7 +170,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   }
 
   .phone-scroll::-webkit-scrollbar-thumb {
-    background-color: rgba(120, 113, 108, 0.4);
+    background-color: color-mix(in srgb, var(--color-line-500) 40%, transparent);
     background-clip: padding-box;
     border: 4px solid transparent;
     border-radius: 999px;
@@ -171,7 +178,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   }
 
   .phone-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(120, 113, 108, 0.75);
+    background-color: color-mix(in srgb, var(--color-line-500) 75%, transparent);
   }
 }
 
@@ -192,6 +199,96 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
 @media (prefers-reduced-motion: reduce) {
   .sheet-up {
     animation: none;
+  }
+}
+
+/* App sidebar (src/components/layout/app-sidebar.tsx).
+
+   Width and rail/expanded layout are driven by the preference on <html>, set
+   before paint by the boot script in layout.tsx, so a saved choice never
+   flashes the other width. Unset means "follow the window": a 72px rail
+   until xl has room for the 260px column. The explicit attributes come last
+   so a choice wins at every width. */
+@media (min-width: 640px) {
+  .app-sidebar {
+    width: 72px;
+    transition: width 180ms ease;
+  }
+
+  /* The brand is the one block whose height depends on the mode: the rail
+     shows the 32px tile alone, the column adds two label lines (20 + 16). Left
+     to its content, the wrapper grows 4px on the way out and the whole nav
+     snaps vertically while the width is still gliding. Pin the taller case so
+     the column only ever moves sideways (`tests/sidebar-brand.test.ts`). */
+  .app-sidebar-brand {
+    min-height: 4.25rem; /* py-4 (32px) + two label lines (36px) */
+  }
+
+  .app-sidebar-label {
+    display: none;
+  }
+
+  .app-sidebar-item,
+  .app-sidebar-brand {
+    justify-content: center;
+  }
+}
+
+@media (min-width: 1280px) {
+  html:not([data-sidebar="rail"]) .app-sidebar {
+    width: 260px;
+  }
+
+  html:not([data-sidebar="rail"]) .app-sidebar-label {
+    display: block;
+  }
+
+  html:not([data-sidebar="rail"]) .app-sidebar-item,
+  html:not([data-sidebar="rail"]) .app-sidebar-brand {
+    justify-content: flex-start;
+  }
+}
+
+html[data-sidebar="rail"] .app-sidebar {
+  width: 72px;
+}
+
+html[data-sidebar="rail"] .app-sidebar-label {
+  display: none;
+}
+
+html[data-sidebar="rail"] .app-sidebar-item,
+html[data-sidebar="rail"] .app-sidebar-brand {
+  justify-content: center;
+}
+
+html[data-sidebar="expanded"] .app-sidebar {
+  width: 260px;
+}
+
+html[data-sidebar="expanded"] .app-sidebar-label {
+  display: block;
+}
+
+html[data-sidebar="expanded"] .app-sidebar-item,
+html[data-sidebar="expanded"] .app-sidebar-brand {
+  justify-content: flex-start;
+}
+
+/* Concept 7, "The Hidden Eat": the wordmark is the brand, so it is what the
+   column shows. The 72px rail has no room for it, and there the app-icon tile
+   takes over — the same drawn "eat", so the name is never said twice. */
+.app-sidebar-mark {
+  display: none;
+}
+
+html[data-sidebar="rail"] .app-sidebar .app-sidebar-mark {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar {
+    transition: none;
   }
 }
 
@@ -222,7 +319,7 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   [data-qr-card] {
     break-inside: avoid;
     page-break-inside: avoid;
-    border: 1px solid #d6d3d1 !important;
+    border: 1px solid var(--color-line-300) !important;
   }
 
   /* Click-to-rename names hint with a dotted underline on screen; never on paper. */

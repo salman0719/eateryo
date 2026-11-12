@@ -14,9 +14,7 @@ export const MAX_ORDER_RETENTION_DAYS = 3650;
 
 export const ORDER_RETENTION_DAYS_ENV = "ORDER_RETENTION_DAYS";
 
-export function orderRetentionDays(
-  env: Record<string, string | undefined> = process.env
-): number {
+export function orderRetentionDays(env: Record<string, string | undefined> = process.env): number {
   const parsed = Number(env[ORDER_RETENTION_DAYS_ENV]);
   if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_ORDER_RETENTION_DAYS;
   return Math.min(Math.trunc(parsed), MAX_ORDER_RETENTION_DAYS);

@@ -36,8 +36,10 @@ yarn-error.log*
 # Agent workspace (local only)
 .freebuff/
 
-# Local testing sandbox (never commit). See ROADMAP.md "local/" section.
-local/
+# Local research sandbox (never commit, except its README so a fresh clone
+# explains what the folder is for). See ROADMAP.md "local/" section.
+local/*
+!local/README.md
 
 # Keep these (negations must come after ignores above)
 !.vscode/settings.json

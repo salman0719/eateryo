@@ -138,9 +138,7 @@ describe("table landing repo", () => {
       const ensured = await ensureRestaurantSlugForUser(db, ownerA, restaurantA);
       expect(ensured.slug).toBe("cafe-a");
       // Second call keeps the existing slug instead of re-deriving.
-      expect((await ensureRestaurantSlugForUser(db, ownerA, restaurantA)).slug).toBe(
-        ensured.slug
-      );
+      expect((await ensureRestaurantSlugForUser(db, ownerA, restaurantA)).slug).toBe(ensured.slug);
     });
   });
 
@@ -237,13 +235,9 @@ describe("table landing repo", () => {
     it("stops listing a menu after it is unpublished", async () => {
       await publishOpenMenu("menu-unpub-1", "Lunch");
       await setRestaurantSlugForUser(db, ownerA, restaurantA, "cafe-a");
-      expect(
-        (await listOpenMenusForRestaurantSlug(db, "cafe-a", MON_NOON))?.menus
-      ).toHaveLength(1);
+      expect((await listOpenMenusForRestaurantSlug(db, "cafe-a", MON_NOON))?.menus).toHaveLength(1);
       await unpublishMenuForUser(db, ownerA, "menu-unpub-1");
-      expect(
-        (await listOpenMenusForRestaurantSlug(db, "cafe-a", MON_NOON))?.menus
-      ).toEqual([]);
+      expect((await listOpenMenusForRestaurantSlug(db, "cafe-a", MON_NOON))?.menus).toEqual([]);
     });
   });
 });

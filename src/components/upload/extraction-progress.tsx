@@ -80,41 +80,41 @@ export function ExtractionProgress({
       <div
         role="status"
         aria-busy="true"
-        className="rounded-2xl border border-amber-200 bg-amber-50 p-5"
+        className="rounded-2xl border border-warning-200 bg-warning-50 p-5"
       >
         <div className="flex items-start gap-3">
           <span
             aria-hidden="true"
-            className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-amber-700 border-t-transparent"
+            className="mt-0.5 h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-accent-700 border-t-transparent"
           />
           <div className="min-w-0">
             <p
               aria-hidden="true"
-              className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase"
+              className="text-[11px] font-semibold tracking-[0.18em] text-warning-800 uppercase"
             >
               {requestStartedAt === null ? "Preparing" : `Working · ${elapsed}s`}
             </p>
-            <h2 className="mt-1 text-base font-bold text-amber-950">{copy.label}</h2>
+            <h2 className="mt-1 text-base font-bold text-warning-950">{copy.label}</h2>
           </div>
         </div>
 
-        <p className="mt-2 text-sm leading-6 text-amber-900">{copy.detail}</p>
+        <p className="mt-2 text-sm leading-6 text-warning-900">{copy.detail}</p>
 
-        <div aria-hidden="true" className="mt-4 h-1.5 overflow-hidden rounded-full bg-amber-200">
+        <div aria-hidden="true" className="mt-4 h-1.5 overflow-hidden rounded-full bg-warning-200">
           <div
-            className="h-full rounded-full bg-amber-700 transition-[width] duration-700"
+            className="h-full rounded-full bg-accent-700 transition-[width] duration-700"
             style={{ width: `${Math.round(fraction * 100)}%` }}
           />
         </div>
 
         <ol aria-label="Extraction steps" className="mt-4 flex flex-wrap gap-1.5">
-          <li className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[11px] font-medium text-amber-900">
+          <li className="inline-flex items-center gap-1.5 rounded-full bg-surface-base/70 px-2.5 py-1 text-[11px] font-medium text-warning-900">
             {photosReady ? (
               <span aria-hidden="true">✓</span>
             ) : (
               <span
                 aria-hidden="true"
-                className="h-2 w-2 animate-pulse rounded-full bg-amber-700"
+                className="h-2 w-2 animate-pulse rounded-full bg-accent-700"
               />
             )}
             {photosReady
@@ -125,39 +125,42 @@ export function ExtractionProgress({
           </li>
           <li
             aria-current="step"
-            className="inline-flex items-center gap-1.5 rounded-full bg-amber-700 px-2.5 py-1 text-[11px] font-semibold text-white"
+            className="inline-flex items-center gap-1.5 rounded-full bg-accent-700 px-2.5 py-1 text-[11px] font-semibold text-on-accent"
           >
-            <span aria-hidden="true" className="h-2 w-2 animate-pulse rounded-full bg-white" />
+            <span
+              aria-hidden="true"
+              className="h-2 w-2 animate-pulse rounded-full bg-surface-base"
+            />
             Read &amp; draft
           </li>
-          <li className="inline-flex items-center gap-1.5 rounded-full bg-white/50 px-2.5 py-1 text-[11px] font-medium text-amber-800/70">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full border border-amber-700/40" />
+          <li className="inline-flex items-center gap-1.5 rounded-full bg-surface-base/50 px-2.5 py-1 text-[11px] font-medium text-warning-800/70">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full border border-accent-700/40" />
             Save
           </li>
         </ol>
 
-        <p className="mt-4 text-xs leading-5 text-amber-800">
+        <p className="mt-4 text-xs leading-5 text-warning-800">
           Keep this tab open. The images are processed in memory and never stored on our server.
         </p>
       </div>
 
-      <aside className="rounded-2xl border border-stone-200 bg-white p-5">
-        <p className="text-[11px] font-semibold tracking-[0.18em] text-amber-800 uppercase">
+      <aside className="rounded-2xl border border-line-200 bg-surface-base p-5">
+        <p className="text-[11px] font-semibold tracking-[0.18em] text-warning-800 uppercase">
           While you wait
         </p>
-        <h2 className="mt-1 text-base font-bold text-stone-900">What happens next</h2>
+        <h2 className="mt-1 text-base font-bold text-ink-900">What happens next</h2>
         <ol className="mt-3 space-y-3">
           {NEXT_STEPS.map((step, index) => (
             <li key={step.title} className="flex items-start gap-2.5">
               <span
                 aria-hidden="true"
-                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-amber-200 bg-amber-50 text-[11px] font-bold text-amber-800"
+                className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-warning-200 bg-warning-50 text-[11px] font-bold text-warning-800"
               >
                 {index + 1}
               </span>
               <div>
-                <p className="text-sm font-semibold text-stone-900">{step.title}</p>
-                <p className="text-xs leading-5 text-stone-600">{step.body}</p>
+                <p className="text-sm font-semibold text-ink-900">{step.title}</p>
+                <p className="text-xs leading-5 text-ink-600">{step.body}</p>
               </div>
             </li>
           ))}

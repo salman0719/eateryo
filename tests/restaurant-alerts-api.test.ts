@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GET as getAlerts, PUT as putAlerts } from "@/app/api/restaurants/[restaurantId]/alerts/route";
+import {
+  GET as getAlerts,
+  PUT as putAlerts,
+} from "@/app/api/restaurants/[restaurantId]/alerts/route";
 import { addMemberForOwner, createRestaurant } from "@/features/tenancy/repo";
 import type { TestDb } from "./helpers/pg-test-db";
 

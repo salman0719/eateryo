@@ -136,11 +136,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.created).toEqual({ restaurant: false, menu: false });
-    const live = await getPublishedMenuByPath(
-      holder.db!,
-      "account-cafe",
-      "account-version"
-    );
+    const live = await getPublishedMenuByPath(holder.db!, "account-cafe", "account-version");
     expect(live?.doc.title).toBe("Account version");
     expect((await getMenuForUser(holder.db!, ownerId, MENU_ID)).doc.title).toBe("Account version");
   });
@@ -168,10 +164,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
   });
 
   it("asks for a restaurant name when the owner has none", async () => {
-    const res = await publishSetup(
-      jsonRequest({ doc: sampleDoc("Nameless") }),
-      menuParams()
-    );
+    const res = await publishSetup(jsonRequest({ doc: sampleDoc("Nameless") }), menuParams());
 
     expect(res.status).toBe(400);
     expect((await res.json()).error.code).toBe("invalid_body");
@@ -183,10 +176,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
     const first = await createRestaurant(holder.db!, ownerId, "One Café");
     await createRestaurant(holder.db!, ownerId, "Two Café");
 
-    const undecided = await publishSetup(
-      jsonRequest({ doc: sampleDoc("Lunch") }),
-      menuParams()
-    );
+    const undecided = await publishSetup(jsonRequest({ doc: sampleDoc("Lunch") }), menuParams());
     expect(undecided.status).toBe(400);
     expect(await listMenusForUser(holder.db!, ownerId)).toHaveLength(0);
 
@@ -285,10 +275,7 @@ describe("POST /api/menus/[menuId]/publish-setup", () => {
 
     holder.userId = ownerId;
     const crossOrigin = await publishSetup(
-      jsonRequest(
-        { doc: sampleDoc("Cross origin"), restaurantName: "Café" },
-        "http://evil.test"
-      ),
+      jsonRequest({ doc: sampleDoc("Cross origin"), restaurantName: "Café" }, "http://evil.test"),
       menuParams()
     );
     expect(crossOrigin.status).toBe(403);

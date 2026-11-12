@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusChip } from "@/components/ui/status-chip";
 import type { MenuSummary } from "@/features/menu/storage";
 import type { RestaurantOption } from "@/features/tenancy/client";
 
@@ -18,6 +19,12 @@ import { CommitInput } from "./fields";
  */
 export interface LibraryMenu extends MenuSummary {
   onServer: boolean;
+  /**
+   * False when the server says this caller may not change the menu. A row
+   * without an answer is never offered a write; the shell fills this from
+   * the same capabilities the editor uses.
+   */
+  canWrite?: boolean;
 }
 
 interface LibraryPanelProps {
@@ -30,6 +37,12 @@ interface LibraryPanelProps {
    * answered yet", so nothing claims "this browser only" on a guess.
    */
   accountMode: boolean;
+  /**
+   * Whether this membership may start a menu (`menus.write`). A staff shift
+   * reads the café's published menus; it never creates a draft, so the
+   * creation controls are absent rather than disabled.
+   */
+  canCreate?: boolean;
   /** Signed out with stamped rows hidden: say so instead of "no menus". */
   hasHiddenMenus?: boolean;
   /** Restaurants the caller owns — where a per-row add can put a menu. */
@@ -40,6 +53,9 @@ interface LibraryPanelProps {
    */
   onMoveToAccount?: (menuId: string, restaurantId: string) => Promise<string | null>;
   unavailable: boolean;
+  /** Overrides the empty state when the shell knows why there is nothing. */
+  emptyTitle?: string;
+  emptyBody?: string;
   onOpen: (id: string) => void;
   /** Optional service name from the second-menu chips (Lunch, Dinner…). */
   onNew: (suggestedTitle?: string) => void;
@@ -57,10 +73,13 @@ export function LibraryPanel({
   menus,
   loading = false,
   accountMode,
+  canCreate = true,
   hasHiddenMenus = false,
   ownedRestaurants = [],
   onMoveToAccount,
   unavailable,
+  emptyTitle,
+  emptyBody,
   onOpen,
   onNew,
   onRename,
@@ -78,7 +97,9 @@ export function LibraryPanel({
   // Q2 companion: the second menu gets a contextual ask, not a bare
   // duplicate — chips name it for its service, the button keeps numbering.
   const secondMenuSuggestions =
-    menus.length > 0 && !loading ? suggestSecondMenuNames(menus.map((menu) => menu.title)) : [];
+    canCreate && menus.length > 0 && !loading
+      ? suggestSecondMenuNames(menus.map((menu) => menu.title))
+      : [];
 
   function startMove(id: string) {
     setMoveError(null);
@@ -114,21 +135,24 @@ export function LibraryPanel({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-stone-900">My menus</h2>
-        <button
-          type="button"
-          onClick={() => onNew()}
-          disabled={unavailable}
-          className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
-        >
-          + New menu
-        </button>
+        <h2 className="text-xl font-bold text-ink-900">My menus</h2>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={() => onNew()}
+            disabled={unavailable}
+            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            + New menu
+          </button>
+        )}
       </div>
 
       {secondMenuSuggestions.length > 0 && (
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 px-4 py-3">
-          <p className="text-sm text-stone-700">
-            Adding another? <span className="font-medium">Is it for a different time or service?</span>
+        <div className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3">
+          <p className="text-sm text-ink-700">
+            Adding another?{" "}
+            <span className="font-medium">Is it for a different time or service?</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {secondMenuSuggestions.map((name) => (
@@ -137,7 +161,7 @@ export function LibraryPanel({
                 type="button"
                 onClick={() => onNew(name)}
                 disabled={unavailable}
-                className="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm font-medium text-stone-700 transition-colors hover:border-amber-700 hover:text-amber-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               >
                 {name}
               </button>
@@ -149,7 +173,7 @@ export function LibraryPanel({
       {unavailable && (
         <p
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           Browser storage isn&apos;t available, so menus can&apos;t be saved here. You can still
           extract and export, but everything will be lost on refresh.
@@ -160,7 +184,7 @@ export function LibraryPanel({
         <div role="status" aria-busy="true" className="flex flex-col gap-3">
           <span className="sr-only">Loading your menus…</span>
           {[0, 1, 2].map((row) => (
-            <div key={row} className="rounded-2xl border border-stone-200 bg-white p-4">
+            <div key={row} className="rounded-2xl border border-line-200 bg-surface-base p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <Skeleton className="h-5 w-2/5" />
@@ -175,25 +199,33 @@ export function LibraryPanel({
           ))}
         </div>
       ) : menus.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-8 text-center">
-          <p className="font-medium text-stone-900">
-            {hasHiddenMenus ? "Signed out" : "No saved menus yet"}
+        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
+          <p className="font-medium text-ink-900">
+            {emptyTitle ??
+              (hasHiddenMenus
+                ? accountMode
+                  ? "No menus for this account"
+                  : "Signed out"
+                : "No saved menus yet")}
           </p>
-          <p className="mt-1 text-sm text-stone-600">
-            {hasHiddenMenus
-              ? "Your menus reappear when you sign in."
-              : "Extract a menu or start a blank one — it will appear here and survive refreshes."}
+          <p className="mt-1 text-sm text-ink-600">
+            {emptyBody ??
+              (hasHiddenMenus
+                ? accountMode
+                  ? "This device holds menus for another account. Sign in as that account to see them."
+                  : "Your menus reappear when you sign in."
+                : "Extract a menu or start a blank one — it will appear here and survive refreshes.")}
           </p>
         </div>
       ) : (
         <ul className="space-y-3">
           {menus.map((menu) => (
-            <li key={menu.id} className="rounded-2xl border border-stone-200 bg-white p-4">
+            <li key={menu.id} className="rounded-2xl border border-line-200 bg-surface-base p-4">
               {menu.corrupt ? (
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="font-medium text-stone-900">Unreadable record</p>
-                    <p className="text-xs text-stone-500">
+                    <p className="font-medium text-ink-900">Unreadable record</p>
+                    <p className="text-xs text-ink-500">
                       Damaged or from an incompatible version — it can only be deleted.
                     </p>
                   </div>
@@ -207,7 +239,7 @@ export function LibraryPanel({
                       });
                       if (ok) onDelete(menu.id);
                     }}
-                    className="rounded-full border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
+                    className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
                   >
                     Delete
                   </button>
@@ -215,26 +247,29 @@ export function LibraryPanel({
               ) : (
                 <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <div className="w-full min-w-0 flex-1 sm:w-auto">
-                    <CommitInput
-                      label={`Rename menu “${menu.title}”`}
-                      value={menu.title}
-                      onCommit={(title) => onRename(menu.id, title.trim())}
-                    />
-                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                    {menu.canWrite === false ? (
+                      <p className="text-sm font-semibold text-ink-900">{menu.title}</p>
+                    ) : (
+                      <CommitInput
+                        label={`Rename menu “${menu.title}”`}
+                        value={menu.title}
+                        onCommit={(title) => onRename(menu.id, title.trim())}
+                      />
+                    )}
+                    <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-500">
                       <span>
                         {menu.categoryCount} {menu.categoryCount === 1 ? "category" : "categories"}{" "}
                         · {menu.itemCount} {menu.itemCount === 1 ? "item" : "items"} · updated{" "}
                         {formatDate(menu.updatedAt)}
                       </span>
                       {accountMode && (
-                        <span
-                          className={
-                            menu.onServer
-                              ? "whitespace-nowrap rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-900"
-                              : "whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900"
-                          }
-                        >
+                        <StatusChip size="sm" tone={menu.onServer ? "success" : "warning"}>
                           {menu.onServer ? "On your account" : "This browser only"}
+                        </StatusChip>
+                      )}
+                      {menu.canWrite === false && (
+                        <span className="whitespace-nowrap rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
+                          View only
                         </span>
                       )}
                     </p>
@@ -242,12 +277,12 @@ export function LibraryPanel({
                   <div className="flex flex-wrap gap-2">
                     {/* Only a read that proved membership may offer the move:
                         while it is unknown, "not on the account" is a guess. */}
-                    {accountMode && !menu.onServer && moveAvailable && (
+                    {menu.canWrite !== false && accountMode && !menu.onServer && moveAvailable && (
                       <button
                         type="button"
                         onClick={() => startMove(menu.id)}
                         disabled={movingId !== null}
-                        className="rounded-full border border-amber-700 px-3 py-1.5 text-xs font-semibold text-amber-800 transition-colors hover:bg-amber-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                        className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-semibold text-accent-800 transition-colors hover:bg-accent-700 hover:text-on-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         {movingId === menu.id ? "Adding…" : "Add to account"}
                       </button>
@@ -255,35 +290,37 @@ export function LibraryPanel({
                     <button
                       type="button"
                       onClick={() => onOpen(menu.id)}
-                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Open
                     </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
-                          confirmLabel: "Delete menu",
-                          destructive: true,
-                        });
-                        if (ok) onDelete(menu.id);
-                      }}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-red-700 hover:text-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700"
-                    >
-                      Delete
-                    </button>
+                    {menu.canWrite !== false && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            message: `Delete “${menu.title}” permanently? Export a JSON backup first if it matters.`,
+                            confirmLabel: "Delete menu",
+                            destructive: true,
+                          });
+                          if (ok) onDelete(menu.id);
+                        }}
+                        className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
               {pickerMenuId === menu.id && (
-                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3 sm:flex-row sm:items-end">
-                  <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-stone-600">
+                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line-200 bg-surface-50 p-3 sm:flex-row sm:items-end">
+                  <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
                     Add “{menu.title}” to
                     <select
                       value={targetId}
                       onChange={(event) => setTargetId(event.target.value)}
-                      className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       <option value="" disabled>
                         Choose a restaurant…
@@ -300,7 +337,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => void runMove(menu.id, targetId)}
                       disabled={!targetId || movingId !== null}
-                      className="rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       {movingId === menu.id ? "Adding…" : "Add"}
                     </button>
@@ -308,7 +345,7 @@ export function LibraryPanel({
                       type="button"
                       onClick={() => setPickerMenuId(null)}
                       disabled={movingId !== null}
-                      className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-medium text-stone-600 transition-colors hover:border-stone-400 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700"
+                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                     >
                       Cancel
                     </button>
@@ -316,7 +353,7 @@ export function LibraryPanel({
                 </div>
               )}
               {moveError?.id === menu.id && (
-                <p role="alert" className="mt-2 text-xs text-red-700">
+                <p role="alert" className="mt-2 text-xs text-danger-700">
                   {moveError.message}
                 </p>
               )}

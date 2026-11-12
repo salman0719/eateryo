@@ -57,26 +57,26 @@ sample data, so the editor, persistence, and export can all be exercised.
 
 ### Environment variables
 
-| Variable             | Where             | Purpose                                                           |
-| -------------------- | ----------------- | ----------------------------------------------------------------- |
-| `GEMINI_API_KEY`     | Server only       | Gemini API key. One of the two extraction vendors.                 |
-| `GROQ_API_KEY`       | Server (optional) | Groq API key. Adds Groq (faster/cheaper) and failover.             |
-| `GEMINI_MODEL`       | Server (optional) | Model override; defaults to `gemini-3.5-flash-lite`.              |
-| `GROQ_MODEL`         | Server (optional) | Model override; defaults to `qwen/qwen3.8-27b`.                    |
-| `AI_PROVIDER`        | Server (optional) | Vendor tried first: `gemini` (default) or `groq`.                 |
-| `AI_FALLBACK_PROVIDER` | Server (optional) | Fallback vendor; unset = the other configured vendor, `none` = no failover. |
-| `DATABASE_URL`       | Server (optional) | Neon Postgres URL. Absent = local-only mode.                      |
-| `BETTER_AUTH_SECRET` | Server only       | Better Auth secret; generate with `openssl rand -base64 32`.      |
-| `BETTER_AUTH_URL`    | Server            | App base URL (local `http://localhost:3200`; prod = site URL).    |
-| `RESEND_API_KEY`     | Server only       | Resend key for sign-in and invitation emails (sends from the verified domain). |
-| `EMAIL_FROM`         | Server only       | Verified sending address for sign-in mail.                        |
-| `OPS_ALERT_EMAIL`    | Server only       | Inbox for failure and volume alerts (Step 11).                    |
-| `CONTACT_EMAIL`      | Server            | Address shown on `/privacy` and `/terms`; unset renders an explicit notice. |
-| `CRON_SECRET`        | Server only       | Bearer secret for the on-demand purge at `/api/cron/retention`. |
-| `EXTRACTION_MONTHLY_CAP` | Server (optional) | Per-account monthly extraction cap (default 150).             |
+| Variable                                                  | Where             | Purpose                                                                                 |
+| --------------------------------------------------------- | ----------------- | --------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`                                          | Server only       | Gemini API key. One of the two extraction vendors.                                      |
+| `GROQ_API_KEY`                                            | Server (optional) | Groq API key. Adds Groq (faster/cheaper) and failover.                                  |
+| `GEMINI_MODEL`                                            | Server (optional) | Model override; defaults to `gemini-3.5-flash-lite`.                                    |
+| `GROQ_MODEL`                                              | Server (optional) | Model override; defaults to `qwen/qwen3.8-27b`.                                         |
+| `AI_PROVIDER`                                             | Server (optional) | Vendor tried first: `gemini` (default) or `groq`.                                       |
+| `AI_FALLBACK_PROVIDER`                                    | Server (optional) | Fallback vendor; unset = the other configured vendor, `none` = no failover.             |
+| `DATABASE_URL`                                            | Server (optional) | Neon Postgres URL. Absent = local-only mode.                                            |
+| `BETTER_AUTH_SECRET`                                      | Server only       | Better Auth secret; generate with `openssl rand -base64 32`.                            |
+| `BETTER_AUTH_URL`                                         | Server            | App base URL (local `http://localhost:3200`; prod = site URL).                          |
+| `RESEND_API_KEY`                                          | Server only       | Resend key for sign-in and invitation emails (sends from the verified domain).          |
+| `EMAIL_FROM`                                              | Server only       | Verified sending address for sign-in mail.                                              |
+| `OPS_ALERT_EMAIL`                                         | Server only       | Inbox for failure and volume alerts (Step 11).                                          |
+| `CONTACT_EMAIL`                                           | Server            | Address shown on `/privacy` and `/terms`; unset renders an explicit notice.             |
+| `CRON_SECRET`                                             | Server only       | Bearer secret for the on-demand purge at `/api/cron/retention`.                         |
+| `EXTRACTION_MONTHLY_CAP`                                  | Server (optional) | Per-account monthly extraction cap (default 150).                                       |
 | `GEMINI_INPUT_USD_PER_MTOK`, `GEMINI_OUTPUT_USD_PER_MTOK` | Server (optional) | Enables cost for Gemini calls in the spend panel; unset means those calls are unpriced. |
-| `GROQ_INPUT_USD_PER_MTOK`, `GROQ_OUTPUT_USD_PER_MTOK` | Server (optional) | The same, for Groq calls. Each vendor is priced with its own rates. |
-| `ORDER_RETENTION_DAYS` | Server (optional) | Order history window used by the purge when it is run (default 90). |
+| `GROQ_INPUT_USD_PER_MTOK`, `GROQ_OUTPUT_USD_PER_MTOK`     | Server (optional) | The same, for Groq calls. Each vendor is priced with its own rates.                     |
+| `ORDER_RETENTION_DAYS`                                    | Server (optional) | Order history window used by the purge when it is run (default 90).                     |
 
 Rules enforced by the code:
 
@@ -158,11 +158,11 @@ address, promotion dates):
    clearly labelled demo data instead.
 3. **Review** — the draft opens in the editor: fix names, prices,
    descriptions, categories, variants/options, dietary labels, and
-   availability; add, duplicate, delete, reorder, and move items. Uncertain    fields carry a visible action pill ("Check price" / "Couldn't read") with
-    an inline confirm ("Looks good" clears the note, "Leave unpriced" accepts
-    a blank price such as market price — totals stay honestly blank). An item
-    priced per size (Small/Medium/Large) counts as priced: its variants carry
-    the prices, so a blank item price is not a missing price.
+   availability; add, duplicate, delete, reorder, and move items. Uncertain fields carry a visible action pill ("Check price" / "Couldn't read") with
+   an inline confirm ("Looks good" clears the note, "Leave unpriced" accepts
+   a blank price such as market price — totals stay honestly blank). An item
+   priced per size (Small/Medium/Large) counts as priced: its variants carry
+   the prices, so a blank item price is not a missing price.
 4. **Save** — edits autosave to IndexedDB (debounced; "Saving… / Saved
    locally" status). Nothing is claimed saved before the transaction succeeds.
 5. **Export** — download the menu as JSON (round-trips through Import JSON)
@@ -197,7 +197,7 @@ Postgres (PGlite) using the real generated migrations.
 Before finishing a change, run the full gate:
 
 ```bash
-npm run lint && npm run typecheck && npm run test && npm run build
+npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build
 npm run secrets:check   # needs the build output above
 ```
 
@@ -254,7 +254,7 @@ to Postgres, publishing makes a menu orderable at the café's tables — there
 is no public menu page and no link to share, so a menu is reached only
 through a printed table card — and table orders reach every staff device
 through the live board. The first menu is named for the owner: **Main Menu** unless the photo
-clearly names a service ("Lunch Menu" → *Lunch*), and the café's name is
+clearly names a service ("Lunch Menu" → _Lunch_), and the café's name is
 confirmed rather than typed. Onboarding never asks for a menu name or link.
 
 The free launch (Steps 7–11) is built and locally verified. The B2B extraction
