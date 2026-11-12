@@ -498,7 +498,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                 }
                 onChange={(event) => changePrefix(event.target.value)}
                 placeholder="Table"
-                className="mt-1 block w-40 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal focus:border-accent-700 focus:outline-none disabled:opacity-50"
+                className="mt-1 block w-40 rounded-xl border border-line-300 px-3 py-1.5 text-sm font-normal placeholder:text-ink-500 focus:border-accent-700 focus:outline-none disabled:opacity-50"
               />
             </label>
             {custom && (
@@ -658,7 +658,7 @@ export function TableQrPanel(props: TableQrPanelProps) {
                   height={200}
                   className={focusedLabel ? "h-64 w-64" : "h-44 w-44"}
                 />
-                <p className="text-[10px] leading-4 text-ink-400">Scan to order</p>
+                <p className="text-[10px] leading-4 text-ink-500">Scan to order</p>
                 {(tableSlug || publicSlug) && (
                   <p className="text-[10px] font-medium leading-4 break-all text-ink-600">
                     {displayTableUrl(code.url)}

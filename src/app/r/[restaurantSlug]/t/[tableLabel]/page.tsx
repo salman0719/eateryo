@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { OrderShell, OrderSkeleton } from "@/components/order/order-menu";
-import { TableOrderTabs } from "@/components/order/table-order-tabs";
+import { TableLanding as TableLandingScreen } from "@/components/order/table-landing";
 import { isSlug } from "@/features/publishing/slug";
 import { normalizeTableLabel, formatTableLabel } from "@/features/orders/table-links";
 import { listOpenMenusForRestaurantSlug, type TableLanding } from "@/features/tables/repo";
@@ -103,7 +103,7 @@ async function TableLandingContent({
     return (
       <OrderShell tableLabel={tableLabel}>
         <div className={`${frame} p-5`}>
-          <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
             {landing.restaurantName} · {formatTableLabel(tableLabel)}
           </p>
           <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
@@ -121,35 +121,17 @@ async function TableLandingContent({
   }
 
   return (
-    <OrderShell tableLabel={tableLabel}>
-      <div className={`${frame} p-5`}>
-        <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
-          {landing.restaurantName} · {formatTableLabel(tableLabel)}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
-        <p className="mt-1 text-sm text-ink-600">
-          {landing.menus.length === 0
-            ? landing.closedMenus.length === 1
-              ? "Nothing is being served right now — opening hours are below."
-              : "Nothing is being served right now — tap a menu to see when it opens."
-            : landing.menus.length === 1
-              ? "Here's what's on — tap a dish to add it."
-              : `${landing.menus.length} menus are open — browse the tabs or search them all at once.`}
-        </p>
-      </div>
-
-      <TableOrderTabs
-        restaurantName={landing.restaurantName}
-        restaurantSlug={landing.restaurantSlug}
-        tableLabel={tableLabel}
-        menus={landing.menus.map((menu) => ({
-          menuId: menu.menuId,
-          menuSlug: menu.menuSlug,
-          title: menu.title,
-          doc: menu.doc,
-        }))}
-        closedMenus={landing.closedMenus}
-      />
-    </OrderShell>
+    <TableLandingScreen
+      restaurantName={landing.restaurantName}
+      restaurantSlug={landing.restaurantSlug}
+      tableLabel={tableLabel}
+      menus={landing.menus.map((menu) => ({
+        menuId: menu.menuId,
+        menuSlug: menu.menuSlug,
+        title: menu.title,
+        doc: menu.doc,
+      }))}
+      closedMenus={landing.closedMenus}
+    />
   );
 }

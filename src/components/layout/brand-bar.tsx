@@ -20,18 +20,21 @@ export function BrandBar({
   signedIn,
   sessionPending,
   className = "",
+  onHome,
 }: {
   signedIn: boolean;
   sessionPending: boolean;
   /** The caller's width rule — `sm:hidden` while the sidebar carries the brand. */
   className?: string;
+  /** The lockup's destination; inside the shell it is client-side Capture. */
+  onHome?: () => void;
 }) {
   return (
     <div data-print-hide className={className}>
       {/* The same measure as the column's `main`, so the name lines up with the
           page whether or not the sidebar is beside it. */}
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pt-4 sm:px-6">
-        <BrandLockup />
+        <BrandLockup onSelect={onHome ?? null} />
         {!sessionPending && !signedIn ? (
           <a
             href="/sign-in"

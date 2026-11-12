@@ -4,6 +4,8 @@ import {
   addLine,
   nextOrderStatus,
   orderCode,
+  orderItemCount,
+  orderItemCountLabel,
   orderStatusLabel,
   orderTotal,
   setLineQuantity,
@@ -55,6 +57,19 @@ describe("order totals", () => {
     expect(orderTotal([])).toBeNull();
     expect(orderTotal([{ ...espresso, unitPrice: null }])).toBeNull();
     expect(orderTotal([espresso, { ...espresso, unitPrice: null, name: "Latte" }])).toBeNull();
+  });
+});
+
+describe("the diner's count", () => {
+  it("counts dishes, not cart rows, and reads in a diner's words", () => {
+    expect(orderItemCountLabel([{ ...espresso, quantity: 2 }])).toBe("2 items");
+    expect(orderItemCountLabel([{ ...espresso, quantity: 1 }])).toBe("1 item");
+    expect(
+      orderItemCount([
+        { ...espresso, quantity: 1 },
+        { ...espresso, quantity: 2 },
+      ])
+    ).toBe(3);
   });
 });
 
