@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, type ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -12,11 +12,15 @@ import { OrderShell } from "@/components/order/order-menu";
  */
 describe("OrderShell brand", () => {
   function render(): string {
+    // The shell requires children in its type; createElement passes them as
+    // arguments, so the cast drops that one prop (same as the provider
+    // renders in tests/sidebar-menus-pending.test.ts).
     return renderToStaticMarkup(
-      createElement(OrderShell, {
-        tableLabel: "3",
-        children: createElement("p", null, "menu"),
-      })
+      createElement(
+        OrderShell as ComponentType<{ tableLabel?: string }>,
+        { tableLabel: "3" },
+        createElement("p", null, "menu")
+      )
     );
   }
 
