@@ -46,6 +46,9 @@ interface AppSidebarProps {
   email: string | null;
   onNavigate: (section: AppSectionId) => void;
   onSignOut: () => void;
+  /** The lockup is the way home: it lands on Capture the way the brand does
+   *  everywhere else, without reloading the shell. */
+  onHome: () => void;
   /**
    * The open menu's sections while the edit workspace is showing. This is the
    * contextual half of the column: the space earns itself by jumping around a
@@ -124,6 +127,7 @@ export function AppSidebar({
   email,
   onNavigate,
   onSignOut,
+  onHome,
   outline,
   outlineKey = "",
   onOutlineSelect,
@@ -186,6 +190,7 @@ export function AppSidebar({
           tagline="Menus · tables · orders"
           truncate
           labelClassName="app-sidebar-label"
+          onSelect={onHome}
         />
       </div>
 

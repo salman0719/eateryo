@@ -61,11 +61,21 @@ export function BrandLockup({
   truncate = false,
   labelClassName = "",
   className = "",
+  href = null,
+  onSelect = null,
 }: {
   /** The second line. Omit it for the wordmark alone. */
   tagline?: string | null;
   /** Clip the tagline instead of letting it set the lockup's width. */
   truncate?: boolean;
+  /**
+   * Home destination for the lockup. One of the two makes the brand a real
+   * control instead of decoration: `href` for pages outside the app shell
+   * (a plain link home), `onSelect` for surfaces inside it (client-side
+   * navigation that keeps in-memory state instead of reloading).
+   */
+  href?: string | null;
+  onSelect?: (() => void) | null;
   /**
    * Classes on the wordmark block. The sidebar passes `app-sidebar-label`, the
    * rule that swaps the wordmark for the app-icon tile once the column is a
@@ -75,8 +85,8 @@ export function BrandLockup({
   className?: string;
 }) {
   const line = truncate ? "block truncate" : "block";
-  return (
-    <div className={`flex items-center gap-2.5 ${className}`}>
+  const inner = (
+    <>
       {/* Only the rail shows this tile; see `.app-sidebar-mark` in globals.css.
           It carries the app icon, so the name in the wordmark would be said
           twice wherever the column has room for both. */}
@@ -111,6 +121,26 @@ export function BrandLockup({
         </svg>
         {tagline ? <span className={`${line} mt-0.5 text-xs text-ink-500`}>{tagline}</span> : null}
       </span>
-    </div>
+    </>
   );
+  const frame = `flex items-center gap-2.5 ${className}`;
+  // The lockup is the way home everywhere it appears, so it is a real control
+  // wherever a destination is given: a link on content pages, a button inside
+  // the shell (which navigates client-side and keeps open work). Its name
+  // comes from the wordmark inside, so neither wrapper repeats it.
+  if (onSelect) {
+    return (
+      <button type="button" onClick={onSelect} title="Eateryo home" className={frame}>
+        {inner}
+      </button>
+    );
+  }
+  if (href) {
+    return (
+      <a href={href} title="Eateryo home" className={frame}>
+        {inner}
+      </a>
+    );
+  }
+  return <div className={frame}>{inner}</div>;
 }
