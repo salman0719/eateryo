@@ -42,6 +42,13 @@ interface AppSidebarProps {
   activeSection: AppSectionId | null;
   /** The session read has not answered: identity stays a placeholder, never "Sign in". */
   sessionPending: boolean;
+  /**
+   * The destination list has no answer yet — the session read, or the
+   * membership read behind it, is still in flight. Rows are placeholders
+   * until it settles: the shell may mount this column before the capability
+   * answer lands, and an empty nav reads as a broken menu.
+   */
+  sectionsPending?: boolean;
   signedIn: boolean;
   email: string | null;
   onNavigate: (section: AppSectionId) => void;
@@ -123,6 +130,7 @@ export function AppSidebar({
   sections,
   activeSection,
   sessionPending,
+  sectionsPending = false,
   signedIn,
   email,
   onNavigate,
@@ -198,10 +206,11 @@ export function AppSidebar({
         aria-label="Sections"
         className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3"
       >
-        {/* The session read has not answered, so the destination list is not
-            known yet: hold its shape instead of an empty column that fills
-            in a moment later. Five rows is a signed-in account's list. */}
-        {sessionPending ? (
+        {/* The destination list is not known yet, so hold its shape instead
+            of an empty column that fills in a moment later. Five rows stand
+            in for a signed-in owner's six: enough to read as a nav, few
+            enough to be honest for a staff account's three. */}
+        {sectionsPending ? (
           <div role="status" aria-busy="true" className="flex flex-col gap-0.5">
             <span className="sr-only">Loading navigation…</span>
             {[0, 1, 2, 3, 4].map((row) => (
@@ -216,7 +225,7 @@ export function AppSidebar({
             ))}
           </div>
         ) : null}
-        {sections.map((section) => {
+        {(sectionsPending ? [] : sections).map((section) => {
           const active = section.id === activeSection;
           return (
             <button

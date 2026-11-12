@@ -2833,9 +2833,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         <div className="flex w-full flex-1">
           {showShellColumn ? (
             <AppSidebar
-              sections={sessionPending ? [] : navSections}
+              sections={navReady ? navSections : []}
               activeSection={sectionForScreen(screen)}
               sessionPending={sessionPending}
+              sectionsPending={!navReady}
               signedIn={signedIn}
               email={email}
               onNavigate={(section) => navigateTo({ screen: section })}
