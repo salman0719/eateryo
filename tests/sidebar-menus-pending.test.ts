@@ -14,8 +14,15 @@ import { CAPABILITIES } from "@/features/tenancy/permissions";
  * enough: the count and its placeholder are what must not swap meanings.
  */
 
-function render(options: { menusPending: boolean; count: number; sessionPending?: boolean }) {
+function render(options: {
+  menusPending: boolean;
+  count: number;
+  sessionPending?: boolean;
+  /** The membership read behind a known session is still in flight. */
+  sectionsPending?: boolean;
+}) {
   const sessionPending = options.sessionPending ?? false;
+  const sectionsPending = options.sectionsPending ?? sessionPending;
   const sections = sessionPending
     ? []
     : availableSections({
@@ -40,6 +47,7 @@ function render(options: { menusPending: boolean; count: number; sessionPending?
         sections,
         activeSection: "capture",
         sessionPending,
+        sectionsPending,
         signedIn: !sessionPending,
         email: sessionPending ? null : "owner@example.com",
         onNavigate: () => {},
@@ -73,7 +81,7 @@ describe("AppSidebar My menus count", () => {
   });
 });
 
-describe("AppSidebar destinations while the session is unknown", () => {
+describe("AppSidebar destinations while the answer is still coming", () => {
   it("holds the nav's shape instead of an empty column", () => {
     const markup = render({ menusPending: false, count: 0, sessionPending: true });
     expect(markup).toContain("Loading navigation");
@@ -85,5 +93,32 @@ describe("AppSidebar destinations while the session is unknown", () => {
     const markup = render({ menusPending: false, count: 0, sessionPending: true });
     expect(markup.match(/Loading navigation/g)).toHaveLength(1);
     expect(markup).not.toContain(">Capture<");
+  });
+
+  /**
+   * The window this column regressed in: the session has answered, so the
+   * column is mounted, but `can()` refuses until the membership read lands —
+   * so `sections` is empty while the nav is in the shell's `!navReady` state.
+   * Without the placeholder the column rendered its brand, account and
+   * collapse button around nothing, then filled.
+   */
+  it("holds the rows while the membership read is still in flight", () => {
+    const markup = render({
+      menusPending: false,
+      count: 0,
+      sessionPending: false,
+      sectionsPending: true,
+    });
+    expect(markup).toContain("Loading navigation");
+    expect(markup.match(/min-h-\[40px\]/g)?.length).toBe(5);
+    expect(markup).not.toContain(">Capture<");
+    // The session did answer, so the account block is real, not a skeleton.
+    expect(markup).toContain("owner@example.com");
+  });
+
+  it("draws the rows once the answer lands", () => {
+    const markup = render({ menusPending: false, count: 0, sectionsPending: false });
+    expect(markup).not.toContain("Loading navigation");
+    expect(markup).toContain(">Capture<");
   });
 });
