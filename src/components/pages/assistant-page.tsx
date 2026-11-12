@@ -63,7 +63,7 @@ export function AssistantPage({
   // nothing while the bounce lands.
   if (!signedIn) return null;
   return (
-    <section className="rounded-2xl border border-dashed border-line-300 bg-surface-base p-8 text-center">
+    <section className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
       <h1 className="font-medium text-ink-900">Assistant isn’t available</h1>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
         The assistant isn’t released to this account yet. Everything else in Eateryo works as usual.

@@ -53,6 +53,7 @@ export function ImagePreview({ pages, onAdd, onReplace, onRemove }: ImagePreview
           >
             <div className="flex items-center justify-center bg-surface-100 p-3">
               {/* Plain img keeps EXIF orientation handling simple for the prototype. */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- preview is a local blob object URL, which the optimizer cannot handle */}
               <img
                 src={page.previewUrl}
                 alt={`Page ${index + 1} preview of ${page.file.name}`}

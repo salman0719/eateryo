@@ -152,7 +152,7 @@ export function OrderPagePreview({
 
       <div className="flex min-w-0 flex-col gap-4">
         <div className={`${frame} p-5`}>
-          <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
+          <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
             {tableName}
           </p>
           <h2 className="mt-1 text-2xl font-bold text-ink-900">
@@ -171,7 +171,7 @@ export function OrderPagePreview({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search dishes…"
-              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm focus:border-accent-700 focus:outline-none"
+              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
             />
           </label>
           {searching && (

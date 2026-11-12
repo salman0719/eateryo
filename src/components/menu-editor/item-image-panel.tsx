@@ -77,6 +77,7 @@ export function ItemImagePanel({
         {copy ? (
           // Straight from the CDN at the size we stored — no optimizer runs
           // for the editor either.
+          // eslint-disable-next-line @next/next/no-img-element -- dish photo served straight from the CDN at its stored size; the optimizer must never touch it
           <img
             src={copy.url}
             alt=""
@@ -89,7 +90,7 @@ export function ItemImagePanel({
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-line-300 bg-surface-50 text-lg text-ink-400"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-line-200 bg-surface-50 text-lg text-ink-400"
           >
             ▢
           </span>

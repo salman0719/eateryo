@@ -13,6 +13,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+import { BrandLockup } from "@/components/ui/brand";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
@@ -70,18 +71,7 @@ export function OrderShell({
   return (
     <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4 px-4 py-6">
       <header className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden="true"
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-700 text-base font-bold text-on-accent"
-          >
-            E
-          </span>
-          <div>
-            <p className="text-sm font-bold tracking-tight text-ink-900">Eateryo</p>
-            <p className="text-xs text-ink-500">Order from your table</p>
-          </div>
-        </div>
+        <BrandLockup tagline="Order from your table" />
         {tableLabel && (
           <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
             {formatTableLabel(tableLabel)}
@@ -258,7 +248,7 @@ export function OrderMenuSection({
                       {dietaryLabels.map((label) => (
                         <span
                           key={label}
-                          className="rounded-full bg-success-100 px-2 py-0.5 text-[11px] font-medium text-success-900"
+                          className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
                         >
                           {label}
                         </span>
@@ -296,7 +286,7 @@ export function OrderMenuSection({
                     <span
                       key={tick}
                       aria-hidden="true"
-                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-success-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
+                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
                     >
                       Added ✓
                     </span>

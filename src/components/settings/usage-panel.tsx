@@ -193,7 +193,7 @@ export function UsagePanel({ restaurantId }: { restaurantId: string | null }) {
             ? "Cost is unknown for this month because some calls did not report token counts or used a vendor without configured rates."
             : "Provider cost is not configured on this server yet, so only usage is counted."}
       </p>
-      <p className="mt-1 text-xs text-ink-400">
+      <p className="mt-1 text-xs text-ink-500">
         Failed attempts that reached the AI still count: the provider bills them.
       </p>
 
@@ -211,7 +211,7 @@ export function UsagePanel({ restaurantId }: { restaurantId: string | null }) {
               ? ` · ${formatMicroUsd(state.status.assistant.costMicros)}`
               : " · cost unknown"}
           </p>
-          <p className="mt-1 text-xs text-ink-400">
+          <p className="mt-1 text-xs text-ink-500">
             Assistant calls come from the same free Workers AI allocation as extraction; the message
             cap resets each UTC month.
           </p>

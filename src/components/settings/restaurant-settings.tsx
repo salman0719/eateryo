@@ -334,7 +334,7 @@ function OwnRestaurantCard() {
                 onChange={(event) => setName(event.target.value)}
                 placeholder="e.g. Sunny Side Café"
                 maxLength={120}
-                className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               />
             </label>
             <button
@@ -561,7 +561,7 @@ function TeamCard({
                   if (event.key === "Enter") void handleAddMember();
                 }}
                 placeholder="teammate@cafe.com"
-                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                className="rounded-lg border border-line-300 px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
               />
             </label>
             <label className="flex flex-col gap-1 text-xs font-medium text-ink-600">
@@ -584,7 +584,7 @@ function TeamCard({
               {adding ? "Adding…" : "Add member"}
             </button>
           </div>
-          <p className="mt-1 text-[11px] leading-4 text-ink-400">
+          <p className="mt-1 text-[11px] leading-4 text-ink-500">
             If they already have an account they join immediately; otherwise we email them a
             one-time invitation link that accepts on sign-in (expires in 7 days).
           </p>
@@ -623,7 +623,7 @@ function TeamCard({
                 <p className="text-sm font-medium text-ink-900">
                   {member.name.trim() ? member.name : member.email}
                   {member.userId === currentUserId && (
-                    <span className="ml-1 text-xs font-normal text-ink-400">(you)</span>
+                    <span className="ml-1 text-xs font-normal text-ink-500">(you)</span>
                   )}
                 </p>
                 <p className="truncate text-xs text-ink-500">{member.email}</p>

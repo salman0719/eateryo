@@ -7,7 +7,14 @@ import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 
 const doc = createSampleMenuDocument();
 
-const base = { restaurantName: "Cafe", restaurantSlug: "cafe", tableLabel: "3" };
+const base = {
+  restaurantName: "Cafe",
+  restaurantSlug: "cafe",
+  tableLabel: "3",
+  // Ordering is all this component does; the confirmation lives in its own
+  // screen, so nothing is placed in these renders.
+  onPlaced: () => undefined,
+};
 
 function render(props: Parameters<typeof TableOrderTabs>[0]) {
   return renderToStaticMarkup(createElement(TableOrderTabs, props));
