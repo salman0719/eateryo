@@ -237,7 +237,7 @@ export function AppSidebar({
               className={`${itemBase} min-h-[40px] px-2.5 py-1.5 ${
                 active
                   ? "bg-accent-100 font-semibold text-accent-900"
-                  : "text-ink-600 hover:bg-surface-50 hover:text-ink-900"
+                  : "text-ink-600 hover:bg-surface-100 hover:text-ink-900"
               }`}
             >
               <span className="flex w-5 shrink-0 items-center justify-center">
@@ -278,7 +278,7 @@ export function AppSidebar({
         {launch && launch.done < launch.total ? (
           <a
             href="/launch"
-            className={`${itemBase} mt-1 min-h-[40px] px-2.5 py-1.5 text-ink-600 hover:bg-surface-50 hover:text-ink-900`}
+            className={`${itemBase} mt-1 min-h-[40px] px-2.5 py-1.5 text-ink-600 hover:bg-surface-100 hover:text-ink-900`}
           >
             <span className="flex w-5 shrink-0 items-center justify-center">
               <ChecklistIcon />
@@ -320,7 +320,7 @@ export function AppSidebar({
                       className={`flex min-h-[32px] w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                         current
                           ? "bg-surface-100 font-semibold text-ink-900"
-                          : "text-ink-600 hover:bg-surface-50 hover:text-ink-900"
+                          : "text-ink-600 hover:bg-surface-100 hover:text-ink-900"
                       }`}
                     >
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>
@@ -351,7 +351,7 @@ export function AppSidebar({
             <button
               type="button"
               onClick={onSignOut}
-              className="mt-1 rounded-lg border border-line-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="mt-1 rounded-lg border border-line-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 transition-colors hover:bg-surface-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Sign out
             </button>
@@ -359,7 +359,7 @@ export function AppSidebar({
         ) : (
           <a
             href="/sign-in"
-            className="inline-flex rounded-lg border border-line-300 px-2.5 py-1 font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="inline-flex rounded-lg border border-line-300 px-2.5 py-1 font-medium text-ink-600 transition-colors hover:bg-surface-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in
           </a>
@@ -375,7 +375,7 @@ export function AppSidebar({
           onClick={toggle}
           aria-expanded={mode === "expanded"}
           aria-label={mode === "expanded" ? "Collapse navigation" : "Expand navigation"}
-          className={`${itemBase} min-h-[36px] px-2.5 py-1 text-xs text-ink-500 hover:bg-surface-50 hover:text-ink-900`}
+          className={`${itemBase} min-h-[36px] px-2.5 py-1 text-xs text-ink-500 hover:bg-surface-100 hover:text-ink-900`}
         >
           <span className="flex w-5 shrink-0 items-center justify-center">
             <PanelLeftIcon size={18} className={mode === "expanded" ? "rotate-180" : undefined} />
