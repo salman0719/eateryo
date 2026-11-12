@@ -44,6 +44,7 @@ function render(options: { menusPending: boolean; count: number; sessionPending?
         email: sessionPending ? null : "owner@example.com",
         onNavigate: () => {},
         onSignOut: () => {},
+        onHome: () => {},
         menusPending: options.menusPending,
       })
     )

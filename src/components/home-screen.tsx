@@ -2840,6 +2840,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               email={email}
               onNavigate={(section) => navigateTo({ screen: section })}
               onSignOut={() => void authClient.signOut()}
+              onHome={() => navigateTo({ screen: "capture" })}
               outline={sidebarOutline}
               outlineKey={sidebarOutlineKey}
               onOutlineSelect={scrollToMenuSection}
@@ -2856,6 +2857,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               signedIn={signedIn}
               sessionPending={sessionPending}
               className={showShellColumn ? "sm:hidden" : undefined}
+              onHome={() => navigateTo({ screen: "capture" })}
             />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the

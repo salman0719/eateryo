@@ -34,7 +34,7 @@ export function SiteHeader({ getStarted = true }: { getStarted?: boolean } = {})
   return (
     <header data-print-hide className="border-b border-line-200 bg-surface-base">
       <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 px-4 py-3">
-        <BrandLockup tagline="Menus, tables, and orders in one place" />
+        <BrandLockup tagline="Menus, tables, and orders in one place" href="/" />
         <div className="flex items-center gap-3">
           {!isPending && !user && getStarted && (
             <a

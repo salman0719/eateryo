@@ -29,6 +29,7 @@ function renderSidebar(): string {
       email: null,
       onNavigate: () => {},
       onSignOut: () => {},
+      onHome: () => {},
     })
   );
 }

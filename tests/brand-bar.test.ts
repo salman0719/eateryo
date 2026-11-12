@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { BrandBar } from "@/components/layout/brand-bar";
+import { BrandLockup } from "@/components/ui/brand";
 import { shellColumnVisible } from "@/features/navigation/routes";
 
 function render(props: { signedIn: boolean; sessionPending: boolean }) {
@@ -42,6 +43,35 @@ describe("BrandBar", () => {
     const html = render({ signedIn: true, sessionPending: false });
     expect(html).not.toContain('href="/sign-in"');
     expect(html).not.toContain("Sign in");
+  });
+});
+
+/**
+ * Clicking the brand goes home. Inside the shell that is a client-side
+ * navigation (a button, so open work survives); on a content page it is a
+ * plain link to `/`. Without a destination the lockup stays decoration — it
+ * must not become a control that goes nowhere.
+ */
+describe("BrandLockup destination", () => {
+  it("is a button when the shell hands it a client-side destination", () => {
+    const html = renderToStaticMarkup(
+      createElement(BrandLockup, { onSelect: () => {}, tagline: "Home" })
+    );
+    expect(html).toContain("<button");
+    expect(html).toContain('title="Eateryo home"');
+    expect(html).not.toContain("<a ");
+  });
+
+  it("is a link to the home route on content pages", () => {
+    const html = renderToStaticMarkup(createElement(BrandLockup, { href: "/" }));
+    expect(html).toContain('href="/"');
+    expect(html).toContain('title="Eateryo home"');
+  });
+
+  it("stays plain when no destination is given", () => {
+    const html = renderToStaticMarkup(createElement(BrandLockup, {}));
+    expect(html).not.toContain("<button");
+    expect(html).not.toContain("<a ");
   });
 });
 
