@@ -11,7 +11,13 @@ import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 
 /**
- * GET  /api/restaurants — the signed-in user's restaurants (with their role).
+ * GET  /api/restaurants — the signed-in user's restaurants (with their role),
+ *   and `accountId`: whose list this is. The shell starts this read with the
+ *   session read (both are gated by the same cookie), so the answer can
+ *   arrive before the client knows which account asked; naming the account
+ *   lets it file the answer without a second round trip. The id is the
+ *   caller's own, already known to their client from the session — it tells
+ *   them nothing they could not read there, and no other account's id.
  * POST /api/restaurants — create one; the caller becomes its owner. An
  *   account may own at most one restaurant (006), so an owner gets 409
  *   `restaurant_exists` instead of a second café. Staff memberships in other
@@ -51,7 +57,7 @@ export async function GET() {
   if (userId instanceof NextResponse) return userId;
   try {
     const restaurants = await listRestaurantsForUser(getDb(), userId);
-    const response = NextResponse.json({ restaurants });
+    const response = NextResponse.json({ restaurants, accountId: userId });
     // Personalized data must never be cached.
     response.headers.set("Cache-Control", "no-store");
     return response;

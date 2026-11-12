@@ -125,6 +125,7 @@ export const ItemEditor = memo(function ItemEditor({
           />
         </label>
         {copy ? (
+          // eslint-disable-next-line @next/next/no-img-element -- dish photo served straight from the CDN at its stored size; the optimizer must never touch it
           <img
             src={copy.url}
             alt=""

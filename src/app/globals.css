@@ -11,6 +11,23 @@ body {
   font-family: var(--font-sans);
 }
 
+/* One pointer for every control. Tailwind's preflight leaves buttons on the
+   UA default (`cursor: default` in Chrome), so nothing clickable advertised
+   itself. A base-layer rule fixes every button, tab and label-driven control
+   at once; a component that needs another cursor (a disabled control's
+   `cursor-not-allowed`, a drag handle's `cursor-grab`) still wins from the
+   utilities layer, because that layer comes after this one. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+}
+
 /* Diner order list: the "Added" confirmation that pops above the Add
    button. Rises, holds long enough to read (~1.6s), then fades — a timer
    removes it from the DOM at 2s, so it never lingers or traps focus. */

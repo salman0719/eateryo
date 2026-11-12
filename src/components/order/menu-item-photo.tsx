@@ -18,6 +18,7 @@ export function MenuItemPhoto({ item }: { item: MenuItem }) {
   if (!copy) return null;
 
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- dish photo served straight from the CDN at its stored size; the optimizer must never touch it
     <img
       src={copy.url}
       alt=""
