@@ -42,10 +42,20 @@ interface AppSidebarProps {
   activeSection: AppSectionId | null;
   /** The session read has not answered: identity stays a placeholder, never "Sign in". */
   sessionPending: boolean;
+  /**
+   * The destination list has no answer yet — the session read, or the
+   * membership read behind it, is still in flight. Rows are placeholders
+   * until it settles: the shell may mount this column before the capability
+   * answer lands, and an empty nav reads as a broken menu.
+   */
+  sectionsPending?: boolean;
   signedIn: boolean;
   email: string | null;
   onNavigate: (section: AppSectionId) => void;
   onSignOut: () => void;
+  /** The lockup is the way home: it lands on Capture the way the brand does
+   *  everywhere else, without reloading the shell. */
+  onHome: () => void;
   /**
    * The open menu's sections while the edit workspace is showing. This is the
    * contextual half of the column: the space earns itself by jumping around a
@@ -120,10 +130,12 @@ export function AppSidebar({
   sections,
   activeSection,
   sessionPending,
+  sectionsPending = false,
   signedIn,
   email,
   onNavigate,
   onSignOut,
+  onHome,
   outline,
   outlineKey = "",
   onOutlineSelect,
@@ -186,6 +198,7 @@ export function AppSidebar({
           tagline="Menus · tables · orders"
           truncate
           labelClassName="app-sidebar-label"
+          onSelect={onHome}
         />
       </div>
 
@@ -193,10 +206,11 @@ export function AppSidebar({
         aria-label="Sections"
         className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-3"
       >
-        {/* The session read has not answered, so the destination list is not
-            known yet: hold its shape instead of an empty column that fills
-            in a moment later. Five rows is a signed-in account's list. */}
-        {sessionPending ? (
+        {/* The destination list is not known yet, so hold its shape instead
+            of an empty column that fills in a moment later. Five rows stand
+            in for a signed-in owner's six: enough to read as a nav, few
+            enough to be honest for a staff account's three. */}
+        {sectionsPending ? (
           <div role="status" aria-busy="true" className="flex flex-col gap-0.5">
             <span className="sr-only">Loading navigation…</span>
             {[0, 1, 2, 3, 4].map((row) => (
@@ -211,7 +225,7 @@ export function AppSidebar({
             ))}
           </div>
         ) : null}
-        {sections.map((section) => {
+        {(sectionsPending ? [] : sections).map((section) => {
           const active = section.id === activeSection;
           return (
             <button
@@ -222,8 +236,8 @@ export function AppSidebar({
               title={section.label}
               className={`${itemBase} min-h-[40px] px-2.5 py-1.5 ${
                 active
-                  ? "bg-accent-50 text-accent-900"
-                  : "text-ink-600 hover:bg-surface-50 hover:text-ink-900"
+                  ? "bg-accent-100 font-semibold text-accent-900"
+                  : "text-ink-600 hover:bg-surface-100 hover:text-ink-900"
               }`}
             >
               <span className="flex w-5 shrink-0 items-center justify-center">
@@ -264,7 +278,7 @@ export function AppSidebar({
         {launch && launch.done < launch.total ? (
           <a
             href="/launch"
-            className={`${itemBase} mt-1 min-h-[40px] px-2.5 py-1.5 text-ink-600 hover:bg-surface-50 hover:text-ink-900`}
+            className={`${itemBase} mt-1 min-h-[40px] px-2.5 py-1.5 text-ink-600 hover:bg-surface-100 hover:text-ink-900`}
           >
             <span className="flex w-5 shrink-0 items-center justify-center">
               <ChecklistIcon />
@@ -291,7 +305,7 @@ export function AppSidebar({
 
         {outline && outline.length > 0 ? (
           <div className="app-sidebar-label mt-3 border-t border-line-200 pt-3">
-            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-400 uppercase">
+            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-500 uppercase">
               In this menu
             </p>
             <ul className="flex flex-col gap-0.5">
@@ -306,11 +320,11 @@ export function AppSidebar({
                       className={`flex min-h-[32px] w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                         current
                           ? "bg-surface-100 font-semibold text-ink-900"
-                          : "text-ink-600 hover:bg-surface-50 hover:text-ink-900"
+                          : "text-ink-600 hover:bg-surface-100 hover:text-ink-900"
                       }`}
                     >
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                      <span className="shrink-0 text-[11px] font-normal text-ink-400">
+                      <span className="shrink-0 text-[11px] font-normal text-ink-500">
                         {item.itemCount}
                       </span>
                     </button>
@@ -337,7 +351,7 @@ export function AppSidebar({
             <button
               type="button"
               onClick={onSignOut}
-              className="mt-1 rounded-lg border border-line-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="mt-1 rounded-lg border border-line-300 px-2.5 py-1 text-[11px] font-medium text-ink-600 transition-colors hover:bg-surface-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Sign out
             </button>
@@ -345,7 +359,7 @@ export function AppSidebar({
         ) : (
           <a
             href="/sign-in"
-            className="inline-flex rounded-lg border border-line-300 px-2.5 py-1 font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            className="inline-flex rounded-lg border border-line-300 px-2.5 py-1 font-medium text-ink-600 transition-colors hover:bg-surface-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
             Sign in
           </a>
@@ -361,7 +375,7 @@ export function AppSidebar({
           onClick={toggle}
           aria-expanded={mode === "expanded"}
           aria-label={mode === "expanded" ? "Collapse navigation" : "Expand navigation"}
-          className={`${itemBase} min-h-[36px] px-2.5 py-1 text-xs text-ink-500 hover:bg-surface-50 hover:text-ink-900`}
+          className={`${itemBase} min-h-[36px] px-2.5 py-1 text-xs text-ink-500 hover:bg-surface-100 hover:text-ink-900`}
         >
           <span className="flex w-5 shrink-0 items-center justify-center">
             <PanelLeftIcon size={18} className={mode === "expanded" ? "rotate-180" : undefined} />

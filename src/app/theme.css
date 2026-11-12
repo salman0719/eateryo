@@ -10,37 +10,62 @@
  * in a class string. A colour that genuinely cannot belong to a role is the
  * documented exception (see AGENTS.md, "Colour usage").
  *
+ * The three neutral roles are separate jobs, not one gray in three spellings:
+ * `ink` is text, `surface` is fills, `line` is boundaries. `ink` and `surface`
+ * still carry the same values until the surface pass lands; `line` already has
+ * its own ramp. Each one answers to a different contrast rule, so tuning one
+ * is never paid for by the other two.
+ *
  * Ramps stay in OKLCH so the studio can regenerate any hue from one base
  * colour.
  */
 @theme {
-  /* Accent: brand actions, primary buttons, links, focus rings. */
-  --color-accent-50: oklch(98.7% 0.022 95.277);
-  --color-accent-100: oklch(96.2% 0.059 95.617);
-  --color-accent-200: oklch(92.4% 0.12 95.746);
-  --color-accent-300: oklch(87.9% 0.169 91.605);
-  --color-accent-400: oklch(82.8% 0.189 84.429);
-  --color-accent-500: oklch(76.9% 0.188 70.08);
-  --color-accent-600: oklch(66.6% 0.179 58.318);
-  --color-accent-700: oklch(55.5% 0.163 48.998);
-  --color-accent-800: oklch(47.3% 0.137 46.201);
-  --color-accent-900: oklch(41.4% 0.112 45.904);
-  --color-accent-950: oklch(27.9% 0.077 45.635);
+  /* Accent: brand actions, primary buttons, links, focus rings. Eucalyptus —
+     the ramp climbs from a pale wash to a deep spruce `-700` fill at hue 169°,
+     well apart from the caution ramp and ~142° from danger at ~27°, so "click
+     this", "read this warning" and "something broke" are three different
+     families. It carries white text at `-700` (4.86) and `-800` (7.53), `-900`
+     on the `-50` wash (11.04), and its fill clears the 3:1 a focus ring needs
+     (4.62 on a card, 4.45 on the page paper). Danger stays a pure red and only
+     ever appears on destruction. */
+  --color-accent-50: #f7fbf9;
+  --color-accent-100: #dfe8e4;
+  --color-accent-200: #c4d5ce;
+  --color-accent-300: #a7c4b8;
+  --color-accent-400: #89b3a3;
+  --color-accent-500: #70a18f;
+  --color-accent-600: #5c8e7c;
+  --color-accent-700: #4f7a6a;
+  --color-accent-800: #3a5b4f;
+  --color-accent-900: #263e35;
+  --color-accent-950: #15231d;
 
-  /* Warning: caution, conflict, paused, draft and review states. The values
-     still mirror the accent ramp, so this split is semantic only; a later
-     visual pass can give warning its own hue without touching components. */
-  --color-warning-50: oklch(98.7% 0.022 95.277);
-  --color-warning-100: oklch(96.2% 0.059 95.617);
-  --color-warning-200: oklch(92.4% 0.12 95.746);
-  --color-warning-300: oklch(87.9% 0.169 91.605);
-  --color-warning-400: oklch(82.8% 0.189 84.429);
-  --color-warning-500: oklch(76.9% 0.188 70.08);
-  --color-warning-600: oklch(66.6% 0.179 58.318);
-  --color-warning-700: oklch(55.5% 0.163 48.998);
-  --color-warning-800: oklch(47.3% 0.137 46.201);
-  --color-warning-900: oklch(41.4% 0.112 45.904);
-  --color-warning-950: oklch(27.9% 0.077 45.635);
+  /* Warning: caution, conflict and review states. Gold, not lemon — the old
+     ramp ran at hue ~100 with chroma up to 0.20, which on a mint page was the
+     loudest thing on screen and read as the brand's accent rather than as a
+     caution. Hue now sits at 85–88 in the washes and slides to 66 by `-900`, so
+     a caution surface is warm without being acidic. It stays ~81° from the
+     accent at 169° and ~61° from danger at 27°, so the three never read as the
+     same family. Never a primary action: a
+     filled button is the accent. Never a *notice* either: information gets
+     `info`, which is why the "we found a menu saved here" banner and the
+     draft-changes strip are blue.
+
+     Ratios: `-800` is 6.70 on `-50` and 6.28 on `-100`; `-900` is 8.58 and 8.04;
+     `-950` is 14.15 and 13.26. `-600` is the outline stop — a caution border
+     marks a control boundary, so WCAG 1.4.11 applies: 3.74 on `surface-base`,
+     3.56 on `-50`, 3.43 on the page, 3.25 on `-100`. */
+  --color-warning-50: oklch(98.5% 0.028 88);
+  --color-warning-100: oklch(96.5% 0.055 88);
+  --color-warning-200: oklch(92.5% 0.095 85);
+  --color-warning-300: oklch(86% 0.125 80);
+  --color-warning-400: oklch(80% 0.135 78);
+  --color-warning-500: oklch(73% 0.13 76);
+  --color-warning-600: oklch(62% 0.128 72);
+  --color-warning-700: oklch(55% 0.115 70);
+  --color-warning-800: oklch(47% 0.1 68);
+  --color-warning-900: oklch(41% 0.085 66);
+  --color-warning-950: oklch(28% 0.06 62);
 
   /* Danger: errors and destructive actions. */
   --color-danger-50: oklch(97.1% 0.013 17.38);
@@ -55,7 +80,15 @@
   --color-danger-900: oklch(39.6% 0.141 25.723);
   --color-danger-950: oklch(25.8% 0.092 26.042);
 
-  /* Success: live, published, confirmed. */
+  /* Success: live, published, confirmed — a signal, never a surface. The accent
+     is a green too, so a success *fill* beside an accent fill reads as a rival
+     primary action (ΔE 0.115), and this cannot be fixed inside the hue family:
+     moving the accent from 169° to 186° takes that only to 0.117, because OKLab
+     distance here is chroma, not hue. So `success` appears as a dot, a 3px rule or
+     inline text (`-700`/`-800`), and a status chip is `surface-100` with `ink-900`
+     words and a 6px dot of this ramp (`ui/status-chip.tsx`). The ramp stays
+     because a dot and a glyph still need a vivid tone; a fill or a wash is the
+     accent's job. */
   --color-success-50: oklch(97.9% 0.021 166.113);
   --color-success-100: oklch(95% 0.052 163.051);
   --color-success-200: oklch(90.5% 0.093 164.15);
@@ -81,44 +114,69 @@
   --color-info-900: oklch(39.1% 0.09 240.876);
   --color-info-950: oklch(29.3% 0.066 243.157);
 
-  /* Ink: text. */
-  --color-ink-50: oklch(98.5% 0.001 106.423);
-  --color-ink-100: oklch(97% 0.001 106.424);
-  --color-ink-200: oklch(92.3% 0.003 48.717);
-  --color-ink-300: oklch(86.9% 0.005 56.366);
-  --color-ink-400: oklch(70.9% 0.01 56.259);
-  --color-ink-500: oklch(55.3% 0.013 58.071);
-  --color-ink-600: oklch(44.4% 0.011 73.639);
-  --color-ink-700: oklch(37.4% 0.01 67.558);
-  --color-ink-800: oklch(26.8% 0.007 34.298);
-  --color-ink-900: oklch(21.6% 0.006 56.043);
-  --color-ink-950: oklch(14.7% 0.004 49.25);
+  /* Ink: text and glyphs only — its own ramp, so a text change never repaints a
+     panel. Text begins at `-500` (4.81 on the card, 4.56 on the page paper):
+     `-600` secondary, `-700` strong secondary, `-900` primary. `-400` is the
+     glyph weight and carries no words — chevrons, separators, the dashed photo
+     box, a disclosure marker, a disabled tab — so it answers to the 3:1 rule a
+     control does (3.51 on the card, 3.33 on the page paper, 3.05 on an inset).
+     At 2.59 it used to paint 10-11px captions, placeholders and timestamps:
+     the one stop that sat under the 4.5 text floor. `-300` and lighter are the
+     inverse fill's tones (12.2 on `surface-900`), where the ladder turns over. */
+  --color-ink-50: #f9fafa;
+  --color-ink-100: #d9dad9;
+  --color-ink-200: #b8bbba;
+  --color-ink-300: #989d9b;
+  --color-ink-400: #75827d;
+  --color-ink-500: #586661;
+  --color-ink-600: #3f4a46;
+  --color-ink-700: #353f3c;
+  --color-ink-800: #2e3432;
+  --color-ink-900: #252a28;
+  --color-ink-950: #1d201f;
 
-  /* Surface: backgrounds, panels, raised cards. */
-  --color-surface-50: oklch(98.5% 0.001 106.423);
-  --color-surface-100: oklch(97% 0.001 106.424);
-  --color-surface-200: oklch(92.3% 0.003 48.717);
-  --color-surface-300: oklch(86.9% 0.005 56.366);
-  --color-surface-400: oklch(70.9% 0.01 56.259);
-  --color-surface-500: oklch(55.3% 0.013 58.071);
-  --color-surface-600: oklch(44.4% 0.011 73.639);
-  --color-surface-700: oklch(37.4% 0.01 67.558);
-  --color-surface-800: oklch(26.8% 0.007 34.298);
-  --color-surface-900: oklch(21.6% 0.006 56.043);
-  --color-surface-950: oklch(14.7% 0.004 49.25);
+  /* Surface: fills — the page, cards, insets, chips, and the inverse bar. Its
+     own ramp, tuned apart from ink: a fill only has to be told apart from the
+     fill beside it, while the text on it carries the 4.5:1. `surface-base` is
+     the card (white), `-50` the page paper and the soft tint a wide panel gets,
+     `-100` the inset a control sits in (chips, disabled fields, inline code),
+     `-200`/`-300` the stronger chip and progress track, and `-900` the inverse
+     fill (tooltips, toasts, the diner's add pill, the phone bezel) and the
+     stock the sheet scrims are mixed from. `-50` stays pale on purpose: ink-500
+     sits on it in the sidebar hover row and a disabled field, so deeper paper
+     would spend their 4.5:1. */
+  --color-surface-50: #f7faf9;
+  --color-surface-100: #ebf0ee;
+  --color-surface-200: #dee5e2;
+  --color-surface-300: #cdd5d2;
+  --color-surface-400: #9ca2a0;
+  --color-surface-500: #6e7471;
+  --color-surface-600: #4f5452;
+  --color-surface-700: #3b3e3d;
+  --color-surface-800: #252726;
+  --color-surface-900: #151616;
+  --color-surface-950: #070807;
 
-  /* Line: borders, dividers, rings, outlines. */
-  --color-line-50: oklch(98.5% 0.001 106.423);
-  --color-line-100: oklch(97% 0.001 106.424);
-  --color-line-200: oklch(92.3% 0.003 48.717);
-  --color-line-300: oklch(86.9% 0.005 56.366);
-  --color-line-400: oklch(70.9% 0.01 56.259);
-  --color-line-500: oklch(55.3% 0.013 58.071);
-  --color-line-600: oklch(44.4% 0.011 73.639);
-  --color-line-700: oklch(37.4% 0.01 67.558);
-  --color-line-800: oklch(26.8% 0.007 34.298);
-  --color-line-900: oklch(21.6% 0.006 56.043);
-  --color-line-950: oklch(14.7% 0.004 49.25);
+  /* Line: borders, dividers, rings, outlines — its own ramp, not a copy of the
+     neutrals, because a border answers to a different rule than text. `line-200`
+     is the divider weight (card edges, hairlines): decorative, so it only has to
+     be seen. `line-300` is the control stop and clears 3:1 against every card it
+     can outline (WCAG 1.4.11: 3.51 on surface-base, 3.36 on surface-50, 3.22 on
+     surface-100). `line-400` is hover and pressed, `line-900` is the frame (the
+     phone bezel). A container never uses 300: at that weight a dashed empty-state
+     box reads as something to press. The one exception is the printed QR card,
+     which keeps 300 for its cut line on paper. */
+  --color-line-50: #f8fbfa;
+  --color-line-100: #d1d5d4;
+  --color-line-200: #abb1af;
+  --color-line-300: #858f8b;
+  --color-line-400: #747e7a;
+  --color-line-500: #646d69;
+  --color-line-600: #555d59;
+  --color-line-700: #464c4a;
+  --color-line-800: #383d3b;
+  --color-line-900: #2b2e2d;
+  --color-line-950: #1d201f;
 
   /* Single-value roles: the card base, text on a filled control, and the
      overlay behind a sheet. */
@@ -126,10 +184,14 @@
   --color-on-accent: oklch(100% 0 0);
   --color-scrim: oklch(0% 0 0 / 0.35);
 
-  /* Page chrome. */
-  --color-background: #faf8f5;
-  --color-foreground: #1c1917;
-  --color-selection: #fcd9a8;
+  /* Page chrome. Body text is `ink-900` itself, so a paragraph and a
+     `text-ink-900` heading are the same black rather than two neighbours, one
+     warm and one cool. Selection is a mid accent wash: it has to be seen over
+     a card and over the page paper (1.53 on white, 1.72 on the paper) while the
+     words inside it keep their contrast (9.55 for `ink-900`). */
+  --color-background: #f2f6f4;
+  --color-foreground: #252a28;
+  --color-selection: #c4d5ce;
 
   /* Type. The family is loaded in `src/app/layout.tsx` via next/font; to swap
      the typeface change that import only — these variable names stay put. */

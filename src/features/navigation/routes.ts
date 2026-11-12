@@ -133,8 +133,6 @@ export interface AppSection {
   moreRank?: number;
   /** The More sheet's one-line reason. */
   why?: string;
-  /** The bottom bar's glyph; the label carries the accessible name. */
-  icon?: string;
   /**
    * Filled in by the shell, never by the table: how many menus the library is
    * showing in the active café, once that number is a fact.
@@ -156,21 +154,18 @@ export const APP_SECTIONS = [
     label: "Capture",
     capabilities: ["menus.write"],
     phone: "bar",
-    icon: "📸",
   },
   {
     id: "library",
     label: "My menus",
     capabilities: ["menus.read"],
     phone: "bar",
-    icon: "📚",
   },
   {
     id: "orders",
     label: "Orders",
     capabilities: ["orders.read"],
     phone: "bar",
-    icon: "🧾",
   },
   {
     id: "assistant",
@@ -238,17 +233,19 @@ export function availableSections(access: SectionAccess): AppSection[] {
  * door, so a settled visitor gets the page instead and `brand-bar.tsx` carries
  * the name and `/sign-in`.
  *
- * Two cases keep it besides an account: a visitor with anonymous drafts, for
- * whom My menus is a real destination, and a session that has not answered.
- * `unknown` keeps it because an unanswered read may be an owner, and hanging
- * the shell's chrome on a guess is exactly what 015 was about.
+ * One case keeps it besides an account: a visitor with anonymous drafts, for
+ * whom My menus is a real destination. An unanswered session keeps nothing:
+ * the column is the account's, so rendering it before the read settles
+ * flashes account chrome at a fresh visitor (and a settled visitor's entry
+ * at nobody yet known). The shell holds a neutral placeholder until the
+ * session and the library have both answered instead of guessing either way.
  */
 export function shellColumnVisible(input: {
   sessionState: SessionState;
   hasWorkingSet: boolean;
 }): boolean {
   if (input.sessionState === "signed-in") return true;
-  if (input.sessionState === "unknown") return true;
+  if (input.sessionState === "unknown") return false;
   return input.hasWorkingSet;
 }
 
@@ -267,7 +264,7 @@ export interface PhoneTab {
 export function phoneTabs(sections: readonly AppSection[]): PhoneTab[] {
   return sections
     .filter((section) => section.phone === "bar")
-    .map((section) => ({ id: section.id, label: section.label, icon: section.icon ?? "" }));
+    .map((section) => ({ id: section.id, label: section.label }));
 }
 
 export interface MoreSheetRow {

@@ -27,7 +27,6 @@ import {
 } from "@/features/menu/option-groups";
 import {
   addLine,
-  orderCode,
   orderTotal,
   setLineQuantity,
   type Order,
@@ -38,6 +37,7 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import { OrderReceived } from "./order-received";
 import { OrderSheet } from "./order-sheet";
 
 interface ServerTableOrderProps {
@@ -156,29 +156,12 @@ export function ServerTableOrder({
   if (placed) {
     return (
       <OrderShell tableLabel={tableLabel}>
-        <div className={`${frame} p-8 text-center`}>
-          <p className="text-sm font-semibold tracking-wider text-success-800 uppercase">
-            Order received
-          </p>
-          <p className="mt-3 text-2xl font-bold text-ink-900">
-            #{orderCode(placed.id)} · {formatTableLabel(placed.tableLabel)}
-          </p>
-          <p className="mt-2 text-sm text-ink-600">
-            {placed.lines.length} {placed.lines.length === 1 ? "line" : "lines"} ·{" "}
-            {formatOrderTotal(placed.currency, orderTotal(placed.lines))}
-          </p>
-          <p className="mx-auto mt-4 max-w-md text-xs leading-5 text-ink-500">
-            The kitchen sees this on their board right away. The total is confirmed when your order
-            is prepared.
-          </p>
-          <button
-            type="button"
-            onClick={() => setPlaced(null)}
-            className="mt-5 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800"
-          >
-            Order something else
-          </button>
-        </div>
+        <OrderReceived
+          order={placed}
+          restaurantName={restaurantName}
+          footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+          onOrderAgain={() => setPlaced(null)}
+        />
       </OrderShell>
     );
   }
@@ -225,7 +208,7 @@ export function ServerTableOrder({
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-warning-800 uppercase">
+            <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
               {restaurantName} · {formatTableLabel(tableLabel)}
             </p>
             <h1 className="mt-1 text-2xl font-bold text-ink-900">
