@@ -153,8 +153,11 @@ export function MagicLinkForm({
 
     const expiry = linkExpiryCopy(status.sentAt, now ?? status.sentAt);
     return (
-      <div className="rounded-xl border border-success-200 bg-success-50 p-4 text-sm text-success-900">
-        <p className="font-medium">Check your email</p>
+      <div className="rounded-xl border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
+        <p className="flex items-center gap-2 font-medium text-ink-900">
+          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success-700" />
+          Check your email
+        </p>
         <p className="mt-1">
           We sent a one-time sign-in link to <span className="font-medium">{status.email}</span>.{" "}
           {expiry.expired
@@ -163,7 +166,7 @@ export function MagicLinkForm({
         </p>
         <button
           type="button"
-          className="mt-3 font-medium underline underline-offset-2 hover:text-success-950"
+          className="mt-3 font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900"
           onClick={resetToIdle}
         >
           {expiry.expired ? "Send a fresh link" : "Use a different email"}
@@ -194,7 +197,7 @@ export function MagicLinkForm({
         placeholder="you@cafe.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600"
+        className="rounded-lg border border-line-300 px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600"
       />
       {status.kind === "error" ? (
         <p
