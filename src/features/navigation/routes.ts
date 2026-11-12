@@ -133,8 +133,6 @@ export interface AppSection {
   moreRank?: number;
   /** The More sheet's one-line reason. */
   why?: string;
-  /** The bottom bar's glyph; the label carries the accessible name. */
-  icon?: string;
   /**
    * Filled in by the shell, never by the table: how many menus the library is
    * showing in the active café, once that number is a fact.
@@ -156,21 +154,18 @@ export const APP_SECTIONS = [
     label: "Capture",
     capabilities: ["menus.write"],
     phone: "bar",
-    icon: "📸",
   },
   {
     id: "library",
     label: "My menus",
     capabilities: ["menus.read"],
     phone: "bar",
-    icon: "📚",
   },
   {
     id: "orders",
     label: "Orders",
     capabilities: ["orders.read"],
     phone: "bar",
-    icon: "🧾",
   },
   {
     id: "assistant",
@@ -269,7 +264,7 @@ export interface PhoneTab {
 export function phoneTabs(sections: readonly AppSection[]): PhoneTab[] {
   return sections
     .filter((section) => section.phone === "bar")
-    .map((section) => ({ id: section.id, label: section.label, icon: section.icon ?? "" }));
+    .map((section) => ({ id: section.id, label: section.label }));
 }
 
 export interface MoreSheetRow {
