@@ -859,6 +859,7 @@ export function MenuEditor({
               {imageUrl && <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>}
               <div className="flex items-stretch gap-3">
                 {imageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element -- source image is a local blob object URL, which the optimizer cannot handle
                   <img
                     src={imageUrl}
                     alt="Original uploaded menu"
