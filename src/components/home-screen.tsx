@@ -56,7 +56,6 @@ import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
   cacheMenu,
-  createMenu,
   deleteMenu,
   getImage,
   getMenu,
@@ -157,7 +156,12 @@ import {
   membershipFlag,
   type MenuMembership,
 } from "@/features/menus/membership";
-import { docForRoutedMenu } from "@/features/menus/routed-doc";
+import {
+  docForRoutedMenu,
+  forgetPendingNewMenu,
+  isPendingNewMenu,
+  rememberPendingNewMenu,
+} from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
 
@@ -659,6 +663,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       } catch {
         if (cancelled) return;
         openedRouteMenuRef.current = null;
+        // A refresh before the first change: the URL names a menu that was
+        // never saved, so there is nothing to report — back quietly.
+        if (route.screen === "editor" && menuId && isPendingNewMenu(menuId)) {
+          forgetPendingNewMenu(menuId);
+          navigateToRef.current?.({ screen: "library" }, true);
+          return;
+        }
         // A dead publish link holds its URL with an explainer card — the
         // draft is in another browser, and the library can't show that.
         if (route.screen === "editor" && route.mode === "publish") {
@@ -701,7 +712,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             clearTimeout(saveTimer.current);
             saveTimer.current = null;
           }
-          if (!storageDownRef.current) {
+          // A menu with no changes was never created: persisting it here
+          // would mint exactly the phantom the transient flow avoids.
+          if (!storageDownRef.current && JSON.stringify(openDoc) !== lastSavedRef.current) {
             void saveMenu(openDoc).catch(() => undefined);
           }
         }
@@ -1156,6 +1169,15 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * browser": the latter is false for every account menu (003).
    */
   function storageSaveState(id: string): SaveState {
+    // A menu that has never changed has never been saved: saying "Saved"
+    // would promise a row the library does not have.
+    if (isPendingNewMenu(id)) {
+      return {
+        kind: "saved",
+        message: "Not saved yet",
+        detail: "Your first change saves it in this browser.",
+      };
+    }
     if (serverBaseRef.current) return savedState("Saved to your account.");
     const membership = decideMenuMembership({
       signedIn: signedInRef.current,
@@ -1183,6 +1205,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
 
   /** Every editor change flows through here: update state + debounced save. */
   function handleDocChange(next: MenuDocument) {
+    // The first change retires the pending marker: whatever happens next,
+    // this menu is a real draft and resolves like one.
+    forgetPendingNewMenu(next.id);
     setActiveDoc(next);
     docRef.current = next;
     if (storageDownRef.current) {
@@ -1366,6 +1391,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           menuAccessRef.current.get(localDoc.id) === "local" ||
           (originNow != null && originNow.accountId === accountKeyRef.current);
         setMenuAccessFor(localDoc.id, localDraft ? "local" : "none");
+        // The server finding nothing is expected for a menu that was never
+        // saved — it is not news, so the status keeps saying so.
+        if (isPendingNewMenu(localDoc.id)) {
+          setSaveState({
+            kind: "saved",
+            message: "Not saved yet",
+            detail: "Your first change saves it in this browser.",
+          });
+          return;
+        }
         setSaveState(
           localDraft
             ? savedState("Saved in this browser — not in your account yet.")
@@ -1469,18 +1504,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // first, honest numbering after) and rename inline in the editor.
     const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
     const title = suggestedTitle?.trim() ? suggestedTitle.trim() : fallback;
-    const doc = storageDownRef.current
-      ? createMenuDocument({ title })
-      : await createMenu(title).catch((error: unknown) => {
-          setLibraryError(
-            error instanceof StorageError ? error.message : "Could not create a menu."
-          );
-          return null;
-        });
-    if (!doc) return;
-    const newMenuActor = signedInRef.current ? accountKeyRef.current : null;
-    if (newMenuActor) await stampDraftOrigin(doc.id, newMenuActor, "");
-    if (!storageDownRef.current) await refreshLibrary();
+    // The menu is created by its first change, not by this tap: it lives in
+    // memory until an edit persists it through the normal autosave path, so
+    // going back now leaves no row, no banner, nothing to finish. The marker
+    // tells a refresh that the URL may name an unsaved menu, so it lands
+    // back in the library quietly instead of reporting it missing.
+    const doc = createMenuDocument({ title });
+    rememberPendingNewMenu(doc.id);
     await openDoc(doc, null, true, "local");
   }
 

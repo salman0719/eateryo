@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
-import { docForRoutedMenu } from "@/features/menus/routed-doc";
+import {
+  docForRoutedMenu,
+  forgetPendingNewMenu,
+  isPendingNewMenu,
+  rememberPendingNewMenu,
+} from "@/features/menus/routed-doc";
 
 /**
  * Entering a second menu painted the first one until its own copy was read:
@@ -36,6 +41,28 @@ describe("docForRoutedMenu", () => {
     expect(docForRoutedMenu(first, { screen: "item", menuId: first.id, itemId: "item-1" })).toBe(
       first
     );
+  });
+
+  it("never mistakes one fresh menu for another", () => {
+    const store = new Map<string, string>();
+    const backing = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+    };
+    // Server render (or private mode): no store means no marker, never a crash.
+    expect(isPendingNewMenu("menu-1", null)).toBe(false);
+    rememberPendingNewMenu("menu-1", null);
+    expect(isPendingNewMenu("menu-1", null)).toBe(false);
+
+    rememberPendingNewMenu("menu-1", backing);
+    expect(isPendingNewMenu("menu-1", backing)).toBe(true);
+    expect(isPendingNewMenu("menu-2", backing)).toBe(false);
+    // Forgetting a different id leaves the marker alone.
+    forgetPendingNewMenu("menu-2", backing);
+    expect(isPendingNewMenu("menu-1", backing)).toBe(true);
+    forgetPendingNewMenu("menu-1", backing);
+    expect(isPendingNewMenu("menu-1", backing)).toBe(false);
   });
 
   it("renders nothing once the route leaves the editor", () => {
