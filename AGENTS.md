@@ -132,22 +132,39 @@ errors, or add lint/type suppressions just to make checks pass.
   `layout.tsx` so a saved choice never flashes. The app shell has no desktop
   header; `site-header.tsx` stays for content pages (launch, legal, dev).
   The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
-  drops it once the session has settled as signed out with nothing in the
-  library, because a column holding the single row "Capture" reads as a broken
-  menu, not as a front door. It stays off while the session or the library is
-  still answering — an unanswered read is neither signed in nor signed out,
-  so the shell holds a neutral placeholder instead of guessing — and for a
-  visitor holding drafts, whose My menus is a real destination. The brand wrapper inside it must stay a
+  never shows it signed out, because a column holding "Capture" reads as a
+  broken menu, not as a front door. It stays off while the session or the
+  library is still answering — an unanswered read is neither signed in nor
+  signed out, so the shell holds a neutral placeholder instead of guessing.
+  Signed out there is no navigation at all (`availableSections` is Capture
+  only): no My menus, no phone tab bar, no More sheet, and a URL for an
+  account surface returns to Capture — `/menus`, `/menus/<id>` and the item
+  pages included. The one exception is `/menus/<id>/publish`, the onboarding
+  publish step, because the emailed magic link returns there. A leftover
+  signed-out draft is resumed from the signed-out capture banner instead,
+  which reopens it in the capture result screen (newest first when several
+  linger); signed in there is no resume banner. The browser is server-only
+  at rest: sign-out dissolves account copies proved in sync
+  (`collectSignOutDissolveIds`, hash-matched stamps only — an interrupted
+  edit is never dissolved), and the pre-sign-in choice names only
+  anonymous drafts (`unstampedIds`), so re-sign-in never asks about a menu
+  that is already on an account. The
+  brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
-  visitor. Signed out it is the only sign-in path there is — the sidebar's
-  account block is desktop-only and the More sheet is signed-in only — so it
-  carries `/sign-in` itself, and it shows nothing extra while the session is
-  unanswered. The chosen identity (concept 7, "The Hidden Eat") is not applied
+  visitor. Signed out it is the only sign-in path there is — the sidebar never
+  shows without an account and the More sheet is signed-in only — so it
+  carries `/sign-in` itself and nothing else: there are no destinations to
+  browse, and it shows nothing at all while the session is
+  unanswered. Every in-shell sign-in path (brand row, sidebar account, library
+  gate) asks about the browser draft first while signed out with one: attach
+  it on login, or wipe it on login — staying is one Escape away (`direct-
+sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
+  flow attaches its journey draft silently instead). The chosen identity (concept 7, "The Hidden Eat") is not applied
   yet: the theme landed first, then the drawn lockup replaces the text in
   `brand.tsx` only.
 - `src/components/pages/capture-page.tsx` — the capture screen, and therefore
@@ -156,6 +173,10 @@ errors, or add lint/type suppressions just to make checks pass.
   keeps; two columns from `lg`, one on a phone so the field is never below the
   fold). The moment a photo exists — or the visitor is known to be signed in —
   it returns to the plain working layout, and an owner never sees the entry.
+  Signed out, the review result is the whole journey: the inline price and
+  "check this" fixes stay, the "Fine-tune in the editor" second path does not
+  (there is no signed-out editor route), and the First look carries the bold
+  reassurance that everything stays editable once signed in.
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.
@@ -244,10 +265,12 @@ errors, or add lint/type suppressions just to make checks pass.
   inside its frame, so it always uses the sheet, never the column.
 - `src/features/menus/` — Step 8 server menus: `repo.ts` (tenancy-scoped,
   conditional-UPDATE `updatedAt` conflict detection), `sync.ts` (typed
-  browser client with `SyncError` codes), `move-to-account.ts` (one-way
-  local import, one menu or the whole library); routes in
-  `src/app/api/menus/`; editor UI in
-  `src/components/menu-editor/conflict-banner.tsx` + `move-to-account-panel.tsx`
+  browser client with `SyncError` codes), `move-to-account.ts` (the one-way
+  local import the sign-in claim runs — there is no manual import UI, and no
+  "Import from this browser" option anywhere); routes in
+  `src/app/api/menus/`; claim decisions in `claim-local-drafts.ts`
+  (sign-in auto-imports every browser draft; no remembered answers, no
+  offer); editor UI in `src/components/menu-editor/conflict-banner.tsx`
 - `tests/helpers/pg-test-db.ts`, `tests/tenancy.test.ts`,
   `tests/auth-magic-link.test.ts` — Step 7 isolation/auth tests (PGlite);
   `tests/menus-repo.test.ts`, `tests/menus-api.test.ts`,

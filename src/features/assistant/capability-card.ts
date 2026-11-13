@@ -22,8 +22,7 @@ point the owner at the contact address on /privacy. Never promise a feature that
    must review them. Prices the model could not read stay empty rather than guessed.
 
 2. My menus (tab: My menus, path /menus)
-   The library lists menus saved in this browser and, when signed in, menus on the account ("On your account").
-   A browser-only menu can be added to the account one-way with "Add to account"; there is no move back down.
+   The library lists menus saved in this browser and, when signed in, menus on the account. Signing in adds every browser draft to the account in one go or discards it; a leftover browser-only menu retries at the next sign-in. Menus never move back down.
    Rename and delete work from the library; deleting an account menu removes it from the account first.
 
 3. Editor (open a menu from My menus, path /menus/<menuId>)
