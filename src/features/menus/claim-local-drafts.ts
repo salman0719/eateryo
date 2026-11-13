@@ -50,6 +50,25 @@ export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraft
   return "offer";
 }
 
+/**
+ * The onboarding promise ("Sign in to publish your menu"): the draft opened
+ * in the publish wizard attaches to the owner's workspace on sign-in, with
+ * no prior-menu check. The emailed magic link names that menu, so a
+ * returning account with five menus still adopts the journey draft — the
+ * link is explicit consent for *it*.
+ */
+export function decidePublishJourneyClaim(input: {
+  signedIn: boolean;
+  /** The shell acts in a membership that may file menus (or will own a new café). */
+  mayFile: boolean;
+  /** This browser holds the journey draft and the account does not. */
+  journeyDraftLocal: boolean;
+  /** This account+menu pair already ran the journey attach this session. */
+  alreadyClaimed: boolean;
+}): boolean {
+  return input.signedIn && input.mayFile && input.journeyDraftLocal && !input.alreadyClaimed;
+}
+
 /** The only part of a restaurant the automatic claim reads. */
 export interface AutoClaimRestaurant {
   id: string;
