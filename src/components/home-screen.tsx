@@ -83,7 +83,7 @@ import { usePathname } from "next/navigation";
 
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
-import { rememberPublishJourney } from "@/features/publishing/wizard-state";
+import { hasPublishJourney, rememberPublishJourney } from "@/features/publishing/wizard-state";
 import { authClient } from "@/lib/auth-client";
 import {
   ExtractClientError,
@@ -137,6 +137,7 @@ import {
 import {
   accountReadState,
   decideLocalDraftClaimSurface,
+  decidePublishJourneyClaim,
   deriveClaimGate,
   dismissLocalDraftClaim,
   loadLocalDraftClaim,
@@ -1765,6 +1766,83 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     void runLocalDraftClaim(restaurant.id, restaurant.name);
   }
 
+  /**
+   * Onboarding promise: the draft opened in the publish wizard attaches to
+   * the owner's workspace on sign-in, with no prior-menu check. Where it
+   * lands: the café the shell acts in when it may file there, else the
+   * owner's first café, else a new café named from the draft (brand-new
+   * accounts). Staff-only sign-ins never reach here — there is no café the
+   * caller may file in.
+   */
+  async function handlePublishJourneyClaim(menuId: string) {
+    const actor = accountKeyRef.current;
+    if (!signedInRef.current || !actor) return;
+    setClaimBusy(true);
+    setClaimError(null);
+    try {
+      const draft = await getMenu(menuId).catch(() => null);
+      if (!draft) return;
+      let targetId: string;
+      let targetName: string;
+      if (canFileBrowserDrafts && activeRestaurantId) {
+        targetId = activeRestaurantId;
+        targetName = activeWorkspace?.name ?? "My restaurant";
+      } else if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
+        targetId = ownedRestaurantsForAccount[0].id;
+        targetName = ownedRestaurantsForAccount[0].name;
+      } else if ((restaurantList?.length ?? 0) === 0) {
+        const created = await createRestaurant(
+          suggestRestaurantName([draft.title]) ?? "My restaurant"
+        );
+        workspace.addRestaurant(created);
+        targetId = created.id;
+        targetName = created.name;
+      } else {
+        setClaimError(
+          "Your account can't file menus yet — ask the café owner to add this address in Settings → Team."
+        );
+        return;
+      }
+      const outcome = await moveLocalMenuToAccount(targetId, menuId);
+      if (outcome.status === "failed") {
+        setClaimError(`We couldn't add your menu to your account — ${outcome.reason}`);
+        return;
+      }
+      addServerId(menuId);
+      await stampClaimedMenus([menuId], actor, (id) => getMenu(id));
+      // The wizard holds the open row on a null baseline; reconcile it to
+      // the agreed revision so the next save stays on the account.
+      if (docRef.current?.id === menuId) {
+        try {
+          const server = await fetchServerMenu(menuId);
+          if (docRef.current?.id === menuId) {
+            serverBaseRef.current = server.updatedAt;
+            await refreshDraftSync(menuId, actor, server.updatedAt, menuContentHash(server.doc));
+            setOriginList(await listDraftOrigins());
+            setSaveState(savedState("Saved to your account."));
+          }
+        } catch {
+          // The next open reconciles; the attach already succeeded.
+        }
+      }
+      markLocalDraftsClaimed(actor);
+      setClaimAnswer({ accountKey: actor, status: "done" });
+      setClaimNotice({
+        imported: outcome.status === "imported" ? 1 : 0,
+        failed: 0,
+        restaurantName: targetName,
+      });
+      await refreshLibrary();
+      void mergeAccountMenus();
+    } catch {
+      setClaimError(
+        "We couldn't add your menu to your account. It is still saved in this browser — try again from My menus."
+      );
+    } finally {
+      setClaimBusy(false);
+    }
+  }
+
   function handleDismissClaim() {
     if (!accountKey) return;
     dismissLocalDraftClaim(accountKey);
@@ -2704,6 +2782,44 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     if (!resumeReady || resumeDismissed !== null) return;
     void Promise.resolve().then(() => setResumeDismissed(false));
   }, [resumeReady, resumeDismissed]);
+
+  // Which journey menu already attached this session (one entry per menu).
+  const journeyClaimRef = useRef<string | null>(null);
+
+  // Onboarding promise ("Sign in to publish your menu"): the journey draft
+  // attaches on sign-in with no prior-menu check — the emailed link is
+  // consent for that menu. The generic auto-import below stays as the
+  // fallback for non-journey drafts.
+  useEffect(() => {
+    if (!signedIn || !accountKey) return;
+    if (claimGate.pending || claimGate.incomplete) return;
+    const menuId = routeMenuId(route);
+    if (!menuId || !hasPublishJourney(menuId)) return;
+    if (serverIds.has(menuId)) return;
+    if (
+      !decidePublishJourneyClaim({
+        signedIn,
+        mayFile: canFileBrowserDrafts || (restaurantList?.length ?? 0) === 0,
+        journeyDraftLocal: localOnly.some((menu) => menu.id === menuId),
+        alreadyClaimed: journeyClaimRef.current === `${accountKey}:${menuId}`,
+      })
+    )
+      return;
+    journeyClaimRef.current = `${accountKey}:${menuId}`;
+    void handlePublishJourneyClaim(menuId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    signedIn,
+    accountKey,
+    route,
+    serverIds,
+    localOnly,
+    canFileBrowserDrafts,
+    restaurantList,
+    ownedRestaurantsForAccount,
+    claimGate.pending,
+    claimGate.incomplete,
+  ]);
 
   useEffect(() => {
     if (!signedIn || !accountKey) return;

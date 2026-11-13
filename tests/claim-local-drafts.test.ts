@@ -4,6 +4,7 @@ import {
   accountReadState,
   decideLocalDraftClaim,
   decideLocalDraftClaimSurface,
+  decidePublishJourneyClaim,
   deriveClaimGate,
   dismissLocalDraftClaim,
   loadBrowserAccount,
@@ -99,6 +100,31 @@ describe("decideLocalDraftClaim", () => {
     // No fork, no queue — the first sign-in adopts the drafts, marked so
     // they never render signed out again.
     expect(decideLocalDraftClaim(NEW_ACCOUNT)).toBe("auto-import");
+  });
+});
+
+describe("decidePublishJourneyClaim", () => {
+  const JOURNEY = {
+    signedIn: true,
+    mayFile: true,
+    journeyDraftLocal: true,
+    alreadyClaimed: false,
+  };
+
+  it("attaches the journey draft with no prior-menu check", () => {
+    // The emailed link is consent for that menu: prior account menus,
+    // remembered answers, and café count never enter this decision.
+    expect(decidePublishJourneyClaim(JOURNEY)).toBe(true);
+  });
+
+  it("stays out when there is nothing local to attach", () => {
+    expect(decidePublishJourneyClaim({ ...JOURNEY, journeyDraftLocal: false })).toBe(false);
+  });
+
+  it("never files twice, signs out, or files without a writable home", () => {
+    expect(decidePublishJourneyClaim({ ...JOURNEY, alreadyClaimed: true })).toBe(false);
+    expect(decidePublishJourneyClaim({ ...JOURNEY, signedIn: false })).toBe(false);
+    expect(decidePublishJourneyClaim({ ...JOURNEY, mayFile: false })).toBe(false);
   });
 });
 
