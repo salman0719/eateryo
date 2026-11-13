@@ -94,7 +94,8 @@ interface MenuEditorProps {
   saveState: SaveState;
   /**
    * Where saves go: "local" = this browser only, "account" = synced to the
-   * signed-in account with the local copy as an offline cache (Step 8).
+   * signed-in account, with the browser holding a working copy until
+   * sign-out (Step 8).
    */
   syncMode: "local" | "account";
   imageUrl: string | null;
@@ -1366,7 +1367,7 @@ export function MenuEditor({
         ) : (
           <p>
             {onServer
-              ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a copy for offline edits."
+              ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a working copy until you sign out."
               : syncMode === "account"
                 ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
                 : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}

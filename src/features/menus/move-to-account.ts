@@ -4,8 +4,9 @@
  * validated API the editor uses.
  *
  * Contract:
- * - One-way: local data is never deleted or modified; the server gains
- *   copies, the browser keeps its originals as the offline cache.
+ * - One-way: local data is never modified in place; the server gains
+ *   copies. Callers dissolve rows the server just accepted; skipped rows
+ *   (already there) stay for the heal.
  * - Idempotent-ish: each document keeps its local id, so re-running the
  *   move skips menus that already exist on the server (409 menu_exists)
  *   instead of duplicating them.
