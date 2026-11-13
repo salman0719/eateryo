@@ -6,12 +6,7 @@ import { BrandBar } from "@/components/layout/brand-bar";
 import { BrandLockup } from "@/components/ui/brand";
 import { shellColumnVisible } from "@/features/navigation/routes";
 
-function render(props: {
-  signedIn: boolean;
-  sessionPending: boolean;
-  onLibrary?: () => void;
-  onSignIn?: () => void;
-}) {
+function render(props: { signedIn: boolean; sessionPending: boolean; onSignIn?: () => void }) {
   return renderToStaticMarkup(createElement(BrandBar, props));
 }
 
@@ -56,14 +51,13 @@ describe("BrandBar", () => {
     expect(html).not.toContain("Sign in");
   });
 
-  it("carries My menus while a signed-out browser holds a draft", () => {
-    const html = render({ signedIn: false, sessionPending: false, onLibrary: () => {} });
-    expect(html).toContain("My menus");
-  });
-
-  it("shows no library path when the signed-out browser is empty", () => {
+  it("carries no destinations of its own while signed out", () => {
+    // A signed-out visitor has nothing to browse: the row is the lockup and
+    // the one sign-in path, and a leftover draft is resumed on Capture.
     const html = render({ signedIn: false, sessionPending: false });
     expect(html).not.toContain("My menus");
+    expect(html).not.toContain("Capture");
+    expect(html).not.toContain("Orders");
   });
 });
 

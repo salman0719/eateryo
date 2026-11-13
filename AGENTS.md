@@ -132,12 +132,15 @@ errors, or add lint/type suppressions just to make checks pass.
   `layout.tsx` so a saved choice never flashes. The app shell has no desktop
   header; `site-header.tsx` stays for content pages (launch, legal, dev).
   The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
-  never shows it signed out, because a column holding "Capture" (and, with a
-  draft, "My menus") reads as a broken menu, not as a front door. It stays off
-  while the session or the library is still answering — an unanswered read is
-  neither signed in nor signed out, so the shell holds a neutral placeholder
-  instead of guessing. A signed-out draft is reached through the brand row's
-  My menus button and the phone tab bar instead. The brand wrapper inside it must stay a
+  never shows it signed out, because a column holding "Capture" reads as a
+  broken menu, not as a front door. It stays off while the session or the
+  library is still answering — an unanswered read is neither signed in nor
+  signed out, so the shell holds a neutral placeholder instead of guessing.
+  Signed out there is no navigation at all (`availableSections` is Capture
+  only): no My menus, no phone tab bar, no More sheet, and a URL for an
+  account surface returns to Capture. A leftover draft is resumed from the
+  capture banner instead, which reopens it in the capture result screen. The
+  brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
@@ -146,8 +149,8 @@ errors, or add lint/type suppressions just to make checks pass.
   wherever the column is absent: below `sm` always, and at every width for a
   visitor. Signed out it is the only sign-in path there is — the sidebar never
   shows without an account and the More sheet is signed-in only — so it
-  carries `/sign-in` itself plus a My menus button while this browser holds a
-  draft, and it shows nothing extra while the session is
+  carries `/sign-in` itself and nothing else: there are no destinations to
+  browse, and it shows nothing at all while the session is
   unanswered. Every in-shell sign-in path (brand row, sidebar account, library
   gate) asks about the browser draft first while signed out with one: attach
   it on login, or wipe it on login — staying is one Escape away (`direct-
