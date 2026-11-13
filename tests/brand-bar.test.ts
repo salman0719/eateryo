@@ -6,7 +6,12 @@ import { BrandBar } from "@/components/layout/brand-bar";
 import { BrandLockup } from "@/components/ui/brand";
 import { shellColumnVisible } from "@/features/navigation/routes";
 
-function render(props: { signedIn: boolean; sessionPending: boolean; onLibrary?: () => void }) {
+function render(props: {
+  signedIn: boolean;
+  sessionPending: boolean;
+  onLibrary?: () => void;
+  onSignIn?: () => void;
+}) {
   return renderToStaticMarkup(createElement(BrandBar, props));
 }
 
@@ -31,6 +36,12 @@ describe("BrandBar", () => {
     const html = render({ signedIn: false, sessionPending: false });
     expect(html).toContain('href="/sign-in"');
     expect(html).toContain("Sign in");
+  });
+
+  it("asks about the browser draft first when the shell takes the sign-in path", () => {
+    const html = render({ signedIn: false, sessionPending: false, onSignIn: () => {} });
+    expect(html).toContain("Sign in");
+    expect(html).not.toContain('href="/sign-in"');
   });
 
   it("claims nothing while the session is unanswered", () => {

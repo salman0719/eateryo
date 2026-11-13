@@ -35,6 +35,11 @@ export interface MenusPageProps {
   onMoveToAccount: PanelProps["onMoveToAccount"];
   /** Called after an import that copied at least one menu (stamp + refresh). */
   onMoved: (report: MoveReport) => void;
+  /**
+   * Signed-out sign-in path. When the shell hands this over, the session-gate
+   * button asks about the browser draft first instead of linking away.
+   */
+  onSignIn?: () => void;
 }
 
 /**
@@ -64,6 +69,7 @@ export function MenusPage({
   onDelete,
   onMoveToAccount,
   onMoved,
+  onSignIn,
 }: MenusPageProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -73,14 +79,23 @@ export function MenusPage({
           className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
         >
           {error}{" "}
-          {isSessionGateMessage(error) && (
-            <a
-              href="/sign-in"
-              className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
-            >
-              Sign in
-            </a>
-          )}
+          {isSessionGateMessage(error) &&
+            (onSignIn ? (
+              <button
+                type="button"
+                onClick={onSignIn}
+                className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
+              >
+                Sign in
+              </button>
+            ) : (
+              <a
+                href="/sign-in"
+                className="font-semibold text-danger-900 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-900"
+              >
+                Sign in
+              </a>
+            ))}
         </p>
       )}
       <LibraryPanel
