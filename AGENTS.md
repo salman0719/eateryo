@@ -143,8 +143,12 @@ errors, or add lint/type suppressions just to make checks pass.
   publish step, because the emailed magic link returns there. A leftover
   signed-out draft is resumed from the signed-out capture banner instead,
   which reopens it in the capture result screen (newest first when several
-  linger); signed in there is no resume banner — sign-in dissolves the
-  rows into the account or wipes them. The
+  linger); signed in there is no resume banner. The browser is server-only
+  at rest: sign-out dissolves account copies proved in sync
+  (`collectSignOutDissolveIds`, hash-matched stamps only — an interrupted
+  edit is never dissolved), and the pre-sign-in choice names only
+  anonymous drafts (`unstampedIds`), so re-sign-in never asks about a menu
+  that is already on an account. The
   brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay

@@ -134,6 +134,7 @@ import { createRestaurant } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
 import {
   clearDraftOrigin,
+  collectSignOutDissolveIds,
   decideHeal,
   getDraftOrigin,
   listDraftOrigins,
@@ -141,6 +142,7 @@ import {
   refreshDraftSync,
   stampClaimedMenus,
   stampDraftOrigin,
+  unstampedIds,
   visibleMenuIds,
   type DraftOrigin,
 } from "@/features/menus/draft-origins";
@@ -285,6 +287,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeDocIdRef = useRef<string | null>(null);
   /** Previous session state, so only a real sign-out (not a first load) clears. */
   const wasSignedInRef = useRef(false);
+  /** The account that was signed in, so sign-out can drop its synced rows. */
+  const prevAccountKeyRef = useRef<string | null>(null);
 
   function navigateTo(next: AppRoute, replace = false, flushCurrent = true) {
     const previousMenuId = routeMenuId(routeRef.current);
@@ -693,12 +697,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   useEffect(() => {
     const wasSignedIn = wasSignedInRef.current;
     wasSignedInRef.current = signedIn;
+    if (signedIn && accountKey) prevAccountKeyRef.current = accountKey;
 
     if (!signedIn) {
       // Sign-out is a privacy boundary. An open editor or a result on
       // Capture can hold an account menu, so a real session end dismisses
-      // both and lands on Capture. Nothing is deleted: anonymous drafts
-      // remain in My menus, and the landed screen is the signed-out home.
+      // both and lands on Capture. Anonymous drafts stay for the capture
+      // banner; account copies proved in sync are dissolved below, so the
+      // landed screen never offers a menu that is already on the account.
       const landing = signOutLandingRoute({ wasSignedIn, signedIn });
       if (landing) {
         const openDoc = docRef.current;
@@ -746,6 +752,24 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
+      // Server-only at rest: account copies proved in sync leave with the
+      // session, so a later sign-in never asks about a menu that is
+      // already there. Anything unproven stays hidden until the heal (or
+      // the claim) sees it — an interrupted edit is never dissolved.
+      const leavingAccount = prevAccountKeyRef.current;
+      prevAccountKeyRef.current = null;
+      if (leavingAccount) {
+        void (async () => {
+          try {
+            for (const id of await collectSignOutDissolveIds(leavingAccount, getMenu)) {
+              await dissolveBrowserMenu(id);
+            }
+          } catch {
+            // Best-effort: leftovers stay stamped and hidden, never asked about.
+          }
+          await refreshLibrary();
+        })();
+      }
       return;
     }
     // Sign-in: merge account menus into the library, heal interrupted work
@@ -1980,8 +2004,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * publish panel): signed out with a real local menu, the owner chooses
    * before leaving. Add → the ids attach on login; delete → they are wiped
    * on login; staying is always one Escape away. Sample rows are
-   * disregarded without asking; without any menu the link navigates
-   * immediately.
+   * disregarded without asking, stamped rows stay for the claim without
+   * asking; without any anonymous menu the link navigates immediately.
    */
   async function requestDirectSignIn() {
     if (signedInRef.current) {
@@ -1996,17 +2020,22 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     }
     const titles = new Map(existing.map((menu) => [menu.id, menu.title] as [string, string]));
     const { real, demo } = await partitionRealMenus(existing.map((menu) => menu.id));
+    // Stamped rows belong to an account — the claim moves them, the heal
+    // triages them — so the choice names only anonymous drafts and never
+    // asks about a menu that is already on one.
+    const askable = unstampedIds(real, await listDraftOrigins().catch(() => []));
     const realTitles = new Map(
       real.map((id) => [id, titles.get(id)] as [string, string | undefined])
     );
-    if (real.length === 0) {
-      // Only sample rows (or nothing at all): no confirmation, the demo
-      // data is simply disregarded on the way in.
+    if (askable.length === 0) {
+      // Only sample rows, stamped rows, or nothing at all: no
+      // confirmation, the demo data is simply disregarded on the way in
+      // and stamped rows stay for the claim.
       for (const id of demo) await dissolveBrowserMenu(id);
       router.push("/sign-in");
       return;
     }
-    const firstTitle = realTitles.get(real[0]);
+    const firstTitle = realTitles.get(askable[0]);
     const title = firstTitle?.trim() ? `“${firstTitle}”` : "your browser menu";
     const addIt = await confirm({
       message: `Add ${title} from this browser to your account when you sign in?`,
@@ -2017,7 +2046,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // names only real menus.
     for (const id of demo) await dissolveBrowserMenu(id);
     if (addIt) {
-      saveDirectSignInIntent({ decision: "attach", menuIds: real });
+      saveDirectSignInIntent({ decision: "attach", menuIds: askable });
       router.push("/sign-in");
       return;
     }
@@ -2030,7 +2059,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       destructive: true,
     });
     if (!wipeIt) return;
-    saveDirectSignInIntent({ decision: "discard", menuIds: real });
+    saveDirectSignInIntent({ decision: "discard", menuIds: askable });
     router.push("/sign-in");
   }
 
