@@ -67,6 +67,7 @@ import {
   type MenuSummary,
 } from "@/features/menu/storage";
 import {
+  createServerMenu,
   deleteServerMenu,
   fetchCafeMenus,
   fetchServerMenu,
@@ -2338,6 +2339,42 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     }
     setDraftSave("saving");
     try {
+      // Server-first: an owner with a café captures straight into the
+      // account, so a rename-and-return never sits "in this browser".
+      const targetId = serverCaptureTarget();
+      if (targetId) {
+        try {
+          const created = await createServerMenu(targetId, doc);
+          if (primaryPageBlob) {
+            try {
+              await saveImage(created.id, primaryPageBlob);
+            } catch {
+              // Image is optional; the menu matters.
+            }
+          }
+          if (token !== draftTokenRef.current) return;
+          const cached = storageDownRef.current ? created.doc : await cacheMenu(created.doc);
+          draftDocRef.current = cached;
+          const autosaveServerActor = accountKeyRef.current;
+          if (autosaveServerActor)
+            await refreshDraftSync(
+              cached.id,
+              autosaveServerActor,
+              created.updatedAt,
+              menuContentHash(cached)
+            );
+          addServerId(cached.id);
+          setMenuAccessFor(cached.id, created.access);
+          rememberMenuCafe(cached.id, targetId);
+          setDraftSave("saved");
+          await refreshLibrary();
+          return;
+        } catch (serverError) {
+          if (serverError instanceof SyncError && serverError.code === "exists") throw serverError;
+          // Fall through to the browser draft; opening it offers the manual
+          // move once the account is reachable.
+        }
+      }
       const saved = await saveMenu(doc);
       if (primaryPageBlob) {
         try {
@@ -2387,6 +2424,43 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           model: extracted.model,
           originalFileName: firstPage?.file.name,
         });
+      const openTarget = serverCaptureTarget();
+      const alreadyOnServer = serverIdsRef.current.has(doc.id);
+      if (openTarget && !alreadyOnServer && !storageDownRef.current) {
+        try {
+          const created = await createServerMenu(openTarget, doc);
+          if (firstPage) {
+            try {
+              await saveImage(created.id, firstPage.file);
+            } catch {
+              // Image is optional; the menu matters.
+            }
+          }
+          const cached = await cacheMenu(created.doc);
+          const openActor = accountKeyRef.current;
+          if (openActor)
+            await refreshDraftSync(
+              cached.id,
+              openActor,
+              created.updatedAt,
+              menuContentHash(cached)
+            );
+          addServerId(cached.id);
+          setMenuAccessFor(cached.id, created.access);
+          rememberMenuCafe(cached.id, openTarget);
+          await refreshLibrary();
+          await openDoc(cached, firstPage ? firstPage.file : null, updateRoute, created.access);
+          return cached;
+        } catch {
+          // Fall through to the browser draft; the manual move retries it.
+        }
+      }
+      if (alreadyOnServer && openTarget) {
+        const access = menuAccessRef.current.get(doc.id);
+        if (!storageDownRef.current) await refreshLibrary();
+        await openDoc(doc, firstPage ? firstPage.file : null, updateRoute, access);
+        return doc;
+      }
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
       if (firstPage && !storageDownRef.current) {
         try {
@@ -2402,6 +2476,24 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       return saved;
     }
     const doc = demoDoc ?? createSampleMenuDocument();
+    const demoTarget = serverCaptureTarget();
+    if (demoTarget && !storageDownRef.current) {
+      try {
+        const created = await createServerMenu(demoTarget, doc);
+        const cached = await cacheMenu(created.doc);
+        const demoActor = accountKeyRef.current;
+        if (demoActor)
+          await refreshDraftSync(cached.id, demoActor, created.updatedAt, menuContentHash(cached));
+        addServerId(cached.id);
+        setMenuAccessFor(cached.id, created.access);
+        rememberMenuCafe(cached.id, demoTarget);
+        await refreshLibrary();
+        await openDoc(cached, null, updateRoute, created.access);
+        return cached;
+      } catch {
+        // Fall through to the browser draft below.
+      }
+    }
     const saved = storageDownRef.current ? doc : await saveMenu(doc);
     await pruneSignedOutOthers(saved.id);
     if (!storageDownRef.current) await refreshLibrary();
@@ -2621,6 +2713,21 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
   const activeRestaurantIdRef = useRef<string | null>(activeRestaurantId);
   activeRestaurantIdRef.current = activeRestaurantId;
+  /**
+   * Server-first creation (signed-in): a new menu is a cloud copy in the
+   * acting café, never a browser-only draft. The ref mirrors the render
+   * answer so async saves decide on the same membership the shell acts in.
+   * Null while signed out, while the café is unresolved, or on a staff
+   * shift — those paths keep the explicit local draft plus manual move.
+   */
+  const signedInCanWrite = signedIn && accountCan("menus.write");
+  const signedInCanWriteRef = useRef(signedInCanWrite);
+  signedInCanWriteRef.current = signedInCanWrite;
+  function serverCaptureTarget(): string | null {
+    if (!signedInRef.current || !accountKeyRef.current) return null;
+    if (!signedInCanWriteRef.current) return null;
+    return activeRestaurantIdRef.current;
+  }
   // Refresh the sidebar's launch progress when the account, the café, or the
   // screen changes: publishing or a first order moves the count, and the next
   // navigation is when the owner sees it. It asks for the café the shell is
@@ -3413,6 +3520,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   previewDoc={resultDoc}
                   source={source}
                   draftSave={draftSave}
+                  draftOnServer={resultDoc ? serverIds.has(resultDoc.id) : false}
                   initialReviewCount={initialReviewCount}
                   onClear={clearCapture}
                   onEdit={() => void handleEditResult()}
