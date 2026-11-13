@@ -157,6 +157,11 @@ import {
   type MenuMembership,
 } from "@/features/menus/membership";
 import {
+  SIGNED_OUT_REPLACE_MESSAGE,
+  SIGNED_OUT_SINGLE_MENU_MESSAGE,
+  signedOutSlotFull,
+} from "@/features/menus/offline-slot";
+import {
   docForRoutedMenu,
   forgetPendingNewMenu,
   isPendingNewMenu,
@@ -1498,8 +1503,42 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     navigateTo({ screen: "editor", menuId: id, mode: "edit" });
   }
 
+  /** Best-effort count of this browser's menus; fail open on unreadable storage. */
+  async function signedOutLibraryCount(): Promise<number> {
+    try {
+      return (await listMenus()).length;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Single offline menu invariant: after a signed-out save, any other rows
+   * are superseded — their replacement was confirmed where the flow began.
+   * Best-effort: a failed prune leaves the extra row for the next save.
+   */
+  async function pruneSignedOutOthers(keepId: string) {
+    if (signedInRef.current) return;
+    try {
+      const all = await listMenus();
+      await Promise.all(
+        all
+          .filter((menu) => menu.id !== keepId)
+          .map((menu) => deleteMenu(menu.id).catch(() => undefined))
+      );
+    } catch {
+      // The next save retries; the extra row stays visible meanwhile.
+    }
+  }
+
   async function handleNewMenu(suggestedTitle?: string) {
     setLibraryError(null);
+    // Single offline menu: signed-out starts one draft, then publishes it —
+    // New never stacks a second browser-only menu.
+    if (!signedInRef.current && (await signedOutLibraryCount()) > 0) {
+      setLibraryError(SIGNED_OUT_SINGLE_MENU_MESSAGE);
+      return;
+    }
     // Q2: never gate on a name — blank menus arrive titled ("Main Menu"
     // first, honest numbering after) and rename inline in the editor.
     const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
@@ -2027,7 +2066,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   /** Start (or restart) a selection from the dropzone — replaces every page. */
   async function selectFiles(incoming: File[]) {
     if (incoming.length === 0) return;
-    if (!(await confirmDiscard())) return;
+    // Single offline menu: a signed-out browser holds one draft, so a fresh
+    // selection replaces it with explicit consent instead of minting a second.
+    if (!signedInRef.current && (await signedOutLibraryCount()) > 0) {
+      const ok = await confirm({
+        message: SIGNED_OUT_REPLACE_MESSAGE,
+        confirmLabel: "Replace menu",
+        destructive: true,
+      });
+      if (!ok) return;
+    } else if (!(await confirmDiscard())) return;
     const check = validateImageBatch(incoming);
     if (!check.valid) {
       setFileError(check.message);
@@ -2055,15 +2103,26 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setFileError(check.message);
       return;
     }
-    // The add control only exists while pages are selected, so there is
-    // always a previous selection to combine; the guard in confirmDiscard
-    // decides whether there is an extraction result worth confirming.
-    const confirmMessage =
-      `This discards the current extraction result — the images themselves are kept. ` +
-      `A new extraction will run on all ${combined.length} images together: the ` +
-      `${pages.length} already selected plus ${incoming.length} new ` +
-      `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
-    if (!(await confirmDiscard(confirmMessage))) return;
+    // Single offline menu: replacing the saved draft needs the same consent
+    // as a fresh selection — the re-extraction supersedes it.
+    if (!signedInRef.current && (await signedOutLibraryCount()) > 0) {
+      const ok = await confirm({
+        message: SIGNED_OUT_REPLACE_MESSAGE,
+        confirmLabel: "Replace menu",
+        destructive: true,
+      });
+      if (!ok) return;
+    } else {
+      // The add control only exists while pages are selected, so there is
+      // always a previous selection to combine; the guard in confirmDiscard
+      // decides whether there is an extraction result worth confirming.
+      const confirmMessage =
+        `This discards the current extraction result — the images themselves are kept. ` +
+        `A new extraction will run on all ${combined.length} images together: the ` +
+        `${pages.length} already selected plus ${incoming.length} new ` +
+        `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
+      if (!(await confirmDiscard(confirmMessage))) return;
+    }
     applySelection(combined);
     void extractFiles(combined);
   }
@@ -2149,7 +2208,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   async function handleDemo() {
-    if (!(await confirmDiscard())) return;
+    if (!signedInRef.current && (await signedOutLibraryCount()) > 0) {
+      const ok = await confirm({
+        message: SIGNED_OUT_REPLACE_MESSAGE,
+        confirmLabel: "Replace menu",
+        destructive: true,
+      });
+      if (!ok) return;
+    } else if (!(await confirmDiscard())) return;
     clearCapture();
     const doc = createSampleMenuDocument();
     setDemoDoc(doc);
@@ -2210,6 +2276,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // an existing stamp.
       const autosaveActor = signedInRef.current ? accountKeyRef.current : null;
       if (autosaveActor) await stampDraftOrigin(saved.id, autosaveActor, "");
+      await pruneSignedOutOthers(saved.id);
       setDraftSave("saved");
       await refreshLibrary();
     } catch (error) {
@@ -2251,12 +2318,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           // Image is optional; the menu matters.
         }
       }
+      await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
       await openDoc(saved, firstPage ? firstPage.file : null, updateRoute, "local");
       return saved;
     }
     const doc = demoDoc ?? createSampleMenuDocument();
     const saved = storageDownRef.current ? doc : await saveMenu(doc);
+    await pruneSignedOutOthers(saved.id);
     if (!storageDownRef.current) await refreshLibrary();
     await openDoc(saved, null, updateRoute, "local");
     return saved;
@@ -2416,8 +2485,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   async function handleImportFile(importFile: File) {
     setImportError(null);
     try {
+      // Single offline menu: an import never stacks a second browser draft.
+      if (!signedInRef.current && (await signedOutLibraryCount()) > 0) {
+        setImportError(SIGNED_OUT_SINGLE_MENU_MESSAGE);
+        return;
+      }
       const doc = parseImportedMenu(await importFile.text());
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
+      await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
       await openDoc(saved, null);
     } catch (error) {
@@ -3017,7 +3092,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   menus={libraryMenus}
                   loading={libraryLoading || libraryAccountPending}
                   accountMode={libraryAccountMode}
-                  canCreate={!signedIn || accountCan("menus.write")}
+                  canCreate={
+                    signedIn
+                      ? accountCan("menus.write")
+                      : !signedOutSlotFull({ signedIn, libraryCount: libraryMenus.length })
+                  }
                   hasHiddenMenus={hasHiddenMenus}
                   emptyTitle={libraryEmpty?.title}
                   emptyBody={libraryEmpty?.body}
