@@ -4,9 +4,10 @@ import { BrandLockup } from "@/components/ui/brand";
  * The brand surface on a phone.
  *
  * Below `sm` the app has no sidebar, so this row is the only place the name
- * appears — and, signed out, the only way into `/sign-in`: the sidebar's
- * account block is desktop-only and the More sheet is signed-in only, so a
- * visitor with no drafts was left with no sign-in path at all.
+ * appears — and, signed out, the only way into `/sign-in`: the sidebar never
+ * shows without an account and the More sheet is signed-in only, so a visitor
+ * would otherwise have no sign-in path at all. It carries nothing else: a
+ * signed-out visitor has no destinations to browse.
  *
  * The row takes no device decision of its own. The caller owns the width, so
  * the signed-out home can later mount the same lockup in a roomier desktop
@@ -21,7 +22,6 @@ export function BrandBar({
   sessionPending,
   className = "",
   onHome,
-  onLibrary,
   onSignIn,
 }: {
   signedIn: boolean;
@@ -30,11 +30,6 @@ export function BrandBar({
   className?: string;
   /** The lockup's destination; inside the shell it is client-side Capture. */
   onHome?: () => void;
-  /**
-   * Signed-out library path. The sidebar never shows without an account, so
-   * the row carries My menus itself while this browser holds a draft.
-   */
-  onLibrary?: () => void;
   /**
    * Signed-out sign-in path. When the shell hands this over, the button asks
    * about the browser draft first instead of navigating straight away.
@@ -49,15 +44,6 @@ export function BrandBar({
         <BrandLockup onSelect={onHome ?? null} />
         {!sessionPending && !signedIn ? (
           <div className="flex shrink-0 items-center gap-2">
-            {onLibrary ? (
-              <button
-                type="button"
-                onClick={onLibrary}
-                className="rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                My menus
-              </button>
-            ) : null}
             {onSignIn ? (
               <button
                 type="button"

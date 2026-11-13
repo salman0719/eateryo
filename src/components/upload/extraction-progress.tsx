@@ -37,7 +37,7 @@ const SIGNED_OUT_STEPS = [
   },
   {
     title: "Saved in this browser",
-    body: "No account needed. The draft waits in My menus on this device.",
+    body: "No account needed. Come back to this browser and the draft is waiting on Capture.",
   },
   {
     title: "Your link, when ready",

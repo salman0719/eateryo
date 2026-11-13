@@ -332,7 +332,7 @@ export function CapturePage({
               source === "ai" && draftSave === "saved"
                 ? draftOnServer
                   ? "Draft saved to your account"
-                  : "Draft saved to My menus"
+                  : "Draft saved in this browser"
                 : source === "ai" && draftSave === "saving"
                   ? "Saving draft…"
                   : null

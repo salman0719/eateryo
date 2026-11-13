@@ -200,24 +200,19 @@ export interface SectionAccess {
   can: (capability: Capability) => boolean;
   /** The Assistant's release flag (its kill switch, A4). */
   assistantEnabled: boolean;
-  /** Signed out only: this browser holds anonymous drafts to continue. */
-  hasWorkingSet: boolean;
 }
 
 /**
  * The sections this person may see, in desktop order.
  *
  * Signed in, only capabilities decide (bar the Assistant's release flag).
- * Signed out the shell is capture-only, plus My menus while anonymous drafts
- * exist to continue — no account surface and no More sheet, whatever a stale
- * capability or the flag says.
+ * Signed out there is no navigation at all: the shell is capture-only, with
+ * no account surface and no More sheet, whatever a stale capability or the
+ * flag says. A draft left behind is picked up from the capture banner, which
+ * is the same screen the work happened on.
  */
 export function availableSections(access: SectionAccess): AppSection[] {
-  if (!access.signedIn) {
-    return APP_SECTIONS.filter(
-      (section) => section.id === "capture" || (section.id === "library" && access.hasWorkingSet)
-    );
-  }
+  if (!access.signedIn) return APP_SECTIONS.filter((section) => section.id === "capture");
   return APP_SECTIONS.filter((section) => {
     if (section.id === "assistant" && !access.assistantEnabled) return false;
     return section.capabilities.some((capability) => access.can(capability));

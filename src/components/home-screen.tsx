@@ -2574,16 +2574,21 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * this without touching the URL, then navigates once to its own mode.
    */
   async function saveResultAndOpen(updateRoute = true): Promise<MenuDocument> {
-    if (source === "ai" && extracted) {
+    // `extracted` is null for a draft resumed after a reload: the stored
+    // document (and `resultDoc`) is the work, so the same path opens it
+    // instead of pretending this is a fresh sample menu.
+    if (source === "ai" && (extracted || resultDoc)) {
       const firstPage = pages[0];
       // Reuse the autosaved draft instead of writing a second record.
       const doc =
         draftDocRef.current ??
-        extractedMenuToDocument(extracted.menu, {
-          provider: extracted.provider,
-          model: extracted.model,
-          originalFileName: firstPage?.file.name,
-        });
+        (extracted
+          ? extractedMenuToDocument(extracted.menu, {
+              provider: extracted.provider,
+              model: extracted.model,
+              originalFileName: firstPage?.file.name,
+            })
+          : resultDoc!);
       // Server-only while signed in: no browser-only copy is ever written.
       // A failure throws to the result screen's error path with the data
       // intact, so the next press retries instead of forking a local copy.
@@ -2787,6 +2792,42 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     const next = { ...doc, title: trimmed };
     patchResultDoc(next);
     void persistResultDoc(next);
+  }
+
+  /**
+   * The signed-out way back. A reload with a browser draft shows a banner on
+   * Capture, and resuming restores that draft into the capture result screen —
+   * the screen the work happened on — rather than asking for the photo again
+   * or sending anyone to a library that no longer exists signed out.
+   */
+  async function handleResumeCapture(menuId: string) {
+    try {
+      const doc = await getMenu(menuId);
+      const image = await getImage(menuId).catch(() => null);
+      if (image) {
+        const file = new File([image.blob], `${doc.title || "menu"}.jpg`, {
+          type: image.mimeType,
+        });
+        applySelection([file]);
+      } else {
+        // The draft outlives its source photo: the result is still the work.
+        applySelection([]);
+      }
+      draftDocRef.current = doc;
+      setResultDoc(doc);
+      setExtracted(null);
+      setInitialReviewCount(
+        doc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
+      );
+      setSource("ai");
+      setDraftSave("saved");
+      setPhase("done");
+      setResumeDismissed(true);
+      navigateTo({ screen: "capture" });
+      scrollToResult();
+    } catch {
+      setLibraryError("Couldn't reopen that draft. Try again in a moment.");
+    }
   }
 
   async function handleEditResult() {
@@ -3297,7 +3338,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     signedIn,
     can: accountCan,
     assistantEnabled: featureFlags.assistant,
-    hasWorkingSet: libraryMenus.length > 0,
   });
   /**
    * The sidebar renders the same table, with the library's number filled in
@@ -3317,9 +3357,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * takes over the name and `/sign-in` at every width.
    *
    * Nothing is assumed while the session or the library is still answering:
-   * `hasWorkingSet` is not a fact until IndexedDB has been read, and the
-   * session is not settled until its read answers, so the column stays off
-   * until both are known instead of flashing account chrome at a visitor.
+   * The library's own read is part of it too: the session is not settled
+   * until its read answers, so the column stays off until both are known
+   * instead of flashing account chrome at a visitor.
    */
   const showShellColumn =
     !sessionPending && !libraryLoading && shellColumnVisible({ sessionState });
@@ -3371,6 +3411,20 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     if (!availableScreenIds.has(guarded) && landing) {
       navigateTo({ screen: landing }, true);
     }
+  });
+
+  // Signed out there is no My menus, Orders or Settings to show, and no
+  // navigation to get back with: an old bookmark for one of them returns to
+  // Capture, where the resume banner offers any draft left behind. The
+  // editor stays reachable — an open draft's own URL still opens it.
+  useEffect(() => {
+    if (signedIn || sessionPending) return;
+    const current = routeRef.current.screen;
+    if (current === "capture" || current === "editor" || current === "item") return;
+    if (libraryLoading) return;
+    // Deferred like the other account reads: the effect must not set state
+    // synchronously while rendering the frame that decided it.
+    void Promise.resolve().then(() => navigateTo({ screen: "capture" }, true));
   });
 
   /**
@@ -3464,13 +3518,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               sessionPending={sessionPending}
               className={showShellColumn ? "sm:hidden" : undefined}
               onHome={() => navigateTo({ screen: "capture" })}
-              onLibrary={
-                // The column never shows signed out, so the row carries My
-                // menus itself while this browser holds a draft to continue.
-                !signedIn && libraryMenus.length > 0
-                  ? () => navigateTo({ screen: "library" })
-                  : undefined
-              }
               // Every in-shell sign-in goes through the choice first: attach
               // the browser draft on login or wipe it on login.
               onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
@@ -3545,8 +3592,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             confirmed `resumeDismissed === false`: until then it is
             invisible, never provisional. Hidden in the editor (it has its
             own publish entry), while the result is on screen (it IS the
-            continue path), and while the claim surfaces speak. */}
-              {(screen === "capture" || screen === "library") &&
+            continue path), and while the claim surfaces speak.
+
+            Signed out there is no library to go back to, so the banner
+            resumes the draft on Capture itself — the screen the work
+            happened on; signed in it still leads to publishing. */}
+              {(screen === "capture" || (signedIn && screen === "library")) &&
                 result === null &&
                 resumeReady &&
                 resumeDismissed === false &&
@@ -3561,27 +3612,35 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-warning-950">
-                            Finish publishing your menu →
+                            {signedIn
+                              ? "Finish publishing your menu →"
+                              : "Pick up where you left off"}
                           </p>
                           <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
-                            {localOnlyCount === 1
-                              ? `“${resumable.title}” is saved in this browser, not published yet.`
-                              : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
+                            {signedIn
+                              ? localOnlyCount === 1
+                                ? `“${resumable.title}” is saved in this browser, not published yet.`
+                                : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`
+                              : localOnlyCount === 1
+                                ? `“${resumable.title}” is still saved in this browser — reopen it here and keep going.`
+                                : `${localOnlyCount} menus are saved in this browser — reopen “${resumable.title}” and keep going.`}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() =>
-                              navigateTo({
-                                screen: "editor",
-                                menuId: resumable.id,
-                                mode: "publish",
-                              })
+                              signedIn
+                                ? navigateTo({
+                                    screen: "editor",
+                                    menuId: resumable.id,
+                                    mode: "publish",
+                                  })
+                                : void handleResumeCapture(resumable.id)
                             }
                             className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                           >
-                            Continue →
+                            {signedIn ? "Continue →" : "Resume →"}
                           </button>
                           <button
                             type="button"
@@ -3884,13 +3943,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         {/*
         Phone nav: signed in, the tab bar pins Capture · My menus · Orders ·
         More (Orders keeps its home for the R0.3 monitor badge; the rest
-        lives in the More sheet). Signed out, the shell is capture-only:
-        Capture plus My menus only when anonymous drafts exist to continue —
-        no Orders, no More. Sits after the footer so it is the last thing on
-        the page and sticks to the viewport bottom instead of floating above
-        the footer links.
+        lives in the More sheet). Signed out there is no tab bar at all: the
+        only screen is Capture, and a draft left behind is resumed from its
+        banner — no Orders, no More, no My menus. Sits after the footer so it
+        is the last thing on the page and sticks to the viewport bottom
+        instead of floating above the footer links.
       */}
-        {navReady && (signedIn || (!libraryLoading && libraryMenus.length > 0)) ? (
+        {navReady && signedIn ? (
           <nav
             data-print-hide
             aria-label="Sections"
