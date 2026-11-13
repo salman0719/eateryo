@@ -140,9 +140,11 @@ errors, or add lint/type suppressions just to make checks pass.
   only): no My menus, no phone tab bar, no More sheet, and a URL for an
   account surface returns to Capture — `/menus`, `/menus/<id>` and the item
   pages included. The one exception is `/menus/<id>/publish`, the onboarding
-  publish step, because the emailed magic link returns there. A leftover draft
-  is resumed from the capture banner instead, which reopens it in the capture
-  result screen. The
+  publish step, because the emailed magic link returns there. A leftover
+  signed-out draft is resumed from the signed-out capture banner instead,
+  which reopens it in the capture result screen (newest first when several
+  linger); signed in there is no resume banner — sign-in dissolves the
+  rows into the account or wipes them. The
   brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
@@ -259,10 +261,12 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   inside its frame, so it always uses the sheet, never the column.
 - `src/features/menus/` — Step 8 server menus: `repo.ts` (tenancy-scoped,
   conditional-UPDATE `updatedAt` conflict detection), `sync.ts` (typed
-  browser client with `SyncError` codes), `move-to-account.ts` (one-way
-  local import, one menu or the whole library); routes in
-  `src/app/api/menus/`; editor UI in
-  `src/components/menu-editor/conflict-banner.tsx` + `move-to-account-panel.tsx`
+  browser client with `SyncError` codes), `move-to-account.ts` (the one-way
+  local import the sign-in claim runs — there is no manual import UI, and no
+  "Import from this browser" option anywhere); routes in
+  `src/app/api/menus/`; claim decisions in `claim-local-drafts.ts`
+  (sign-in auto-imports every browser draft; no remembered answers, no
+  offer); editor UI in `src/components/menu-editor/conflict-banner.tsx`
 - `tests/helpers/pg-test-db.ts`, `tests/tenancy.test.ts`,
   `tests/auth-magic-link.test.ts` — Step 7 isolation/auth tests (PGlite);
   `tests/menus-repo.test.ts`, `tests/menus-api.test.ts`,
