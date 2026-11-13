@@ -17,9 +17,9 @@ import {
 } from "@/features/menus/claim-local-drafts";
 
 /**
- * R1 claim rules: a brand-new account auto-imports its browser drafts, an
- * established account is offered them, and a remembered answer (done or
- * "not now") stops both. Storage failures must never lose a draft.
+ * R1 claim rules: sign-in auto-imports every unseen browser draft, whether
+ * or not the account already holds menus, and a remembered answer (done or
+ * dismissed) stops it. Storage failures must never lose a draft.
  */
 
 function fakeStorage(): Storage {
@@ -61,7 +61,9 @@ describe("decideLocalDraftClaim", () => {
     expect(decideLocalDraftClaim({ ...NEW_ACCOUNT, localCount: 0 })).toBe("none");
   });
 
-  it("offers the import once the account already has menus", () => {
+  it("auto-imports even when the account already has menus", () => {
+    // No offer banner: sign-in claims every unseen draft in one go, and the
+    // import target reuses the owned café rather than minting a new one.
     expect(
       decideLocalDraftClaim({
         ...NEW_ACCOUNT,
@@ -69,7 +71,7 @@ describe("decideLocalDraftClaim", () => {
         restaurantCount: 1,
         ownedRestaurantCount: 1,
       })
-    ).toBe("offer");
+    ).toBe("auto-import");
   });
 
   it("auto-imports when the account holds no menus, even with a restaurant", () => {
@@ -335,7 +337,7 @@ describe("claim gate", () => {
         signedIn: true,
         claim: claimInputs({ accountMenuCount: 3, ownedRestaurantCount: 1 }),
       })
-    ).toBe("offer");
+    ).toBe("auto-import");
     expect(
       decideLocalDraftClaimSurface({ gate, signedIn: true, claim: claimInputs({ localCount: 0 }) })
     ).toBe("none");
