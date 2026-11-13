@@ -148,7 +148,11 @@ errors, or add lint/type suppressions just to make checks pass.
   shows without an account and the More sheet is signed-in only — so it
   carries `/sign-in` itself plus a My menus button while this browser holds a
   draft, and it shows nothing extra while the session is
-  unanswered. The chosen identity (concept 7, "The Hidden Eat") is not applied
+  unanswered. Every in-shell sign-in path (brand row, sidebar account, library
+  gate) asks about the browser draft first while signed out with one: attach
+  it on login, or wipe it on login — staying is one Escape away (`direct-
+sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
+  flow attaches its journey draft silently instead). The chosen identity (concept 7, "The Hidden Eat") is not applied
   yet: the theme landed first, then the drawn lockup replaces the text in
   `brand.tsx` only.
 - `src/components/pages/capture-page.tsx` — the capture screen, and therefore

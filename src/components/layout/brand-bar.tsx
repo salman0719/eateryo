@@ -22,6 +22,7 @@ export function BrandBar({
   className = "",
   onHome,
   onLibrary,
+  onSignIn,
 }: {
   signedIn: boolean;
   sessionPending: boolean;
@@ -34,6 +35,11 @@ export function BrandBar({
    * the row carries My menus itself while this browser holds a draft.
    */
   onLibrary?: () => void;
+  /**
+   * Signed-out sign-in path. When the shell hands this over, the button asks
+   * about the browser draft first instead of navigating straight away.
+   */
+  onSignIn?: () => void;
 }) {
   return (
     <div data-print-hide className={className}>
@@ -52,12 +58,22 @@ export function BrandBar({
                 My menus
               </button>
             ) : null}
-            <a
-              href="/sign-in"
-              className="rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              Sign in
-            </a>
+            {onSignIn ? (
+              <button
+                type="button"
+                onClick={onSignIn}
+                className="rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                Sign in
+              </button>
+            ) : (
+              <a
+                href="/sign-in"
+                className="rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                Sign in
+              </a>
+            )}
           </div>
         ) : null}
       </div>

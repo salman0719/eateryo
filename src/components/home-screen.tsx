@@ -81,11 +81,22 @@ import {
   publishMenu,
   unpublishMenu,
 } from "@/features/publishing/client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
-import { hasPublishJourney, rememberPublishJourney } from "@/features/publishing/wizard-state";
+import {
+  clearWizardLinkSent,
+  clearWizardState,
+  forgetPublishJourney,
+  hasPublishJourney,
+  rememberPublishJourney,
+} from "@/features/publishing/wizard-state";
+import {
+  clearDirectSignInIntent,
+  loadDirectSignInIntent,
+  saveDirectSignInIntent,
+} from "@/features/menus/direct-sign-in";
 import { authClient } from "@/lib/auth-client";
 import {
   ExtractClientError,
@@ -309,6 +320,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // page component already mounted swaps nothing — without this sync the
   // URL moves while the screen stays on the old one.
   const pathname = usePathname();
+  const router = useRouter();
   useEffect(() => {
     const syncFromLocation = () => {
       const next = parseAppRoute(window.location.href);
@@ -1828,20 +1840,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       const draft = await getMenu(menuId).catch(() => null);
       if (!draft) return;
       let targetId: string;
-      let targetName: string;
       if (canFileBrowserDrafts && activeRestaurantId) {
         targetId = activeRestaurantId;
-        targetName = activeWorkspace?.name ?? "My restaurant";
       } else if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
         targetId = ownedRestaurantsForAccount[0].id;
-        targetName = ownedRestaurantsForAccount[0].name;
       } else if ((restaurantList?.length ?? 0) === 0) {
         const created = await createRestaurant(
           suggestRestaurantName([draft.title]) ?? "My restaurant"
         );
         workspace.addRestaurant(created);
         targetId = created.id;
-        targetName = created.name;
       } else {
         setClaimError(
           "Your account can't file menus yet — ask the café owner to add this address in Settings → Team."
@@ -1870,13 +1878,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           // The next open reconciles; the attach already succeeded.
         }
       }
+      // Silent by design: the emailed link already promised this menu joins
+      // the account, so no banner celebrates it. Marking it done keeps the
+      // generic offer from re-asking for the same draft.
       markLocalDraftsClaimed(actor);
       setClaimAnswer({ accountKey: actor, status: "done" });
-      setClaimNotice({
-        imported: outcome.status === "imported" ? 1 : 0,
-        failed: 0,
-        restaurantName: targetName,
-      });
       await refreshLibrary();
       void mergeAccountMenus();
     } catch {
@@ -1886,6 +1892,72 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     } finally {
       setClaimBusy(false);
     }
+  }
+
+  /**
+   * Everything the wipe of one browser menu touches: the document and its
+   * image, the account stamp, the publish wizard's form/link/journey marks,
+   * and the pending-new marker. Best-effort per menu so one unreadable row
+   * never blocks the rest.
+   */
+  async function wipeBrowserMenus(menuIds: readonly string[]) {
+    for (const menuId of menuIds) {
+      try {
+        await deleteMenu(menuId);
+      } catch {
+        // One stubborn row never blocks the rest.
+      }
+      await clearDraftOrigin(menuId);
+      clearWizardState(menuId);
+      clearWizardLinkSent(menuId);
+      forgetPublishJourney(menuId);
+      forgetPendingNewMenu(menuId);
+    }
+  }
+
+  /**
+   * The plain "Sign in" buttons (brand row, sidebar account, library gate,
+   * publish panel): signed out with a local menu, the owner chooses before
+   * leaving. Add → the ids attach on login; delete → they are wiped on
+   * login; staying is always one Escape away. Without a local menu the link
+   * behaves as before and navigates immediately.
+   */
+  async function requestDirectSignIn() {
+    if (signedInRef.current) {
+      router.push("/sign-in");
+      return;
+    }
+    let existing: MenuSummary[] = [];
+    try {
+      existing = await listMenus();
+    } catch {
+      existing = [];
+    }
+    if (existing.length === 0) {
+      router.push("/sign-in");
+      return;
+    }
+    const title = existing[0]?.title?.trim() ? `“${existing[0]?.title}”` : "your browser menu";
+    const addIt = await confirm({
+      message: `Add ${title} from this browser to your account when you sign in?`,
+      confirmLabel: "Add it on sign-in",
+      cancelLabel: "Don't add it",
+    });
+    const ids = existing.map((menu) => menu.id);
+    if (addIt) {
+      saveDirectSignInIntent({ decision: "attach", menuIds: ids });
+      router.push("/sign-in");
+      return;
+    }
+    const wipeIt = await confirm({
+      message: `Delete ${title} from this browser and sign in without it? You can export a JSON backup from My menus first.`,
+      confirmLabel: "Delete and sign in",
+      cancelLabel: "Stay here",
+      destructive: true,
+    });
+    if (!wipeIt) return;
+    saveDirectSignInIntent({ decision: "discard", menuIds: ids });
+    router.push("/sign-in");
   }
 
   function handleDismissClaim() {
@@ -2996,6 +3068,49 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // Which journey menu already attached this session (one entry per menu).
   const journeyClaimRef = useRef<string | null>(null);
 
+  // Direct "Sign in" choice: attach the named menus silently, or wipe them,
+  // exactly once. Runs before the journey and generic claims so a discard
+  // wins over any auto-import of the same rows.
+  useEffect(() => {
+    if (!signedIn || !accountKey) return;
+    if (claimGate.pending || claimGate.incomplete) return;
+    const intent = loadDirectSignInIntent();
+    if (!intent || intent.menuIds.length === 0) return;
+    clearDirectSignInIntent();
+    if (intent.decision === "discard") {
+      void (async () => {
+        await wipeBrowserMenus(intent.menuIds);
+        await refreshLibrary();
+        setOriginList(await listDraftOrigins().catch(() => []));
+      })();
+      return;
+    }
+    // The state writes below run in a task, not the effect body, so one
+    // failing row reports without cascading a render off the sign-in sync.
+    void (async () => {
+      for (const menuId of intent.menuIds) {
+        if (serverIdsRef.current.has(menuId)) continue;
+        const mayFile = canFileBrowserDrafts || (restaurantList?.length ?? 0) === 0;
+        if (!mayFile) {
+          setClaimError(
+            "Your account can't file menus yet — ask the café owner to add this address in Settings → Team."
+          );
+          continue;
+        }
+        journeyClaimRef.current = `${accountKey}:${menuId}`;
+        await handlePublishJourneyClaim(menuId);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    signedIn,
+    accountKey,
+    claimGate.pending,
+    claimGate.incomplete,
+    canFileBrowserDrafts,
+    restaurantList,
+  ]);
+
   // Onboarding promise ("Sign in to publish your menu"): the journey draft
   // attaches on sign-in with no prior-menu check — the emailed link is
   // consent for that menu. The generic auto-import below stays as the
@@ -3267,6 +3382,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               email={email}
               onNavigate={(section) => navigateTo({ screen: section })}
               onSignOut={() => void authClient.signOut()}
+              onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
               onHome={() => navigateTo({ screen: "capture" })}
               outline={sidebarOutline}
               outlineKey={sidebarOutlineKey}
@@ -3292,6 +3408,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   ? () => navigateTo({ screen: "library" })
                   : undefined
               }
+              // Every in-shell sign-in goes through the choice first: attach
+              // the browser draft on login or wipe it on login.
+              onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
             />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the
@@ -3435,6 +3554,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   onRename={(id, title) => void handleRenameMenu(id, title)}
                   onDelete={(id) => void handleDeleteMenu(id)}
                   onMoveToAccount={handleMoveMenuToAccount}
+                  onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
                   onMoved={(report) => {
                     const actor = accountKeyRef.current;
                     void (async () => {
