@@ -2027,8 +2027,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       router.push("/sign-in");
       return;
     }
+    // Signed out there is no library to export from, so the backup
+    // instruction names nothing — the choice is delete or stay.
     const wipeIt = await confirm({
-      message: `Delete ${title} from this browser and sign in without it? You can export a JSON backup from My menus first.`,
+      message: `Delete ${title} from this browser and sign in without it? This cannot be undone.`,
       confirmLabel: "Delete and sign in",
       cancelLabel: "Stay here",
       destructive: true,
