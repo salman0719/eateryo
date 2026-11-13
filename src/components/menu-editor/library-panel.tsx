@@ -262,9 +262,11 @@ export function LibraryPanel({
                         · {menu.itemCount} {menu.itemCount === 1 ? "item" : "items"} · updated{" "}
                         {formatDate(menu.updatedAt)}
                       </span>
-                      {accountMode && (
-                        <StatusChip size="sm" tone={menu.onServer ? "success" : "warning"}>
-                          {menu.onServer ? "On your account" : "This browser only"}
+                      {/* Signed-in menus live on the account by construction, so only
+                          the exceptional browser-only row is named. */}
+                      {accountMode && !menu.onServer && (
+                        <StatusChip size="sm" tone="warning">
+                          This browser only
                         </StatusChip>
                       )}
                       {menu.canWrite === false && (
