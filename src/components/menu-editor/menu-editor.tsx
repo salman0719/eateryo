@@ -804,11 +804,15 @@ export function MenuEditor({
             >
               set up table ordering
             </button>{" "}
-            — we create your café if you don&apos;t have one yet.{" "}
-            <strong>
-              Don&apos;t worry about getting everything right — you can keep making changes after
-              you sign in.
-            </strong>
+            — we create your café if you don&apos;t have one yet. Or{" "}
+            <button
+              type="button"
+              onClick={() => changeMode("preview")}
+              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              preview the order page
+            </button>
+            .
           </p>
         ) : (
           <p>

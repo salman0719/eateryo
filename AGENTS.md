@@ -138,8 +138,11 @@ errors, or add lint/type suppressions just to make checks pass.
   signed out, so the shell holds a neutral placeholder instead of guessing.
   Signed out there is no navigation at all (`availableSections` is Capture
   only): no My menus, no phone tab bar, no More sheet, and a URL for an
-  account surface returns to Capture. A leftover draft is resumed from the
-  capture banner instead, which reopens it in the capture result screen. The
+  account surface returns to Capture — `/menus`, `/menus/<id>` and the item
+  pages included. The one exception is `/menus/<id>/publish`, the onboarding
+  publish step, because the emailed magic link returns there. A leftover draft
+  is resumed from the capture banner instead, which reopens it in the capture
+  result screen. The
   brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
@@ -164,6 +167,10 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   keeps; two columns from `lg`, one on a phone so the field is never below the
   fold). The moment a photo exists — or the visitor is known to be signed in —
   it returns to the plain working layout, and an owner never sees the entry.
+  Signed out, the review result is the whole journey: the inline price and
+  "check this" fixes stay, the "Fine-tune in the editor" second path does not
+  (there is no signed-out editor route), and the First look carries the bold
+  reassurance that everything stays editable once signed in.
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.
