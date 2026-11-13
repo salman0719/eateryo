@@ -72,6 +72,7 @@ import {
   fetchCafeMenus,
   fetchServerMenu,
   SyncError,
+  type MembershipAccess,
   type ServerMenu,
   updateServerMenu,
 } from "@/features/menus/sync";
@@ -853,6 +854,34 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     });
   }
 
+  /**
+   * An attach just proved this menu lives on the account in a known café:
+   * record both answers now instead of waiting for the café-keyed read,
+   * which only knows the café the shell acts in. Without this a menu
+   * attached into another café reads as on-account with no access — the
+   * library's "View only" dead end. A skipped attach (already on the
+   * server) carries no fresh answer, so the row is read back instead.
+   */
+  async function adoptAttachedMenu(
+    menuId: string,
+    restaurantId: string,
+    access?: MembershipAccess
+  ) {
+    rememberMenuCafe(menuId, restaurantId);
+    if (access) {
+      setMenuAccessFor(menuId, access);
+      return;
+    }
+    try {
+      const server = await fetchServerMenu(menuId);
+      rememberMenuCafe(menuId, server.restaurantId);
+      setMenuAccessFor(menuId, server.access);
+    } catch {
+      // The café-keyed merge covers the common case; this only heals the
+      // attach-into-another-café gap.
+    }
+  }
+
   /** Record one menu's access answer without touching the rest. */
   function setMenuAccessFor(id: string, access: MenuAccess) {
     if (menuAccessRef.current.get(id) === access) return;
@@ -921,7 +950,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     const run = (async () => {
       try {
         const { menus: serverMenus } = await fetchCafeMenus(restaurantId);
-        replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
+        // Same other-café rule as access below: a row provably on the
+        // account stays listed even when it lives in another café.
+        const nextIds = new Set(serverMenus.map((menu) => menu.id));
+        for (const id of serverIdsRef.current) {
+          const knownCafe = menuRestaurantById.get(id);
+          if (knownCafe && knownCafe !== restaurantId) nextIds.add(id);
+        }
+        replaceServerIds(nextIds);
         rememberMenuCafes(serverMenus);
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
@@ -931,10 +967,20 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         }
         // One answer, no second role lookup: each summary already carries the
         // caller's capabilities. A browser-only menu keeps its local answer
-        // while the server list has nothing to say about it.
+        // while the server list has nothing to say about it. A menu attached
+        // into another café keeps its explicit answer too: this café's list
+        // cannot speak for a row that lives elsewhere.
         const accessById = new Map<string, MenuAccess>(menuAccessById(serverMenus));
         for (const [id, access] of menuAccessRef.current) {
-          if (access === "local" && !accessById.has(id)) accessById.set(id, "local");
+          if (accessById.has(id)) continue;
+          if (access === "local") {
+            accessById.set(id, "local");
+            continue;
+          }
+          const knownCafe = menuRestaurantById.get(id);
+          if (knownCafe && knownCafe !== restaurantId && access !== "none") {
+            accessById.set(id, access);
+          }
         }
         replaceMenuAccess(accessById);
         const localIds = new Set((await listMenus()).map((menu) => menu.id));
@@ -1711,6 +1757,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       return `“${title}” could not be added — ${outcome.reason}`;
     }
     addServerId(menuId);
+    if (outcome.status === "imported") {
+      await adoptAttachedMenu(menuId, restaurantId, outcome.access);
+    } else {
+      await adoptAttachedMenu(menuId, restaurantId);
+    }
     const moveActor = accountKeyRef.current;
     if (moveActor) await stampClaimedMenus([menuId], moveActor, (id) => getMenu(id));
     await mergeAccountMenus();
@@ -1733,7 +1784,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         restaurantId,
         localOnly.map((menu) => menu.id)
       );
-      [...report.imported, ...report.skipped].forEach((id) => addServerId(id));
+      for (const id of report.imported) {
+        addServerId(id);
+        await adoptAttachedMenu(id, restaurantId, report.accessById[id]);
+      }
+      for (const id of report.skipped) {
+        addServerId(id);
+        await adoptAttachedMenu(id, restaurantId);
+      }
       // Claimed rows are provably the account's copies: stamp them so a
       // later sign-out hides them instead of showing stale doppelgängers.
       if (accountKey) {
@@ -1862,6 +1920,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         return;
       }
       addServerId(menuId);
+      if (outcome.status === "imported") {
+        await adoptAttachedMenu(menuId, targetId, outcome.access);
+      } else {
+        await adoptAttachedMenu(menuId, targetId);
+      }
       await stampClaimedMenus([menuId], actor, (id) => getMenu(id));
       // The wizard holds the open row on a null baseline; reconcile it to
       // the agreed revision so the next save stays on the account.
