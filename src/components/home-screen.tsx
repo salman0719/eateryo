@@ -3413,15 +3413,17 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     }
   });
 
-  // Signed out there is no My menus, Orders or Settings to show, and no
-  // navigation to get back with: an old bookmark for one of them returns to
-  // Capture, where the resume banner offers any draft left behind. The
-  // editor stays reachable — an open draft's own URL still opens it.
+  // Signed out there is no My menus, no editor, no Orders or Settings, and
+  // no navigation to get back with: an old bookmark for any of them returns
+  // to Capture, where the resume banner offers any draft left behind. The
+  // onboarding publish step is the one exception — the emailed magic link
+  // returns there — so its URL keeps working for a visitor.
   useEffect(() => {
     if (signedIn || sessionPending) return;
-    const current = routeRef.current.screen;
-    if (current === "capture" || current === "editor" || current === "item") return;
     if (libraryLoading) return;
+    const routed = routeRef.current;
+    const onboarding = routed.screen === "editor" && routed.mode === "publish";
+    if (routed.screen === "capture" || onboarding) return;
     // Deferred like the other account reads: the effect must not set state
     // synchronously while rendering the frame that decided it.
     void Promise.resolve().then(() => navigateTo({ screen: "capture" }, true));
@@ -3533,9 +3535,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             <main
               className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6 sm:py-8 ${
                 // The editor is a dense working surface; the other app screens
-                // share the remaining width beside the sidebar instead of
-                // keeping the marketing measure they had under a top bar.
-                screen === "editor" ? "max-w-6xl" : "max-w-5xl"
+                // — including the publish step, which is onboarding rather
+                // than editing — share the brand row's measure so the page
+                // and the lockup start on the same left edge.
+                screen === "editor" && editorMode !== "publish" ? "max-w-6xl" : "max-w-5xl"
               }`}
             >
               {signedIn && claimNotice && screen !== "editor" && (

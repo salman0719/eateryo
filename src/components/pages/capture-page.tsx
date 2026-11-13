@@ -320,7 +320,10 @@ export function CapturePage({
             data={result}
             source={source}
             onStartOver={onClear}
-            onEdit={onEdit}
+            // Onboarding ends at Publish: signed out there is no editor
+            // route at all, so the second path would only dead-end.
+            onEdit={signedIn ? onEdit : undefined}
+            reassureEditable={!signedIn}
             onResolveItem={onResolveItem}
             onResolveAll={onResolveAll}
             onUpdatePrice={onUpdatePrice}
