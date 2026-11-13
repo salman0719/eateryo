@@ -153,11 +153,8 @@ import {
   decideLocalDraftClaimSurface,
   decidePublishJourneyClaim,
   deriveClaimGate,
-  loadLocalDraftClaim,
-  markLocalDraftsClaimed,
   resolveAutoClaimTarget,
   resumeBannerReady,
-  type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 import {
   decideMenuOpen,
@@ -512,11 +509,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeMenuAccountCheckFailed = activeMenuMembership === "unreachable";
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
-  /** The answer just given here; the stored per-account value is the fallback. */
-  const [claimAnswer, setClaimAnswer] = useState<{
-    accountKey: string;
-    status: LocalDraftClaimStatus;
-  } | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimNotice, setClaimNotice] = useState<LocalDraftClaimNotice | null>(null);
   /**
@@ -1741,32 +1733,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
-   * Add one browser-only menu to an owned restaurant. The library row shows
-   * the returned message on failure; success marks the row as on the account
-   * right away, then reconciles with the server list.
-   */
-  async function handleMoveMenuToAccount(
-    menuId: string,
-    restaurantId: string
-  ): Promise<string | null> {
-    const title = visibleMenus.find((menu) => menu.id === menuId)?.title ?? "That menu";
-    const outcome = await moveLocalMenuToAccount(restaurantId, menuId);
-    if (outcome.status === "failed") {
-      return `“${title}” could not be added — ${outcome.reason}`;
-    }
-    addServerId(menuId);
-    if (outcome.status === "imported") {
-      await adoptAttachedMenu(menuId, restaurantId, outcome.access);
-    } else {
-      await adoptAttachedMenu(menuId, restaurantId);
-    }
-    const moveActor = accountKeyRef.current;
-    if (moveActor) await stampClaimedMenus([menuId], moveActor, (id) => getMenu(id));
-    await mergeAccountMenus();
-    return null;
-  }
-
-  /**
    * Copy the rest of this browser's menus into one owned restaurant. Shared
    * by the automatic import, the direct sign-in intent, and the import that
    * follows the wizard creating the account's first café. Freshly imported
@@ -1781,6 +1747,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // data into a real café.
       const { real, demo } = await partitionRealMenus(localOnly.map((menu) => menu.id));
       for (const id of demo) await dissolveBrowserMenu(id);
+      if (real.length === 0) {
+        // Nothing but sample rows, already disregarded above: no import,
+        // no notice.
+        await refreshLibrary();
+        return;
+      }
       const report = await moveLocalMenusToAccount(restaurantId, real);
       for (const id of report.imported) {
         addServerId(id);
@@ -1834,15 +1806,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         failed: report.failed.length,
         restaurantName,
       });
-      if (accountKey) {
-        markLocalDraftsClaimed(accountKey);
-        setClaimAnswer({ accountKey, status: "done" });
-      }
       await refreshLibrary();
       void mergeAccountMenus();
     } catch {
       setClaimError(
-        "We couldn't read the menus saved in this browser. They are still here — try again from My menus."
+        "We couldn't read the menus saved in this browser. They are still here — they will join your account the next time you sign in."
       );
     }
   }
@@ -1869,7 +1837,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       await runLocalDraftClaim(created.id, created.name);
     } catch {
       setClaimError(
-        "We couldn't set up your café automatically. Import your menus from My menus when you're ready."
+        "We couldn't set up your café automatically. Your menus are still in this browser — they will join your account the next time you sign in."
       );
     }
   }
@@ -1939,15 +1907,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // import dissolves — the heal triages the rest on open.
       if (outcome.status === "imported") await dissolveBrowserMenu(menuId);
       // Silent by design: the emailed link already promised this menu joins
-      // the account, so no banner celebrates it. Marking it done keeps a
-      // later frame from re-running the same import.
-      markLocalDraftsClaimed(actor);
-      setClaimAnswer({ accountKey: actor, status: "done" });
+      // the account, so no banner celebrates it.
       await refreshLibrary();
       void mergeAccountMenus();
     } catch {
       setClaimError(
-        "We couldn't add your menu to your account. It is still saved in this browser — try again from My menus."
+        "We couldn't add your menu to your account. It is still saved in this browser — it will join your account the next time you sign in."
       );
     }
   }
@@ -3131,20 +3096,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }));
   const localOnly = libraryMenus.filter((menu) => !menu.onServer);
   const localOnlyCount = localOnly.length;
-  // A name for the first-run "Name your restaurant" field, guessed from the
-  // titles of the menus the move would copy (null when they say nothing).
-  const suggestedRestaurantName = suggestRestaurantName(localOnly.map((menu) => menu.title));
 
-  // The claim surfaces stay out of the editor: importing the menu that is
-  // open would create an account version the editor is not synced with. The
-  // wizard's own publish handles the open draft, and the post-publish import
-  // above covers the rest.
-  const storedClaimStatus = accountKey ? loadLocalDraftClaim(accountKey) : "unseen";
-  const claimStatus =
-    claimAnswer?.accountKey === accountKey ? claimAnswer.status : storedClaimStatus;
-  // Sign-in claims every unseen browser draft in one go — there is no
-  // offer banner. Marking the claim done keeps a later frame from
-  // re-running the same import.
+  // Sign-in claims every browser draft in one go — attach or discard, no
+  // remembered answers, no offer. A claim that ran while a draft was open
+  // reconciles the editor to the agreed revision instead of forking it.
   //
   // "pending" and "unavailable" are real answers, not stand-ins for "none".
   // While the session or the account's inventory is still loading the
@@ -3185,7 +3140,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           accountMenuCount: serverIds.size,
           restaurantCount: restaurantList?.length ?? 0,
           ownedRestaurantCount: ownedRestaurantsForAccount.length,
-          status: claimStatus,
         },
       })
     : "none";
@@ -3302,22 +3256,17 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // successful read in this session can still run it.
     if (claimGate.pending || claimGate.incomplete) return;
     if (claimEvaluatedRef.current === accountKey) return;
-    claimEvaluatedRef.current = accountKey;
     if (localDraftsDecision !== "auto-import") return;
+    // Marked only when the import runs: rows that arrive later (an offline
+    // save while signed in) must still be claimed instead of inheriting a
+    // decision made when the browser held nothing.
+    claimEvaluatedRef.current = accountKey;
     const titles = localOnly.map((menu) => menu.title);
     // Deferred: the effect must not set state synchronously while rendering
     // the frame that made the decision.
     void Promise.resolve().then(() => handleAutoClaim(titles));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    accountKey,
-    claimGate.incomplete,
-    claimGate.pending,
-    claimStatus,
-    localDraftsDecision,
-    screen,
-    signedIn,
-  ]);
+  }, [accountKey, claimGate.incomplete, claimGate.pending, localDraftsDecision, screen, signedIn]);
 
   /**
    * The menu the URL names. Leaving the editor for the library keeps the
@@ -3620,20 +3569,17 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 </p>
               )}
 
-              {/* Q7 resume banner: the way back for anyone who wandered off (or
-            returns from the magic-link email) with a saved-but-unpublished
-            draft. Whether a draft is unpublished is *server* knowledge, so
-            this renders only after `resumeReady` (session, library and —
-            signed in — an account menu list that answered) and only with a
+              {/* Q7 resume banner, signed out only: the way back for anyone
+            who wandered off with a saved-but-unpublished draft. Signed out
+            there is no library to go back to, so the banner resumes the
+            newest draft on Capture itself — the screen the work happened
+            on. It renders only after the library answers and only with a
             confirmed `resumeDismissed === false`: until then it is
-            invisible, never provisional. Hidden in the editor (it has its
-            own publish entry), while the result is on screen (it IS the
-            continue path), and while the claim surfaces speak.
-
-            Signed out there is no library to go back to, so the banner
-            resumes the draft on Capture itself — the screen the work
-            happened on; signed in it still leads to publishing. */}
-              {(screen === "capture" || (signedIn && screen === "library")) &&
+            invisible, never provisional. Hidden while the result is on
+            screen (it IS the continue path), and signed in it never
+            renders at all — signing in dissolves the rows instead. */}
+              {screen === "capture" &&
+                !signedIn &&
                 result === null &&
                 resumeReady &&
                 resumeDismissed === false &&
@@ -3648,35 +3594,21 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-warning-950">
-                            {signedIn
-                              ? "Finish publishing your menu →"
-                              : "Pick up where you left off"}
+                            Pick up where you left off
                           </p>
                           <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
-                            {signedIn
-                              ? localOnlyCount === 1
-                                ? `“${resumable.title}” is saved in this browser, not published yet.`
-                                : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`
-                              : localOnlyCount === 1
-                                ? `“${resumable.title}” is still saved in this browser — reopen it here and keep going.`
-                                : `${localOnlyCount} menus are saved in this browser — reopen “${resumable.title}” and keep going.`}
+                            {localOnlyCount === 1
+                              ? `“${resumable.title}” is still saved in this browser — reopen it here and keep going.`
+                              : `${localOnlyCount} menus are saved in this browser — reopen “${resumable.title}” and keep going.`}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              signedIn
-                                ? navigateTo({
-                                    screen: "editor",
-                                    menuId: resumable.id,
-                                    mode: "publish",
-                                  })
-                                : void handleResumeCapture(resumable.id)
-                            }
+                            onClick={() => void handleResumeCapture(resumable.id)}
                             className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                           >
-                            {signedIn ? "Continue →" : "Resume →"}
+                            Resume →
                           </button>
                           <button
                             type="button"
@@ -3701,31 +3633,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   hasHiddenMenus={hasHiddenMenus}
                   emptyTitle={libraryEmpty?.title}
                   emptyBody={libraryEmpty?.body}
-                  signedIn={signedIn}
-                  importCount={localOnlyCount}
-                  importMenuIds={localOnly.map((menu) => menu.id)}
-                  suggestedName={suggestedRestaurantName}
-                  ownedRestaurants={ownedRestaurantsForAccount}
                   unavailable={storageDown}
                   onOpen={(id) => void handleOpenMenu(id)}
                   onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
                   onRename={(id, title) => void handleRenameMenu(id, title)}
                   onDelete={(id) => void handleDeleteMenu(id)}
-                  onMoveToAccount={handleMoveMenuToAccount}
                   onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
-                  onMoved={(report) => {
-                    const actor = accountKeyRef.current;
-                    void (async () => {
-                      if (actor) {
-                        await stampClaimedMenus(
-                          [...report.imported, ...report.skipped],
-                          actor,
-                          (id) => getMenu(id)
-                        );
-                      }
-                      await mergeAccountMenus();
-                    })();
-                  }}
                 />
               )}
 
