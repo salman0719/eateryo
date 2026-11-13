@@ -17,10 +17,6 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
-import {
-  LocalDraftsNotice,
-  type LocalDraftClaimNotice,
-} from "@/components/menu-editor/local-drafts-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
 import { MonitorToasts } from "@/components/orders/monitor-toasts";
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
@@ -510,7 +506,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [claimNotice, setClaimNotice] = useState<LocalDraftClaimNotice | null>(null);
+
   /**
    * Session state of the "Continue getting your link" resume banner (Q7).
    * `null` means *not confirmed yet*: the banner's inputs are read
@@ -1738,7 +1734,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * follows the wizard creating the account's first café. Freshly imported
    * rows dissolve; the notice reports per-batch totals.
    */
-  async function runLocalDraftClaim(restaurantId: string, restaurantName: string) {
+  async function runLocalDraftClaim(restaurantId: string) {
     setClaimError(null);
     try {
       // Only the visible browser-only rows move: hidden rows belong to
@@ -1801,11 +1797,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       for (const id of report.imported) {
         await dissolveBrowserMenu(id);
       }
-      setClaimNotice({
-        imported: report.imported.length,
-        failed: report.failed.length,
-        restaurantName,
-      });
+      // No notice: sign-in claims the drafts silently — the rows simply
+      // appear in My menus, and a stranded row retries next sign-in.
       await refreshLibrary();
       void mergeAccountMenus();
     } catch {
@@ -1829,12 +1822,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const target = resolveAutoClaimTarget(ownedRestaurantsForAccount, titles);
       if (target.kind === "reuse") {
-        await runLocalDraftClaim(target.restaurantId, target.restaurantName);
+        await runLocalDraftClaim(target.restaurantId);
         return;
       }
       const created = await createRestaurant(target.name);
       workspace.addRestaurant(created);
-      await runLocalDraftClaim(created.id, created.name);
+      await runLocalDraftClaim(created.id);
     } catch {
       setClaimError(
         "We couldn't set up your café automatically. Your menus are still in this browser — they will join your account the next time you sign in."
@@ -3535,13 +3528,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 screen === "editor" && editorMode !== "publish" ? "max-w-6xl" : "max-w-5xl"
               }`}
             >
-              {signedIn && claimNotice && screen !== "editor" && (
-                <LocalDraftsNotice
-                  notice={claimNotice}
-                  onOpenLibrary={() => navigateTo({ screen: "library" })}
-                  onDismiss={() => setClaimNotice(null)}
-                />
-              )}
               {signedIn && claimError && (
                 <div
                   role="alert"
@@ -3584,7 +3570,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 resumeReady &&
                 resumeDismissed === false &&
                 localOnlyCount > 0 &&
-                !claimNotice &&
                 claimSurfaceQuiet &&
                 (() => {
                   const resumable = localOnly.find((menu) => !menu.corrupt);
