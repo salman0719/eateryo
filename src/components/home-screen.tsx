@@ -3095,12 +3095,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * until both are known instead of flashing account chrome at a visitor.
    */
   const showShellColumn =
-    !sessionPending &&
-    !libraryLoading &&
-    shellColumnVisible({
-      sessionState,
-      hasWorkingSet: libraryMenus.length > 0,
-    });
+    !sessionPending && !libraryLoading && shellColumnVisible({ sessionState });
   /** Nav waits for the membership read: no provisional tabs, no empty bar. */
   const navReady = !sessionPending && !accountAccessPending;
   /**
@@ -3241,6 +3236,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               sessionPending={sessionPending}
               className={showShellColumn ? "sm:hidden" : undefined}
               onHome={() => navigateTo({ screen: "capture" })}
+              onLibrary={
+                // The column never shows signed out, so the row carries My
+                // menus itself while this browser holds a draft to continue.
+                !signedIn && libraryMenus.length > 0
+                  ? () => navigateTo({ screen: "library" })
+                  : undefined
+              }
             />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the

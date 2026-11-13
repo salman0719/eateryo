@@ -21,6 +21,7 @@ export function BrandBar({
   sessionPending,
   className = "",
   onHome,
+  onLibrary,
 }: {
   signedIn: boolean;
   sessionPending: boolean;
@@ -28,6 +29,11 @@ export function BrandBar({
   className?: string;
   /** The lockup's destination; inside the shell it is client-side Capture. */
   onHome?: () => void;
+  /**
+   * Signed-out library path. The sidebar never shows without an account, so
+   * the row carries My menus itself while this browser holds a draft.
+   */
+  onLibrary?: () => void;
 }) {
   return (
     <div data-print-hide className={className}>
@@ -36,12 +42,23 @@ export function BrandBar({
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 pt-4 sm:px-6">
         <BrandLockup onSelect={onHome ?? null} />
         {!sessionPending && !signedIn ? (
-          <a
-            href="/sign-in"
-            className="shrink-0 rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-          >
-            Sign in
-          </a>
+          <div className="flex shrink-0 items-center gap-2">
+            {onLibrary ? (
+              <button
+                type="button"
+                onClick={onLibrary}
+                className="rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                My menus
+              </button>
+            ) : null}
+            <a
+              href="/sign-in"
+              className="rounded-lg border border-line-300 px-2.5 py-1 text-xs font-medium text-ink-600 transition-colors hover:bg-surface-50 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              Sign in
+            </a>
+          </div>
         ) : null}
       </div>
     </div>
