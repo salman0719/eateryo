@@ -64,9 +64,11 @@ describe("LibraryPanel account chips", () => {
     expect(html).not.toContain("This browser only");
   });
 
-  it("names the membership a finished read proved", () => {
+  it("names only the exceptional browser-only row", () => {
+    // Signed-in menus live on the account by construction, so an account
+    // row carries no chip at all — only the row the read proved missing.
     const onAccount = render({ accountMode: true, menus: [menu({ onServer: true })] });
-    expect(onAccount).toContain("On your account");
+    expect(onAccount).not.toContain("On your account");
     expect(onAccount).not.toContain("This browser only");
 
     const browserOnly = render({ accountMode: true, menus: [menu({ onServer: false })] });
