@@ -227,26 +227,20 @@ export function availableSections(access: SectionAccess): AppSection[] {
 /**
  * Whether the shell shows its left column at all.
  *
- * The column is the account's: destinations, the open menu's outline, the
- * sign-in button and the café on shift. With nobody signed in it would hold a
- * single row — "Capture" — which reads as a broken menu rather than a front
- * door, so a settled visitor gets the page instead and `brand-bar.tsx` carries
- * the name and `/sign-in`.
+ * The column belongs to the account and never shows signed out: with nobody
+ * signed in it would hold "Capture" (and, with a draft, "My menus"), which
+ * reads as a broken menu rather than a front door. A visitor gets the page
+ * itself instead, and `brand-bar.tsx` carries the name, `/sign-in`, and My
+ * menus while drafts exist.
  *
- * One case keeps it besides an account: a visitor with anonymous drafts, for
- * whom My menus is a real destination. An unanswered session keeps nothing:
- * the column is the account's, so rendering it before the read settles
- * flashes account chrome at a fresh visitor (and a settled visitor's entry
- * at nobody yet known). The shell holds a neutral placeholder until the
- * session and the library have both answered instead of guessing either way.
+ * An unanswered session keeps nothing: rendering the column before the read
+ * settles flashes account chrome at a fresh visitor (and a settled visitor's
+ * entry at nobody yet known). The shell holds a neutral placeholder until
+ * the session and the library have both answered instead of guessing either
+ * way.
  */
-export function shellColumnVisible(input: {
-  sessionState: SessionState;
-  hasWorkingSet: boolean;
-}): boolean {
-  if (input.sessionState === "signed-in") return true;
-  if (input.sessionState === "unknown") return false;
-  return input.hasWorkingSet;
+export function shellColumnVisible(input: { sessionState: SessionState }): boolean {
+  return input.sessionState === "signed-in";
 }
 
 /**

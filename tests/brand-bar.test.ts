@@ -6,7 +6,7 @@ import { BrandBar } from "@/components/layout/brand-bar";
 import { BrandLockup } from "@/components/ui/brand";
 import { shellColumnVisible } from "@/features/navigation/routes";
 
-function render(props: { signedIn: boolean; sessionPending: boolean }) {
+function render(props: { signedIn: boolean; sessionPending: boolean; onLibrary?: () => void }) {
   return renderToStaticMarkup(createElement(BrandBar, props));
 }
 
@@ -43,6 +43,16 @@ describe("BrandBar", () => {
     const html = render({ signedIn: true, sessionPending: false });
     expect(html).not.toContain('href="/sign-in"');
     expect(html).not.toContain("Sign in");
+  });
+
+  it("carries My menus while a signed-out browser holds a draft", () => {
+    const html = render({ signedIn: false, sessionPending: false, onLibrary: () => {} });
+    expect(html).toContain("My menus");
+  });
+
+  it("shows no library path when the signed-out browser is empty", () => {
+    const html = render({ signedIn: false, sessionPending: false });
+    expect(html).not.toContain("My menus");
   });
 });
 
@@ -82,19 +92,14 @@ describe("BrandLockup destination", () => {
  */
 describe("shellColumnVisible", () => {
   it("keeps the column for a signed-in account", () => {
-    expect(shellColumnVisible({ sessionState: "signed-in", hasWorkingSet: false })).toBe(true);
+    expect(shellColumnVisible({ sessionState: "signed-in" })).toBe(true);
   });
 
-  it("drops it for a settled visitor with nothing to show", () => {
-    expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: false })).toBe(false);
-  });
-
-  it("keeps it for a visitor with drafts, because My menus is a destination", () => {
-    expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: true })).toBe(true);
+  it("never shows it to a settled visitor, drafts or not", () => {
+    expect(shellColumnVisible({ sessionState: "signed-out" })).toBe(false);
   });
 
   it("hides it while the session is unanswered", () => {
-    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: false })).toBe(false);
-    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: true })).toBe(false);
+    expect(shellColumnVisible({ sessionState: "unknown" })).toBe(false);
   });
 });

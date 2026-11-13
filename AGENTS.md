@@ -132,21 +132,22 @@ errors, or add lint/type suppressions just to make checks pass.
   `layout.tsx` so a saved choice never flashes. The app shell has no desktop
   header; `site-header.tsx` stays for content pages (launch, legal, dev).
   The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
-  drops it once the session has settled as signed out with nothing in the
-  library, because a column holding the single row "Capture" reads as a broken
-  menu, not as a front door. It stays off while the session or the library is
-  still answering — an unanswered read is neither signed in nor signed out,
-  so the shell holds a neutral placeholder instead of guessing — and for a
-  visitor holding drafts, whose My menus is a real destination. The brand wrapper inside it must stay a
+  never shows it signed out, because a column holding "Capture" (and, with a
+  draft, "My menus") reads as a broken menu, not as a front door. It stays off
+  while the session or the library is still answering — an unanswered read is
+  neither signed in nor signed out, so the shell holds a neutral placeholder
+  instead of guessing. A signed-out draft is reached through the brand row's
+  My menus button and the phone tab bar instead. The brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
-  visitor. Signed out it is the only sign-in path there is — the sidebar's
-  account block is desktop-only and the More sheet is signed-in only — so it
-  carries `/sign-in` itself, and it shows nothing extra while the session is
+  visitor. Signed out it is the only sign-in path there is — the sidebar never
+  shows without an account and the More sheet is signed-in only — so it
+  carries `/sign-in` itself plus a My menus button while this browser holds a
+  draft, and it shows nothing extra while the session is
   unanswered. The chosen identity (concept 7, "The Hidden Eat") is not applied
   yet: the theme landed first, then the drawn lockup replaces the text in
   `brand.tsx` only.
