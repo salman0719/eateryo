@@ -56,6 +56,7 @@ import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
   cacheMenu,
+  deleteImage,
   deleteMenu,
   getImage,
   getMenu,
@@ -1825,6 +1826,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           // baseline. Never fail the claim over it.
         }
       }
+      // Dissolve what the account just took: a leftover row would come
+      // back as an anonymous draft on sign-out. Skipped rows stay — they
+      // may be ahead of the server, and the heal triages those on open.
+      for (const id of report.imported) {
+        await dissolveAttachedMenu(id);
+      }
       setClaimNotice({
         imported: report.imported.length,
         failed: report.failed.length,
@@ -1941,6 +1948,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           // The next open reconciles; the attach already succeeded.
         }
       }
+      // The account holds the copy now: dissolve the browser row so it
+      // can never resurface as an anonymous draft on sign-out. A skipped
+      // row (already on the server) may be ahead of it, so only a fresh
+      // import dissolves — the heal triages the rest on open.
+      if (outcome.status === "imported") await dissolveAttachedMenu(menuId);
       // Silent by design: the emailed link already promised this menu joins
       // the account, so no banner celebrates it. Marking it done keeps the
       // generic offer from re-asking for the same draft.
@@ -1963,6 +1975,27 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * and the pending-new marker. Best-effort per menu so one unreadable row
    * never blocks the rest.
    */
+  /**
+   * Dissolve-after-attach: the account holds the copy now, so the browser
+   * row is redundant — and any leftover would resurface as an anonymous
+   * draft on sign-out. Only freshly imported rows dissolve; skipped rows
+   * may be ahead of the server and stay for the heal to triage. Wizard
+   * and journey marks stay: the menu still exists, on the account.
+   */
+  async function dissolveAttachedMenu(menuId: string) {
+    try {
+      await deleteMenu(menuId);
+    } catch {
+      // The stamp already hides the row; the next save's prune retries.
+    }
+    try {
+      await deleteImage(menuId);
+    } catch {
+      // Source photo only; the account copy is unaffected.
+    }
+    await clearDraftOrigin(menuId);
+  }
+
   async function wipeBrowserMenus(menuIds: readonly string[]) {
     for (const menuId of menuIds) {
       try {
