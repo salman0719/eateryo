@@ -16,7 +16,7 @@
 
 import { getMenu, listMenus } from "@/features/menu/storage";
 
-import { createServerMenu, SyncError } from "./sync";
+import { createServerMenu, SyncError, type MembershipAccess } from "./sync";
 
 export interface MoveFailure {
   id: string;
@@ -31,11 +31,19 @@ export interface MoveReport {
   skipped: string[];
   /** Menus that could not be moved, with a human-readable reason each. */
   failed: MoveFailure[];
+  /**
+   * The server's own access answer per imported menu. Adopt it — the create
+   * call just proved the row lives on the account in the target café, so the
+   * shell must not wait for a café-keyed read that may cover another café.
+   */
+  accessById: Partial<Record<string, MembershipAccess>>;
 }
 
 /** What happened to one local menu (per-row moves report it directly). */
 export type MoveOutcome =
-  { status: "imported" } | { status: "skipped" } | { status: "failed"; reason: string };
+  | { status: "imported"; access: MembershipAccess }
+  | { status: "skipped" }
+  | { status: "failed"; reason: string };
 
 function failureReason(error: unknown): string {
   if (error instanceof SyncError) {
@@ -67,8 +75,10 @@ export async function moveLocalMenuToAccount(
   try {
     const doc = await getMenu(menuId);
     // The document keeps its local id; the server adopts it as the row id.
-    await createServerMenu(restaurantId, doc);
-    return { status: "imported" };
+    // The create answer carries the caller's access — thread it through so
+    // the row never renders as on-account with no access ("View only").
+    const created = await createServerMenu(restaurantId, doc);
+    return { status: "imported", access: created.access };
   } catch (error) {
     if (error instanceof SyncError && error.code === "exists") return { status: "skipped" };
     return { status: "failed", reason: failureReason(error) };
@@ -87,7 +97,7 @@ export async function moveLocalMenusToAccount(
 ): Promise<MoveReport> {
   const summaries = await listMenus();
   const wanted = onlyIds ? new Set(onlyIds) : null;
-  const report: MoveReport = { imported: [], skipped: [], failed: [] };
+  const report: MoveReport = { imported: [], skipped: [], failed: [], accessById: {} };
 
   // Sequential on purpose: each menu is a validated round trip, and a
   // predictable order makes partial failures easy to read and re-run.
@@ -102,8 +112,10 @@ export async function moveLocalMenusToAccount(
       continue;
     }
     const outcome = await moveLocalMenuToAccount(restaurantId, summary.id);
-    if (outcome.status === "imported") report.imported.push(summary.id);
-    else if (outcome.status === "skipped") report.skipped.push(summary.id);
+    if (outcome.status === "imported") {
+      report.imported.push(summary.id);
+      report.accessById[summary.id] = outcome.access;
+    } else if (outcome.status === "skipped") report.skipped.push(summary.id);
     else report.failed.push({ id: summary.id, title: summary.title, reason: outcome.reason });
   }
 
