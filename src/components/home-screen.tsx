@@ -52,7 +52,7 @@ import {
   updateItem,
 } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
-import { createSampleMenuDocument } from "@/features/menu/sample-menu";
+import { createSampleMenuDocument, DEMO_PROVIDER } from "@/features/menu/sample-menu";
 import {
   cacheMenu,
   deleteImage,
@@ -1776,11 +1776,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     setClaimError(null);
     try {
       // Only the visible browser-only rows move: hidden rows belong to
-      // another session and are never swept into this account.
-      const report = await moveLocalMenusToAccount(
-        restaurantId,
-        localOnly.map((menu) => menu.id)
-      );
+      // another session and are never swept into this account. Sample rows
+      // are disregarded, never imported — signing in must not file demo
+      // data into a real café.
+      const { real, demo } = await partitionRealMenus(localOnly.map((menu) => menu.id));
+      for (const id of demo) await dissolveBrowserMenu(id);
+      const report = await moveLocalMenusToAccount(restaurantId, real);
       for (const id of report.imported) {
         addServerId(id);
         await adoptAttachedMenu(id, restaurantId, report.accessById[id]);
@@ -1826,7 +1827,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // back as an anonymous draft on sign-out. Skipped rows stay — they
       // may be ahead of the server, and the heal triages those on open.
       for (const id of report.imported) {
-        await dissolveAttachedMenu(id);
+        await dissolveBrowserMenu(id);
       }
       setClaimNotice({
         imported: report.imported.length,
@@ -1936,7 +1937,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // can never resurface as an anonymous draft on sign-out. A skipped
       // row (already on the server) may be ahead of it, so only a fresh
       // import dissolves — the heal triages the rest on open.
-      if (outcome.status === "imported") await dissolveAttachedMenu(menuId);
+      if (outcome.status === "imported") await dissolveBrowserMenu(menuId);
       // Silent by design: the emailed link already promised this menu joins
       // the account, so no banner celebrates it. Marking it done keeps a
       // later frame from re-running the same import.
@@ -1958,13 +1959,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * never blocks the rest.
    */
   /**
-   * Dissolve-after-attach: the account holds the copy now, so the browser
-   * row is redundant — and any leftover would resurface as an anonymous
-   * draft on sign-out. Only freshly imported rows dissolve; skipped rows
-   * may be ahead of the server and stay for the heal to triage. Wizard
-   * and journey marks stay: the menu still exists, on the account.
+   * Dissolve a browser row: the document, its source photo, and its stamp.
+   * Used after a successful attach (the account holds the copy now, so any
+   * leftover would resurface as an anonymous draft on sign-out) and for
+   * demo data (sample rows are never asked about). Wizard and journey marks
+   * stay: an attached menu still exists, on the account.
    */
-  async function dissolveAttachedMenu(menuId: string) {
+  async function dissolveBrowserMenu(menuId: string) {
     try {
       await deleteMenu(menuId);
     } catch {
@@ -1994,11 +1995,35 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
+   * Split browser rows into the owner's real menus and sample rows. Demo
+   * data is never asked about — signing in disregards it — while an
+   * unreadable row counts as real, so the dialogs still cover it and the
+   * move reports it instead of silently dropping it.
+   */
+  async function partitionRealMenus(ids: readonly string[]): Promise<{
+    real: string[];
+    demo: string[];
+  }> {
+    const real: string[] = [];
+    const demo: string[] = [];
+    for (const id of ids) {
+      try {
+        const doc = await getMenu(id);
+        (doc.source?.provider === DEMO_PROVIDER ? demo : real).push(id);
+      } catch {
+        real.push(id);
+      }
+    }
+    return { real, demo };
+  }
+
+  /**
    * The plain "Sign in" buttons (brand row, sidebar account, library gate,
-   * publish panel): signed out with a local menu, the owner chooses before
-   * leaving. Add → the ids attach on login; delete → they are wiped on
-   * login; staying is always one Escape away. Without a local menu the link
-   * behaves as before and navigates immediately.
+   * publish panel): signed out with a real local menu, the owner chooses
+   * before leaving. Add → the ids attach on login; delete → they are wiped
+   * on login; staying is always one Escape away. Sample rows are
+   * disregarded without asking; without any menu the link navigates
+   * immediately.
    */
   async function requestDirectSignIn() {
     if (signedInRef.current) {
@@ -2011,19 +2036,30 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     } catch {
       existing = [];
     }
-    if (existing.length === 0) {
+    const titles = new Map(existing.map((menu) => [menu.id, menu.title] as [string, string]));
+    const { real, demo } = await partitionRealMenus(existing.map((menu) => menu.id));
+    const realTitles = new Map(
+      real.map((id) => [id, titles.get(id)] as [string, string | undefined])
+    );
+    if (real.length === 0) {
+      // Only sample rows (or nothing at all): no confirmation, the demo
+      // data is simply disregarded on the way in.
+      for (const id of demo) await dissolveBrowserMenu(id);
       router.push("/sign-in");
       return;
     }
-    const title = existing[0]?.title?.trim() ? `“${existing[0]?.title}”` : "your browser menu";
+    const firstTitle = realTitles.get(real[0]);
+    const title = firstTitle?.trim() ? `“${firstTitle}”` : "your browser menu";
     const addIt = await confirm({
       message: `Add ${title} from this browser to your account when you sign in?`,
       confirmLabel: "Add it on sign-in",
       cancelLabel: "Don't add it",
     });
-    const ids = existing.map((menu) => menu.id);
+    // Sample rows go quietly whichever answer the owner gives; the intent
+    // names only real menus.
+    for (const id of demo) await dissolveBrowserMenu(id);
     if (addIt) {
-      saveDirectSignInIntent({ decision: "attach", menuIds: ids });
+      saveDirectSignInIntent({ decision: "attach", menuIds: real });
       router.push("/sign-in");
       return;
     }
@@ -2036,7 +2072,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       destructive: true,
     });
     if (!wipeIt) return;
-    saveDirectSignInIntent({ decision: "discard", menuIds: ids });
+    saveDirectSignInIntent({ decision: "discard", menuIds: real });
     router.push("/sign-in");
   }
 
