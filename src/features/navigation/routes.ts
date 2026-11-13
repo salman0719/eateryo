@@ -200,24 +200,19 @@ export interface SectionAccess {
   can: (capability: Capability) => boolean;
   /** The Assistant's release flag (its kill switch, A4). */
   assistantEnabled: boolean;
-  /** Signed out only: this browser holds anonymous drafts to continue. */
-  hasWorkingSet: boolean;
 }
 
 /**
  * The sections this person may see, in desktop order.
  *
  * Signed in, only capabilities decide (bar the Assistant's release flag).
- * Signed out the shell is capture-only, plus My menus while anonymous drafts
- * exist to continue — no account surface and no More sheet, whatever a stale
- * capability or the flag says.
+ * Signed out there is no navigation at all: the shell is capture-only, with
+ * no account surface and no More sheet, whatever a stale capability or the
+ * flag says. A draft left behind is picked up from the capture banner, which
+ * is the same screen the work happened on.
  */
 export function availableSections(access: SectionAccess): AppSection[] {
-  if (!access.signedIn) {
-    return APP_SECTIONS.filter(
-      (section) => section.id === "capture" || (section.id === "library" && access.hasWorkingSet)
-    );
-  }
+  if (!access.signedIn) return APP_SECTIONS.filter((section) => section.id === "capture");
   return APP_SECTIONS.filter((section) => {
     if (section.id === "assistant" && !access.assistantEnabled) return false;
     return section.capabilities.some((capability) => access.can(capability));
@@ -227,26 +222,20 @@ export function availableSections(access: SectionAccess): AppSection[] {
 /**
  * Whether the shell shows its left column at all.
  *
- * The column is the account's: destinations, the open menu's outline, the
- * sign-in button and the café on shift. With nobody signed in it would hold a
- * single row — "Capture" — which reads as a broken menu rather than a front
- * door, so a settled visitor gets the page instead and `brand-bar.tsx` carries
- * the name and `/sign-in`.
+ * The column belongs to the account and never shows signed out: with nobody
+ * signed in it would hold "Capture" (and, with a draft, "My menus"), which
+ * reads as a broken menu rather than a front door. A visitor gets the page
+ * itself instead, and `brand-bar.tsx` carries the name, `/sign-in`, and My
+ * menus while drafts exist.
  *
- * One case keeps it besides an account: a visitor with anonymous drafts, for
- * whom My menus is a real destination. An unanswered session keeps nothing:
- * the column is the account's, so rendering it before the read settles
- * flashes account chrome at a fresh visitor (and a settled visitor's entry
- * at nobody yet known). The shell holds a neutral placeholder until the
- * session and the library have both answered instead of guessing either way.
+ * An unanswered session keeps nothing: rendering the column before the read
+ * settles flashes account chrome at a fresh visitor (and a settled visitor's
+ * entry at nobody yet known). The shell holds a neutral placeholder until
+ * the session and the library have both answered instead of guessing either
+ * way.
  */
-export function shellColumnVisible(input: {
-  sessionState: SessionState;
-  hasWorkingSet: boolean;
-}): boolean {
-  if (input.sessionState === "signed-in") return true;
-  if (input.sessionState === "unknown") return false;
-  return input.hasWorkingSet;
+export function shellColumnVisible(input: { sessionState: SessionState }): boolean {
+  return input.sessionState === "signed-in";
 }
 
 /**

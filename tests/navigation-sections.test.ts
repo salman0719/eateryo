@@ -13,7 +13,6 @@ function sectionsFor(overrides: Partial<SectionAccess> = {}) {
     signedIn: true,
     can: (capability) => CAPABILITIES.includes(capability),
     assistantEnabled: false,
-    hasWorkingSet: false,
     ...overrides,
   });
 }
@@ -23,7 +22,6 @@ function staffSections(assistantEnabled = true) {
     signedIn: true,
     can: (capability) => STAFF_CAPABILITIES.includes(capability),
     assistantEnabled,
-    hasWorkingSet: false,
   });
 }
 
@@ -58,7 +56,6 @@ describe("availableSections", () => {
       signedIn: true,
       can: (capability) => capability === "menus.read",
       assistantEnabled: false,
-      hasWorkingSet: true,
     });
     expect(reader.map((section) => section.id)).toEqual(["library"]);
   });
@@ -80,17 +77,22 @@ describe("availableSections", () => {
         signedIn: true,
         can: (grant) => grant === capability,
         assistantEnabled: false,
-        hasWorkingSet: false,
       });
       expect(sections.map((section) => section.id)).toEqual(["tables"]);
     }
   });
 
-  it("is capture-only signed out, plus the working set when drafts exist", () => {
+  it("is capture-only signed out, whatever this browser holds", () => {
+    // No My menus, no Orders, no More sheet: a signed-out draft is resumed
+    // from the capture banner rather than browsed in a library.
     expect(sectionsFor({ signedIn: false }).map((section) => section.id)).toEqual(["capture"]);
     expect(
-      sectionsFor({ signedIn: false, hasWorkingSet: true }).map((section) => section.id)
-    ).toEqual(["capture", "library"]);
+      sectionsFor({
+        signedIn: false,
+        can: () => true,
+        assistantEnabled: true,
+      }).map((section) => section.id)
+    ).toEqual(["capture"]);
   });
 
   it("hides the Assistant while its release flag is off", () => {

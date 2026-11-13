@@ -148,12 +148,11 @@ export default function StatusStatesDevPage() {
                 <StatusChip tone="danger">Possible duplicate</StatusChip>
                 <StatusChip size="sm">Cancelled</StatusChip>
                 <StatusChip size="sm" tone="success">
-                  On your account
+                  Saved
                 </StatusChip>
               </div>
               <Caption>
-                publish panel · orders board · library row · StatusChip (surface-100 / ink-900 /
-                dot)
+                publish panel · orders board · StatusChip (surface-100 / ink-900 / dot)
               </Caption>
             </div>
 

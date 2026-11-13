@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusChip } from "@/components/ui/status-chip";
 import type { MenuSummary } from "@/features/menu/storage";
-import type { RestaurantOption } from "@/features/tenancy/client";
 
 import { suggestSecondMenuNames } from "@/features/menu/menu-utils";
 
@@ -45,13 +42,6 @@ interface LibraryPanelProps {
   canCreate?: boolean;
   /** Signed out with stamped rows hidden: say so instead of "no menus". */
   hasHiddenMenus?: boolean;
-  /** Restaurants the caller owns — where a per-row add can put a menu. */
-  ownedRestaurants?: RestaurantOption[];
-  /**
-   * Add one browser-only menu to a restaurant. Resolves to a message to
-   * show on that row, or null when the add succeeded (or was already there).
-   */
-  onMoveToAccount?: (menuId: string, restaurantId: string) => Promise<string | null>;
   unavailable: boolean;
   /** Overrides the empty state when the shell knows why there is nothing. */
   emptyTitle?: string;
@@ -75,8 +65,6 @@ export function LibraryPanel({
   accountMode,
   canCreate = true,
   hasHiddenMenus = false,
-  ownedRestaurants = [],
-  onMoveToAccount,
   unavailable,
   emptyTitle,
   emptyBody,
@@ -86,13 +74,6 @@ export function LibraryPanel({
   onDelete,
 }: LibraryPanelProps) {
   const { confirm, dialog } = useConfirm();
-  /** The row whose restaurant picker is open (one add at a time). */
-  const [pickerMenuId, setPickerMenuId] = useState<string | null>(null);
-
-  const [targetId, setTargetId] = useState("");
-  const [movingId, setMovingId] = useState<string | null>(null);
-  const [moveError, setMoveError] = useState<{ id: string; message: string } | null>(null);
-  const moveAvailable = onMoveToAccount != null && ownedRestaurants.length > 0;
 
   // Q2 companion: the second menu gets a contextual ask, not a bare
   // duplicate — chips name it for its service, the button keeps numbering.
@@ -100,37 +81,6 @@ export function LibraryPanel({
     canCreate && menus.length > 0 && !loading
       ? suggestSecondMenuNames(menus.map((menu) => menu.title))
       : [];
-
-  function startMove(id: string) {
-    setMoveError(null);
-    const only = ownedRestaurants.length === 1 ? ownedRestaurants[0] : undefined;
-    if (only) {
-      // One restaurant means no choice to make: add straight away.
-      setTargetId(only.id);
-      void runMove(id, only.id);
-      return;
-    }
-    setTargetId("");
-    setPickerMenuId(id);
-  }
-
-  async function runMove(id: string, restaurantId: string) {
-    if (!restaurantId || !onMoveToAccount || movingId !== null) return;
-    setMovingId(id);
-    setMoveError(null);
-    try {
-      const message = await onMoveToAccount(id, restaurantId);
-      if (message) setMoveError({ id, message });
-      else setPickerMenuId(null);
-    } catch {
-      setMoveError({
-        id,
-        message: "Could not add that menu. Check your connection and try again.",
-      });
-    } finally {
-      setMovingId(null);
-    }
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -262,11 +212,6 @@ export function LibraryPanel({
                         · {menu.itemCount} {menu.itemCount === 1 ? "item" : "items"} · updated{" "}
                         {formatDate(menu.updatedAt)}
                       </span>
-                      {accountMode && (
-                        <StatusChip size="sm" tone={menu.onServer ? "success" : "warning"}>
-                          {menu.onServer ? "On your account" : "This browser only"}
-                        </StatusChip>
-                      )}
                       {menu.canWrite === false && (
                         <span className="whitespace-nowrap rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
                           View only
@@ -275,18 +220,6 @@ export function LibraryPanel({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {/* Only a read that proved membership may offer the move:
-                        while it is unknown, "not on the account" is a guess. */}
-                    {menu.canWrite !== false && accountMode && !menu.onServer && moveAvailable && (
-                      <button
-                        type="button"
-                        onClick={() => startMove(menu.id)}
-                        disabled={movingId !== null}
-                        className="rounded-full border border-accent-700 px-3 py-1.5 text-xs font-semibold text-accent-800 transition-colors hover:bg-accent-700 hover:text-on-accent disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                      >
-                        {movingId === menu.id ? "Adding…" : "Add to account"}
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => onOpen(menu.id)}
@@ -312,50 +245,6 @@ export function LibraryPanel({
                     )}
                   </div>
                 </div>
-              )}
-              {pickerMenuId === menu.id && (
-                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line-200 bg-surface-50 p-3 sm:flex-row sm:items-end">
-                  <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-ink-600">
-                    Add “{menu.title}” to
-                    <select
-                      value={targetId}
-                      onChange={(event) => setTargetId(event.target.value)}
-                      className="rounded-lg border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                    >
-                      <option value="" disabled>
-                        Choose a restaurant…
-                      </option>
-                      {ownedRestaurants.map((restaurant) => (
-                        <option key={restaurant.id} value={restaurant.id}>
-                          {restaurant.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void runMove(menu.id, targetId)}
-                      disabled={!targetId || movingId !== null}
-                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                    >
-                      {movingId === menu.id ? "Adding…" : "Add"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPickerMenuId(null)}
-                      disabled={movingId !== null}
-                      className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-600 transition-colors hover:border-line-400 hover:text-ink-900 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-              {moveError?.id === menu.id && (
-                <p role="alert" className="mt-2 text-xs text-danger-700">
-                  {moveError.message}
-                </p>
               )}
             </li>
           ))}

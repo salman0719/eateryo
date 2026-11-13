@@ -135,8 +135,8 @@ async function requestJson<T>(
   try {
     response = await fetch(path, init);
   } catch {
-    // Offline / server unreachable: signed-in editing degrades loudly but
-    // the local copy is untouched (IndexedDB stays the offline cache).
+    // Server unreachable: signed-in editing degrades loudly but the local
+    // copy is untouched and retried on the next save.
     throw new SyncError("unavailable", "Could not reach the server. Check your connection.");
   }
 
