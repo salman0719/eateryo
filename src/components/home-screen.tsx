@@ -1080,6 +1080,37 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setSaveState(storageSaveState(doc.id));
       return;
     }
+    // Server-first library work: the first change to a pending new menu
+    // creates the cloud copy instead of a browser-only draft, so a
+    // rename-and-return is already on the account.
+    const pendingTarget = isPendingNewMenu(doc.id) ? serverCaptureTarget() : null;
+    if (pendingTarget) {
+      try {
+        const created = await createServerMenu(pendingTarget, doc);
+        const cached = await cacheMenu(created.doc);
+        forgetPendingNewMenu(cached.id);
+        lastSavedRef.current = JSON.stringify(cached);
+        docRef.current = cached;
+        setActiveDoc(cached);
+        serverBaseRef.current = created.updatedAt;
+        addServerId(cached.id);
+        setMenuAccessFor(cached.id, created.access);
+        rememberMenuCafe(cached.id, pendingTarget);
+        const pendingActor = accountKeyRef.current;
+        if (pendingActor)
+          await refreshDraftSync(
+            cached.id,
+            pendingActor,
+            created.updatedAt,
+            menuContentHash(cached)
+          );
+        setMenus(await listMenus());
+        setSaveState(savedState("Saved to your account."));
+        return;
+      } catch {
+        // Fall through to the browser draft; the manual move retries it.
+      }
+    }
     try {
       const saved = await saveMenu(doc);
       lastSavedRef.current = JSON.stringify(saved);
@@ -2661,6 +2692,29 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         return;
       }
       const doc = parseImportedMenu(await importFile.text());
+      const importTarget = serverCaptureTarget();
+      if (importTarget && !storageDownRef.current) {
+        try {
+          const created = await createServerMenu(importTarget, doc);
+          const cached = await cacheMenu(created.doc);
+          const importActor = accountKeyRef.current;
+          if (importActor)
+            await refreshDraftSync(
+              cached.id,
+              importActor,
+              created.updatedAt,
+              menuContentHash(cached)
+            );
+          addServerId(cached.id);
+          setMenuAccessFor(cached.id, created.access);
+          rememberMenuCafe(cached.id, importTarget);
+          await refreshLibrary();
+          await openDoc(cached, null, true, created.access);
+          return;
+        } catch {
+          // Fall through to the browser draft; the manual move retries it.
+        }
+      }
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
       await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
