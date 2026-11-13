@@ -72,6 +72,7 @@ import {
   fetchCafeMenus,
   fetchServerMenu,
   SyncError,
+  type ServerMenu,
   updateServerMenu,
 } from "@/features/menus/sync";
 import {
@@ -1076,35 +1077,52 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setSaveState(storageSaveState(doc.id));
       return;
     }
-    // Server-first library work: the first change to a pending new menu
-    // creates the cloud copy instead of a browser-only draft, so a
-    // rename-and-return is already on the account.
-    const pendingTarget = isPendingNewMenu(doc.id) ? serverCaptureTarget() : null;
-    if (pendingTarget) {
+    // Server-only while signed in: the first change to a pending new menu
+    // creates the cloud copy, so a rename-and-return is already on the
+    // account. No local fallback — the error stays visible and the next
+    // change retries, with the edits kept in memory meanwhile.
+    if (isPendingNewMenu(doc.id) && signedInRef.current) {
+      const pendingTarget = await ensureServerTarget(doc.title);
+      if (!pendingTarget) {
+        setSaveState({
+          kind: "error",
+          message: "Couldn't reach your account — edits are kept, and the next change retries.",
+        });
+        return;
+      }
       try {
         const created = await createServerMenu(pendingTarget, doc);
-        const cached = await cacheMenu(created.doc);
+        const cached = await cacheServerDraft(created);
         forgetPendingNewMenu(cached.id);
         lastSavedRef.current = JSON.stringify(cached);
         docRef.current = cached;
         setActiveDoc(cached);
         serverBaseRef.current = created.updatedAt;
-        addServerId(cached.id);
-        setMenuAccessFor(cached.id, created.access);
-        rememberMenuCafe(cached.id, pendingTarget);
-        const pendingActor = accountKeyRef.current;
-        if (pendingActor)
-          await refreshDraftSync(
-            cached.id,
-            pendingActor,
-            created.updatedAt,
-            menuContentHash(cached)
-          );
         setMenus(await listMenus());
         setSaveState(savedState("Saved to your account."));
         return;
-      } catch {
-        // Fall through to the browser draft; the manual move retries it.
+      } catch (error) {
+        if (error instanceof SyncError && error.code === "exists") {
+          try {
+            const existing = await fetchServerMenu(doc.id);
+            const cached = await cacheServerDraft(existing);
+            forgetPendingNewMenu(cached.id);
+            lastSavedRef.current = JSON.stringify(cached);
+            docRef.current = cached;
+            setActiveDoc(cached);
+            serverBaseRef.current = existing.updatedAt;
+            setMenus(await listMenus());
+            setSaveState(savedState("Saved to your account."));
+            return;
+          } catch {
+            // Fall through to the error below.
+          }
+        }
+        setSaveState({
+          kind: "error",
+          message: "Couldn't save to your account — edits are kept, and the next change retries.",
+        });
+        return;
       }
     }
     try {
@@ -1209,7 +1227,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       return {
         kind: "saved",
         message: "Not saved yet",
-        detail: "Your first change saves it in this browser.",
+        detail: signedInRef.current
+          ? "Your first change saves it to your account."
+          : "Your first change saves it in this browser.",
       };
     }
     if (serverBaseRef.current) return savedState("Saved to your account.");
@@ -2342,41 +2362,43 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     }
     setDraftSave("saving");
     try {
-      // Server-first: an owner with a café captures straight into the
-      // account, so a rename-and-return never sits "in this browser".
-      const targetId = serverCaptureTarget();
-      if (targetId) {
-        try {
-          const created = await createServerMenu(targetId, doc);
-          if (primaryPageBlob) {
-            try {
-              await saveImage(created.id, primaryPageBlob);
-            } catch {
-              // Image is optional; the menu matters.
-            }
-          }
-          if (token !== draftTokenRef.current) return;
-          const cached = storageDownRef.current ? created.doc : await cacheMenu(created.doc);
-          draftDocRef.current = cached;
-          const autosaveServerActor = accountKeyRef.current;
-          if (autosaveServerActor)
-            await refreshDraftSync(
-              cached.id,
-              autosaveServerActor,
-              created.updatedAt,
-              menuContentHash(cached)
-            );
-          addServerId(cached.id);
-          setMenuAccessFor(cached.id, created.access);
-          rememberMenuCafe(cached.id, targetId);
-          setDraftSave("saved");
-          await refreshLibrary();
-          return;
-        } catch (serverError) {
-          if (serverError instanceof SyncError && serverError.code === "exists") throw serverError;
-          // Fall through to the browser draft; opening it offers the manual
-          // move once the account is reachable.
+      // Server-only while signed in: the draft is a cloud copy from the
+      // start, so a rename-and-return never sits "in this browser". No
+      // local fallback — a failure keeps the in-memory result and the next
+      // Extract press retries.
+      if (signedInRef.current) {
+        const targetId = await ensureServerTarget(doc.title);
+        if (!targetId) {
+          throw new SyncError(
+            "unavailable",
+            "Couldn't reach your account. Check your connection, then press Extract again."
+          );
         }
+        let server: ServerMenu;
+        try {
+          server = await createServerMenu(targetId, doc);
+        } catch (serverError) {
+          // A retry that landed after an ambiguous failure adopts the row
+          // instead of duplicating it.
+          if (serverError instanceof SyncError && serverError.code === "exists") {
+            server = await fetchServerMenu(doc.id);
+          } else {
+            throw serverError;
+          }
+        }
+        if (primaryPageBlob) {
+          try {
+            await saveImage(server.id, primaryPageBlob);
+          } catch {
+            // Image is optional; the menu matters.
+          }
+        }
+        if (token !== draftTokenRef.current) return;
+        const cached = await cacheServerDraft(server);
+        draftDocRef.current = cached;
+        setDraftSave("saved");
+        await refreshLibrary();
+        return;
       }
       const saved = await saveMenu(doc);
       if (primaryPageBlob) {
@@ -2427,42 +2449,51 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           model: extracted.model,
           originalFileName: firstPage?.file.name,
         });
-      const openTarget = serverCaptureTarget();
-      const alreadyOnServer = serverIdsRef.current.has(doc.id);
-      if (openTarget && !alreadyOnServer && !storageDownRef.current) {
-        try {
-          const created = await createServerMenu(openTarget, doc);
-          if (firstPage) {
-            try {
-              await saveImage(created.id, firstPage.file);
-            } catch {
-              // Image is optional; the menu matters.
-            }
-          }
-          const cached = await cacheMenu(created.doc);
-          const openActor = accountKeyRef.current;
-          if (openActor)
-            await refreshDraftSync(
-              cached.id,
-              openActor,
-              created.updatedAt,
-              menuContentHash(cached)
-            );
-          addServerId(cached.id);
-          setMenuAccessFor(cached.id, created.access);
-          rememberMenuCafe(cached.id, openTarget);
-          await refreshLibrary();
-          await openDoc(cached, firstPage ? firstPage.file : null, updateRoute, created.access);
-          return cached;
-        } catch {
-          // Fall through to the browser draft; the manual move retries it.
+      // Server-only while signed in: no browser-only copy is ever written.
+      // A failure throws to the result screen's error path with the data
+      // intact, so the next press retries instead of forking a local copy.
+      if (signedInRef.current) {
+        if (storageDownRef.current) {
+          throw new StorageError(
+            "unavailable",
+            "Browser storage is unavailable, so the menu can't be cached. Try again."
+          );
         }
-      }
-      if (alreadyOnServer && openTarget) {
-        const access = menuAccessRef.current.get(doc.id);
-        if (!storageDownRef.current) await refreshLibrary();
-        await openDoc(doc, firstPage ? firstPage.file : null, updateRoute, access);
-        return doc;
+        const alreadyOnServer = serverIdsRef.current.has(doc.id);
+        if (alreadyOnServer) {
+          const access = menuAccessRef.current.get(doc.id);
+          await refreshLibrary();
+          await openDoc(doc, firstPage ? firstPage.file : null, updateRoute, access);
+          return doc;
+        }
+        const targetId = await ensureServerTarget(doc.title);
+        if (!targetId) {
+          throw new StorageError(
+            "unavailable",
+            "Couldn't reach your account. Check your connection and try again."
+          );
+        }
+        let server: ServerMenu;
+        try {
+          server = await createServerMenu(targetId, doc);
+        } catch (serverError) {
+          if (serverError instanceof SyncError && serverError.code === "exists") {
+            server = await fetchServerMenu(doc.id);
+          } else {
+            throw serverError;
+          }
+        }
+        if (firstPage) {
+          try {
+            await saveImage(server.id, firstPage.file);
+          } catch {
+            // Image is optional; the menu matters.
+          }
+        }
+        const cached = await cacheServerDraft(server);
+        await refreshLibrary();
+        await openDoc(cached, firstPage ? firstPage.file : null, updateRoute, server.access);
+        return cached;
       }
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
       if (firstPage && !storageDownRef.current) {
@@ -2479,23 +2510,34 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       return saved;
     }
     const doc = demoDoc ?? createSampleMenuDocument();
-    const demoTarget = serverCaptureTarget();
-    if (demoTarget && !storageDownRef.current) {
-      try {
-        const created = await createServerMenu(demoTarget, doc);
-        const cached = await cacheMenu(created.doc);
-        const demoActor = accountKeyRef.current;
-        if (demoActor)
-          await refreshDraftSync(cached.id, demoActor, created.updatedAt, menuContentHash(cached));
-        addServerId(cached.id);
-        setMenuAccessFor(cached.id, created.access);
-        rememberMenuCafe(cached.id, demoTarget);
-        await refreshLibrary();
-        await openDoc(cached, null, updateRoute, created.access);
-        return cached;
-      } catch {
-        // Fall through to the browser draft below.
+    if (signedInRef.current) {
+      if (storageDownRef.current) {
+        throw new StorageError(
+          "unavailable",
+          "Browser storage is unavailable, so the menu can't be cached. Try again."
+        );
       }
+      const demoTarget = await ensureServerTarget(doc.title);
+      if (!demoTarget) {
+        throw new StorageError(
+          "unavailable",
+          "Couldn't reach your account. Check your connection and try again."
+        );
+      }
+      let demoServer: ServerMenu;
+      try {
+        demoServer = await createServerMenu(demoTarget, doc);
+      } catch (serverError) {
+        if (serverError instanceof SyncError && serverError.code === "exists") {
+          demoServer = await fetchServerMenu(doc.id);
+        } else {
+          throw serverError;
+        }
+      }
+      const cached = await cacheServerDraft(demoServer);
+      await refreshLibrary();
+      await openDoc(cached, null, updateRoute, demoServer.access);
+      return cached;
     }
     const saved = storageDownRef.current ? doc : await saveMenu(doc);
     await pruneSignedOutOthers(saved.id);
@@ -2658,31 +2700,42 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   async function handleImportFile(importFile: File) {
     setImportError(null);
     try {
-      // Single offline menu: the prune after saving supersedes the old draft.
       const doc = parseImportedMenu(await importFile.text());
-      const importTarget = serverCaptureTarget();
-      if (importTarget && !storageDownRef.current) {
+      // Server-only while signed in: an import lands straight on the
+      // account. Staff-only sign-ins have no writable café, so the import
+      // is refused instead of stacking a browser-only draft.
+      if (signedInRef.current) {
+        if (storageDownRef.current) {
+          setImportError("Browser storage is unavailable, so the menu can't be cached. Try again.");
+          return;
+        }
+        const importTarget = await ensureServerTarget(doc.title);
+        if (!importTarget) {
+          setImportError(
+            canFileBrowserDrafts === false && (restaurantList?.length ?? 0) > 0
+              ? "Only the restaurant owner can add menus — ask the owner to import this file."
+              : "Couldn't reach your account. Check your connection and try again."
+          );
+          return;
+        }
         try {
           const created = await createServerMenu(importTarget, doc);
-          const cached = await cacheMenu(created.doc);
-          const importActor = accountKeyRef.current;
-          if (importActor)
-            await refreshDraftSync(
-              cached.id,
-              importActor,
-              created.updatedAt,
-              menuContentHash(cached)
-            );
-          addServerId(cached.id);
-          setMenuAccessFor(cached.id, created.access);
-          rememberMenuCafe(cached.id, importTarget);
+          const cached = await cacheServerDraft(created);
           await refreshLibrary();
           await openDoc(cached, null, true, created.access);
           return;
-        } catch {
-          // Fall through to the browser draft; the manual move retries it.
+        } catch (error) {
+          if (error instanceof SyncError && error.code === "exists") {
+            const existing = await fetchServerMenu(doc.id);
+            const cached = await cacheServerDraft(existing);
+            await refreshLibrary();
+            await openDoc(cached, null, true, existing.access);
+            return;
+          }
+          throw error;
         }
       }
+      // Single offline menu: the prune after saving supersedes the old draft.
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
       await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
@@ -2736,19 +2789,47 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeRestaurantIdRef = useRef<string | null>(activeRestaurantId);
   activeRestaurantIdRef.current = activeRestaurantId;
   /**
-   * Server-first creation (signed-in): a new menu is a cloud copy in the
-   * acting café, never a browser-only draft. The ref mirrors the render
-   * answer so async saves decide on the same membership the shell acts in.
-   * Null while signed out, while the café is unresolved, or on a staff
-   * shift — those paths keep the explicit local draft plus manual move.
+   * Server-only creation (signed-in): a new menu is a cloud copy, never a
+   * browser-only draft. Prefers the café the shell acts in when it may file
+   * there, else the owner's first café; a brand-new account gets its café
+   * provisioned from the menu title instead of a local draft (publishing can
+   * no longer be the first server write). Staff-only contexts return null —
+   * there is no café the caller may file in, and nothing is invented behind
+   * anyone's back. The refs mirror the render answer so async saves decide
+   * on the same membership the shell acts in.
    */
   const signedInCanWrite = signedIn && accountCan("menus.write");
   const signedInCanWriteRef = useRef(signedInCanWrite);
   signedInCanWriteRef.current = signedInCanWrite;
-  function serverCaptureTarget(): string | null {
+  async function ensureServerTarget(menuTitle: string): Promise<string | null> {
     if (!signedInRef.current || !accountKeyRef.current) return null;
-    if (!signedInCanWriteRef.current) return null;
-    return activeRestaurantIdRef.current;
+    if (activeRestaurantIdRef.current && signedInCanWriteRef.current) {
+      return activeRestaurantIdRef.current;
+    }
+    if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
+      return ownedRestaurantsForAccount[0].id;
+    }
+    if ((restaurantList?.length ?? 0) > 0) return null;
+    try {
+      const created = await createRestaurant(suggestRestaurantName([menuTitle]) ?? "My restaurant");
+      workspace.addRestaurant(created);
+      return created.id;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * File a fresh server menu as the local cache: same id, server clock,
+   * stamped to this account so sign-out hides it like any account copy.
+   */
+  async function cacheServerDraft(server: ServerMenu): Promise<MenuDocument> {
+    const cached = storageDownRef.current ? server.doc : await cacheMenu(server.doc);
+    const actor = accountKeyRef.current;
+    if (actor) await refreshDraftSync(cached.id, actor, server.updatedAt, menuContentHash(cached));
+    addServerId(cached.id);
+    setMenuAccessFor(cached.id, server.access);
+    rememberMenuCafe(cached.id, server.restaurantId);
+    return cached;
   }
   // Refresh the sidebar's launch progress when the account, the café, or the
   // screen changes: publishing or a first order moves the count, and the next
