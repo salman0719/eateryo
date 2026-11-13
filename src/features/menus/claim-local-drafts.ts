@@ -1,16 +1,16 @@
 /**
  * Claiming the drafts that exist only in this browser (R1).
  *
- * Sign-in is the one moment that claims. An account with no menus adopts
- * every browser draft in one go; an account that already holds menus is
- * *offered* the same import. Both paths use the same one-way move helper,
- * which marks each row with the account — so a claimed row never renders
- * signed out again. A shared device deliberately swallows: whoever signs in
- * first owns what was in the browser, and that is the documented trade
- * for having no forks, no queues, no per-device scoping matrix.
+ * Sign-in is the one moment that claims: every unseen browser draft joins
+ * the account in one go, whether or not the account already holds menus —
+ * there is no offer banner. The import dissolves the browser rows, so a
+ * claimed row never renders signed out again. A shared device deliberately
+ * swallows: whoever signs in first owns what was in the browser, and that
+ * is the documented trade for having no forks, no queues, no per-device
+ * scoping matrix.
  *
  * The decision is pure so it can be tested without a browser; only the
- * per-account "done / not now" memory touches localStorage, and it fails
+ * per-account "done / dismissed" memory touches localStorage, and it fails
  * quiet when storage is unavailable.
  */
 
@@ -18,7 +18,7 @@ import { suggestRestaurantName } from "@/features/menu/menu-utils";
 
 export type LocalDraftClaimStatus = "unseen" | "dismissed" | "done";
 
-export type LocalDraftClaimAction = "auto-import" | "offer" | "none";
+export type LocalDraftClaimAction = "auto-import" | "none";
 
 export interface LocalDraftClaimInputs {
   /** Menus saved in this browser that the account does not hold yet. */
@@ -34,20 +34,19 @@ export interface LocalDraftClaimInputs {
 }
 
 /**
- * No menus on the account means every browser draft is adopted at sign-in —
- * restaurant ownership does not change *whether* to adopt, because
+ * Every unseen browser draft is adopted at sign-in — restaurant ownership
+ * does not change *whether* to adopt, because
  * {@link resolveAutoClaimTarget} reuses a café the account already owns and
- * mints one only when it owns none. An account that already holds menus gets
- * a one-click offer instead. Staff-only accounts with menus are left alone:
- * they own no restaurant to import into, so the manual panel is the honest
- * place to explain that.
+ * mints one only when it owns none. Staff-only accounts with menus are left
+ * alone: they own no restaurant to import into, so the manual panel is the
+ * honest place to explain that.
  */
 export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraftClaimAction {
   if (inputs.localCount <= 0) return "none";
   if (inputs.status !== "unseen") return "none";
   if (inputs.accountMenuCount === 0) return "auto-import";
   if (inputs.ownedRestaurantCount === 0) return "none";
-  return "offer";
+  return "auto-import";
 }
 
 /**
@@ -243,8 +242,8 @@ function writeClaimStatus(userId: string, status: Exclude<LocalDraftClaimStatus,
   try {
     storage.setItem(localDraftClaimKey(userId), status);
   } catch {
-    // The offer may reappear next time; that is recoverable, unlike losing
-    // the drafts themselves.
+    // The import simply runs again next time; that is recoverable, unlike
+    // losing the drafts themselves.
   }
 }
 
@@ -266,8 +265,8 @@ export function rememberBrowserAccount(userId: string): void {
   try {
     storage.setItem(BROWSER_ACCOUNT_KEY, userId);
   } catch {
-    // Without it, a later account is offered the manual import instead of an
-    // automatic one. Slower, never wrong.
+    // Without it, a later account falls back to the manual import instead of
+    // the automatic one. Slower, never wrong.
   }
 }
 
@@ -276,7 +275,7 @@ export function markLocalDraftsClaimed(userId: string): void {
   writeClaimStatus(userId, "done");
 }
 
-/** "Not now": keep the manual import available, but stop offering. */
+/** Dismissed: keep the manual import available, but never auto-import for this account. */
 export function dismissLocalDraftClaim(userId: string): void {
   writeClaimStatus(userId, "dismissed");
 }

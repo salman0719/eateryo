@@ -19,7 +19,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import {
   LocalDraftsNotice,
-  LocalDraftsOffer,
   type LocalDraftClaimNotice,
 } from "@/components/menu-editor/local-drafts-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
@@ -154,7 +153,6 @@ import {
   decideLocalDraftClaimSurface,
   decidePublishJourneyClaim,
   deriveClaimGate,
-  dismissLocalDraftClaim,
   loadLocalDraftClaim,
   markLocalDraftsClaimed,
   resolveAutoClaimTarget,
@@ -519,7 +517,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     accountKey: string;
     status: LocalDraftClaimStatus;
   } | null>(null);
-  const [claimBusy, setClaimBusy] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [claimNotice, setClaimNotice] = useState<LocalDraftClaimNotice | null>(null);
   /**
@@ -1771,12 +1768,11 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
 
   /**
    * Copy the rest of this browser's menus into one owned restaurant. Shared
-   * by the one-click offer, the automatic import for a brand-new account,
-   * and the import that follows the wizard creating the account's first
-   * café. The local copies stay put; the notice reports per-batch totals.
+   * by the automatic import, the direct sign-in intent, and the import that
+   * follows the wizard creating the account's first café. Freshly imported
+   * rows dissolve; the notice reports per-batch totals.
    */
   async function runLocalDraftClaim(restaurantId: string, restaurantName: string) {
-    setClaimBusy(true);
     setClaimError(null);
     try {
       // Only the visible browser-only rows move: hidden rows belong to
@@ -1847,22 +1843,19 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setClaimError(
         "We couldn't read the menus saved in this browser. They are still here — try again from My menus."
       );
-    } finally {
-      setClaimBusy(false);
     }
   }
 
   /**
-   * An account with no menus adopts this browser's drafts in one go. Where
-   * they land is the account's own café when it has one — an empty café is
-   * still *its* café — and only an account that owns none gets one created,
-   * named from the menu titles rather than a placeholder the owner cannot
-   * recognise. Reusing is what stops a retried claim from minting a second
-   * café next to the first.
+   * Sign-in adopts this browser's drafts in one go, whether or not the
+   * account already holds menus. Where they land is the account's own café
+   * when it has one — an empty café is still *its* café — and only an
+   * account that owns none gets one created, named from the menu titles
+   * rather than a placeholder the owner cannot recognise. Reusing is what
+   * stops a retried claim from minting a second café next to the first.
    */
   async function handleAutoClaim(titles: string[]) {
     if (!accountKey) return;
-    setClaimBusy(true);
     setClaimError(null);
     try {
       const target = resolveAutoClaimTarget(ownedRestaurantsForAccount, titles);
@@ -1877,15 +1870,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setClaimError(
         "We couldn't set up your café automatically. Import your menus from My menus when you're ready."
       );
-    } finally {
-      setClaimBusy(false);
     }
-  }
-
-  function handleClaimAdd(restaurantId: string) {
-    const restaurant = ownedRestaurantsForAccount.find((item) => item.id === restaurantId);
-    if (!restaurant) return;
-    void runLocalDraftClaim(restaurant.id, restaurant.name);
   }
 
   /**
@@ -1899,7 +1884,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   async function handlePublishJourneyClaim(menuId: string) {
     const actor = accountKeyRef.current;
     if (!signedInRef.current || !actor) return;
-    setClaimBusy(true);
     setClaimError(null);
     try {
       const draft = await getMenu(menuId).catch(() => null);
@@ -1954,8 +1938,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // import dissolves — the heal triages the rest on open.
       if (outcome.status === "imported") await dissolveAttachedMenu(menuId);
       // Silent by design: the emailed link already promised this menu joins
-      // the account, so no banner celebrates it. Marking it done keeps the
-      // generic offer from re-asking for the same draft.
+      // the account, so no banner celebrates it. Marking it done keeps a
+      // later frame from re-running the same import.
       markLocalDraftsClaimed(actor);
       setClaimAnswer({ accountKey: actor, status: "done" });
       await refreshLibrary();
@@ -1964,8 +1948,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setClaimError(
         "We couldn't add your menu to your account. It is still saved in this browser — try again from My menus."
       );
-    } finally {
-      setClaimBusy(false);
     }
   }
 
@@ -2054,12 +2036,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     if (!wipeIt) return;
     saveDirectSignInIntent({ decision: "discard", menuIds: ids });
     router.push("/sign-in");
-  }
-
-  function handleDismissClaim() {
-    if (!accountKey) return;
-    dismissLocalDraftClaim(accountKey);
-    setClaimAnswer({ accountKey, status: "dismissed" });
   }
 
   function resetLiveDoc() {
@@ -3128,17 +3104,15 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const storedClaimStatus = accountKey ? loadLocalDraftClaim(accountKey) : "unseen";
   const claimStatus =
     claimAnswer?.accountKey === accountKey ? claimAnswer.status : storedClaimStatus;
-  // The editor suppresses the *offer* (importing the open menu would fork
-  // the revision the editor is holding), but never the empty-account
-  // auto-import: signing in inside the publish wizard is the onboarding
-  // path, and leaving it ungated strands the draft as anonymous — the next
-  // sign-out resurrects the resume banner for a menu the account owns.
+  // Sign-in claims every unseen browser draft in one go — there is no
+  // offer banner. Marking the claim done keeps a later frame from
+  // re-running the same import.
   //
   // "pending" and "unavailable" are real answers, not stand-ins for "none".
   // While the session or the account's inventory is still loading the
   // decision is *unknown* (the resume banner once read that unknown as a
-  // settled "none", passed its `!== "offer"` check and rendered in the load
-  // gap — the flicker). A read that *failed* is unknown too, and must never
+  // settled "none" and rendered in the load gap — the flicker). A read
+  // that *failed* is unknown too, and must never
   // be read as an empty account: that would push this browser's drafts at a
   // server that did not answer. Signed out and settled, the decision really
   // is "none".
@@ -3581,18 +3555,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   onDismiss={() => setClaimNotice(null)}
                 />
               )}
-              {!claimNotice &&
-                localDraftsDecision === "offer" &&
-                screen !== "editor" &&
-                ownedRestaurantsForAccount.length > 0 && (
-                  <LocalDraftsOffer
-                    count={localOnlyCount}
-                    restaurants={ownedRestaurantsForAccount}
-                    busy={claimBusy}
-                    onAdd={handleClaimAdd}
-                    onDismiss={handleDismissClaim}
-                  />
-                )}
               {signedIn && claimError && (
                 <div
                   role="alert"

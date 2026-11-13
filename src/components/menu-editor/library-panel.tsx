@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusChip } from "@/components/ui/status-chip";
 import type { MenuSummary } from "@/features/menu/storage";
 import type { RestaurantOption } from "@/features/tenancy/client";
 
@@ -262,13 +261,6 @@ export function LibraryPanel({
                         · {menu.itemCount} {menu.itemCount === 1 ? "item" : "items"} · updated{" "}
                         {formatDate(menu.updatedAt)}
                       </span>
-                      {/* Signed-in menus live on the account by construction, so only
-                          the exceptional browser-only row is named. */}
-                      {accountMode && !menu.onServer && (
-                        <StatusChip size="sm" tone="warning">
-                          This browser only
-                        </StatusChip>
-                      )}
                       {menu.canWrite === false && (
                         <span className="whitespace-nowrap rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
                           View only
