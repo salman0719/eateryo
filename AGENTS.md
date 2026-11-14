@@ -181,6 +181,22 @@ errors, or add lint/type suppressions just to make checks pass.
   here, so no screen can hold a second opinion about what the account owns.
   `refreshLibrary` and the café map are stable callbacks, so the shell's route
   opener can name them as dependencies without re-running every render.
+- `src/features/menus/active-menu.ts` — `useActiveMenu`: the one open menu
+  document — its debounced autosave, `flushSave` (what navigation calls before
+  leaving a menu), the account revision the next push is based on, the conflict
+  banner's state and its two explicit answers, the editor's photo URL, and the
+  import/export of a menu file. It is the only writer of a menu document, so no
+  screen can save behind another one's back, and `healStampedDrafts` pushes the
+  interrupted work of closed menus on a same-account return. It does not file
+  menus: `fileMenu`, `cacheServerDraft` and `pruneSignedOutOthers` are the
+  shell's menu lifecycle arriving as doors, so the café a menu lands in stays
+  decided where the membership is known, and `cannotFileMenus` shapes the
+  import's refusal. Its reads are per document — `getOpenDoc`/`getOpenDocId`
+  for the units below it, `openBaseline`/`onServerRevision`/`onMenuRenamed` for
+  a rename made in the library, `onOpenDoc` to announce a new document so
+  publication never has to be imported. `releaseOpenDoc` and `resetActiveMenu`
+  are the sign-out pair: the synchronous release that stops pending work before
+  the last edits are saved, then the state clear.
 - `src/features/publishing/use-publication.ts` — `usePublication`: the open
   menu's publication — whether it is live, what diners see now, and the three
   actions that change it. It follows the document the editor holds, flushes the
