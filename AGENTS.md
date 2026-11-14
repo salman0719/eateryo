@@ -170,6 +170,18 @@ errors, or add lint/type suppressions just to make checks pass.
   Screens call `navigate(route)`; none takes a parsed route as a prop. Moving
   to the App Router's own URLs later changes this provider, not its callers.
   Tests: `tests/navigation-history.test.ts`.
+- `src/features/menus/library-context.tsx` — the library and the account's
+  answers about it: the browser's menu list, the ids the server proved, the
+  café each row belongs to, the per-menu access map and the device's draft
+  stamps, behind `useLibrary()`. The markers are tri-state and settle together
+  — an empty id set before `serverMenusReadFor` lands means "not asked yet",
+  never "this browser only" (001), and a read that ended by failing sets
+  `serverMenusReadFailedFor` so surfaces can say the account could not be
+  checked (016). The café-keyed merge, the retry and the sign-out reset live
+  here, so no screen can hold a second opinion about what the account owns.
+  The shell keeps the one open document; drafts awaiting a claim move next.
+  `refreshLibrary` and the café map are stable callbacks, so the shell's route
+  opener can name them as dependencies without re-running every render.
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
