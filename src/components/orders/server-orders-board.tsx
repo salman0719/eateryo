@@ -34,6 +34,7 @@ import { useOrderMonitor } from "@/features/orders/monitor";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { OrderLineOptions } from "@/components/order/option-groups";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
@@ -265,12 +266,13 @@ export function ServerOrdersBoard() {
                       key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
                       className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
                     >
-                      <span>
+                      <span className="min-w-0">
                         <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
                         {line.name}
                         {line.variantName && (
                           <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
                         )}
+                        <OrderLineOptions options={line.options} currency={order.currency} />
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-ink-500">
                         {line.unitPrice === null

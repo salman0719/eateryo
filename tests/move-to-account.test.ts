@@ -119,6 +119,8 @@ describe("moveLocalMenusToAccount", () => {
               options: [
                 {
                   name: "Bread",
+                  min: 0,
+                  max: 1,
                   choices: [
                     { name: "Sourdough", priceDelta: null },
                     { name: "Gluten-free", priceDelta: 2 },

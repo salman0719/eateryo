@@ -9,6 +9,7 @@
  */
 
 import {
+  menuOptionSchema,
   SCHEMA_VERSION,
   type MenuCategory,
   type MenuDocument,
@@ -81,6 +82,7 @@ export function createMenuDocument(input?: {
     title: input?.title?.trim() ? input.title.trim() : "Untitled menu",
     currency: input?.currency ?? null,
     categories: [],
+    modifierTemplates: [],
     updatedAt: nowIso(),
   };
 }
@@ -100,7 +102,10 @@ function buildItem(
     available: input.available ?? null,
     dietaryLabels: input.dietaryLabels ? [...input.dietaryLabels] : [],
     variants: input.variants ? clone(input.variants) : [],
-    options: input.options ? clone(input.options) : [],
+    // Old or partial option shapes (extraction, samples, older docs passing
+    // through an edit) gain the contract defaults here, so every item in a
+    // document carries the full group rules.
+    options: input.options ? input.options.map((option) => menuOptionSchema.parse(option)) : [],
     reviewNotes: input.reviewNotes ? [...input.reviewNotes] : [],
     unpricedAccepted: input.unpricedAccepted ?? false,
   };
