@@ -157,7 +157,7 @@ errors, or add lint/type suppressions just to make checks pass.
   outlive a screen in dependency order (session and café → route → library)
   inside a Suspense whose fallback is the shell's own geometry. The route is
   read from the URL (`usePathname`, seeded into `NavigationProvider`), so an
-  address is never a prop: every route file under `(app)/` is `<HomeScreen />`
+  address is never a prop: every route file under `(app)/` is `<AppShell />`
   and nothing else. `/`, `/menus`, `/orders`, `/assistant`, `/tables` and
   `/settings` prerender the shell; `/menus/<id>` (plus `reorder`, `preview`,
   `publish`, `items/<item>`) streams it, because a menu id is not known at
@@ -167,14 +167,21 @@ errors, or add lint/type suppressions just to make checks pass.
   instead of a 404. A new screen is one route file plus its `AppScreen`; no
   route file parses a route. The screen itself still renders from one switch in
   the shell — the navigation entry below says why that is deliberate.
-- `src/components/layout/app-shell.tsx` — the frame every app screen sits in:
+- `src/components/layout/app-shell.tsx` — the app's shell, and what every
+  `(app)/` route file renders: it owns the units whose life is a screen rather
+  than a session (the open document, capture, publication, the row verbs, the
+  draft claims) and makes the screen decision, guards included — a signed-out
+  account URL goes back to Capture, a membership is sent to a surface it may
+  use, a dead publish link gets its card. It renders no chrome of its own; the
+  frame it wraps is `ShellFrame`.
+- `src/components/layout/shell-frame.tsx` — the frame every app screen sits in:
   the left column, the brand row that stands in where the column is absent,
   the workspace switcher, the content measure and footer, the phone tab bar,
   the More sheet and the order monitor's toasts. It renders chrome only —
   sections, counts, notices and the page itself arrive already resolved, the
   page through `children` — so a screen can change without touching the frame.
-  `HomeScreen` still owns the shell's state and hands this component the
-  answers; the frame is covered by `tests/app-shell.test.ts`.
+  `AppShell` owns the shell's state and hands this component the answers; the
+  frame is covered by `tests/shell-frame.test.ts`.
 - `src/features/navigation/navigation-context.tsx`, `history.ts` — the one
   owner of "which screen is showing": `NavigationProvider` holds the route,
   writes the URL through the pure `historyWriteFor` decision (push, replace,
