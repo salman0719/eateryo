@@ -222,7 +222,7 @@ export function PublishWizard({
       null;
 
     return (
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+      <div className="flex w-full flex-col gap-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold tracking-wide text-warning-800 uppercase">
@@ -307,11 +307,11 @@ export function PublishWizard({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
+    <div className="flex w-full flex-col gap-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold tracking-wide text-warning-800 uppercase">
-            Publish your menu
+            {signedIn ? "Publish your menu" : "Final step"}
           </p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
             {signedIn ? "One short form, then you can take orders" : "Sign in to publish your menu"}
@@ -322,13 +322,17 @@ export function PublishWizard({
               : "Publishing needs an account — it’s the only thing we ask for. Your draft is saved in this browser, so it will be waiting when you come back; the emailed link returns you to this same screen."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          ← Back to editing
-        </button>
+        {/* Signing in is the last step of onboarding: there is no editor
+            behind it to go back to signed out, so no way back is offered. */}
+        {signedIn && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            ← Back to editing
+          </button>
+        )}
       </div>
 
       {continuesJourney && <JourneySteps current={PUBLISH_STEP_INDEX} />}

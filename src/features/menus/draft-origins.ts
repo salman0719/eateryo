@@ -141,6 +141,46 @@ export async function clearDraftOrigin(menuId: string): Promise<void> {
   );
 }
 
+/**
+ * Rows no account has stamped: the only ones sign-in may ask about. A
+ * stamped row belongs to an account — the claim moves it and the heal
+ * triages it — so the pre-sign-in choice never names it. Pure.
+ */
+export function unstampedIds(
+  ids: readonly string[],
+  origins: readonly Pick<DraftOrigin, "menuId">[]
+): string[] {
+  const stamped = new Set(origins.map((origin) => origin.menuId));
+  return ids.filter((id) => !stamped.has(id));
+}
+
+/**
+ * Account copies safe to drop at sign-out: stamped to the account that is
+ * leaving, with an agreed content hash the local document still matches.
+ * Anything unproven stays — an interrupted edit is never dissolved, the
+ * heal triages it at the next open instead. Reads stay inside this
+ * module's store; documents come from the caller's reader. Best-effort
+ * per row, so one unreadable row never blocks the rest.
+ */
+export async function collectSignOutDissolveIds(
+  accountId: string,
+  readDoc: (menuId: string) => Promise<MenuDocument>
+): Promise<string[]> {
+  const origins = await listDraftOrigins().catch(() => []);
+  const dissolvable: string[] = [];
+  for (const origin of origins) {
+    if (origin.accountId !== accountId || !origin.lastSyncedHash) continue;
+    try {
+      if (menuContentHash(await readDoc(origin.menuId)) === origin.lastSyncedHash) {
+        dissolvable.push(origin.menuId);
+      }
+    } catch {
+      // Unreadable means unprovable: the row stays.
+    }
+  }
+  return dissolvable;
+}
+
 /** What a same-account return should do with one stamped row. */
 export type HealDecision = "push" | "conflict" | "adopt" | "none";
 

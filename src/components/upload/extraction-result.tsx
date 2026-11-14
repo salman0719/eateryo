@@ -82,6 +82,12 @@ interface ExtractionResultProps {
   onRenameTitle?: (title: string) => void;
   /** Shown when the draft already exists in local storage. */
   savedNotice?: string | null;
+  /**
+   * Signed out: onboarding ends at publishing, and the editor opens only
+   * after signing in. The First look then carries the reassurance that the
+   * draft is not final — every field stays editable on the account.
+   */
+  reassureEditable?: boolean;
   /** Canonical document for the phone preview; null hides the first look. */
   previewDoc?: MenuDocument | null;
 }
@@ -174,6 +180,7 @@ export function ExtractionResult({
   editLabel = "Edit menu",
   savedNotice = null,
   previewDoc = null,
+  reassureEditable = false,
 }: ExtractionResultProps) {
   const itemCount = data.categories.reduce((sum, c) => sum + c.items.length, 0);
   const reviewCount = data.categories.reduce((sum, c) => sum + c.items.filter(isFlagged).length, 0);
@@ -566,6 +573,14 @@ export function ExtractionResult({
                 Nothing is live yet, and ordering is off in this preview. Check anything marked,
                 then publish it when it looks right.
               </p>
+              {reassureEditable && (
+                <p className="mt-2 text-sm leading-6 text-ink-800">
+                  <strong className="font-semibold text-ink-900">
+                    Don&apos;t worry about getting everything right
+                  </strong>{" "}
+                  — you can always make changes in the editor once you sign in.
+                </p>
+              )}
             </div>
 
             <div className="flex items-baseline justify-between gap-3">

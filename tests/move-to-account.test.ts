@@ -159,6 +159,10 @@ describe("moveLocalMenusToAccount", () => {
     expect(report.imported.sort()).toEqual(["menu-detailed", "menu-second"]);
     expect(report.skipped).toEqual([]);
     expect(report.failed).toEqual([]);
+    expect(report.accessById).toEqual({
+      "menu-detailed": { role: "owner", capabilities: ["menus.read", "menus.write"] },
+      "menu-second": { role: "owner", capabilities: ["menus.read", "menus.write"] },
+    });
 
     // The stored server document is byte-identical to the local one apart
     // from nothing: the client sends the document as-is, ids included.
@@ -314,7 +318,12 @@ describe("moveLocalMenuToAccount", () => {
 
     const outcome = await moveLocalMenuToAccount("r-1", "menu-pick-me");
 
-    expect(outcome).toEqual({ status: "imported" });
+    // The import carries the server's own access answer, so the shell can
+    // adopt the row without waiting for a café-keyed re-read.
+    expect(outcome).toEqual({
+      status: "imported",
+      access: { role: "owner", capabilities: ["menus.read", "menus.write"] },
+    });
     expect([...state.menus.keys()]).toEqual(["menu-pick-me"]);
     expect(state.restaurants).toEqual(["r-1"]);
     // Still one-way: both local documents survive.
@@ -327,7 +336,10 @@ describe("moveLocalMenuToAccount", () => {
     const state: ServerState = { menus: new Map(), restaurants: [] };
     stubServer(state);
 
-    expect(await moveLocalMenuToAccount("r-1", "menu-twice")).toEqual({ status: "imported" });
+    expect(await moveLocalMenuToAccount("r-1", "menu-twice")).toEqual({
+      status: "imported",
+      access: { role: "owner", capabilities: ["menus.read", "menus.write"] },
+    });
     expect(await moveLocalMenuToAccount("r-1", "menu-twice")).toEqual({ status: "skipped" });
     expect(state.menus.size).toBe(1);
   });
