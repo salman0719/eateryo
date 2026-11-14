@@ -1,38 +1,41 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 
-import { SiteFooter } from "@/components/layout/site-footer";
-import { HomeScreen } from "@/components/home-screen";
 import { Skeleton } from "@/components/ui/skeleton";
-import { parseAppRoute } from "@/features/navigation/routes";
+import { LibraryProvider } from "@/features/menus/library-context";
+import { NavigationProvider } from "@/features/navigation/navigation-context";
+import { WorkspaceProvider } from "@/features/tenancy/workspace-context";
 
 /**
- * Deep links into an open menu: `/menus/<id>` and its mode or item
- * segments. Next 16 treats a dynamic segment as runtime data (see the
- * invitations page): `await params` must happen behind a Suspense boundary,
- * so the shell streams a placeholder first and the editor route arrives
- * with the path. Unknown shapes fall back to the library via
- * `parseAppRoute`, same as client-side navigation.
+ * Every app screen sits in this one layout, so the units that outlive a screen
+ * are mounted once: the session and its cafés, the route, and the library — in
+ * dependency order, each reading the one above it. A screen change never
+ * unmounts the facts they hold.
+ *
+ * The boundary is load-bearing, not decoration. The route is read from the URL
+ * (see `NavigationProvider`), and a menu URL's id is not known when the layout
+ * is prerendered, so the shell streams its fallback for those; `cacheComponents`
+ * requires a boundary around a client hook that reads a URL segment it cannot
+ * resolve at build time. Static screens never suspend, so they still
+ * server-render their shell.
  */
-export default function MenuPathPage({ params }: { params: Promise<{ path: string[] }> }) {
+export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={<MenuPathLoading />}>
-      <MenuPathContent params={params} />
+    <Suspense fallback={<ShellLoading />}>
+      <WorkspaceProvider>
+        <NavigationProvider>
+          <LibraryProvider>{children}</LibraryProvider>
+        </NavigationProvider>
+      </WorkspaceProvider>
     </Suspense>
   );
 }
 
-async function MenuPathContent({ params }: { params: Promise<{ path: string[] }> }) {
-  const { path } = await params;
-  return <HomeScreen initialRoute={parseAppRoute(`/menus/${path.join("/")}`)} />;
-}
-
 /**
- * The placeholder uses the same shell geometry as `HomeScreen` (a sidebar
- * column plus the content column) rather than the old top header, so the
- * streamed editor does not shift the page when it arrives. The column keeps
- * `app-sidebar`, so its width follows the saved rail/expanded choice too.
+ * The shell's own geometry — a column plus the content measure — so a streamed
+ * screen does not shift the page when it arrives, and the column keeps
+ * `app-sidebar` so its width follows the saved rail/expanded choice.
  */
-function MenuPathLoading() {
+function ShellLoading() {
   return (
     <div className="flex w-full flex-1">
       <aside
@@ -63,7 +66,6 @@ function MenuPathLoading() {
             </div>
           </div>
         </main>
-        <SiteFooter />
       </div>
     </div>
   );

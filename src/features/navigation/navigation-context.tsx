@@ -25,10 +25,13 @@ import { appRouteHref, parseAppRoute, routeMenuId, type AppRoute } from "./route
  * touches history. Moving to the App Router's own URLs later means replacing
  * the body of `navigate`/the sync effect, not every call site.
  *
- * The URL stays the source of truth in both directions: `navigate` writes it
- * before it changes the visible route, and the sync effect picks up every
- * change the app did not make — back/forward, a typed URL, a `<Link>` push
- * whose page was already mounted.
+ * The URL stays the source of truth in both directions: the route is seeded
+ * from `usePathname()` (which is rendered into the HTML on the first load, so
+ * the server paints the screen the URL names), `navigate` writes the URL before
+ * it changes the visible route, and the sync effect picks up every change the
+ * app did not make — back/forward, a typed URL, a `<Link>` push whose page was
+ * already mounted. No route file hands a parsed route down, so an address and
+ * the screen showing it cannot disagree.
  */
 
 export interface NavigateOptions {
@@ -66,19 +69,14 @@ export interface NavigationValue {
 
 const NavigationContext = createContext<NavigationValue | null>(null);
 
-export function NavigationProvider({
-  initialRoute,
-  children,
-}: {
-  /** The route the page's URL names, parsed by the route file. */
-  initialRoute: AppRoute;
-  children: ReactNode;
-}) {
-  const [route, setRoute] = useState<AppRoute>(initialRoute);
+export function NavigationProvider({ children }: { children: ReactNode }) {
+  /** The URL is the only input: the first screen is the one it names. */
+  const pathname = usePathname();
+  const [route, setRoute] = useState<AppRoute>(() => parseAppRoute(pathname));
   const [ready, setReady] = useState(false);
   const [missingPublishMenuId, setMissingPublishMenuId] = useState<string | null>(null);
 
-  const routeRef = useRef<AppRoute>(initialRoute);
+  const routeRef = useRef<AppRoute>(route);
   const saveFlushRef = useRef<(() => Promise<void>) | null>(null);
 
   /** Leaving a menu flushes its pending save (same menu: nothing to do). */
@@ -117,7 +115,6 @@ export function NavigationProvider({
   // as well as `popstate` matters because a `<Link>` push whose target page
   // component is already mounted swaps nothing — without this the URL moves
   // while the screen stays on the old one.
-  const pathname = usePathname();
   useEffect(() => {
     const syncFromLocation = () => {
       const next = parseAppRoute(window.location.href);
