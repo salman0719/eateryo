@@ -2,7 +2,7 @@ import { createElement, type ComponentType, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { AppShell, type AppShellProps } from "@/components/layout/app-shell";
+import { ShellFrame, type ShellFrameProps } from "@/components/layout/shell-frame";
 import { APP_SECTIONS } from "@/features/navigation/routes";
 
 /**
@@ -12,13 +12,13 @@ import { APP_SECTIONS } from "@/features/navigation/routes";
  * needs (who is signed in, which column shows, which sections are available)
  * and renders the chrome around whatever page it is handed.
  */
-function render(overrides: Partial<AppShellProps> = {}, child: ReactNode = null): string {
+function render(overrides: Partial<ShellFrameProps> = {}, child: ReactNode = null): string {
   // The frame requires children in its type; createElement passes them as
   // arguments, so the cast drops that one prop (same pattern as the sidebar
   // and diner-shell tests).
   return renderToStaticMarkup(
     createElement(
-      AppShell as ComponentType<Omit<AppShellProps, "children"> & { children?: ReactNode }>,
+      ShellFrame as ComponentType<Omit<ShellFrameProps, "children"> & { children?: ReactNode }>,
       {
         dialog: null,
         screen: "capture",
@@ -68,7 +68,7 @@ function render(overrides: Partial<AppShellProps> = {}, child: ReactNode = null)
   );
 }
 
-describe("AppShell", () => {
+describe("ShellFrame", () => {
   it("renders the destinations and the page in the content column", () => {
     const html = render({}, createElement("p", null, "page body"));
     expect(html).toContain(">Capture<");

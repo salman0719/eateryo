@@ -1,6 +1,6 @@
-import { HomeScreen } from "@/components/home-screen";
+import { AppShell } from "@/components/layout/app-shell";
 
 /** Assistant (A1) — signed-in help about the product. */
 export default function AssistantPage() {
-  return <HomeScreen />;
+  return <AppShell />;
 }

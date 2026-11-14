@@ -1,6 +1,6 @@
-import { HomeScreen } from "@/components/home-screen";
+import { AppShell } from "@/components/layout/app-shell";
 
 /** The orders board for the café the shell is acting in. */
 export default function OrdersPage() {
-  return <HomeScreen />;
+  return <AppShell />;
 }
