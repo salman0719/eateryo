@@ -71,7 +71,7 @@ import {
   publishMenu,
   unpublishMenu,
 } from "@/features/publishing/client";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
@@ -97,9 +97,7 @@ import { validateImageBatch } from "@/lib/image-constraints";
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
 import {
   availableSections,
-  appRouteHref,
   moreSheetRows,
-  parseAppRoute,
   phoneTabs,
   routeMenuId,
   shellColumnVisible,
@@ -121,6 +119,7 @@ import {
 } from "@/features/tenancy/access";
 import { workspaceCan } from "@/features/tenancy/workspace";
 import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
+import { NavigationProvider, useNavigation } from "@/features/navigation/navigation-context";
 import { createRestaurant } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
 import {
@@ -191,17 +190,28 @@ function stepIndex(phase: Phase, hasResult: boolean): number {
  */
 export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   // The account and the acting membership live one level up, so every screen
-  // (this shell included) asks about the same café.
+  // (this shell included) asks about the same café. The screen itself belongs
+  // to the navigation provider, so every screen can read it without the shell.
   return (
     <WorkspaceProvider>
-      <HomeShell initialRoute={initialRoute} />
+      <NavigationProvider initialRoute={initialRoute}>
+        <HomeShell />
+      </NavigationProvider>
     </WorkspaceProvider>
   );
 }
 
-function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
-  // The URL is the source of truth for the main screen and selected menu.
-  const [route, setRoute] = useState<AppRoute>(initialRoute);
+function HomeShell() {
+  // The URL is the source of truth for the main screen and selected menu; the
+  // provider owns that state and the history writes (see navigation-context).
+  const {
+    route,
+    navigate,
+    ready: navigationReady,
+    missingPublishMenuId,
+    markMissingPublish,
+    registerSaveFlush,
+  } = useNavigation();
   const { confirm, dialog } = useConfirm();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
   const selectedItemId = route.screen === "item" ? route.itemId : null;
@@ -222,17 +232,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // Which editor surface the URL asks for (edit, reorder, preview);
   // an item deep link is always the edit workspace.
   const editorMode: EditorMode = route.screen === "editor" ? route.mode : "edit";
-  /** A publish URL whose draft resolves nowhere: hold the URL with an
-   * explainer card instead of bouncing to the library. Cleared on any
-   * navigation; re-set if the same dead URL is opened again. */
-  const [missingPublishMenuId, setMissingPublishMenuId] = useState<string | null>(null);
-  const routeRef = useRef<AppRoute>(route);
-  const navigationReadyRef = useRef(false);
   const openedRouteMenuRef = useRef<string | null>(null);
-  const flushSaveRef = useRef<(() => Promise<void>) | null>(null);
-  const navigateToRef = useRef<
-    ((next: AppRoute, replace?: boolean, flushCurrent?: boolean) => void) | null
-  >(null);
   const openDocRef = useRef<
     | ((
         doc: MenuDocument,
@@ -248,49 +248,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   /** The account that was signed in, so sign-out can drop its synced rows. */
   const prevAccountKeyRef = useRef<string | null>(null);
 
-  function navigateTo(next: AppRoute, replace = false, flushCurrent = true) {
-    const previousMenuId = routeMenuId(routeRef.current);
-    if (flushCurrent && previousMenuId && previousMenuId !== routeMenuId(next)) {
-      void flushSaveRef.current?.();
-    }
-    const href = appRouteHref(next);
-    if (
-      typeof window !== "undefined" &&
-      window.location.pathname + window.location.search !== href
-    ) {
-      if (replace) window.history.replaceState(null, "", href);
-      else window.history.pushState(null, "", href);
-    }
-    routeRef.current = next;
-    setRoute(next);
-    setMissingPublishMenuId(null);
-    if (typeof window !== "undefined") navigationReadyRef.current = true;
-  }
-
-  // The visible screen must follow every URL change, however it happened:
-  // tab clicks and in-app links write the History API directly (native
-  // history is integrated with Next's router, so each path change surfaces
-  // in `usePathname`), and back/forward fires `popstate`. Subscribing to the
-  // pathname as well matters because a `<Link>` push whose target is the
-  // page component already mounted swaps nothing — without this sync the
-  // URL moves while the screen stays on the old one.
-  const pathname = usePathname();
   const router = useRouter();
-  useEffect(() => {
-    const syncFromLocation = () => {
-      const next = parseAppRoute(window.location.href);
-      const previousMenuId = routeMenuId(routeRef.current);
-      if (previousMenuId && previousMenuId !== routeMenuId(next)) {
-        void flushSaveRef.current?.();
-      }
-      routeRef.current = next;
-      setRoute(next);
-      navigationReadyRef.current = true;
-    };
-    syncFromLocation();
-    window.addEventListener("popstate", syncFromLocation);
-    return () => window.removeEventListener("popstate", syncFromLocation);
-  }, [pathname]);
 
   // Signed out is capture-only (plus the library working set and the editor
   // for anonymous drafts): orders/tables/settings/assistant need an account,
@@ -300,14 +258,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // unanswered (015): unknown is not signed out.
   useEffect(() => {
     if (sessionState === "signed-out") {
-      const guarded = routeRef.current.screen;
+      const guarded = route.screen;
       if (
         guarded === "assistant" ||
         guarded === "orders" ||
         guarded === "tables" ||
         guarded === "settings"
       ) {
-        navigateTo({ screen: "capture" }, true);
+        navigate({ screen: "capture" }, { replace: true });
       }
     }
   });
@@ -533,14 +491,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     void refreshLibrary();
   }, []);
 
-  flushSaveRef.current = flushSave;
-  navigateToRef.current = navigateTo;
+  // The pending save lives with navigation: it flushes before leaving a menu.
+  registerSaveFlush(flushSave);
   openDocRef.current = openDoc;
   activeDocIdRef.current = activeDoc?.id ?? null;
   editorImageUrlRef.current = editorImageUrl;
 
   useEffect(() => {
-    if (!navigationReadyRef.current || !routeMenuId(route) || sessionState === "unknown") return;
+    if (!navigationReady || !routeMenuId(route) || sessionState === "unknown") return;
     const menuId = routeMenuId(route);
     if (!menuId) return;
     if (activeDocIdRef.current === menuId) {
@@ -607,7 +565,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             if (cancelled) return;
             setLibraryError(menuOpenBlockedMessage(access.reason));
             openedRouteMenuRef.current = null;
-            navigateToRef.current?.({ screen: "library" }, true);
+            navigate({ screen: "library" }, { replace: true });
             return;
           }
           try {
@@ -632,17 +590,17 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         // never saved, so there is nothing to report — back quietly.
         if (route.screen === "editor" && menuId && isPendingNewMenu(menuId)) {
           forgetPendingNewMenu(menuId);
-          navigateToRef.current?.({ screen: "library" }, true);
+          navigate({ screen: "library" }, { replace: true });
           return;
         }
         // A dead publish link holds its URL with an explainer card — the
         // draft is in another browser, and the library can't show that.
         if (route.screen === "editor" && route.mode === "publish") {
-          setMissingPublishMenuId(menuId);
+          markMissingPublish(menuId);
           return;
         }
         setLibraryError(unresolvableMenuMessage(route));
-        navigateToRef.current?.({ screen: "library" }, true);
+        navigate({ screen: "library" }, { replace: true });
       }
     })();
 
@@ -650,7 +608,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       cancelled = true;
       if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
     };
-  }, [route, sessionState, signedIn, accountKey, serverMenusReadFor]);
+  }, [
+    route,
+    sessionState,
+    signedIn,
+    accountKey,
+    serverMenusReadFor,
+    navigationReady,
+    navigate,
+    markMissingPublish,
+  ]);
 
   useEffect(() => {
     const wasSignedIn = wasSignedInRef.current;
@@ -685,31 +652,40 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             void saveMenu(openDoc).catch(() => undefined);
           }
         }
-        setActiveDoc(null);
-        setEditorImage(null);
-        setConflict(null);
-        setConflictError(null);
-        setPublication(null);
-        setPublicationMenuId(null);
-        setPublicationLoaded(false);
-        setPublishError(null);
-        resetLiveDoc();
-        if (resultDoc !== null || pages.length > 0) applySelection([]);
-        navigateTo(landing, true, false);
       }
-      replaceServerIds(new Set());
-      replaceMenuAccess(new Map());
-      setMenuRestaurantById(new Map());
-      // The ids and the read that produced them reset together (001): a stale
-      // "settled" marker over an empty id set would let the next sign-in paint
-      // the same false chip.
-      setServerMenusFor(null);
-      setServerMenusReadFailedFor(null);
-      setServerMenusReadFor(null);
       accountMenusSettledRef.current = null;
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
+      // The shell answers a session end by clearing what the account owned.
+      // Deferred like the other account reads in this file: an effect must not
+      // set state synchronously while rendering the frame that decided it. The
+      // refs above are already cleared, so nothing can reopen the editor into
+      // the gap, and a microtask still lands before the next paint.
+      void Promise.resolve().then(() => {
+        if (landing) {
+          setActiveDoc(null);
+          setEditorImage(null);
+          setConflict(null);
+          setConflictError(null);
+          setPublication(null);
+          setPublicationMenuId(null);
+          setPublicationLoaded(false);
+          setPublishError(null);
+          resetLiveDoc();
+          if (resultDoc !== null || pages.length > 0) applySelection([]);
+          navigate(landing, { replace: true, flushCurrent: false });
+        }
+        replaceServerIds(new Set());
+        replaceMenuAccess(new Map());
+        setMenuRestaurantById(new Map());
+        // The ids and the read that produced them reset together (001): a stale
+        // "settled" marker over an empty id set would let the next sign-in paint
+        // the same false chip.
+        setServerMenusFor(null);
+        setServerMenusReadFailedFor(null);
+        setServerMenusReadFor(null);
+      });
       // Server-only at rest: account copies proved in sync leave with the
       // session, so a later sign-in never asks about a menu that is
       // already there. Anything unproven stays hidden until the heal (or
@@ -1334,7 +1310,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     );
     setImportError(null);
     setEditorImage(imageBlob ? URL.createObjectURL(imageBlob) : null);
-    if (updateRoute) navigateTo({ screen: "editor", menuId: doc.id, mode: "edit" });
+    if (updateRoute) navigate({ screen: "editor", menuId: doc.id, mode: "edit" });
     void syncWithAccount(doc);
   }
 
@@ -1575,7 +1551,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
 
   function handleOpenMenu(id: string) {
     setLibraryError(null);
-    navigateTo({ screen: "editor", menuId: id, mode: "edit" });
+    navigate({ screen: "editor", menuId: id, mode: "edit" });
   }
 
   /**
@@ -2260,7 +2236,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       resetLiveDoc();
       await refreshLibrary();
       if (accountNote) setLibraryError(accountNote);
-      navigateTo({ screen: "library" }, false, false);
+      navigate({ screen: "library" }, { flushCurrent: false });
     } catch (error) {
       setLibraryError(
         error instanceof StorageError ? error.message : "Could not delete that menu."
@@ -2273,7 +2249,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     setEditorImage(null);
     await refreshLibrary();
     void mergeAccountMenus();
-    navigateTo({ screen: "library" }, false, false);
+    navigate({ screen: "library" }, { flushCurrent: false });
   }
 
   // --- Capture flow -------------------------------------------------------
@@ -2815,7 +2791,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setDraftSave("saved");
       setPhase("done");
       setResumeDismissed(true);
-      navigateTo({ screen: "capture" });
+      navigate({ screen: "capture" });
       scrollToResult();
     } catch {
       setLibraryError("Couldn't reopen that draft. Try again in a moment.");
@@ -2837,7 +2813,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     try {
       const saved = await saveResultAndOpen(false);
       rememberPublishJourney(saved.id);
-      navigateTo({ screen: "editor", menuId: saved.id, mode: "publish" });
+      navigate({ screen: "editor", menuId: saved.id, mode: "publish" });
     } catch (error) {
       showOpenError(error);
     }
@@ -3046,7 +3022,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     const belongsToTarget = menuRestaurantId
       ? menuRestaurantId === target?.restaurantId
       : workspaceCan(target, "menus.write");
-    if (!belongsToTarget) navigateTo({ screen: "library" });
+    if (!belongsToTarget) navigate({ screen: "library" });
   }
   /**
    * The acting café's rows. The account read is café-keyed, so every server
@@ -3373,7 +3349,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // staff shift. Unknown access is not a refusal: the guard waits.
   useEffect(() => {
     if (!signedIn || accountAccessPending) return;
-    const guarded = routeRef.current.screen;
+    const guarded = route.screen;
     if (guarded === "assistant" && featureFlagsLoading) return;
     // The editor and item pages answer for themselves: their menu carries
     // the server's own access answer, and a foreign menu moves the
@@ -3383,7 +3359,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // keeps the page it has rather than bouncing between two refusals.
     const landing = sections[0]?.id;
     if (!availableScreenIds.has(guarded) && landing) {
-      navigateTo({ screen: landing }, true);
+      navigate({ screen: landing }, { replace: true });
     }
   });
 
@@ -3395,12 +3371,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   useEffect(() => {
     if (signedIn || sessionPending) return;
     if (libraryLoading) return;
-    const routed = routeRef.current;
+    const routed = route;
     const onboarding = routed.screen === "editor" && routed.mode === "publish";
     if (routed.screen === "capture" || onboarding) return;
     // Deferred like the other account reads: the effect must not set state
     // synchronously while rendering the frame that decided it.
-    void Promise.resolve().then(() => navigateTo({ screen: "capture" }, true));
+    void Promise.resolve().then(() => navigate({ screen: "capture" }, { replace: true }));
   });
 
   /**
@@ -3489,13 +3465,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         canGetStarted,
         launchHint: sheetLaunchHint,
       }}
-      onNavigate={(section) => navigateTo({ screen: section })}
-      onHome={() => navigateTo({ screen: "capture" })}
+      onNavigate={(section) => navigate({ screen: section })}
+      onHome={() => navigate({ screen: "capture" })}
       // Every in-shell sign-in goes through the choice first: attach the
       // browser draft on login or wipe it on login.
       onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
       onSignOut={() => void authClient.signOut()}
-      onOpenOrders={() => navigateTo({ screen: "orders" })}
+      onOpenOrders={() => navigate({ screen: "orders" })}
     >
       {signedIn && claimError && (
         <div
@@ -3611,7 +3587,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               (menu) => serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
             )
             .map((menu) => ({ id: menu.id, title: menu.title }))}
-          onBackToCapture={() => navigateTo({ screen: "capture" })}
+          onBackToCapture={() => navigate({ screen: "capture" })}
         />
       )}
 
@@ -3673,12 +3649,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   ownedRestaurants={ownedRestaurantsForAccount}
                   restaurantsLoading={restaurantsLoading}
                   onPublished={handleWizardPublished}
-                  onBack={() =>
-                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
-                  }
-                  onOpenTables={() => navigateTo({ screen: "tables" })}
+                  onBack={() => navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" })}
+                  onOpenTables={() => navigate({ screen: "tables" })}
                   onOpenEditor={() =>
-                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
+                    navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
                   }
                 />
               ) : (
@@ -3687,7 +3661,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   selectedItemId={selectedItemId}
                   mode={activeMenuCanWrite ? editorMode : "preview"}
                   onModeChange={(mode) =>
-                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
+                    navigate({ screen: "editor", menuId: routedDoc.id, mode })
                   }
                   onChange={handleDocChange}
                   saveState={saveState}
@@ -3702,7 +3676,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                     )?.name ?? null
                   }
                   onStartPublish={() =>
-                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
+                    navigate({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
                   }
                   imageUrl={editorImageUrl}
                   onExportJson={handleExportJson}
@@ -3781,8 +3755,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
 
       {screen === "editor" && !routedDoc && missingPublishMenuId && (
         <MissingDraftCard
-          onOpenLibrary={() => navigateTo({ screen: "library" })}
-          onStartFresh={() => navigateTo({ screen: "capture" })}
+          onOpenLibrary={() => navigate({ screen: "library" })}
+          onStartFresh={() => navigate({ screen: "capture" })}
         />
       )}
       {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
@@ -3802,7 +3776,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             </button>
             <button
               type="button"
-              onClick={() => navigateTo({ screen: "library" })}
+              onClick={() => navigate({ screen: "library" })}
               className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
             >
               Back to My menus
