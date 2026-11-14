@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AssistantPage } from "@/components/pages/assistant-page";
@@ -233,42 +233,12 @@ function HomeShell() {
   // an item deep link is always the edit workspace.
   const editorMode: EditorMode = route.screen === "editor" ? route.mode : "edit";
   const openedRouteMenuRef = useRef<string | null>(null);
-  const openDocRef = useRef<
-    | ((
-        doc: MenuDocument,
-        image: Blob | null,
-        updateRoute?: boolean,
-        accessHint?: MenuAccess
-      ) => Promise<void>)
-    | null
-  >(null);
-  const activeDocIdRef = useRef<string | null>(null);
   /** Previous session state, so only a real sign-out (not a first load) clears. */
   const wasSignedInRef = useRef(false);
   /** The account that was signed in, so sign-out can drop its synced rows. */
   const prevAccountKeyRef = useRef<string | null>(null);
 
   const router = useRouter();
-
-  // Signed out is capture-only (plus the library working set and the editor
-  // for anonymous drafts): orders/tables/settings/assistant need an account,
-  // so a signed-out visitor who lands on one (typed URL, old bookmark)
-  // goes back to capture. Runs every render by design; the guard goes
-  // quiet once the screen moves on, and stays inert while the session read is
-  // unanswered (015): unknown is not signed out.
-  useEffect(() => {
-    if (sessionState === "signed-out") {
-      const guarded = route.screen;
-      if (
-        guarded === "assistant" ||
-        guarded === "orders" ||
-        guarded === "tables" ||
-        guarded === "settings"
-      ) {
-        navigate({ screen: "capture" }, { replace: true });
-      }
-    }
-  });
 
   const [pages, setPages] = useState<PageImage[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -312,11 +282,6 @@ function HomeShell() {
   const replaceIndexRef = useRef<number | null>(null);
   /** Preview URLs currently shown for `pages` (revoked on swap and unmount). */
   const liveUrlsRef = useRef<string[]>([]);
-  /**
-   * Mirror of `editorImageUrl`: the route effect must know whether the open
-   * menu's source image is currently shown (ref read — no extra effect runs).
-   */
-  const editorImageUrlRef = useRef<string | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const docRef = useRef<MenuDocument | null>(null);
   const lastSavedRef = useRef<string | null>(null);
@@ -344,6 +309,10 @@ function HomeShell() {
   const accountAccessPending = signedIn && workspace.pending;
   const restaurantsLoading = signedIn && workspace.pending;
   const switchWorkspace = workspace.switchTo;
+  /** The café the shell acts in, from the provider above the shell. */
+  const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
+  /** Whether this membership may file new menus into the acting café. */
+  const signedInCanWrite = signedIn && accountCan("menus.write");
   /**
    * The ownership wall's sentence is only true while nobody is known, so it is
    * derived away the moment a session settles signed in — never cleared by an
@@ -463,262 +432,9 @@ function HomeShell() {
   const [liveDocMenuId, setLiveDocMenuId] = useState<string | null>(null);
   const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
-  useEffect(() => {
-    signedInRef.current = signedIn;
-    sessionStateRef.current = sessionState;
-    accountKeyRef.current = accountKey;
-  }, [signedIn, sessionState, accountKey]);
-
-  // The save status and the publish gate decide in async code that finishes
-  // after an await, so the failed read travels with the other refs (003, 016).
-  useEffect(() => {
-    accountMenusReadFailedRef.current = serverMenusReadFailedFor;
-  }, [serverMenusReadFailedFor]);
-
   // Display derives from the canonical docs (which carry confirmations),
   // falling back to the raw extraction only for the empty state.
   const result: PreviewMenu | null = resultDoc ?? demoDoc ?? extracted?.menu ?? null;
-
-  useEffect(() => {
-    return () => {
-      liveUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      if (editorImageUrl) URL.revokeObjectURL(editorImageUrl);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    void refreshLibrary();
-  }, []);
-
-  // The pending save lives with navigation: it flushes before leaving a menu.
-  registerSaveFlush(flushSave);
-  openDocRef.current = openDoc;
-  activeDocIdRef.current = activeDoc?.id ?? null;
-  editorImageUrlRef.current = editorImageUrl;
-
-  useEffect(() => {
-    if (!navigationReady || !routeMenuId(route) || sessionState === "unknown") return;
-    const menuId = routeMenuId(route);
-    if (!menuId) return;
-    if (activeDocIdRef.current === menuId) {
-      openedRouteMenuRef.current = menuId;
-      // Fast path: the doc is already in memory (editor mode switches, and
-      // returns to a menu that was left open). "Back to library" releases
-      // the source image URL while keeping the doc, so returning through
-      // this path must restore the image — otherwise the editor reopens
-      // without it. Only the image is re-read; the doc is not.
-      if (editorImageUrlRef.current) return;
-      let imageCancelled = false;
-      void (async () => {
-        try {
-          const stored = await getImage(menuId);
-          if (imageCancelled || activeDocIdRef.current !== menuId) return;
-          setEditorImage(stored?.blob ? URL.createObjectURL(stored.blob) : null);
-        } catch {
-          // The editor is fully usable without the image; the next full
-          // open of this menu retries the read.
-        }
-      })();
-      return () => {
-        imageCancelled = true;
-      };
-    }
-    if (openedRouteMenuRef.current === menuId) return;
-    openedRouteMenuRef.current = menuId;
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        let doc: MenuDocument;
-        let imageBlob: Blob | null = null;
-        let accessHint: MenuAccess | undefined;
-        try {
-          doc = await getMenu(menuId);
-          // The device stamp is a privacy boundary, not an accusation (015): a
-          // row stamped to this account is the account's own copy, an unstamped
-          // row is the shared anonymous working set, and only a row stamped to
-          // somebody else stays shut. An unanswered session decides nothing
-          // here — the effect re-runs when the read settles.
-          const origin = await getDraftOrigin(menuId).catch(() => undefined);
-          // The server's own list is the second authority for a shared
-          // browser: a published menu it listed for this account opens even
-          // when the local row is stamped to the owner who wrote the draft.
-          const sharedPublished =
-            accountMenusSettledRef.current === accountKeyRef.current &&
-            isPublishedOnlyAccess(menuAccessRef.current.get(menuId));
-          const access = decideMenuOpen({
-            session: sessionStateRef.current,
-            stampAccountId: origin?.accountId,
-            accountKey: accountKeyRef.current,
-            sharedPublished,
-            accountReadPending: signedIn && serverMenusReadFor !== accountKey,
-          });
-          if (access.state === "wait") {
-            if (cancelled) return;
-            openedRouteMenuRef.current = null;
-            return;
-          }
-          if (access.state === "blocked") {
-            // A torn-down run must never navigate: this was the one branch in
-            // the effect without the cancellation guard (015).
-            if (cancelled) return;
-            setLibraryError(menuOpenBlockedMessage(access.reason));
-            openedRouteMenuRef.current = null;
-            navigate({ screen: "library" }, { replace: true });
-            return;
-          }
-          try {
-            imageBlob = (await getImage(menuId))?.blob ?? null;
-          } catch {
-            imageBlob = null;
-          }
-        } catch (localError) {
-          if (!signedIn) throw localError;
-          const serverMenu = await fetchServerMenu(menuId);
-          rememberMenuCafe(serverMenu.id, serverMenu.restaurantId);
-          doc = serverMenu.doc;
-          accessHint = serverMenu.access;
-          await cacheMenu(doc).catch(() => undefined);
-          await refreshLibrary();
-        }
-        if (!cancelled) await openDocRef.current?.(doc, imageBlob, false, accessHint);
-      } catch {
-        if (cancelled) return;
-        openedRouteMenuRef.current = null;
-        // A refresh before the first change: the URL names a menu that was
-        // never saved, so there is nothing to report — back quietly.
-        if (route.screen === "editor" && menuId && isPendingNewMenu(menuId)) {
-          forgetPendingNewMenu(menuId);
-          navigate({ screen: "library" }, { replace: true });
-          return;
-        }
-        // A dead publish link holds its URL with an explainer card — the
-        // draft is in another browser, and the library can't show that.
-        if (route.screen === "editor" && route.mode === "publish") {
-          markMissingPublish(menuId);
-          return;
-        }
-        setLibraryError(unresolvableMenuMessage(route));
-        navigate({ screen: "library" }, { replace: true });
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
-    };
-  }, [
-    route,
-    sessionState,
-    signedIn,
-    accountKey,
-    serverMenusReadFor,
-    navigationReady,
-    navigate,
-    markMissingPublish,
-  ]);
-
-  useEffect(() => {
-    const wasSignedIn = wasSignedInRef.current;
-    wasSignedInRef.current = signedIn;
-    if (signedIn && accountKey) prevAccountKeyRef.current = accountKey;
-
-    if (!signedIn) {
-      // Sign-out is a privacy boundary. An open editor or a result on
-      // Capture can hold an account menu, so a real session end dismisses
-      // both and lands on Capture. Anonymous drafts stay for the capture
-      // banner; account copies proved in sync are dissolved below, so the
-      // landed screen never offers a menu that is already on the account.
-      const landing = signOutLandingRoute({ wasSignedIn, signedIn });
-      if (landing) {
-        const openDoc = docRef.current;
-        if (openDoc) {
-          // Release the open document before saving it. Pending account
-          // work (sync, publication, the route opener) checks docRef and
-          // bails once it is null, so nothing can reopen the editor. The
-          // direct save still keeps the latest local edits.
-          docRef.current = null;
-          lastSavedRef.current = null;
-          serverBaseRef.current = null;
-          conflictRef.current = null;
-          if (saveTimer.current) {
-            clearTimeout(saveTimer.current);
-            saveTimer.current = null;
-          }
-          // A menu with no changes was never created: persisting it here
-          // would mint exactly the phantom the transient flow avoids.
-          if (!storageDownRef.current && JSON.stringify(openDoc) !== lastSavedRef.current) {
-            void saveMenu(openDoc).catch(() => undefined);
-          }
-        }
-      }
-      accountMenusSettledRef.current = null;
-      // State is compared with accountKey when read, so a stale value from
-      // the previous session can never authorise an import for this one.
-      claimEvaluatedRef.current = null;
-      // The shell answers a session end by clearing what the account owned.
-      // Deferred like the other account reads in this file: an effect must not
-      // set state synchronously while rendering the frame that decided it. The
-      // refs above are already cleared, so nothing can reopen the editor into
-      // the gap, and a microtask still lands before the next paint.
-      void Promise.resolve().then(() => {
-        if (landing) {
-          setActiveDoc(null);
-          setEditorImage(null);
-          setConflict(null);
-          setConflictError(null);
-          setPublication(null);
-          setPublicationMenuId(null);
-          setPublicationLoaded(false);
-          setPublishError(null);
-          resetLiveDoc();
-          if (resultDoc !== null || pages.length > 0) applySelection([]);
-          navigate(landing, { replace: true, flushCurrent: false });
-        }
-        replaceServerIds(new Set());
-        replaceMenuAccess(new Map());
-        setMenuRestaurantById(new Map());
-        // The ids and the read that produced them reset together (001): a stale
-        // "settled" marker over an empty id set would let the next sign-in paint
-        // the same false chip.
-        setServerMenusFor(null);
-        setServerMenusReadFailedFor(null);
-        setServerMenusReadFor(null);
-      });
-      // Server-only at rest: account copies proved in sync leave with the
-      // session, so a later sign-in never asks about a menu that is
-      // already there. Anything unproven stays hidden until the heal (or
-      // the claim) sees it — an interrupted edit is never dissolved.
-      const leavingAccount = prevAccountKeyRef.current;
-      prevAccountKeyRef.current = null;
-      if (leavingAccount) {
-        void (async () => {
-          try {
-            for (const id of await collectSignOutDissolveIds(leavingAccount, getMenu)) {
-              await dissolveBrowserMenu(id);
-            }
-          } catch {
-            // Best-effort: leftovers stay stamped and hidden, never asked about.
-          }
-          await refreshLibrary();
-        })();
-      }
-      return;
-    }
-    // Sign-in: merge account menus into the library, heal interrupted work
-    // from closed menus, and reconcile a menu that was already open. A menu
-    // that was never moved to the account stays local-only (serverBaseRef
-    // stays null), so this cannot loop.
-    void refreshLibrary();
-    void healStampedDrafts();
-    const doc = docRef.current;
-    if (doc && serverBaseRef.current === null && !conflictRef.current) {
-      void syncWithAccount(doc);
-    }
-    if (doc) void refreshPublication(doc.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedIn]);
 
   /** Which account+café the shell has already read this session. */
   const mergedCafeRef = useRef<string | null>(null);
@@ -729,44 +445,6 @@ function HomeShell() {
    * instead of waiting forever. Ids and access answers from the previous café
    * do not describe this one, so they are dropped before the new read.
    */
-  useEffect(() => {
-    if (!signedIn || !accountKey) {
-      mergedCafeRef.current = null;
-      return;
-    }
-    if (!activeWorkspace) {
-      if (workspace.pending) return;
-      mergedCafeRef.current = `${accountKey}:none`;
-      // Deferred like the other account reads: the effect must not set state
-      // synchronously while rendering the frame that decided it.
-      void Promise.resolve().then(() => {
-        replaceServerIds(new Set());
-        replaceMenuAccess(new Map());
-        setServerMenusFor(accountKey);
-        setServerMenusReadFailedFor(null);
-        setServerMenusReadFor(accountKey);
-        accountMenusSettledRef.current = accountKey;
-      });
-      return;
-    }
-    const key = `${accountKey}:${activeWorkspace.restaurantId}`;
-    if (mergedCafeRef.current === key) return;
-    mergedCafeRef.current = key;
-    // Keep the browser-only answers: a local draft is the caller's own row and
-    // belongs to no café, so it must not become read-only on a switch.
-    replaceServerIds(new Set());
-    replaceMenuAccess(
-      new Map([...menuAccessRef.current].filter(([, access]) => access === "local"))
-    );
-    setServerMenusFor(null);
-    setServerMenusReadFor(null);
-    setServerMenusReadFailedFor(null);
-    accountMenusSettledRef.current = null;
-    // Chain onto a merge left over from the previous café instead of letting
-    // the dedupe swallow this one (001).
-    void (mergeRef.current ?? Promise.resolve()).then(() => mergeAccountMenus());
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mergeAccountMenus is intentionally render-scoped: listing it would re-run this café-keyed effect every render, and the mergedCafeRef key guard already dedupes repeat runs
-  }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
 
   function replaceServerIds(next: ReadonlySet<string>) {
     serverIdsRef.current = next;
@@ -873,7 +551,7 @@ function HomeShell() {
     setServerMenusReadFailedFor(null);
     setServerMenusReadFor(null);
     accountMenusSettledRef.current = null;
-    void mergeAccountMenus();
+    void mergeAccountMenus(activeRestaurantId);
   }
 
   /**
@@ -884,12 +562,12 @@ function HomeShell() {
    * the server revision on open. Best-effort: offline or a server DB that
    * is unavailable leaves the local library standing alone.
    */
-  async function mergeAccountMenus() {
+  async function mergeAccountMenus(restaurantId: string | null) {
     if (!signedInRef.current || mergeRef.current) return;
     // Café-keyed: the library is one café's list, so the read names the café.
     // Until it resolves the keyed effect re-runs; an account with no café is
-    // settled there, never here as an empty "read".
-    const restaurantId = activeRestaurantIdRef.current;
+    // settled there, never here as an empty "read". The café arrives as an
+    // argument, so the read cannot act in a membership the shell has left.
     if (!restaurantId) return;
     const run = (async () => {
       try {
@@ -1084,7 +762,11 @@ function HomeShell() {
     // account. No local fallback — the error stays visible and the next
     // change retries, with the edits kept in memory meanwhile.
     if (isPendingNewMenu(doc.id) && signedInRef.current) {
-      const pendingTarget = await ensureServerTarget(doc.title);
+      const pendingTarget = await ensureServerTarget(
+        doc.title,
+        activeRestaurantId,
+        signedInCanWrite
+      );
       if (!pendingTarget) {
         setSaveState({
           kind: "error",
@@ -1758,7 +1440,7 @@ function HomeShell() {
       // No notice: sign-in claims the drafts silently — the rows simply
       // appear in My menus, and a stranded row retries next sign-in.
       await refreshLibrary();
-      void mergeAccountMenus();
+      void mergeAccountMenus(activeRestaurantId);
     } catch {
       setClaimError(
         "We couldn't read the menus saved in this browser. They are still here — they will join your account the next time you sign in."
@@ -1860,7 +1542,7 @@ function HomeShell() {
       // Silent by design: the emailed link already promised this menu joins
       // the account, so no banner celebrates it.
       await refreshLibrary();
-      void mergeAccountMenus();
+      void mergeAccountMenus(activeRestaurantId);
     } catch {
       setClaimError(
         "We couldn't add your menu to your account. It is still saved in this browser — it will join your account the next time you sign in."
@@ -2175,7 +1857,7 @@ function HomeShell() {
         // succeeded, so this must not surface as a failure.
       }
     })();
-    void mergeAccountMenus();
+    void mergeAccountMenus(activeRestaurantId);
     void refreshLibrary();
     // Auto-import happens at sign-in only. Publishing never sweeps the
     // browser: anything left over stays put for the offer/manual path.
@@ -2248,7 +1930,7 @@ function HomeShell() {
     await flushSave();
     setEditorImage(null);
     await refreshLibrary();
-    void mergeAccountMenus();
+    void mergeAccountMenus(activeRestaurantId);
     navigate({ screen: "library" }, { flushCurrent: false });
   }
 
@@ -2470,7 +2152,7 @@ function HomeShell() {
       // local fallback — a failure keeps the in-memory result and the next
       // Extract press retries.
       if (signedInRef.current) {
-        const targetId = await ensureServerTarget(doc.title);
+        const targetId = await ensureServerTarget(doc.title, activeRestaurantId, signedInCanWrite);
         if (!targetId) {
           throw new SyncError(
             "unavailable",
@@ -2574,7 +2256,7 @@ function HomeShell() {
           await openDoc(doc, firstPage ? firstPage.file : null, updateRoute, access);
           return doc;
         }
-        const targetId = await ensureServerTarget(doc.title);
+        const targetId = await ensureServerTarget(doc.title, activeRestaurantId, signedInCanWrite);
         if (!targetId) {
           throw new StorageError(
             "unavailable",
@@ -2625,7 +2307,7 @@ function HomeShell() {
           "Browser storage is unavailable, so the menu can't be cached. Try again."
         );
       }
-      const demoTarget = await ensureServerTarget(doc.title);
+      const demoTarget = await ensureServerTarget(doc.title, activeRestaurantId, signedInCanWrite);
       if (!demoTarget) {
         throw new StorageError(
           "unavailable",
@@ -2853,7 +2535,11 @@ function HomeShell() {
           setImportError("Browser storage is unavailable, so the menu can't be cached. Try again.");
           return;
         }
-        const importTarget = await ensureServerTarget(doc.title);
+        const importTarget = await ensureServerTarget(
+          doc.title,
+          activeRestaurantId,
+          signedInCanWrite
+        );
         if (!importTarget) {
           setImportError(
             canFileBrowserDrafts === false && (restaurantList?.length ?? 0) > 0
@@ -2925,31 +2611,22 @@ function HomeShell() {
   const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
   const libraryAccountMode = signedIn && serverMenusFor === accountKey;
   /**
-   * The acting café's id, and the same answer for async work that finishes
-   * after the render that decided it. Both come from the provider above the
-   * shell, so the switcher, the tabs and the café-keyed read cannot disagree.
-   */
-  const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
-  const activeRestaurantIdRef = useRef<string | null>(activeRestaurantId);
-  activeRestaurantIdRef.current = activeRestaurantId;
-  /**
    * Server-only creation (signed-in): a new menu is a cloud copy, never a
    * browser-only draft. Prefers the café the shell acts in when it may file
    * there, else the owner's first café; a brand-new account gets its café
    * provisioned from the menu title instead of a local draft (publishing can
    * no longer be the first server write). Staff-only contexts return null —
    * there is no café the caller may file in, and nothing is invented behind
-   * anyone's back. The refs mirror the render answer so async saves decide
-   * on the same membership the shell acts in.
+   * anyone's back. The café and the permission arrive as arguments, so an
+   * async save decides on the membership its own caller was acting in.
    */
-  const signedInCanWrite = signedIn && accountCan("menus.write");
-  const signedInCanWriteRef = useRef(signedInCanWrite);
-  signedInCanWriteRef.current = signedInCanWrite;
-  async function ensureServerTarget(menuTitle: string): Promise<string | null> {
+  async function ensureServerTarget(
+    menuTitle: string,
+    restaurantId: string | null,
+    canWrite: boolean
+  ): Promise<string | null> {
     if (!signedInRef.current || !accountKeyRef.current) return null;
-    if (activeRestaurantIdRef.current && signedInCanWriteRef.current) {
-      return activeRestaurantIdRef.current;
-    }
+    if (restaurantId && canWrite) return restaurantId;
     if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
       return ownedRestaurantsForAccount[0].id;
     }
@@ -2975,34 +2652,6 @@ function HomeShell() {
     rememberMenuCafe(cached.id, server.restaurantId);
     return cached;
   }
-  // Refresh the sidebar's launch progress when the account, the café, or the
-  // screen changes: publishing or a first order moves the count, and the next
-  // navigation is when the owner sees it. It asks for the café the shell is
-  // acting in — never the account's other memberships — and waits for that
-  // café to be resolved. A failed read hides the row instead of guessing.
-  useEffect(() => {
-    // Nothing to read without an account and a café. The stored count is not
-    // cleared here (a synchronous setState in an effect); the render compares
-    // account and café, so an old membership's count can never show.
-    if (!signedIn || !accountKey || !activeRestaurantId) return;
-    let cancelled = false;
-    void fetchLaunchStatus(activeRestaurantId)
-      .then((status) => {
-        if (cancelled) return;
-        const progress = launchProgress(status, cardsPrintedOnThisDevice());
-        setLaunchChecklist({
-          accountKey,
-          restaurantId: activeRestaurantId,
-          ...progress,
-        });
-      })
-      .catch(() => {
-        if (!cancelled) setLaunchChecklist(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [signedIn, accountKey, activeRestaurantId, screen]);
   /**
    * Switch the membership the shell acts in. Stored under the account, so a
    * staff context chosen on a shared device never greets the next person.
@@ -3114,6 +2763,526 @@ function HomeShell() {
     accountMenusSettled: libraryAccountMode,
   });
 
+  // Which journey menu already attached this session (one entry per menu).
+  const journeyClaimRef = useRef<string | null>(null);
+
+  /**
+   * The menu the URL names. Leaving the editor for the library keeps the
+   * document in memory on purpose (mode changes and returns skip the read),
+   * but that copy is never a stand-in for a *different* menu: entering
+   * another one must show its own loading state until its copy arrives, not
+   * the previous menu's rows — which could even be edited into the wrong
+   * record.
+   */
+  const routedDoc = docForRoutedMenu(activeDoc, route);
+  // Publish state is only ever shown for the menu it was loaded for; a stale
+  // answer for a previously opened menu is never displayed.
+  const activePublicationMenuId = routedDoc?.id ?? null;
+  const activePublication = publicationMenuId === activePublicationMenuId ? publication : null;
+  const activePublicationLoaded =
+    publicationMenuId === activePublicationMenuId && publicationLoaded;
+  /**
+   * The open menu's access answer. Missing is unanswered, not permission: the
+   * editor renders a placeholder until the server says what this caller may
+   * do. Staff without `menus.write` get a preview; a menu the server refused
+   * (`"none"`) is never rendered, cached draft or not.
+   */
+  const activeMenuAccess = activeDoc ? menuAccess.get(activeDoc.id) : undefined;
+  const activeMenuAccessPending = signedIn && activeDoc != null && activeMenuAccess === undefined;
+  const activeMenuAccessDenied = activeMenuAccess === "none";
+  const activeMenuCanWrite = !signedIn || accessCan(activeMenuAccess, "menus.write");
+  const activeMenuCanPublish = !signedIn || accessCan(activeMenuAccess, "menus.publish");
+  // Staff on the menu's restaurant get a view-only editor (the server refuses
+  // their writes anyway; the UI must not offer the controls at all).
+  const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
+
+  /**
+   * The switcher follows the menu. A deep link can open a menu from the other
+   * café — the account can read it — while the shell is still acting in the
+   * café it was left in, which would leave the switcher and the screen
+   * disagreeing. Select the menu's café instead, once that café is known and
+   * the account actually holds it. Only the routed menu counts: a document
+   * kept in memory while browsing the library must not drag the context back.
+   */
+  const routedMenuRestaurantId = routedDoc ? (menuRestaurantById.get(routedDoc.id) ?? null) : null;
+  const followMenuCafe =
+    signedIn &&
+    !accountAccessPending &&
+    accountKey !== null &&
+    routedMenuRestaurantId !== null &&
+    routedMenuRestaurantId !== activeWorkspace?.restaurantId &&
+    workspaces.some((entry) => entry.restaurantId === routedMenuRestaurantId);
+
+  /**
+   * Every surface follows the one navigation table: a section is visible only
+   * when the active membership holds its capability (signed out: Capture
+   * plus the anonymous working set). The pills, tab bar and More sheet all
+   * read this list, so they cannot drift apart, and a section contributed
+   * later cannot appear ungated.
+   */
+  const sections = availableSections({
+    signedIn,
+    can: accountCan,
+    assistantEnabled: featureFlags.assistant,
+  });
+  /**
+   * The sidebar renders the same table, with the library's number filled in
+   * once it is a fact about the active café (`libraryCountKnown`).
+   */
+  const navSections = sections.map((section) =>
+    section.id === "library" && libraryCountKnown
+      ? { ...section, count: libraryMenus.length }
+      : section
+  );
+  const availableScreenIds = new Set(sections.map((section) => section.id));
+  const phoneTabList = phoneTabs(sections);
+  const moreRows = moreSheetRows(sections);
+  /**
+   * The left column belongs to the account. A visitor with nothing in the
+   * library gets the entry page instead of a one-row menu, and the brand row
+   * takes over the name and `/sign-in` at every width.
+   *
+   * Nothing is assumed while the session or the library is still answering:
+   * The library's own read is part of it too: the session is not settled
+   * until its read answers, so the column stays off until both are known
+   * instead of flashing account chrome at a visitor.
+   */
+  const showShellColumn =
+    !sessionPending && !libraryLoading && shellColumnVisible({ sessionState });
+  /** Nav waits for the membership read: no provisional tabs, no empty bar. */
+  const navReady = !sessionPending && !accountAccessPending;
+  /**
+   * Capture's first frame waits for the same two answers as the column:
+   * rendering the page before they land flashes the plain working layout
+   * at a visitor whose entry composition arrives a moment later.
+   */
+  const shellReady = !sessionPending && !libraryLoading;
+  /** The More sheet owns the current screen (and so shows as pressed). */
+  const screenInMore = moreRows.some((row) => row.id === screen);
+  const canGetStarted = signedIn && accountCan("settings.manage");
+  /** Why an empty library is empty, when the shell can tell. */
+  const libraryEmpty = (() => {
+    if (!signedIn || restaurantList === null) return undefined;
+    if (restaurantList.length === 0) {
+      return {
+        title: "No café on this account yet",
+        body: "If you were invited, open the invitation link from your email, or ask the owner to add this address in Settings → Team. Otherwise, capture a menu to start your own café.",
+      };
+    }
+    if (activeWorkspace === null) return undefined;
+    // The list is the active café's, so the empty state names that café — not
+    // the account, whose other café may be full of menus.
+    return {
+      title: `No menus at ${activeWorkspace.name} yet`,
+      body: accountCan("menus.write")
+        ? "Capture a menu or start a blank one — it will appear here and survive refreshes."
+        : "Staff see this café's published menus only. Ask the owner to publish one; drafts and unpublished menus stay private until then.",
+    };
+  })();
+
+  /**
+   * The sidebar's contextual half: the open menu's sections, only while the
+   * edit workspace is showing. Reorder and preview have their own shape, and
+   * a publish wizard has no sections to jump between.
+   */
+  const sidebarOutline =
+    screen === "editor" && editorMode === "edit" && routedDoc
+      ? routedDoc.categories.map((category) => ({
+          id: category.id,
+          name: category.name.trim() || "Untitled category",
+          itemCount: category.items.length,
+        }))
+      : null;
+  const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
+  /**
+   * Unfinished checklist for this account **and this café** only: another
+   * membership's count is never shown, and complete or unknown hides the row.
+   */
+  const launchChecklistForActive =
+    launchChecklist &&
+    launchChecklist.accountKey === accountKey &&
+    launchChecklist.restaurantId === activeRestaurantId
+      ? launchChecklist
+      : null;
+  const sidebarLaunch =
+    signedIn && launchChecklistForActive && !launchChecklistForActive.complete
+      ? { done: launchChecklistForActive.done, total: launchChecklistForActive.total }
+      : null;
+  /** The More sheet's checklist line: progress, finished, or not read yet. */
+  const sheetLaunchHint = sidebarLaunch
+    ? "What's left to set up"
+    : launchChecklistForActive
+      ? "All steps done"
+      : "See what's left to set up";
+  /**
+   * The My menus count is only true once the account's list has been read.
+   * Before that the local set can be smaller than the account's, so the
+   * sidebar holds a placeholder rather than a number that will jump. A read
+   * that failed is settled, not pending: it gets no skeleton and no number.
+   */
+  const sidebarMenuCountPending =
+    !sessionPending &&
+    (libraryLoading || (signedIn && !libraryCountKnown && serverMenusReadFailedFor !== accountKey));
+
+  /** Jump the editor list to the section chosen in the sidebar. */
+  function scrollToMenuSection(categoryId: string) {
+    document.getElementById(`menu-section-${categoryId}`)?.scrollIntoView({ block: "start" });
+  }
+
+  // The route opener has to act with the latest `openDoc` without re-running
+  // whenever a render recreates it; an effect event is the supported way to
+  // read a fresh closure from an effect.
+  const openDocEvent = useEffectEvent(openDoc);
+
+  // EFFECTS MOVED BELOW FUNCTIONS: every effect runs after the
+  // functions it calls. Order among them is the original order, so the
+  // render -> effect sequence is unchanged.
+
+  // Signed out is capture-only (plus the library working set and the editor
+  // for anonymous drafts): orders/tables/settings/assistant need an account,
+  // so a signed-out visitor who lands on one (typed URL, old bookmark)
+  // goes back to capture. Runs every render by design; the guard goes
+  // quiet once the screen moves on, and stays inert while the session read is
+  // unanswered (015): unknown is not signed out.
+  useEffect(() => {
+    if (sessionState === "signed-out") {
+      const guarded = route.screen;
+      if (
+        guarded === "assistant" ||
+        guarded === "orders" ||
+        guarded === "tables" ||
+        guarded === "settings"
+      ) {
+        navigate({ screen: "capture" }, { replace: true });
+      }
+    }
+  });
+
+  useEffect(() => {
+    signedInRef.current = signedIn;
+    sessionStateRef.current = sessionState;
+    accountKeyRef.current = accountKey;
+  }, [signedIn, sessionState, accountKey]);
+
+  // The save status and the publish gate decide in async code that finishes
+  // after an await, so the failed read travels with the other refs (003, 016).
+  useEffect(() => {
+    accountMenusReadFailedRef.current = serverMenusReadFailedFor;
+  }, [serverMenusReadFailedFor]);
+
+  useEffect(() => {
+    return () => {
+      liveUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      if (editorImageUrl) URL.revokeObjectURL(editorImageUrl);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The first library read. Its state writes land after the await, so it is
+  // scheduled rather than run inside the effect body: nothing is set during
+  // the commit that mounts the shell.
+  useEffect(() => {
+    void Promise.resolve().then(refreshLibrary);
+  }, []);
+
+  // The pending save lives with navigation: it flushes before leaving a menu.
+  // Registered after every commit so navigation always holds the latest
+  // closure, without writing to the provider's ref during render.
+  useEffect(() => {
+    registerSaveFlush(flushSave);
+  });
+
+  useEffect(() => {
+    if (!navigationReady || !routeMenuId(route) || sessionState === "unknown") return;
+    const menuId = routeMenuId(route);
+    if (!menuId) return;
+    if (docRef.current?.id === menuId) {
+      openedRouteMenuRef.current = menuId;
+      // Fast path: the doc is already in memory (editor mode switches, and
+      // returns to a menu that was left open). "Back to library" releases
+      // the source image URL while keeping the doc, so returning through
+      // this path re-reads the image — the document itself is not re-read.
+      let imageCancelled = false;
+      void (async () => {
+        try {
+          const stored = await getImage(menuId);
+          if (imageCancelled || docRef.current?.id !== menuId) return;
+          setEditorImage(stored?.blob ? URL.createObjectURL(stored.blob) : null);
+        } catch {
+          // The editor is fully usable without the image; the next full
+          // open of this menu retries the read.
+        }
+      })();
+      return () => {
+        imageCancelled = true;
+      };
+    }
+    if (openedRouteMenuRef.current === menuId) return;
+    openedRouteMenuRef.current = menuId;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        let doc: MenuDocument;
+        let imageBlob: Blob | null = null;
+        let accessHint: MenuAccess | undefined;
+        try {
+          doc = await getMenu(menuId);
+          // The device stamp is a privacy boundary, not an accusation (015): a
+          // row stamped to this account is the account's own copy, an unstamped
+          // row is the shared anonymous working set, and only a row stamped to
+          // somebody else stays shut. An unanswered session decides nothing
+          // here — the effect re-runs when the read settles.
+          const origin = await getDraftOrigin(menuId).catch(() => undefined);
+          // The server's own list is the second authority for a shared
+          // browser: a published menu it listed for this account opens even
+          // when the local row is stamped to the owner who wrote the draft.
+          const sharedPublished =
+            accountMenusSettledRef.current === accountKeyRef.current &&
+            isPublishedOnlyAccess(menuAccessRef.current.get(menuId));
+          const access = decideMenuOpen({
+            session: sessionStateRef.current,
+            stampAccountId: origin?.accountId,
+            accountKey: accountKeyRef.current,
+            sharedPublished,
+            accountReadPending: signedIn && serverMenusReadFor !== accountKey,
+          });
+          if (access.state === "wait") {
+            if (cancelled) return;
+            openedRouteMenuRef.current = null;
+            return;
+          }
+          if (access.state === "blocked") {
+            // A torn-down run must never navigate: this was the one branch in
+            // the effect without the cancellation guard (015).
+            if (cancelled) return;
+            setLibraryError(menuOpenBlockedMessage(access.reason));
+            openedRouteMenuRef.current = null;
+            navigate({ screen: "library" }, { replace: true });
+            return;
+          }
+          try {
+            imageBlob = (await getImage(menuId))?.blob ?? null;
+          } catch {
+            imageBlob = null;
+          }
+        } catch (localError) {
+          if (!signedIn) throw localError;
+          const serverMenu = await fetchServerMenu(menuId);
+          rememberMenuCafe(serverMenu.id, serverMenu.restaurantId);
+          doc = serverMenu.doc;
+          accessHint = serverMenu.access;
+          await cacheMenu(doc).catch(() => undefined);
+          await refreshLibrary();
+        }
+        if (!cancelled) await openDocEvent(doc, imageBlob, false, accessHint);
+      } catch {
+        if (cancelled) return;
+        openedRouteMenuRef.current = null;
+        // A refresh before the first change: the URL names a menu that was
+        // never saved, so there is nothing to report — back quietly.
+        if (route.screen === "editor" && menuId && isPendingNewMenu(menuId)) {
+          forgetPendingNewMenu(menuId);
+          navigate({ screen: "library" }, { replace: true });
+          return;
+        }
+        // A dead publish link holds its URL with an explainer card — the
+        // draft is in another browser, and the library can't show that.
+        if (route.screen === "editor" && route.mode === "publish") {
+          markMissingPublish(menuId);
+          return;
+        }
+        setLibraryError(unresolvableMenuMessage(route));
+        navigate({ screen: "library" }, { replace: true });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (openedRouteMenuRef.current === menuId) openedRouteMenuRef.current = null;
+    };
+  }, [
+    route,
+    sessionState,
+    signedIn,
+    accountKey,
+    serverMenusReadFor,
+    navigationReady,
+    navigate,
+    markMissingPublish,
+  ]);
+
+  useEffect(() => {
+    const wasSignedIn = wasSignedInRef.current;
+    wasSignedInRef.current = signedIn;
+    if (signedIn && accountKey) prevAccountKeyRef.current = accountKey;
+
+    if (!signedIn) {
+      // Sign-out is a privacy boundary. An open editor or a result on
+      // Capture can hold an account menu, so a real session end dismisses
+      // both and lands on Capture. Anonymous drafts stay for the capture
+      // banner; account copies proved in sync are dissolved below, so the
+      // landed screen never offers a menu that is already on the account.
+      const landing = signOutLandingRoute({ wasSignedIn, signedIn });
+      if (landing) {
+        const openDoc = docRef.current;
+        if (openDoc) {
+          // Release the open document before saving it. Pending account
+          // work (sync, publication, the route opener) checks docRef and
+          // bails once it is null, so nothing can reopen the editor. The
+          // direct save still keeps the latest local edits.
+          docRef.current = null;
+          lastSavedRef.current = null;
+          serverBaseRef.current = null;
+          conflictRef.current = null;
+          if (saveTimer.current) {
+            clearTimeout(saveTimer.current);
+            saveTimer.current = null;
+          }
+          // A menu with no changes was never created: persisting it here
+          // would mint exactly the phantom the transient flow avoids.
+          if (!storageDownRef.current && JSON.stringify(openDoc) !== lastSavedRef.current) {
+            void saveMenu(openDoc).catch(() => undefined);
+          }
+        }
+      }
+      accountMenusSettledRef.current = null;
+      // State is compared with accountKey when read, so a stale value from
+      // the previous session can never authorise an import for this one.
+      claimEvaluatedRef.current = null;
+      // The shell answers a session end by clearing what the account owned.
+      // Deferred like the other account reads in this file: an effect must not
+      // set state synchronously while rendering the frame that decided it. The
+      // refs above are already cleared, so nothing can reopen the editor into
+      // the gap, and a microtask still lands before the next paint.
+      void Promise.resolve().then(() => {
+        if (landing) {
+          setActiveDoc(null);
+          setEditorImage(null);
+          setConflict(null);
+          setConflictError(null);
+          setPublication(null);
+          setPublicationMenuId(null);
+          setPublicationLoaded(false);
+          setPublishError(null);
+          resetLiveDoc();
+          if (resultDoc !== null || pages.length > 0) applySelection([]);
+          navigate(landing, { replace: true, flushCurrent: false });
+        }
+        replaceServerIds(new Set());
+        replaceMenuAccess(new Map());
+        setMenuRestaurantById(new Map());
+        // The ids and the read that produced them reset together (001): a stale
+        // "settled" marker over an empty id set would let the next sign-in paint
+        // the same false chip.
+        setServerMenusFor(null);
+        setServerMenusReadFailedFor(null);
+        setServerMenusReadFor(null);
+      });
+      // Server-only at rest: account copies proved in sync leave with the
+      // session, so a later sign-in never asks about a menu that is
+      // already there. Anything unproven stays hidden until the heal (or
+      // the claim) sees it — an interrupted edit is never dissolved.
+      const leavingAccount = prevAccountKeyRef.current;
+      prevAccountKeyRef.current = null;
+      if (leavingAccount) {
+        void (async () => {
+          try {
+            for (const id of await collectSignOutDissolveIds(leavingAccount, getMenu)) {
+              await dissolveBrowserMenu(id);
+            }
+          } catch {
+            // Best-effort: leftovers stay stamped and hidden, never asked about.
+          }
+          await refreshLibrary();
+        })();
+      }
+      return;
+    }
+    // Sign-in: merge account menus into the library, heal interrupted work
+    // from closed menus, and reconcile a menu that was already open. A menu
+    // that was never moved to the account stays local-only (serverBaseRef
+    // stays null), so this cannot loop.
+    void Promise.resolve().then(refreshLibrary);
+    void Promise.resolve().then(healStampedDrafts);
+    const doc = docRef.current;
+    if (doc && serverBaseRef.current === null && !conflictRef.current) {
+      void syncWithAccount(doc);
+    }
+    if (doc) void refreshPublication(doc.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn || !accountKey) {
+      mergedCafeRef.current = null;
+      return;
+    }
+    if (!activeWorkspace) {
+      if (workspace.pending) return;
+      mergedCafeRef.current = `${accountKey}:none`;
+      // Deferred like the other account reads: the effect must not set state
+      // synchronously while rendering the frame that decided it.
+      void Promise.resolve().then(() => {
+        replaceServerIds(new Set());
+        replaceMenuAccess(new Map());
+        setServerMenusFor(accountKey);
+        setServerMenusReadFailedFor(null);
+        setServerMenusReadFor(accountKey);
+        accountMenusSettledRef.current = accountKey;
+      });
+      return;
+    }
+    const key = `${accountKey}:${activeWorkspace.restaurantId}`;
+    if (mergedCafeRef.current === key) return;
+    mergedCafeRef.current = key;
+    // Keep the browser-only answers: a local draft is the caller's own row and
+    // belongs to no café, so it must not become read-only on a switch.
+    replaceServerIds(new Set());
+    replaceMenuAccess(
+      new Map([...menuAccessRef.current].filter(([, access]) => access === "local"))
+    );
+    setServerMenusFor(null);
+    setServerMenusReadFor(null);
+    setServerMenusReadFailedFor(null);
+    accountMenusSettledRef.current = null;
+    // Chain onto a merge left over from the previous café instead of letting
+    // the dedupe swallow this one (001).
+    void (mergeRef.current ?? Promise.resolve()).then(() =>
+      mergeAccountMenus(activeWorkspace.restaurantId)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mergeAccountMenus is intentionally render-scoped: listing it would re-run this café-keyed effect every render, and the mergedCafeRef key guard already dedupes repeat runs
+  }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
+
+  // Refresh the sidebar's launch progress when the account, the café, or the
+  // screen changes: publishing or a first order moves the count, and the next
+  // navigation is when the owner sees it. It asks for the café the shell is
+  // acting in — never the account's other memberships — and waits for that
+  // café to be resolved. A failed read hides the row instead of guessing.
+  useEffect(() => {
+    // Nothing to read without an account and a café. The stored count is not
+    // cleared here (a synchronous setState in an effect); the render compares
+    // account and café, so an old membership's count can never show.
+    if (!signedIn || !accountKey || !activeRestaurantId) return;
+    let cancelled = false;
+    void fetchLaunchStatus(activeRestaurantId)
+      .then((status) => {
+        if (cancelled) return;
+        const progress = launchProgress(status, cardsPrintedOnThisDevice());
+        setLaunchChecklist({
+          accountKey,
+          restaurantId: activeRestaurantId,
+          ...progress,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setLaunchChecklist(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, accountKey, activeRestaurantId, screen]);
+
   // Confirm the dismissal only after the inputs settle, so the banner's
   // very first render is already a confirmed decision, not an assumption.
   // Deferred exactly like the auto-import below: while unconfirmed the
@@ -3123,9 +3292,6 @@ function HomeShell() {
     if (!resumeReady || resumeDismissed !== null) return;
     void Promise.resolve().then(() => setResumeDismissed(false));
   }, [resumeReady, resumeDismissed]);
-
-  // Which journey menu already attached this session (one entry per menu).
-  const journeyClaimRef = useRef<string | null>(null);
 
   // Direct "Sign in" choice: attach the named menus silently, or wipe them,
   // exactly once. Runs before the journey and generic claims so a discard
@@ -3224,125 +3390,12 @@ function HomeShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountKey, claimGate.incomplete, claimGate.pending, localDraftsDecision, screen, signedIn]);
 
-  /**
-   * The menu the URL names. Leaving the editor for the library keeps the
-   * document in memory on purpose (mode changes and returns skip the read),
-   * but that copy is never a stand-in for a *different* menu: entering
-   * another one must show its own loading state until its copy arrives, not
-   * the previous menu's rows — which could even be edited into the wrong
-   * record.
-   */
-  const routedDoc = docForRoutedMenu(activeDoc, route);
-  // Publish state is only ever shown for the menu it was loaded for; a stale
-  // answer for a previously opened menu is never displayed.
-  const activePublicationMenuId = routedDoc?.id ?? null;
-  const activePublication = publicationMenuId === activePublicationMenuId ? publication : null;
-  const activePublicationLoaded =
-    publicationMenuId === activePublicationMenuId && publicationLoaded;
-  /**
-   * The open menu's access answer. Missing is unanswered, not permission: the
-   * editor renders a placeholder until the server says what this caller may
-   * do. Staff without `menus.write` get a preview; a menu the server refused
-   * (`"none"`) is never rendered, cached draft or not.
-   */
-  const activeMenuAccess = activeDoc ? menuAccess.get(activeDoc.id) : undefined;
-  const activeMenuAccessPending = signedIn && activeDoc != null && activeMenuAccess === undefined;
-  const activeMenuAccessDenied = activeMenuAccess === "none";
-  const activeMenuCanWrite = !signedIn || accessCan(activeMenuAccess, "menus.write");
-  const activeMenuCanPublish = !signedIn || accessCan(activeMenuAccess, "menus.publish");
-  // Staff on the menu's restaurant get a view-only editor (the server refuses
-  // their writes anyway; the UI must not offer the controls at all).
-  const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
-
-  /**
-   * The switcher follows the menu. A deep link can open a menu from the other
-   * café — the account can read it — while the shell is still acting in the
-   * café it was left in, which would leave the switcher and the screen
-   * disagreeing. Select the menu's café instead, once that café is known and
-   * the account actually holds it. Only the routed menu counts: a document
-   * kept in memory while browsing the library must not drag the context back.
-   */
-  const routedMenuRestaurantId = routedDoc ? (menuRestaurantById.get(routedDoc.id) ?? null) : null;
-  const followMenuCafe =
-    signedIn &&
-    !accountAccessPending &&
-    accountKey !== null &&
-    routedMenuRestaurantId !== null &&
-    routedMenuRestaurantId !== activeWorkspace?.restaurantId &&
-    workspaces.some((entry) => entry.restaurantId === routedMenuRestaurantId);
   useEffect(() => {
     if (!followMenuCafe || !routedMenuRestaurantId) return;
     // Deferred like the other account reads: never set state synchronously
     // while rendering the frame that decided to switch.
     void Promise.resolve().then(() => switchWorkspace(routedMenuRestaurantId));
   }, [followMenuCafe, routedMenuRestaurantId, switchWorkspace]);
-
-  /**
-   * Every surface follows the one navigation table: a section is visible only
-   * when the active membership holds its capability (signed out: Capture
-   * plus the anonymous working set). The pills, tab bar and More sheet all
-   * read this list, so they cannot drift apart, and a section contributed
-   * later cannot appear ungated.
-   */
-  const sections = availableSections({
-    signedIn,
-    can: accountCan,
-    assistantEnabled: featureFlags.assistant,
-  });
-  /**
-   * The sidebar renders the same table, with the library's number filled in
-   * once it is a fact about the active café (`libraryCountKnown`).
-   */
-  const navSections = sections.map((section) =>
-    section.id === "library" && libraryCountKnown
-      ? { ...section, count: libraryMenus.length }
-      : section
-  );
-  const availableScreenIds = new Set(sections.map((section) => section.id));
-  const phoneTabList = phoneTabs(sections);
-  const moreRows = moreSheetRows(sections);
-  /**
-   * The left column belongs to the account. A visitor with nothing in the
-   * library gets the entry page instead of a one-row menu, and the brand row
-   * takes over the name and `/sign-in` at every width.
-   *
-   * Nothing is assumed while the session or the library is still answering:
-   * The library's own read is part of it too: the session is not settled
-   * until its read answers, so the column stays off until both are known
-   * instead of flashing account chrome at a visitor.
-   */
-  const showShellColumn =
-    !sessionPending && !libraryLoading && shellColumnVisible({ sessionState });
-  /** Nav waits for the membership read: no provisional tabs, no empty bar. */
-  const navReady = !sessionPending && !accountAccessPending;
-  /**
-   * Capture's first frame waits for the same two answers as the column:
-   * rendering the page before they land flashes the plain working layout
-   * at a visitor whose entry composition arrives a moment later.
-   */
-  const shellReady = !sessionPending && !libraryLoading;
-  /** The More sheet owns the current screen (and so shows as pressed). */
-  const screenInMore = moreRows.some((row) => row.id === screen);
-  const canGetStarted = signedIn && accountCan("settings.manage");
-  /** Why an empty library is empty, when the shell can tell. */
-  const libraryEmpty = (() => {
-    if (!signedIn || restaurantList === null) return undefined;
-    if (restaurantList.length === 0) {
-      return {
-        title: "No café on this account yet",
-        body: "If you were invited, open the invitation link from your email, or ask the owner to add this address in Settings → Team. Otherwise, capture a menu to start your own café.",
-      };
-    }
-    if (activeWorkspace === null) return undefined;
-    // The list is the active café's, so the empty state names that café — not
-    // the account, whose other café may be full of menus.
-    return {
-      title: `No menus at ${activeWorkspace.name} yet`,
-      body: accountCan("menus.write")
-        ? "Capture a menu or start a blank one — it will appear here and survive refreshes."
-        : "Staff see this café's published menus only. Ask the owner to publish one; drafts and unpublished menus stay private until then.",
-    };
-  })();
 
   // A typed URL or old bookmark for a surface this membership cannot use
   // lands on the first one it can — Capture for an owner, My menus for a
@@ -3378,55 +3431,6 @@ function HomeShell() {
     // synchronously while rendering the frame that decided it.
     void Promise.resolve().then(() => navigate({ screen: "capture" }, { replace: true }));
   });
-
-  /**
-   * The sidebar's contextual half: the open menu's sections, only while the
-   * edit workspace is showing. Reorder and preview have their own shape, and
-   * a publish wizard has no sections to jump between.
-   */
-  const sidebarOutline =
-    screen === "editor" && editorMode === "edit" && routedDoc
-      ? routedDoc.categories.map((category) => ({
-          id: category.id,
-          name: category.name.trim() || "Untitled category",
-          itemCount: category.items.length,
-        }))
-      : null;
-  const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
-  /**
-   * Unfinished checklist for this account **and this café** only: another
-   * membership's count is never shown, and complete or unknown hides the row.
-   */
-  const launchChecklistForActive =
-    launchChecklist &&
-    launchChecklist.accountKey === accountKey &&
-    launchChecklist.restaurantId === activeRestaurantId
-      ? launchChecklist
-      : null;
-  const sidebarLaunch =
-    signedIn && launchChecklistForActive && !launchChecklistForActive.complete
-      ? { done: launchChecklistForActive.done, total: launchChecklistForActive.total }
-      : null;
-  /** The More sheet's checklist line: progress, finished, or not read yet. */
-  const sheetLaunchHint = sidebarLaunch
-    ? "What's left to set up"
-    : launchChecklistForActive
-      ? "All steps done"
-      : "See what's left to set up";
-  /**
-   * The My menus count is only true once the account's list has been read.
-   * Before that the local set can be smaller than the account's, so the
-   * sidebar holds a placeholder rather than a number that will jump. A read
-   * that failed is settled, not pending: it gets no skeleton and no number.
-   */
-  const sidebarMenuCountPending =
-    !sessionPending &&
-    (libraryLoading || (signedIn && !libraryCountKnown && serverMenusReadFailedFor !== accountKey));
-
-  /** Jump the editor list to the section chosen in the sidebar. */
-  function scrollToMenuSection(categoryId: string) {
-    document.getElementById(`menu-section-${categoryId}`)?.scrollIntoView({ block: "start" });
-  }
 
   return (
     <AppShell
