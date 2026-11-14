@@ -1,6 +1,6 @@
-import { HomeScreen } from "@/components/home-screen";
+import { AppShell } from "@/components/layout/app-shell";
 
 /** An open menu in the edit workspace. */
 export default function MenuEditorPage() {
-  return <HomeScreen />;
+  return <AppShell />;
 }

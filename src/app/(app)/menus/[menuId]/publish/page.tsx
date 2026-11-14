@@ -1,4 +1,4 @@
-import { HomeScreen } from "@/components/home-screen";
+import { AppShell } from "@/components/layout/app-shell";
 
 /**
  * The publish wizard. This is also the URL a magic link returns to, so it
@@ -6,5 +6,5 @@ import { HomeScreen } from "@/components/home-screen";
  * itself rather than the route refusing.
  */
 export default function MenuPublishPage() {
-  return <HomeScreen />;
+  return <AppShell />;
 }

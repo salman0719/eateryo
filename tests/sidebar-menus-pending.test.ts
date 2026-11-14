@@ -30,7 +30,7 @@ function render(options: {
         can: (capability) => CAPABILITIES.includes(capability),
         assistantEnabled: false,
       }).map((section) =>
-        // The shell fills in the library's number, exactly as home-screen does.
+        // The shell fills in the library's number, exactly as the shell does.
         section.id === "library" ? { ...section, count: options.count } : section
       );
   return renderToStaticMarkup(

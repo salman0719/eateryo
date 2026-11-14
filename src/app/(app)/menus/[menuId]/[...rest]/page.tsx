@@ -1,4 +1,4 @@
-import { HomeScreen } from "@/components/home-screen";
+import { AppShell } from "@/components/layout/app-shell";
 
 /**
  * A menu URL the app no longer mints — the in-editor Table QR links from before
@@ -8,5 +8,5 @@ import { HomeScreen } from "@/components/home-screen";
  * a 404, which is the promise old bookmarks were given.
  */
 export default function StaleMenuPathPage() {
-  return <HomeScreen />;
+  return <AppShell />;
 }
