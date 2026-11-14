@@ -48,7 +48,6 @@ import {
   shellColumnVisible,
   signOutLandingRoute,
   unresolvableMenuMessage,
-  type AppRoute,
   type AppScreen,
   type EditorMode,
 } from "@/features/navigation/routes";
@@ -61,14 +60,14 @@ import {
   isPublishedOnlyAccess,
   type MenuAccess,
 } from "@/features/tenancy/access";
-import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
-import { LibraryProvider, useLibrary } from "@/features/menus/library-context";
+import { useWorkspace } from "@/features/tenancy/workspace-context";
+import { useLibrary } from "@/features/menus/library-context";
 import { useActiveMenu } from "@/features/menus/active-menu";
 import { useMenuLifecycle } from "@/features/menus/menu-lifecycle";
 import { useDraftClaims } from "@/features/menus/draft-claims";
 import { useCapture } from "@/features/capture/use-capture";
 import { usePublication } from "@/features/publishing/use-publication";
-import { NavigationProvider, useNavigation } from "@/features/navigation/navigation-context";
+import { useNavigation } from "@/features/navigation/navigation-context";
 import {
   collectSignOutDissolveIds,
   getDraftOrigin,
@@ -105,24 +104,14 @@ function stepIndex(phase: Phase, hasResult: boolean): number {
 
 /**
  * The whole signed-in/out app shell (capture → library → editor → …).
- * Every screen URL has its own route file that hands us its parsed route,
- * so a hard load server-renders the right screen instead of flashing the
- * capture screen first; after hydration `syncFromLocation` keeps `route`
- * in step with the History API.
+ *
+ * The units that outlive a screen — the account, the route, the library — are
+ * mounted by `app/(app)/layout.tsx`, and the route comes from the URL, so every
+ * route file renders this and nothing else: a screen's address is never a prop
+ * that could drift from the address bar.
  */
-export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
-  // The account and the acting membership live one level up, so every screen
-  // (this shell included) asks about the same café. The screen itself belongs
-  // to the navigation provider, so every screen can read it without the shell.
-  return (
-    <WorkspaceProvider>
-      <NavigationProvider initialRoute={initialRoute}>
-        <LibraryProvider>
-          <HomeShell />
-        </LibraryProvider>
-      </NavigationProvider>
-    </WorkspaceProvider>
-  );
+export function HomeScreen() {
+  return <HomeShell />;
 }
 
 function HomeShell() {
