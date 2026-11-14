@@ -16,20 +16,13 @@ import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
 import { MenuEditor } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
-import {
-  createMenuDocument,
-  defaultNewMenuTitle,
-  suggestRestaurantName,
-} from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import {
   cacheMenu,
-  deleteMenu,
   getImage,
   getMenu,
   listMenus,
-  renameMenu,
   saveImage,
   saveMenu,
   StorageError,
@@ -37,11 +30,9 @@ import {
 } from "@/features/menu/storage";
 import {
   createServerMenu,
-  deleteServerMenu,
   fetchServerMenu,
   SyncError,
   type ServerMenu,
-  updateServerMenu,
 } from "@/features/menus/sync";
 import { useRouter } from "next/navigation";
 
@@ -70,23 +61,18 @@ import {
   isPublishedOnlyAccess,
   type MenuAccess,
 } from "@/features/tenancy/access";
-import { workspaceCan } from "@/features/tenancy/workspace";
 import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
 import { LibraryProvider, useLibrary } from "@/features/menus/library-context";
 import { useActiveMenu } from "@/features/menus/active-menu";
+import { useMenuLifecycle } from "@/features/menus/menu-lifecycle";
 import { useDraftClaims } from "@/features/menus/draft-claims";
 import { useCapture } from "@/features/capture/use-capture";
 import { usePublication } from "@/features/publishing/use-publication";
 import { NavigationProvider, useNavigation } from "@/features/navigation/navigation-context";
-import { createRestaurant } from "@/features/tenancy/client";
 import {
-  clearDraftOrigin,
   collectSignOutDissolveIds,
   getDraftOrigin,
   listDraftOrigins,
-  menuContentHash,
-  refreshDraftSync,
-  stampDraftOrigin,
   unstampedIds,
   visibleMenuIds,
 } from "@/features/menus/draft-origins";
@@ -107,7 +93,6 @@ import {
   docForRoutedMenu,
   forgetPendingNewMenu,
   isPendingNewMenu,
-  rememberPendingNewMenu,
 } from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
@@ -165,7 +150,6 @@ function HomeShell() {
     serverIdsRef,
     menuAccess,
     menuAccessRef,
-    menuRestaurantById,
     serverMenusFor,
     serverMenusReadFor,
     serverMenusReadFailedFor,
@@ -175,9 +159,6 @@ function HomeShell() {
     mergeAccountMenus,
     retryAccountCheck,
     resetAccountAnswer,
-    setMenuAccessFor,
-    addServerId,
-    removeServerId,
     rememberMenuCafe,
   } = useLibrary();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
@@ -230,11 +211,59 @@ function HomeShell() {
   const ownedRestaurantsForAccount = workspace.owned;
   const accountAccessPending = signedIn && workspace.pending;
   const restaurantsLoading = signedIn && workspace.pending;
-  const switchWorkspace = workspace.switchTo;
   /** The café the shell acts in, from the provider above the shell. */
   const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
-  /** Whether this membership may file new menus into the acting café. */
-  const signedInCanWrite = signedIn && accountCan("menus.write");
+  // The one open document — its autosave, flush, conflict, photo, filing and
+  // the files it imports — is its own unit, so nothing here writes a menu
+  // behind the editor's back. The capture flow files through it.
+  const {
+    doc: activeDoc,
+    saveState,
+    conflict,
+    conflictError,
+    imageUrl: editorImageUrl,
+    importError,
+    getOpenDoc,
+    getOpenDocId,
+    openBaseline,
+    onServerRevision,
+    onClaimedOpenDoc,
+    onMenuRenamed,
+    openDoc,
+    changeDoc: handleDocChange,
+    flushSave,
+    ensureServerTarget,
+    cacheServerDraft,
+    pruneSignedOutOthers,
+    healStampedDrafts,
+    handleLoadServerVersion,
+    handleKeepMyVersion,
+    handleExportJson,
+    handleExportCsv,
+    importFile,
+    forgetOpenDoc,
+    clearImage,
+    showImage,
+    releaseOpenDoc,
+    resetActiveMenu,
+    resyncOpenDoc,
+  } = useActiveMenu({
+    cannotFileMenus,
+    onOpenDoc,
+  });
+
+  // The library's row verbs and the one membership the shell acts in. It
+  // reaches the open document through doors instead of holding a second copy,
+  // and it is what follows a deep link into another café.
+  const { openMenu, newMenu, renameMenu, deleteMenu, switchWorkspace } = useMenuLifecycle({
+    openDocId: activeDoc?.id ?? null,
+    openDoc,
+    forgetOpenDoc,
+    onMenuRenamed,
+    openBaseline,
+    onServerRevision,
+  });
+
   // The capture document — pages, extraction, the result under review and its
   // draft. It ends where the menu begins; this screen keeps the menu.
   const {
@@ -268,8 +297,7 @@ function HomeShell() {
     draftDocId,
   } = useCapture({
     confirmDiscard,
-    ensureServerTarget: (menuTitle: string) =>
-      ensureServerTarget(menuTitle, activeRestaurantId, signedInCanWrite),
+    ensureServerTarget,
     cacheServerDraft,
     pruneSignedOutOthers,
     revealResult: scrollToResult,
@@ -293,44 +321,6 @@ function HomeShell() {
   const sessionStateRef = useRef<SessionState>("unknown");
   /** Current account id for async work (closures may outlive the render). */
   const accountKeyRef = useRef<string | null>(null);
-  // The one open document — its autosave, flush, conflict, photo and the files
-  // it imports — is its own unit. It files a menu through the shell's menu
-  // lifecycle doors, so the café a menu lands in stays decided here.
-  const {
-    doc: activeDoc,
-    saveState,
-    conflict,
-    conflictError,
-    imageUrl: editorImageUrl,
-    importError,
-    getOpenDoc,
-    getOpenDocId,
-    openBaseline,
-    onServerRevision,
-    onClaimedOpenDoc,
-    onMenuRenamed,
-    openDoc,
-    changeDoc: handleDocChange,
-    flushSave,
-    healStampedDrafts,
-    handleLoadServerVersion,
-    handleKeepMyVersion,
-    handleExportJson,
-    handleExportCsv,
-    importFile,
-    forgetOpenDoc,
-    clearImage,
-    showImage,
-    releaseOpenDoc,
-    resetActiveMenu,
-    resyncOpenDoc,
-  } = useActiveMenu({
-    fileMenu: (menuTitle) => ensureServerTarget(menuTitle, activeRestaurantId, signedInCanWrite),
-    cacheServerDraft,
-    pruneSignedOutOthers,
-    cannotFileMenus,
-    onOpenDoc,
-  });
   /**
    * Where the open menu is saved. `null` while the account read is still
    * pending, so nothing claims "this browser only" on a guess (001, 003).
@@ -430,137 +420,6 @@ function HomeShell() {
 
   // --- Library actions ----------------------------------------------------
 
-  function handleOpenMenu(id: string) {
-    reportLibraryError(null);
-    navigate({ screen: "editor", menuId: id, mode: "edit" });
-  }
-
-  /**
-   * Single offline menu invariant: after a signed-out save, any other rows
-   * are superseded — their replacement was confirmed where the flow began.
-   * Best-effort: a failed prune leaves the extra row for the next save.
-   */
-  async function pruneSignedOutOthers(keepId: string) {
-    if (signedInRef.current) return;
-    try {
-      const all = await listMenus();
-      await Promise.all(
-        all
-          .filter((menu) => menu.id !== keepId)
-          .map((menu) => deleteMenu(menu.id).catch(() => undefined))
-      );
-    } catch {
-      // The next save retries; the extra row stays visible meanwhile.
-    }
-  }
-
-  async function handleNewMenu(suggestedTitle?: string) {
-    reportLibraryError(null);
-    if (!signedInRef.current) {
-      // Replacement, not accumulation: the old offline draft goes away now
-      // so the new blank slate is the browser's one menu. No confirmation —
-      // starting over is the whole point of this button.
-      try {
-        const all = await listMenus();
-        await Promise.all(all.map((menu) => deleteMenu(menu.id).catch(() => undefined)));
-        await refreshLibrary();
-      } catch {
-        // A failed delete surfaces on the next save's prune instead.
-      }
-    }
-    // Q2: never gate on a name — blank menus arrive titled ("Main Menu"
-    // first, honest numbering after) and rename inline in the editor.
-    const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
-    const title = suggestedTitle?.trim() ? suggestedTitle.trim() : fallback;
-    // The menu is created by its first change, not by this tap: it lives in
-    // memory until an edit persists it through the normal autosave path, so
-    // going back now leaves no row, no banner, nothing to finish. The marker
-    // tells a refresh that the URL may name an unsaved menu, so it lands
-    // back in the library quietly instead of reporting it missing.
-    const doc = createMenuDocument({ title });
-    rememberPendingNewMenu(doc.id);
-    await openDoc(doc, null, true, "local");
-  }
-
-  async function handleRenameMenu(id: string, title: string) {
-    const access = menuAccessRef.current.get(id);
-    if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
-      reportLibraryError("Only someone with menu access can rename this menu.");
-      return;
-    }
-    try {
-      const renamed = await renameMenu(id, title);
-      const renameActor = signedInRef.current ? accountKeyRef.current : null;
-      if (renameActor && accessCan(menuAccessRef.current.get(id), "menus.write")) {
-        // Keep the existing baseline when this menu is not open: the
-        // editor's baseline belongs to another document.
-        await stampDraftOrigin(id, renameActor, openBaseline(id));
-      }
-      if (signedInRef.current && serverIdsRef.current.has(id)) {
-        await pushRenameToAccount(renamed);
-      }
-      await refreshLibrary();
-      onMenuRenamed(renamed);
-    } catch (error) {
-      reportLibraryError(
-        error instanceof StorageError ? error.message : "Could not rename that menu."
-      );
-    }
-  }
-
-  /**
-   * Push a library rename to the account. The base revision is fetched
-   * first — a library rename can target a menu the editor doesn't have
-   * open, so there is no `serverBaseRef` to lean on. A conflict is
-   * reported, never overwritten; it resolves on the next editor open,
-   * which adopts the account revision. The local rename always stands.
-   */
-  async function pushRenameToAccount(renamed: MenuDocument) {
-    try {
-      const serverMenu = await fetchServerMenu(renamed.id);
-      try {
-        const pushed = await updateServerMenu(renamed.id, renamed, serverMenu.updatedAt);
-        onServerRevision(renamed.id, pushed.updatedAt);
-        const renameSyncActor = accountKeyRef.current;
-        if (renameSyncActor)
-          await refreshDraftSync(
-            renamed.id,
-            renameSyncActor,
-            pushed.updatedAt,
-            menuContentHash(renamed)
-          );
-      } catch (error) {
-        if (error instanceof SyncError && error.code === "not_found") {
-          removeServerId(renamed.id); // Gone on the server; nothing to push.
-        } else if (error instanceof SyncError && error.code === "conflict") {
-          reportLibraryError(
-            "Renamed in this browser — it changed on your other device. Open the menu to reconcile."
-          );
-        } else if (error instanceof SyncError && error.code === "forbidden") {
-          reportLibraryError(
-            "Renamed in this browser — only the restaurant owner can rename it on your account."
-          );
-        } else if (error instanceof SyncError && error.code === "unauthorized") {
-          reportLibraryError(
-            "Renamed in this browser — sign in again to rename it on your account."
-          );
-        } else {
-          reportLibraryError(
-            "Renamed in this browser — the change could not be saved to your account. Try again when online."
-          );
-        }
-      }
-    } catch (error) {
-      if (error instanceof SyncError && error.code === "not_found") {
-        removeServerId(renamed.id);
-        return;
-      }
-      reportLibraryError(
-        "Renamed in this browser — your account could not be reached. Try again when online."
-      );
-    }
-  }
-
   /**
    * The plain "Sign in" buttons (brand row, sidebar account, library gate,
    * publish panel): signed out with a real local menu, the owner chooses
@@ -625,49 +484,13 @@ function HomeShell() {
     router.push("/sign-in");
   }
 
+  /**
+   * The lifecycle deletes the row and leaves the editor, so publication is
+   * reset here: this level is the only one that can see both units.
+   */
   async function handleDeleteMenu(id: string) {
-    const access = menuAccessRef.current.get(id);
-    if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
-      reportLibraryError("Only someone with menu access can delete this menu.");
-      return;
-    }
-    try {
-      // Remove it from the account first when it is there, so a failure is
-      // reported before the browser copy is gone. The browser delete always
-      // proceeds — it is the user's data and their explicit intent.
-      let accountNote: string | null = null;
-      if (signedInRef.current && serverIdsRef.current.has(id)) {
-        try {
-          await deleteServerMenu(id);
-          removeServerId(id);
-        } catch (error) {
-          if (error instanceof SyncError && error.code === "not_found") {
-            removeServerId(id); // Already gone on the server.
-          } else if (error instanceof SyncError && error.code === "forbidden") {
-            accountNote =
-              "Deleted from this browser — only the restaurant owner can remove it from your account.";
-          } else if (error instanceof SyncError && error.code === "unauthorized") {
-            accountNote =
-              "Deleted from this browser — sign in again to remove it from your account.";
-          } else {
-            accountNote =
-              "Deleted from this browser — it could not be removed from your account. Try again when online.";
-          }
-        }
-      }
-      await deleteMenu(id);
-      await clearDraftOrigin(id);
-      removeServerId(id);
-      forgetOpenDoc(id);
-      resetPublication();
-      await refreshLibrary();
-      if (accountNote) reportLibraryError(accountNote);
-      navigate({ screen: "library" }, { flushCurrent: false });
-    } catch (error) {
-      reportLibraryError(
-        error instanceof StorageError ? error.message : "Could not delete that menu."
-      );
-    }
+    await deleteMenu(id);
+    resetPublication();
   }
 
   async function handleBackToLibrary() {
@@ -725,7 +548,7 @@ function HomeShell() {
           await openDoc(doc, firstPage ? firstPage.file : null, updateRoute, access);
           return doc;
         }
-        const targetId = await ensureServerTarget(doc.title, activeRestaurantId, signedInCanWrite);
+        const targetId = await ensureServerTarget(doc.title);
         if (!targetId) {
           throw new StorageError(
             "unavailable",
@@ -776,7 +599,7 @@ function HomeShell() {
           "Browser storage is unavailable, so the menu can't be cached. Try again."
         );
       }
-      const demoTarget = await ensureServerTarget(doc.title, activeRestaurantId, signedInCanWrite);
+      const demoTarget = await ensureServerTarget(doc.title);
       if (!demoTarget) {
         throw new StorageError(
           "unavailable",
@@ -882,69 +705,6 @@ function HomeShell() {
   const libraryAccountPending = sessionPending || (signedIn && serverMenusReadFor !== accountKey);
   const libraryAccountMode = signedIn && serverMenusFor === accountKey;
   /**
-   * Server-only creation (signed-in): a new menu is a cloud copy, never a
-   * browser-only draft. Prefers the café the shell acts in when it may file
-   * there, else the owner's first café; a brand-new account gets its café
-   * provisioned from the menu title instead of a local draft (publishing can
-   * no longer be the first server write). Staff-only contexts return null —
-   * there is no café the caller may file in, and nothing is invented behind
-   * anyone's back. The café and the permission arrive as arguments, so an
-   * async save decides on the membership its own caller was acting in.
-   */
-  async function ensureServerTarget(
-    menuTitle: string,
-    restaurantId: string | null,
-    canWrite: boolean
-  ): Promise<string | null> {
-    if (!signedInRef.current || !accountKeyRef.current) return null;
-    if (restaurantId && canWrite) return restaurantId;
-    if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
-      return ownedRestaurantsForAccount[0].id;
-    }
-    if ((restaurantList?.length ?? 0) > 0) return null;
-    try {
-      const created = await createRestaurant(suggestRestaurantName([menuTitle]) ?? "My restaurant");
-      workspace.addRestaurant(created);
-      return created.id;
-    } catch {
-      return null;
-    }
-  }
-  /**
-   * File a fresh server menu as the local cache: same id, server clock,
-   * stamped to this account so sign-out hides it like any account copy.
-   */
-  async function cacheServerDraft(server: ServerMenu): Promise<MenuDocument> {
-    const cached = storageDownRef.current ? server.doc : await cacheMenu(server.doc);
-    const actor = accountKeyRef.current;
-    if (actor) await refreshDraftSync(cached.id, actor, server.updatedAt, menuContentHash(cached));
-    addServerId(cached.id);
-    setMenuAccessFor(cached.id, server.access);
-    rememberMenuCafe(cached.id, server.restaurantId);
-    return cached;
-  }
-  /**
-   * Switch the membership the shell acts in. Stored under the account, so a
-   * staff context chosen on a shared device never greets the next person.
-   *
-   * The open editor belongs to its menu's café, so switching to a different
-   * one leaves the editor for the new café's library instead of keeping a
-   * menu on screen under a café it does not belong to. A browser-only draft
-   * has no café, so it stays only where the new membership can write.
-   */
-  function handleSwitchWorkspace(key: string) {
-    const target = workspaces.find((entry) => entry.key === key) ?? null;
-    switchWorkspace(key);
-
-    const menuId = routeMenuId(route);
-    if (!menuId) return;
-    const menuRestaurantId = menuRestaurantById.get(menuId);
-    const belongsToTarget = menuRestaurantId
-      ? menuRestaurantId === target?.restaurantId
-      : workspaceCan(target, "menus.write");
-    if (!belongsToTarget) navigate({ screen: "library" });
-  }
-  /**
    * The acting café's rows. The account read is café-keyed, so every server
    * row already belongs here — there is no per-row café to filter on. Only
    * browser drafts still need a rule: they belong to a membership that can
@@ -1024,23 +784,6 @@ function HomeShell() {
   // Staff on the menu's restaurant get a view-only editor (the server refuses
   // their writes anyway; the UI must not offer the controls at all).
   const activeMenuIsStaff = accessIsStaff(activeMenuAccess) && !activeMenuCanWrite;
-
-  /**
-   * The switcher follows the menu. A deep link can open a menu from the other
-   * café — the account can read it — while the shell is still acting in the
-   * café it was left in, which would leave the switcher and the screen
-   * disagreeing. Select the menu's café instead, once that café is known and
-   * the account actually holds it. Only the routed menu counts: a document
-   * kept in memory while browsing the library must not drag the context back.
-   */
-  const routedMenuRestaurantId = routedDoc ? (menuRestaurantById.get(routedDoc.id) ?? null) : null;
-  const followMenuCafe =
-    signedIn &&
-    !accountAccessPending &&
-    accountKey !== null &&
-    routedMenuRestaurantId !== null &&
-    routedMenuRestaurantId !== activeWorkspace?.restaurantId &&
-    workspaces.some((entry) => entry.restaurantId === routedMenuRestaurantId);
 
   /**
    * Every surface follows the one navigation table: a section is visible only
@@ -1445,13 +1188,6 @@ function HomeShell() {
     void Promise.resolve().then(() => setResumeDismissed(false));
   }, [resumeReady, resumeDismissed]);
 
-  useEffect(() => {
-    if (!followMenuCafe || !routedMenuRestaurantId) return;
-    // Deferred like the other account reads: never set state synchronously
-    // while rendering the frame that decided to switch.
-    void Promise.resolve().then(() => switchWorkspace(routedMenuRestaurantId));
-  }, [followMenuCafe, routedMenuRestaurantId, switchWorkspace]);
-
   // A typed URL or old bookmark for a surface this membership cannot use
   // lands on the first one it can — Capture for an owner, My menus for a
   // staff shift. Unknown access is not a refusal: the guard waits.
@@ -1512,7 +1248,7 @@ function HomeShell() {
       }}
       workspaces={workspaces}
       activeWorkspace={activeWorkspace}
-      onSwitchWorkspace={handleSwitchWorkspace}
+      onSwitchWorkspace={switchWorkspace}
       phone={{
         ready: navReady,
         tabs: phoneTabList,
@@ -1610,9 +1346,9 @@ function HomeShell() {
           emptyTitle={libraryEmpty?.title}
           emptyBody={libraryEmpty?.body}
           unavailable={storageDown}
-          onOpen={(id) => void handleOpenMenu(id)}
-          onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
-          onRename={(id, title) => void handleRenameMenu(id, title)}
+          onOpen={(id) => void openMenu(id)}
+          onNew={(suggestedTitle?: string) => void newMenu(suggestedTitle)}
+          onRename={(id, title) => void renameMenu(id, title)}
           onDelete={(id) => void handleDeleteMenu(id)}
           onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
         />

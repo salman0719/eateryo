@@ -10,8 +10,16 @@ import {
   parseImportedMenu,
   serializeMenu,
 } from "@/features/menu/import-export";
+import { suggestRestaurantName } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
-import { getMenu, saveMenu, StorageError } from "@/features/menu/storage";
+import {
+  cacheMenu,
+  deleteMenu,
+  getMenu,
+  listMenus,
+  saveMenu,
+  StorageError,
+} from "@/features/menu/storage";
 import {
   decideHeal,
   getDraftOrigin,
@@ -33,6 +41,7 @@ import {
 } from "@/features/menus/sync";
 import { useNavigation } from "@/features/navigation/navigation-context";
 import { accessCan, isPublishedOnlyAccess, type MenuAccess } from "@/features/tenancy/access";
+import { createRestaurant } from "@/features/tenancy/client";
 import { useWorkspace } from "@/features/tenancy/workspace-context";
 
 /**
@@ -42,18 +51,13 @@ import { useWorkspace } from "@/features/tenancy/workspace-context";
  * autosave, the conflict's two answers, the imports that file a new menu — so
  * no screen can save behind another one's back.
  *
- * It does not file menus: `fileMenu`, `cacheServerDraft` and
- * `pruneSignedOutOthers` are the shell's menu lifecycle, arriving as doors.
- * That keeps the café a menu lands in, and whether this membership may file
- * at all, decided where the membership is known.
+ * It also files menus, because its own autosave is what creates them: the
+ * café a new menu lands in, whether this membership may file at all, and the
+ * signed-out prune that keeps this browser to one draft. Nothing is invented
+ * behind anyone's back — a staff shift with no café it may write in files
+ * nothing and says so.
  */
 export type ActiveMenuOptions = {
-  /** File a new menu into the acting café: its id, or null when there is none. */
-  fileMenu(menuTitle: string): Promise<string | null>;
-  /** Cache a server copy as this browser's draft. */
-  cacheServerDraft(server: ServerMenu): Promise<MenuDocument>;
-  /** Supersede the browser's other signed-out rows after this one saves. */
-  pruneSignedOutOthers(keepId: string): Promise<void>;
   /** Whether a failed filing means this membership may not file menus. */
   cannotFileMenus(): boolean;
   /** The open document changed: the shell's per-menu answers follow it. */
@@ -71,7 +75,7 @@ function sameMenuContent(a: MenuDocument, b: MenuDocument): boolean {
 }
 
 export function useActiveMenu(options: ActiveMenuOptions) {
-  const { signedIn, accountKey } = useWorkspace();
+  const { signedIn, accountKey, active, can, owned, restaurants, addRestaurant } = useWorkspace();
   const {
     storageDownRef,
     serverIdsRef,
@@ -85,6 +89,10 @@ export function useActiveMenu(options: ActiveMenuOptions) {
     rememberMenuCafe,
   } = useLibrary();
   const { navigate } = useNavigation();
+
+  /** The café this editor files into, and whether it may file there at all. */
+  const activeRestaurantId = active?.restaurantId ?? null;
+  const signedInCanWrite = signedIn && can("menus.write");
 
   /** Session answers for async work that finishes after an await. */
   const signedInRef = useRef(signedIn);
@@ -191,6 +199,66 @@ export function useActiveMenu(options: ActiveMenuOptions) {
     if (healedAny) await refreshLibrary();
   }
 
+  // --- Filing a menu ------------------------------------------------------
+
+  /**
+   * Single offline menu invariant: after a signed-out save, any other rows
+   * are superseded — their replacement was confirmed where the flow began.
+   * Best-effort: a failed prune leaves the extra row for the next save.
+   */
+  async function pruneSignedOutOthers(keepId: string) {
+    if (signedInRef.current) return;
+    try {
+      const all = await listMenus();
+      await Promise.all(
+        all
+          .filter((menu) => menu.id !== keepId)
+          .map((menu) => deleteMenu(menu.id).catch(() => undefined))
+      );
+    } catch {
+      // The next save retries; the extra row stays visible meanwhile.
+    }
+  }
+
+  /**
+   * Server-only creation (signed-in): a new menu is a cloud copy, never a
+   * browser-only draft. Prefers the café the editor acts in when it may file
+   * there, else the owner's first café; a brand-new account gets its café
+   * provisioned from the menu title instead of a local draft (publishing can
+   * no longer be the first server write). Staff-only contexts return null —
+   * there is no café the caller may file in, and nothing is invented behind
+   * anyone's back.
+   */
+  async function ensureServerTarget(menuTitle: string): Promise<string | null> {
+    if (!signedInRef.current || !accountKeyRef.current) return null;
+    if (activeRestaurantId && signedInCanWrite) return activeRestaurantId;
+    if (owned.length > 0 && owned[0]) {
+      return owned[0].id;
+    }
+    if ((restaurants?.length ?? 0) > 0) return null;
+    try {
+      const created = await createRestaurant(suggestRestaurantName([menuTitle]) ?? "My restaurant");
+      addRestaurant(created);
+      return created.id;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * File a fresh server menu as the local cache: same id, server clock,
+   * stamped to this account so sign-out hides it like any account copy.
+   */
+  async function cacheServerDraft(server: ServerMenu): Promise<MenuDocument> {
+    const cached = storageDownRef.current ? server.doc : await cacheMenu(server.doc);
+    const actor = accountKeyRef.current;
+    if (actor) await refreshDraftSync(cached.id, actor, server.updatedAt, menuContentHash(cached));
+    addServerId(cached.id);
+    setMenuAccessFor(cached.id, server.access);
+    rememberMenuCafe(cached.id, server.restaurantId);
+    return cached;
+  }
+
   // --- Autosave -----------------------------------------------------------
 
   async function doSave() {
@@ -206,7 +274,7 @@ export function useActiveMenu(options: ActiveMenuOptions) {
     // account. No local fallback — the error stays visible and the next
     // change retries, with the edits kept in memory meanwhile.
     if (isPendingNewMenu(doc.id) && signedInRef.current) {
-      const pendingTarget = await options.fileMenu(doc.title);
+      const pendingTarget = await ensureServerTarget(doc.title);
       if (!pendingTarget) {
         setSaveState({
           kind: "error",
@@ -216,7 +284,7 @@ export function useActiveMenu(options: ActiveMenuOptions) {
       }
       try {
         const created = await createServerMenu(pendingTarget, doc);
-        const cached = await options.cacheServerDraft(created);
+        const cached = await cacheServerDraft(created);
         forgetPendingNewMenu(cached.id);
         lastSavedRef.current = JSON.stringify(cached);
         docRef.current = cached;
@@ -229,7 +297,7 @@ export function useActiveMenu(options: ActiveMenuOptions) {
         if (error instanceof SyncError && error.code === "exists") {
           try {
             const existing = await fetchServerMenu(doc.id);
-            const cached = await options.cacheServerDraft(existing);
+            const cached = await cacheServerDraft(existing);
             forgetPendingNewMenu(cached.id);
             lastSavedRef.current = JSON.stringify(cached);
             docRef.current = cached;
@@ -692,7 +760,7 @@ export function useActiveMenu(options: ActiveMenuOptions) {
           setImportError("Browser storage is unavailable, so the menu can't be cached. Try again.");
           return;
         }
-        const importTarget = await options.fileMenu(doc.title);
+        const importTarget = await ensureServerTarget(doc.title);
         if (!importTarget) {
           setImportError(
             options.cannotFileMenus()
@@ -703,14 +771,14 @@ export function useActiveMenu(options: ActiveMenuOptions) {
         }
         try {
           const created = await createServerMenu(importTarget, doc);
-          const cached = await options.cacheServerDraft(created);
+          const cached = await cacheServerDraft(created);
           await refreshLibrary();
           await openDoc(cached, null, true, created.access);
           return;
         } catch (error) {
           if (error instanceof SyncError && error.code === "exists") {
             const existing = await fetchServerMenu(doc.id);
-            const cached = await options.cacheServerDraft(existing);
+            const cached = await cacheServerDraft(existing);
             await refreshLibrary();
             await openDoc(cached, null, true, existing.access);
             return;
@@ -720,7 +788,7 @@ export function useActiveMenu(options: ActiveMenuOptions) {
       }
       // Single offline menu: the prune after saving supersedes the old draft.
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
-      await options.pruneSignedOutOthers(saved.id);
+      await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
       await openDoc(saved, null);
     } catch (error) {
@@ -841,6 +909,9 @@ export function useActiveMenu(options: ActiveMenuOptions) {
     openDoc,
     changeDoc: handleDocChange,
     flushSave,
+    ensureServerTarget,
+    cacheServerDraft,
+    pruneSignedOutOthers,
     healStampedDrafts,
     handleLoadServerVersion,
     handleKeepMyVersion,
