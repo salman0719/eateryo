@@ -29,7 +29,6 @@ function render(options: {
         signedIn: true,
         can: (capability) => CAPABILITIES.includes(capability),
         assistantEnabled: false,
-        hasWorkingSet: true,
       }).map((section) =>
         // The shell fills in the library's number, exactly as home-screen does.
         section.id === "library" ? { ...section, count: options.count } : section

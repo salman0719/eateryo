@@ -53,6 +53,11 @@ interface AppSidebarProps {
   email: string | null;
   onNavigate: (section: AppSectionId) => void;
   onSignOut: () => void;
+  /**
+   * Signed-out sign-in path. When the shell hands this over, the button asks
+   * about the browser draft first instead of navigating straight away.
+   */
+  onSignIn?: () => void;
   /** The lockup is the way home: it lands on Capture the way the brand does
    *  everywhere else, without reloading the shell. */
   onHome: () => void;
@@ -135,6 +140,7 @@ export function AppSidebar({
   email,
   onNavigate,
   onSignOut,
+  onSignIn,
   onHome,
   outline,
   outlineKey = "",
@@ -356,6 +362,14 @@ export function AppSidebar({
               Sign out
             </button>
           </>
+        ) : onSignIn ? (
+          <button
+            type="button"
+            onClick={onSignIn}
+            className="inline-flex rounded-lg border border-line-300 px-2.5 py-1 font-medium text-ink-600 transition-colors hover:bg-surface-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            Sign in
+          </button>
         ) : (
           <a
             href="/sign-in"
