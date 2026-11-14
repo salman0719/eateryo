@@ -16,13 +16,6 @@ import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
 import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
-import type {
-  PreviewMenu,
-  ReviewItemLocation,
-  ReviewResolution,
-} from "@/components/upload/extraction-result";
-import type { PageImage } from "@/components/upload/image-preview";
-import { extractedMenuToDocument } from "@/features/menu/convert";
 import {
   downloadTextFile,
   menuFilename,
@@ -31,14 +24,9 @@ import {
   serializeMenu,
 } from "@/features/menu/import-export";
 import {
-  acceptItemUnpriced,
-  confirmItemReviewed,
   createMenuDocument,
   defaultNewMenuTitle,
-  hasAnyPrice,
-  isItemFlagged,
   suggestRestaurantName,
-  updateItem,
 } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
@@ -75,13 +63,7 @@ import type { PublishSetupResult } from "@/features/publishing/setup-schema";
 import { rememberPublishJourney } from "@/features/publishing/wizard-state";
 import { saveDirectSignInIntent } from "@/features/menus/direct-sign-in";
 import { authClient } from "@/lib/auth-client";
-import {
-  ExtractClientError,
-  extractMenuFromFiles,
-  type MenuExtractionResult,
-} from "@/lib/extract-client";
-import { validateImageBatch } from "@/lib/image-constraints";
-import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
+import { ExtractClientError } from "@/lib/extract-client";
 import {
   availableSections,
   moreSheetRows,
@@ -107,6 +89,7 @@ import { workspaceCan } from "@/features/tenancy/workspace";
 import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
 import { LibraryProvider, useLibrary } from "@/features/menus/library-context";
 import { useDraftClaims } from "@/features/menus/draft-claims";
+import { useCapture } from "@/features/capture/use-capture";
 import { NavigationProvider, useNavigation } from "@/features/navigation/navigation-context";
 import { createRestaurant } from "@/features/tenancy/client";
 import {
@@ -250,30 +233,6 @@ function HomeShell() {
 
   const router = useRouter();
 
-  const [pages, setPages] = useState<PageImage[]>([]);
-  const [fileError, setFileError] = useState<string | null>(null);
-  const [phase, setPhase] = useState<Phase>("upload");
-  const [extracted, setExtracted] = useState<MenuExtractionResult | null>(null);
-  /** Canonical form of the current result, for the phone-framed first look. */
-  const [resultDoc, setResultDoc] = useState<MenuDocument | null>(null);
-  /** Real progress for the extraction wait; null outside an extraction. */
-  const [extractProgress, setExtractProgress] = useState<{
-    pageCount: number;
-    preparedPages: number;
-    requestStartedAt: number | null;
-  } | null>(null);
-  /** Draft persisted automatically after a successful AI extraction. */
-  const [draftSave, setDraftSave] = useState<"idle" | "saving" | "saved" | "unavailable">("idle");
-  /** Flagged count when the current extraction landed; drives the "N of M
-   * checked" progress on the result screen. Reset with the capture. */
-  const [initialReviewCount, setInitialReviewCount] = useState<number | null>(null);
-  const draftDocRef = useRef<MenuDocument | null>(null);
-  /** Guards autosave state against a newer extraction or a reset. */
-  const draftTokenRef = useRef(0);
-  const [demoDoc, setDemoDoc] = useState<MenuDocument | null>(null);
-  const [source, setSource] = useState<"ai" | "demo">("ai");
-  const [extractError, setExtractError] = useState<ExtractClientError | null>(null);
-
   // Editor state: the one open document. The library itself lives in the
   // provider above the shell.
   const [activeDoc, setActiveDoc] = useState<MenuDocument | null>(null);
@@ -286,8 +245,6 @@ function HomeShell() {
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
   const replaceIndexRef = useRef<number | null>(null);
-  /** Preview URLs currently shown for `pages` (revoked on swap and unmount). */
-  const liveUrlsRef = useRef<string[]>([]);
   const resultRef = useRef<HTMLDivElement>(null);
   const docRef = useRef<MenuDocument | null>(null);
   const lastSavedRef = useRef<string | null>(null);
@@ -316,6 +273,46 @@ function HomeShell() {
   const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
   /** Whether this membership may file new menus into the acting café. */
   const signedInCanWrite = signedIn && accountCan("menus.write");
+  // The capture document — pages, extraction, the result under review and its
+  // draft. It ends where the menu begins; this screen keeps the menu.
+  const {
+    pages,
+    fileError,
+    phase,
+    extracted,
+    resultDoc,
+    extractProgress,
+    draftSave,
+    initialReviewCount,
+    demoDoc,
+    source,
+    extractError,
+    result,
+    setExtractError,
+    applySelection,
+    selectFiles,
+    addPages,
+    replacePageAt,
+    removePage,
+    clearCapture,
+    handleExtract,
+    handleDemo,
+    handleResolveResultItem,
+    handleUpdateResultPrice,
+    handleResolveAllResultItems,
+    handleRenameResultTitle,
+    resumeDraft,
+    documentForSave,
+    draftDocId,
+  } = useCapture({
+    confirmDiscard,
+    ensureServerTarget: (menuTitle: string) =>
+      ensureServerTarget(menuTitle, activeRestaurantId, signedInCanWrite),
+    cacheServerDraft,
+    pruneSignedOutOthers,
+    revealResult: scrollToResult,
+    reportError: reportLibraryError,
+  });
   /**
    * The ownership wall's sentence is only true while nobody is known, so it is
    * derived away the moment a session settles signed in — never cleared by an
@@ -419,10 +416,6 @@ function HomeShell() {
   const [liveDoc, setLiveDoc] = useState<MenuDocument | null>(null);
   const [liveDocMenuId, setLiveDocMenuId] = useState<string | null>(null);
   const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">("idle");
-
-  // Display derives from the canonical docs (which carry confirmations),
-  // falling back to the raw extraction only for the empty state.
-  const result: PreviewMenu | null = resultDoc ?? demoDoc ?? extracted?.menu ?? null;
 
   /**
    * Café-keyed read: the library is one café's list, so a different membership
@@ -1353,7 +1346,7 @@ function HomeShell() {
     // The published menu may be the capture draft: once it has a link,
     // Capture goes back to a fresh upload instead of showing the old draft
     // as if it were still being worked on. Other menus leave capture alone.
-    if (menuId === draftDocRef.current?.id || menuId === demoDoc?.id) {
+    if (menuId === draftDocId() || menuId === demoDoc?.id) {
       clearCapture();
     }
   }
@@ -1441,293 +1434,18 @@ function HomeShell() {
    * show the new ones, and drop any stale extraction result. Callers have
    * already confirmed discarding and validated the batch.
    */
-  function applySelection(nextFiles: File[]) {
-    // Any change of pages invalidates the draft tied to the old selection.
-    draftTokenRef.current += 1;
-    draftDocRef.current = null;
-    setDraftSave("idle");
-    pages.forEach((page) => URL.revokeObjectURL(page.previewUrl));
-    const next = nextFiles.map((file) => ({ file, previewUrl: URL.createObjectURL(file) }));
-    liveUrlsRef.current = next.map((page) => page.previewUrl);
-    setPages(next);
-    setFileError(null);
-    setExtractError(null);
-    setExtracted(null);
-    setResultDoc(null);
-    setDemoDoc(null);
-    setInitialReviewCount(null);
-    setExtractProgress(null);
-    setPhase(next.length > 0 ? "ready" : "upload");
-  }
-
-  /** Start (or restart) a selection from the dropzone — replaces every page. */
-  async function selectFiles(incoming: File[]) {
-    if (incoming.length === 0) return;
-    // Signed-out replacement needs no consent: the single offline draft is
-    // superseded once the new capture saves (pruned in autoSaveDraft), and
-    // a failed extraction leaves the old draft standing.
-    if (signedInRef.current && !(await confirmDiscard())) return;
-    const check = validateImageBatch(incoming);
-    if (!check.valid) {
-      setFileError(check.message);
-      return;
-    }
-    applySelection(incoming);
-  }
-
-  /**
-   * Append pages to the current selection; the whole set is validated as one
-   * batch. Adding a page never discards the images — only a previous
-   * extraction of them is stale — so the confirm says exactly that, and the
-   * new extraction runs right away over the old pages plus the new ones
-   * instead of making the user press Extract a second time.
-   */
-  async function addPages(incoming: File[]) {
-    if (incoming.length === 0) return;
-    if (phase === "extracting") {
-      setFileError("An extraction is running — add pages once it finishes.");
-      return;
-    }
-    const combined = [...pages.map((page) => page.file), ...incoming];
-    const check = validateImageBatch(combined);
-    if (!check.valid) {
-      setFileError(check.message);
-      return;
-    }
-    if (signedInRef.current) {
-      // The add control only exists while pages are selected, so there is
-      // always a previous selection to combine; the guard in confirmDiscard
-      // decides whether there is an extraction result worth confirming.
-      // Signed-out replacement needs no consent (see selectFiles).
-      const confirmMessage =
-        `This discards the current extraction result — the images themselves are kept. ` +
-        `A new extraction will run on all ${combined.length} images together: the ` +
-        `${pages.length} already selected plus ${incoming.length} new ` +
-        `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
-      if (!(await confirmDiscard(confirmMessage))) return;
-    }
-    applySelection(combined);
-    void extractFiles(combined);
-  }
-
-  /** Replace one page, keeping the rest of the selection in place. */
-  function replacePageAt(index: number, nextFile: File) {
-    if (!pages[index]) return;
-    const check = validateImageBatch(pages.map((page, i) => (i === index ? nextFile : page.file)));
-    if (!check.valid) {
-      setFileError(check.message);
-      return;
-    }
-    applySelection(pages.map((page, i) => (i === index ? nextFile : page.file)));
-  }
-
-  /** Drop one page; dropping the last one returns to the dropzone. */
-  async function removePage(index: number) {
-    if (!(await confirmDiscard())) return;
-    applySelection(pages.filter((_, i) => i !== index).map((page) => page.file));
-  }
-
-  function clearCapture() {
-    applySelection([]);
-  }
-
-  /** Run one extraction over an explicit file list (normally the selection). */
-  async function extractFiles(files: File[]) {
-    if (files.length === 0 || phase === "extracting") return;
-    setPhase("extracting");
-    setFileError(null);
-    setExtractError(null);
-    setExtractProgress({ pageCount: files.length, preparedPages: 0, requestStartedAt: null });
-    try {
-      // Normalize first: AVIF is transcoded to JPEG here because the provider
-      // cannot read it, and mislabeled files get their real MIME type. One at
-      // a time, so the page count in the progress panel is a real milestone.
-      const prepared: Awaited<ReturnType<typeof prepareImageForUpload>>[] = [];
-      for (const file of files) {
-        prepared.push(await prepareImageForUpload(file));
-        setExtractProgress((current) =>
-          current ? { ...current, preparedPages: current.preparedPages + 1 } : current
-        );
-      }
-      setExtractProgress((current) =>
-        current ? { ...current, requestStartedAt: Date.now() } : current
-      );
-      const extraction = await extractMenuFromFiles(
-        prepared.map((image) => new File([image.blob], image.filename, { type: image.mimeType }))
-      );
-      const previewDoc =
-        extraction.menu.categories.length > 0
-          ? extractedMenuToDocument(extraction.menu, {
-              provider: extraction.provider,
-              model: extraction.model,
-              originalFileName: files[0]?.name,
-            })
-          : null;
-      setResultDoc(previewDoc);
-      setExtracted(extraction);
-      setInitialReviewCount(
-        previewDoc == null
-          ? 0
-          : previewDoc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
-      );
-      setSource("ai");
-      setPhase("done");
-      void autoSaveDraft(extraction, files[0] ?? null, previewDoc);
-    } catch (error) {
-      setExtractError(
-        error instanceof ExtractClientError
-          ? error
-          : error instanceof PrepareImageError
-            ? new ExtractClientError("invalid_file_type", error.message)
-            : new ExtractClientError("internal_error", "Something went wrong. Try again.")
-      );
-      setPhase("ready");
-    }
-    scrollToResult();
-  }
-
-  function handleExtract() {
-    void extractFiles(pages.map((page) => page.file));
-  }
-
-  async function handleDemo() {
-    if (signedInRef.current && !(await confirmDiscard())) return;
-    clearCapture();
-    const doc = createSampleMenuDocument();
-    setDemoDoc(doc);
-    setResultDoc(doc);
-    setInitialReviewCount(
-      doc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
-    );
-    setSource("demo");
-    setPhase("done");
-    scrollToResult();
-  }
-
-  /**
-   * Persist an extraction immediately, so reviewing the draft in the editor
-   * is optional rather than the act of saving. Skips empty results (nothing
-   * worth storing) and keeps the newest draft when extractions overlap.
-   */
-  async function autoSaveDraft(
-    extraction: MenuExtractionResult,
-    primaryPage: File | null,
-    existingDoc: MenuDocument | null = null
-  ) {
-    const token = (draftTokenRef.current += 1);
-    if (extraction.menu.categories.length === 0) {
-      draftDocRef.current = null;
-      setDraftSave("idle");
-      return;
-    }
-    const doc =
-      existingDoc ??
-      extractedMenuToDocument(extraction.menu, {
-        provider: extraction.provider,
-        model: extraction.model,
-        originalFileName: primaryPage?.name,
-      });
-    draftDocRef.current = doc;
-    // One blob per menu: the first page stands in as the source image.
-    const primaryPageBlob = primaryPage;
-    if (storageDownRef.current) {
-      setDraftSave("unavailable");
-      return;
-    }
-    setDraftSave("saving");
-    try {
-      // Server-only while signed in: the draft is a cloud copy from the
-      // start, so a rename-and-return never sits "in this browser". No
-      // local fallback — a failure keeps the in-memory result and the next
-      // Extract press retries.
-      if (signedInRef.current) {
-        const targetId = await ensureServerTarget(doc.title, activeRestaurantId, signedInCanWrite);
-        if (!targetId) {
-          throw new SyncError(
-            "unavailable",
-            "Couldn't reach your account. Check your connection, then press Extract again."
-          );
-        }
-        let server: ServerMenu;
-        try {
-          server = await createServerMenu(targetId, doc);
-        } catch (serverError) {
-          // A retry that landed after an ambiguous failure adopts the row
-          // instead of duplicating it.
-          if (serverError instanceof SyncError && serverError.code === "exists") {
-            server = await fetchServerMenu(doc.id);
-          } else {
-            throw serverError;
-          }
-        }
-        if (primaryPageBlob) {
-          try {
-            await saveImage(server.id, primaryPageBlob);
-          } catch {
-            // Image is optional; the menu matters.
-          }
-        }
-        if (token !== draftTokenRef.current) return;
-        const cached = await cacheServerDraft(server);
-        draftDocRef.current = cached;
-        setDraftSave("saved");
-        await refreshLibrary();
-        return;
-      }
-      const saved = await saveMenu(doc);
-      if (primaryPageBlob) {
-        try {
-          await saveImage(saved.id, primaryPageBlob);
-        } catch {
-          // Image is optional; the menu matters.
-        }
-      }
-      if (token !== draftTokenRef.current) return;
-      draftDocRef.current = saved;
-      // A draft saved while signed in belongs to this account from now on:
-      // sign-out must hide it, published or not. Empty baseline — the menu
-      // is not confirmed on the server yet — and stamping never downgrades
-      // an existing stamp.
-      const autosaveActor = signedInRef.current ? accountKeyRef.current : null;
-      if (autosaveActor) await stampDraftOrigin(saved.id, autosaveActor, "");
-      await pruneSignedOutOthers(saved.id);
-      setDraftSave("saved");
-      await refreshLibrary();
-    } catch (error) {
-      if (token !== draftTokenRef.current) return;
-      setDraftSave("unavailable");
-      setExtractError(
-        new ExtractClientError(
-          "internal_error",
-          error instanceof StorageError
-            ? error.message
-            : "The draft could not be saved in this browser, but you can still edit it."
-        )
-      );
-    }
-  }
-
-  /** Save the current result (AI or demo) and open it in the editor. */
   /**
    * Persist the current result and open it. The wizard entry point reuses
    * this without touching the URL, then navigates once to its own mode.
    */
   async function saveResultAndOpen(updateRoute = true): Promise<MenuDocument> {
     // `extracted` is null for a draft resumed after a reload: the stored
-    // document (and `resultDoc`) is the work, so the same path opens it
-    // instead of pretending this is a fresh sample menu.
-    if (source === "ai" && (extracted || resultDoc)) {
-      const firstPage = pages[0];
-      // Reuse the autosaved draft instead of writing a second record.
-      const doc =
-        draftDocRef.current ??
-        (extracted
-          ? extractedMenuToDocument(extracted.menu, {
-              provider: extracted.provider,
-              model: extracted.model,
-              originalFileName: firstPage?.file.name,
-            })
-          : resultDoc!);
+    // document is the work, so the same path opens it instead of pretending
+    // this is a fresh sample menu. The hook answers "what is this capture
+    // about to become", reusing the autosaved draft.
+    const pending = documentForSave();
+    if (pending) {
+      const { doc, firstPage } = pending;
       // Server-only while signed in: no browser-only copy is ever written.
       // A failure throws to the result screen's error path with the data
       // intact, so the next press retries instead of forking a local copy.
@@ -1836,137 +1554,13 @@ function HomeShell() {
   }
 
   /** Point every result-screen confirmation at the same canonical doc. */
-  function patchResultDoc(next: MenuDocument) {
-    setResultDoc(next);
-    if (source === "demo") setDemoDoc(next);
-    draftDocRef.current = next;
-  }
-
-  /** Persist a confirmation to IndexedDB (demo stays in memory until saved). */
-  async function persistResultDoc(next: MenuDocument) {
-    if (storageDownRef.current || source === "demo") return;
-    // Invalidate an in-flight autosave so its stale completion cannot
-    // overwrite the confirmation it raced.
-    draftTokenRef.current += 1;
-    setDraftSave("saving");
-    try {
-      const saved = await saveMenu(next);
-      draftDocRef.current = saved;
-      // Same rule as the autosave: a confirmation made while signed in
-      // marks the row, so sign-out hides it. Never downgrades a stamp.
-      const confirmActor = signedInRef.current ? accountKeyRef.current : null;
-      if (confirmActor) await stampDraftOrigin(saved.id, confirmActor, "");
-      setResultDoc(saved);
-      setDraftSave("saved");
-      await refreshLibrary();
-    } catch {
-      setDraftSave("unavailable");
-    }
-  }
-
-  /** "Looks good" clears the AI notes; "leave unpriced" also accepts the
-   * null price (e.g. market price). Prices are never invented. */
-  function handleResolveResultItem(loc: ReviewItemLocation, resolution: ReviewResolution) {
-    const doc = source === "demo" ? demoDoc : resultDoc;
-    if (!doc) return;
-    const category = doc.categories[loc.categoryIndex];
-    const item = category?.items[loc.itemIndex];
-    if (!category || !item) return;
-    const next =
-      resolution === "leave-unpriced"
-        ? acceptItemUnpriced(doc, category.id, item.id)
-        : confirmItemReviewed(doc, category.id, item.id);
-    patchResultDoc(next);
-    void persistResultDoc(next);
-  }
-
-  /** Fix a flagged price in the Check-this queue. Blank stays blank;
-   * entering a number resolves Check price; clearing back to blank
-   * re-flags unless the item was accepted as intentionally unpriced. */
-  function handleUpdateResultPrice(loc: ReviewItemLocation, price: number | null) {
-    const doc = source === "demo" ? demoDoc : resultDoc;
-    if (!doc) return;
-    const category = doc.categories[loc.categoryIndex];
-    const item = category?.items[loc.itemIndex];
-    if (!category || !item) return;
-    // Filling in a missing price replaces the AI's uncertainty about it:
-    // the owner's number clears the notes in the same tap. Editing an
-    // existing price leaves notes alone — they may concern something else,
-    // and "Looks good" confirms those explicitly.
-    const next = updateItem(
-      doc,
-      category.id,
-      item.id,
-      !hasAnyPrice(item) && price !== null ? { price, reviewNotes: [] } : { price }
-    );
-    patchResultDoc(next);
-    void persistResultDoc(next);
-  }
-
-  /** The impatient path: confirm every flagged item as shown. Null prices
-   * stay null (totals stay honestly blank) — nothing is invented. */
-  function handleResolveAllResultItems() {
-    const doc = source === "demo" ? demoDoc : resultDoc;
-    if (!doc) return;
-    let next = doc;
-    for (const category of doc.categories) {
-      for (const item of category.items) {
-        if (!isItemFlagged(item)) continue;
-        next = hasAnyPrice(item)
-          ? confirmItemReviewed(next, category.id, item.id)
-          : acceptItemUnpriced(next, category.id, item.id);
-      }
-    }
-    patchResultDoc(next);
-    void persistResultDoc(next);
-  }
-
-  /** Q2: the result title is an editable field, never a naming gate.
-   * Commits persist to the draft like price fixes; blank is ignored. */
-  function handleRenameResultTitle(title: string) {
-    const trimmed = title.trim();
-    if (!trimmed) return;
-    const doc = source === "demo" ? demoDoc : resultDoc;
-    if (!doc || doc.title === trimmed) return;
-    const next = { ...doc, title: trimmed };
-    patchResultDoc(next);
-    void persistResultDoc(next);
-  }
-
-  /**
-   * The signed-out way back. A reload with a browser draft shows a banner on
-   * Capture, and resuming restores that draft into the capture result screen —
-   * the screen the work happened on — rather than asking for the photo again
-   * or sending anyone to a library that no longer exists signed out.
-   */
+  /** The signed-out resume banner: load the draft, then return to Capture. */
   async function handleResumeCapture(menuId: string) {
-    try {
-      const doc = await getMenu(menuId);
-      const image = await getImage(menuId).catch(() => null);
-      if (image) {
-        const file = new File([image.blob], `${doc.title || "menu"}.jpg`, {
-          type: image.mimeType,
-        });
-        applySelection([file]);
-      } else {
-        // The draft outlives its source photo: the result is still the work.
-        applySelection([]);
-      }
-      draftDocRef.current = doc;
-      setResultDoc(doc);
-      setExtracted(null);
-      setInitialReviewCount(
-        doc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
-      );
-      setSource("ai");
-      setDraftSave("saved");
-      setPhase("done");
-      setResumeDismissed(true);
-      navigate({ screen: "capture" });
-      scrollToResult();
-    } catch {
-      reportLibraryError("Couldn't reopen that draft. Try again in a moment.");
-    }
+    const doc = await resumeDraft(menuId);
+    if (!doc) return;
+    setResumeDismissed(true);
+    navigate({ screen: "capture" });
+    scrollToResult();
   }
 
   async function handleEditResult() {
@@ -2413,7 +2007,6 @@ function HomeShell() {
 
   useEffect(() => {
     return () => {
-      liveUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       if (editorImageUrl) URL.revokeObjectURL(editorImageUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
