@@ -181,6 +181,14 @@ errors, or add lint/type suppressions just to make checks pass.
   here, so no screen can hold a second opinion about what the account owns.
   `refreshLibrary` and the café map are stable callbacks, so the shell's route
   opener can name them as dependencies without re-running every render.
+- `src/features/publishing/use-publication.ts` — `usePublication`: the open
+  menu's publication — whether it is live, what diners see now, and the three
+  actions that change it. It follows the document the editor holds, flushes the
+  pending save before a snapshot, and never shows a status loaded for a different
+  menu (`publicationMenuId` guards every read). The editor is reached through
+  doors: `getOpenDoc`, `flushSave`, `onServerRevision` (the wizard's agreed
+  revision) and `onPublishedMenu` (a published capture draft resets capture).
+  `resetPublication()` is the one five-line reset the shell used to repeat.
 - `src/features/capture/use-capture.ts` — `useCapture`: the capture document —
   the pages selected, the extraction, the result under review, the draft saved
   as it goes, and the review edits (resolve, price, rename). It stops where the
