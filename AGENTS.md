@@ -165,7 +165,8 @@ errors, or add lint/type suppressions just to make checks pass.
   `/menus/<id>/[...rest]` remains so a stale bookmark, or a table QR link from
   before QR cards moved to Tables, still lands in the library with a message
   instead of a 404. A new screen is one route file plus its `AppScreen`; no
-  route file parses a route.
+  route file parses a route. The screen itself still renders from one switch in
+  the shell — the navigation entry below says why that is deliberate.
 - `src/components/layout/app-shell.tsx` — the frame every app screen sits in:
   the left column, the brand row that stands in where the column is absent,
   the workspace switcher, the content measure and footer, the phone tab bar,
@@ -184,7 +185,33 @@ errors, or add lint/type suppressions just to make checks pass.
   first screen is the one `usePathname()` names (rendered into the HTML, so a
   hard load paints the right screen rather than flashing capture). Moving to
   the App Router's own URLs later changes this provider, not its callers.
+
+  **Why the screens still render from one switch.** Every page file is per
+  route, but the child each returns is the shell, which picks the screen from
+  `route.screen`. Two decisions put it there, and changing either moves
+  behaviour. First, `navigate` writes the URL with `history.pushState` rather
+  than pushing a Next `<Link>`: Next does not re-render a page on pushState, so
+  the page tree is built once per load and the visible screen has to be
+  something that re-renders on route state — the shell is that component. A
+  Next push was avoided because it remounts the page component, which is where
+  the open menu's document, its pending autosave, the conflict banner and the
+  capture review live. Second, the screen is not a function of the URL alone:
+  the guards turn an account URL back to Capture when signed out (the publish
+  step excepted, for the magic link), send a membership to its first surface
+  when the URL names one it cannot use, and hold the dead-publish-link
+  recovery; `item`, `reorder`, `preview` and `publish` are modes of the editor
+  rather than screens of their own, and an editor URL whose document has not
+  arrived yet is its skeleton.
+  Rendering per route instead would want the document and capture state hoisted
+  above the pages (a menu left open while the reader sits in Settings, with the
+  sign-out and café-switch rules that follow), `navigate` on `router.push`, and
+  a new home for the guards — server redirects, so a round trip per guarded
+  URL. It would buy per-route code splitting, prefetch, and route-level
+  `loading`/`error` files, and retire the `AppScreen` union. That is a
+  behaviour change, not a move: its own branch, and a browser pass.
+
   Tests: `tests/navigation-history.test.ts`.
+
 - `src/features/menus/library-context.tsx` — the library and the account's
   answers about it: the browser's menu list, the ids the server proved, the
   café each row belongs to, the per-menu access map and the device's draft
