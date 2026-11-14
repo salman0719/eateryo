@@ -58,7 +58,6 @@ import {
 import {
   createServerMenu,
   deleteServerMenu,
-  fetchCafeMenus,
   fetchServerMenu,
   SyncError,
   type MembershipAccess,
@@ -114,11 +113,11 @@ import {
   accessCan,
   accessIsStaff,
   isPublishedOnlyAccess,
-  menuAccessById,
   type MenuAccess,
 } from "@/features/tenancy/access";
 import { workspaceCan } from "@/features/tenancy/workspace";
 import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
+import { LibraryProvider, useLibrary } from "@/features/menus/library-context";
 import { NavigationProvider, useNavigation } from "@/features/navigation/navigation-context";
 import { createRestaurant } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
@@ -195,7 +194,9 @@ export function HomeScreen({ initialRoute }: { initialRoute: AppRoute }) {
   return (
     <WorkspaceProvider>
       <NavigationProvider initialRoute={initialRoute}>
-        <HomeShell />
+        <LibraryProvider>
+          <HomeShell />
+        </LibraryProvider>
       </NavigationProvider>
     </WorkspaceProvider>
   );
@@ -213,6 +214,35 @@ function HomeShell() {
     registerSaveFlush,
   } = useNavigation();
   const { confirm, dialog } = useConfirm();
+  // Everything the account has answered about the library lives one level up,
+  // so every screen reads the same list and the same membership markers.
+  const {
+    menus,
+    originList,
+    libraryLoading,
+    libraryError,
+    storageDown,
+    storageDownRef,
+    serverIds,
+    serverIdsRef,
+    menuAccess,
+    menuAccessRef,
+    menuRestaurantById,
+    serverMenusFor,
+    serverMenusReadFor,
+    serverMenusReadFailedFor,
+    accountMenusSettledRef,
+    accountMenusReadFailedRef,
+    refreshLibrary,
+    reportLibraryError,
+    mergeAccountMenus,
+    retryAccountCheck,
+    resetAccountAnswer,
+    setMenuAccessFor,
+    addServerId,
+    removeServerId,
+    rememberMenuCafe,
+  } = useLibrary();
   const screen: AppScreen = route.screen === "item" ? "editor" : route.screen;
   const selectedItemId = route.screen === "item" ? route.itemId : null;
   /** R0 phone nav: the More sheet (Tables · Assistant · Settings). */
@@ -264,12 +294,8 @@ function HomeShell() {
   const [source, setSource] = useState<"ai" | "demo">("ai");
   const [extractError, setExtractError] = useState<ExtractClientError | null>(null);
 
-  // Library + editor state.
-  const [menus, setMenus] = useState<MenuSummary[]>([]);
-  /** True until the first library read settles (skeleton rows, not the empty state). */
-  const [libraryLoading, setLibraryLoading] = useState(true);
-  const [storageDown, setStorageDown] = useState(false);
-  const [libraryError, setLibraryError] = useState<string | null>(null);
+  // Editor state: the one open document. The library itself lives in the
+  // provider above the shell.
   const [activeDoc, setActiveDoc] = useState<MenuDocument | null>(null);
   const [saveState, setSaveState] = useState<SaveState>(
     savedState("Saved in this browser. Sign in to use this menu on other devices.")
@@ -286,7 +312,6 @@ function HomeShell() {
   const docRef = useRef<MenuDocument | null>(null);
   const lastSavedRef = useRef<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const storageDownRef = useRef(false);
 
   // The account read and the acting membership belong to the provider above
   // the shell: one read for every screen. What the shell may do is the active
@@ -336,44 +361,6 @@ function HomeShell() {
   const [conflict, setConflict] = useState<{ serverUpdatedAt: string | null } | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
   const conflictRef = useRef<{ serverUpdatedAt: string | null } | null>(null);
-  /** Ids of the caller's menus that exist on the server (chips + operations). */
-  const serverIdsRef = useRef<ReadonlySet<string>>(new Set());
-  const [serverIds, setServerIds] = useState<ReadonlySet<string>>(new Set());
-  /**
-   * The café each account menu belongs to, keyed by menu id. A browser-only
-   * draft has no entry — it belongs to no café until it is moved. The
-   * summaries already carry this, so the library can be scoped without a
-   * second request.
-   */
-  const [menuRestaurantById, setMenuRestaurantById] = useState<ReadonlyMap<string, string>>(
-    new Map()
-  );
-  /** Ids of account menus where the caller is staff only (view, never edit). */
-  /**
-   * Server-resolved access for each menu, keyed by id. A missing id is the
-   * unanswered state — never "no access" and never "owner". `"local"` is a
-   * browser-only menu the caller owns; `"none"` is a row the server refused,
-   * whose cached copy must not be rendered.
-   */
-  const menuAccessRef = useRef<ReadonlyMap<string, MenuAccess>>(new Map());
-  const [menuAccess, setMenuAccess] = useState<ReadonlyMap<string, MenuAccess>>(new Map());
-  /** Which account the server menu ids belong to; null until a merge settles. */
-  const [serverMenusFor, setServerMenusFor] = useState<string | null>(null);
-  /** Which account's server menu read failed (same third state, menus). */
-  const [serverMenusReadFailedFor, setServerMenusReadFailedFor] = useState<string | null>(null);
-  /**
-   * Which account's server menu list has *finished* being read, however it
-   * ended. The chip column waits for this (001): before it lands, an empty id
-   * set means "not asked yet", never "this browser only".
-   */
-  const [serverMenusReadFor, setServerMenusReadFor] = useState<string | null>(null);
-  /**
-   * The same marker as a ref: the save status and the publish gate decide in
-   * async code that finishes after an await (003).
-   */
-  const accountMenusSettledRef = useRef<string | null>(null);
-  /** The same failure marker as a ref: the save status decides after awaits. */
-  const accountMenusReadFailedRef = useRef<string | null>(null);
   /**
    * Where the open menu is saved. `null` while the account read is still
    * pending, so nothing claims "this browser only" on a guess (001, 003).
@@ -392,8 +379,6 @@ function HomeShell() {
    * checked, and does not offer the café-creating flow on a guess (016).
    */
   const activeMenuAccountCheckFailed = activeMenuMembership === "unreachable";
-  /** Device-local ownership stamps (which account each draft belongs to). */
-  const [originList, setOriginList] = useState<DraftOrigin[]>([]);
   const [claimError, setClaimError] = useState<string | null>(null);
 
   /**
@@ -411,8 +396,6 @@ function HomeShell() {
    * never swept into an account behind the owner's back.
    */
   const claimEvaluatedRef = useRef<string | null>(null);
-  /** Deduplicates concurrent account merges. */
-  const mergeRef = useRef<Promise<void> | null>(null);
 
   // Publishing (Step 9): the open menu's public-link state, loaded on open
   // and refreshed whenever the preview is shown (that is when an owner looks
@@ -436,45 +419,12 @@ function HomeShell() {
   // falling back to the raw extraction only for the empty state.
   const result: PreviewMenu | null = resultDoc ?? demoDoc ?? extracted?.menu ?? null;
 
-  /** Which account+café the shell has already read this session. */
-  const mergedCafeRef = useRef<string | null>(null);
-
   /**
    * Café-keyed read: the library is one café's list, so a different membership
    * starts from a different read, and an account with no café settles empty
    * instead of waiting forever. Ids and access answers from the previous café
    * do not describe this one, so they are dropped before the new read.
    */
-
-  function replaceServerIds(next: ReadonlySet<string>) {
-    serverIdsRef.current = next;
-    setServerIds(next);
-  }
-
-  function replaceMenuAccess(next: ReadonlyMap<string, MenuAccess>) {
-    menuAccessRef.current = next;
-    setMenuAccess(next);
-  }
-
-  /**
-   * Which café a menu belongs to, learned from the server's own answer. It
-   * follows the switcher across cafés (a deep link can open another café's
-   * menu) and is never used to filter the library — the café-keyed read
-   * already returns one café's rows.
-   */
-  function rememberMenuCafe(menuId: string, restaurantId: string) {
-    setMenuRestaurantById((current) =>
-      current.get(menuId) === restaurantId ? current : new Map(current).set(menuId, restaurantId)
-    );
-  }
-
-  function rememberMenuCafes(menus: { id: string; restaurantId: string }[]) {
-    setMenuRestaurantById((current) => {
-      const next = new Map(current);
-      for (const menu of menus) next.set(menu.id, menu.restaurantId);
-      return next;
-    });
-  }
 
   /**
    * An attach just proved this menu lives on the account in a known café:
@@ -501,199 +451,6 @@ function HomeShell() {
     } catch {
       // The café-keyed merge covers the common case; this only heals the
       // attach-into-another-café gap.
-    }
-  }
-
-  /** Record one menu's access answer without touching the rest. */
-  function setMenuAccessFor(id: string, access: MenuAccess) {
-    if (menuAccessRef.current.get(id) === access) return;
-    const next = new Map(menuAccessRef.current);
-    next.set(id, access);
-    replaceMenuAccess(next);
-  }
-
-  function addServerId(id: string) {
-    if (serverIdsRef.current.has(id)) return;
-    const next = new Set(serverIdsRef.current);
-    next.add(id);
-    replaceServerIds(next);
-  }
-
-  function removeServerId(id: string) {
-    if (!serverIdsRef.current.has(id)) return;
-    const next = new Set(serverIdsRef.current);
-    next.delete(id);
-    replaceServerIds(next);
-  }
-
-  async function refreshLibrary() {
-    try {
-      setMenus(await listMenus());
-      setOriginList(await listDraftOrigins());
-      setStorageDown(false);
-      storageDownRef.current = false;
-    } catch (error) {
-      setStorageDown(true);
-      storageDownRef.current = true;
-      if (error instanceof StorageError) setLibraryError(error.message);
-    } finally {
-      setLibraryLoading(false);
-    }
-  }
-
-  /**
-   * Retry the account's menu read after a failure (016). The markers drop
-   * back to "not read yet" first, so the surfaces return to their
-   * placeholders instead of announcing an answer that has not arrived.
-   */
-  function handleRetryAccountCheck() {
-    if (!accountKey) return;
-    setServerMenusReadFailedFor(null);
-    setServerMenusReadFor(null);
-    accountMenusSettledRef.current = null;
-    void mergeAccountMenus(activeRestaurantId);
-  }
-
-  /**
-   * Merge the account's menus into the local library (signed in only). A
-   * menu that exists only on the server — moved from another device — is
-   * downloaded and cached locally once, so the library lists and opens it
-   * anywhere; afterwards it behaves like any local menu, reconciled with
-   * the server revision on open. Best-effort: offline or a server DB that
-   * is unavailable leaves the local library standing alone.
-   */
-  async function mergeAccountMenus(restaurantId: string | null) {
-    if (!signedInRef.current || mergeRef.current) return;
-    // Café-keyed: the library is one café's list, so the read names the café.
-    // Until it resolves the keyed effect re-runs; an account with no café is
-    // settled there, never here as an empty "read". The café arrives as an
-    // argument, so the read cannot act in a membership the shell has left.
-    if (!restaurantId) return;
-    const run = (async () => {
-      try {
-        const { menus: serverMenus } = await fetchCafeMenus(restaurantId);
-        // Same other-café rule as access below: a row provably on the
-        // account stays listed even when it lives in another café.
-        const nextIds = new Set(serverMenus.map((menu) => menu.id));
-        for (const id of serverIdsRef.current) {
-          const knownCafe = menuRestaurantById.get(id);
-          if (knownCafe && knownCafe !== restaurantId) nextIds.add(id);
-        }
-        replaceServerIds(nextIds);
-        rememberMenuCafes(serverMenus);
-        // The claim offer waits for this: an empty set is only trustworthy
-        // once the account has actually been read.
-        if (signedInRef.current) {
-          setServerMenusFor(accountKey);
-          setServerMenusReadFailedFor(null);
-        }
-        // One answer, no second role lookup: each summary already carries the
-        // caller's capabilities. A browser-only menu keeps its local answer
-        // while the server list has nothing to say about it. A menu attached
-        // into another café keeps its explicit answer too: this café's list
-        // cannot speak for a row that lives elsewhere.
-        const accessById = new Map<string, MenuAccess>(menuAccessById(serverMenus));
-        for (const [id, access] of menuAccessRef.current) {
-          if (accessById.has(id)) continue;
-          if (access === "local") {
-            accessById.set(id, "local");
-            continue;
-          }
-          const knownCafe = menuRestaurantById.get(id);
-          if (knownCafe && knownCafe !== restaurantId && access !== "none") {
-            accessById.set(id, access);
-          }
-        }
-        replaceMenuAccess(accessById);
-        const localIds = new Set((await listMenus()).map((menu) => menu.id));
-        let cachedAny = false;
-        let originsChanged = false;
-        for (const summary of serverMenus) {
-          // A member without the draft grant must never open a cached draft:
-          // replace it with the live snapshot before it can be read. This is
-          // the cache half of the server-side projection (the API already
-          // refuses to send the draft).
-          if (!summary.access.capabilities.includes("menus.read_draft")) {
-            try {
-              const full = await fetchServerMenu(summary.id);
-              await cacheMenu({ ...full.doc, updatedAt: full.updatedAt });
-              cachedAny = true;
-            } catch {
-              // One unreadable row never blocks the rest; the next refresh
-              // retries it.
-            }
-            continue;
-          }
-          if (localIds.has(summary.id)) {
-            // Backfill: this row is provably the account's (same id on the
-            // server) but was never marked — signed out, it would resurface
-            // as an anonymous draft. The agreed revision comes from the
-            // server, so a later return heals instead of conflicting.
-            // Staff rows and someone else's cache are never touched.
-            if (!accessCan(menuAccessRef.current.get(summary.id), "menus.write")) continue;
-            const backfillActor = accountKeyRef.current;
-            if (!backfillActor) continue;
-            try {
-              const origin = await getDraftOrigin(summary.id).catch(() => undefined);
-              if (origin) continue;
-              if (!signedInRef.current) continue;
-              const full = await fetchServerMenu(summary.id);
-              if (!signedInRef.current) continue;
-              await refreshDraftSync(
-                summary.id,
-                backfillActor,
-                full.updatedAt,
-                menuContentHash(full.doc)
-              );
-              originsChanged = true;
-            } catch {
-              // One unreadable row never blocks the rest; the next sign-in
-              // retries it.
-            }
-            continue;
-          }
-          try {
-            const full = await fetchServerMenu(summary.id);
-            await cacheMenu(full.doc);
-            const mergeActor = accountKeyRef.current;
-            if (mergeActor)
-              await refreshDraftSync(
-                summary.id,
-                mergeActor,
-                full.updatedAt,
-                menuContentHash(full.doc)
-              );
-            cachedAny = true;
-          } catch {
-            // One failed download never blocks the rest; the menu stays in
-            // the account and the next refresh retries it.
-          }
-        }
-        if (cachedAny) setMenus(await listMenus());
-        if (originsChanged) setOriginList(await listDraftOrigins());
-      } catch {
-        // Signed out mid-flight, offline, or the server DB is unavailable:
-        // the local library stands alone. Remember that the read failed so
-        // the claim gate can settle as unknown instead of waiting forever.
-        mergedCafeRef.current = null;
-        if (signedInRef.current && accountKeyRef.current) {
-          setServerMenusReadFailedFor(accountKeyRef.current);
-        }
-      } finally {
-        // Settled either way, so the library may stop skeletoning. On a failed
-        // read it then says nothing about membership rather than claiming
-        // "this browser only" (001).
-        if (signedInRef.current && accountKeyRef.current) {
-          setServerMenusReadFor(accountKeyRef.current);
-          accountMenusSettledRef.current = accountKeyRef.current;
-        }
-      }
-    })();
-    mergeRef.current = run;
-    try {
-      await run;
-    } finally {
-      mergeRef.current = null;
     }
   }
 
@@ -782,7 +539,7 @@ function HomeShell() {
         docRef.current = cached;
         setActiveDoc(cached);
         serverBaseRef.current = created.updatedAt;
-        setMenus(await listMenus());
+        await refreshLibrary();
         setSaveState(savedState("Saved to your account."));
         return;
       } catch (error) {
@@ -795,7 +552,7 @@ function HomeShell() {
             docRef.current = cached;
             setActiveDoc(cached);
             serverBaseRef.current = existing.updatedAt;
-            setMenus(await listMenus());
+            await refreshLibrary();
             setSaveState(savedState("Saved to your account."));
             return;
           } catch {
@@ -819,7 +576,7 @@ function HomeShell() {
       if (actor && accessCan(menuAccessRef.current.get(saved.id), "menus.write")) {
         await stampDraftOrigin(saved.id, actor, serverBaseRef.current ?? "");
       }
-      setMenus(await listMenus());
+      await refreshLibrary();
       if (!(await pushToAccount(saved))) {
         setSaveState(
           conflictRef.current
@@ -1232,7 +989,7 @@ function HomeShell() {
   // --- Library actions ----------------------------------------------------
 
   function handleOpenMenu(id: string) {
-    setLibraryError(null);
+    reportLibraryError(null);
     navigate({ screen: "editor", menuId: id, mode: "edit" });
   }
 
@@ -1256,7 +1013,7 @@ function HomeShell() {
   }
 
   async function handleNewMenu(suggestedTitle?: string) {
-    setLibraryError(null);
+    reportLibraryError(null);
     if (!signedInRef.current) {
       // Replacement, not accumulation: the old offline draft goes away now
       // so the new blank slate is the browser's one menu. No confirmation —
@@ -1286,7 +1043,7 @@ function HomeShell() {
   async function handleRenameMenu(id: string, title: string) {
     const access = menuAccessRef.current.get(id);
     if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
-      setLibraryError("Only someone with menu access can rename this menu.");
+      reportLibraryError("Only someone with menu access can rename this menu.");
       return;
     }
     try {
@@ -1311,7 +1068,7 @@ function HomeShell() {
         setActiveDoc(renamed);
       }
     } catch (error) {
-      setLibraryError(
+      reportLibraryError(
         error instanceof StorageError ? error.message : "Could not rename that menu."
       );
     }
@@ -1342,17 +1099,19 @@ function HomeShell() {
         if (error instanceof SyncError && error.code === "not_found") {
           removeServerId(renamed.id); // Gone on the server; nothing to push.
         } else if (error instanceof SyncError && error.code === "conflict") {
-          setLibraryError(
+          reportLibraryError(
             "Renamed in this browser — it changed on your other device. Open the menu to reconcile."
           );
         } else if (error instanceof SyncError && error.code === "forbidden") {
-          setLibraryError(
+          reportLibraryError(
             "Renamed in this browser — only the restaurant owner can rename it on your account."
           );
         } else if (error instanceof SyncError && error.code === "unauthorized") {
-          setLibraryError("Renamed in this browser — sign in again to rename it on your account.");
+          reportLibraryError(
+            "Renamed in this browser — sign in again to rename it on your account."
+          );
         } else {
-          setLibraryError(
+          reportLibraryError(
             "Renamed in this browser — the change could not be saved to your account. Try again when online."
           );
         }
@@ -1362,7 +1121,7 @@ function HomeShell() {
         removeServerId(renamed.id);
         return;
       }
-      setLibraryError(
+      reportLibraryError(
         "Renamed in this browser — your account could not be reached. Try again when online."
       );
     }
@@ -1423,7 +1182,7 @@ function HomeShell() {
               server.updatedAt,
               menuContentHash(server.doc)
             );
-            setOriginList(await listDraftOrigins());
+            await refreshLibrary();
             setSaveState(savedState("Saved to your account."));
           }
         } catch {
@@ -1527,7 +1286,7 @@ function HomeShell() {
           if (docRef.current?.id === menuId) {
             serverBaseRef.current = server.updatedAt;
             await refreshDraftSync(menuId, actor, server.updatedAt, menuContentHash(server.doc));
-            setOriginList(await listDraftOrigins());
+            await refreshLibrary();
             setSaveState(savedState("Saved to your account."));
           }
         } catch {
@@ -1850,7 +1609,7 @@ function HomeShell() {
             server.updatedAt,
             menuContentHash(server.doc)
           );
-          setOriginList(await listDraftOrigins());
+          await refreshLibrary();
         }
       } catch {
         // The next editor open reconciles the baseline; publishing already
@@ -1872,7 +1631,7 @@ function HomeShell() {
   async function handleDeleteMenu(id: string) {
     const access = menuAccessRef.current.get(id);
     if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
-      setLibraryError("Only someone with menu access can delete this menu.");
+      reportLibraryError("Only someone with menu access can delete this menu.");
       return;
     }
     try {
@@ -1917,10 +1676,10 @@ function HomeShell() {
       setPublishError(null);
       resetLiveDoc();
       await refreshLibrary();
-      if (accountNote) setLibraryError(accountNote);
+      if (accountNote) reportLibraryError(accountNote);
       navigate({ screen: "library" }, { flushCurrent: false });
     } catch (error) {
-      setLibraryError(
+      reportLibraryError(
         error instanceof StorageError ? error.message : "Could not delete that menu."
       );
     }
@@ -2476,7 +2235,7 @@ function HomeShell() {
       navigate({ screen: "capture" });
       scrollToResult();
     } catch {
-      setLibraryError("Couldn't reopen that draft. Try again in a moment.");
+      reportLibraryError("Couldn't reopen that draft. Try again in a moment.");
     }
   }
 
@@ -2964,25 +2723,12 @@ function HomeShell() {
     accountKeyRef.current = accountKey;
   }, [signedIn, sessionState, accountKey]);
 
-  // The save status and the publish gate decide in async code that finishes
-  // after an await, so the failed read travels with the other refs (003, 016).
-  useEffect(() => {
-    accountMenusReadFailedRef.current = serverMenusReadFailedFor;
-  }, [serverMenusReadFailedFor]);
-
   useEffect(() => {
     return () => {
       liveUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       if (editorImageUrl) URL.revokeObjectURL(editorImageUrl);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // The first library read. Its state writes land after the await, so it is
-  // scheduled rather than run inside the effect body: nothing is set during
-  // the commit that mounts the shell.
-  useEffect(() => {
-    void Promise.resolve().then(refreshLibrary);
   }, []);
 
   // The pending save lives with navigation: it flushes before leaving a menu.
@@ -3056,7 +2802,7 @@ function HomeShell() {
             // A torn-down run must never navigate: this was the one branch in
             // the effect without the cancellation guard (015).
             if (cancelled) return;
-            setLibraryError(menuOpenBlockedMessage(access.reason));
+            reportLibraryError(menuOpenBlockedMessage(access.reason));
             openedRouteMenuRef.current = null;
             navigate({ screen: "library" }, { replace: true });
             return;
@@ -3092,7 +2838,7 @@ function HomeShell() {
           markMissingPublish(menuId);
           return;
         }
-        setLibraryError(unresolvableMenuMessage(route));
+        reportLibraryError(unresolvableMenuMessage(route));
         navigate({ screen: "library" }, { replace: true });
       }
     })();
@@ -3110,6 +2856,13 @@ function HomeShell() {
     navigationReady,
     navigate,
     markMissingPublish,
+    // The library's own answers: two stable refs and two stable callbacks, so
+    // listing them never re-runs this effect on a render of its own.
+    accountMenusSettledRef,
+    menuAccessRef,
+    refreshLibrary,
+    rememberMenuCafe,
+    reportLibraryError,
   ]);
 
   useEffect(() => {
@@ -3169,15 +2922,10 @@ function HomeShell() {
           if (resultDoc !== null || pages.length > 0) applySelection([]);
           navigate(landing, { replace: true, flushCurrent: false });
         }
-        replaceServerIds(new Set());
-        replaceMenuAccess(new Map());
-        setMenuRestaurantById(new Map());
         // The ids and the read that produced them reset together (001): a stale
         // "settled" marker over an empty id set would let the next sign-in paint
         // the same false chip.
-        setServerMenusFor(null);
-        setServerMenusReadFailedFor(null);
-        setServerMenusReadFor(null);
+        resetAccountAnswer();
       });
       // Server-only at rest: account copies proved in sync leave with the
       // session, so a later sign-in never asks about a menu that is
@@ -3212,47 +2960,6 @@ function HomeShell() {
     if (doc) void refreshPublication(doc.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
-
-  useEffect(() => {
-    if (!signedIn || !accountKey) {
-      mergedCafeRef.current = null;
-      return;
-    }
-    if (!activeWorkspace) {
-      if (workspace.pending) return;
-      mergedCafeRef.current = `${accountKey}:none`;
-      // Deferred like the other account reads: the effect must not set state
-      // synchronously while rendering the frame that decided it.
-      void Promise.resolve().then(() => {
-        replaceServerIds(new Set());
-        replaceMenuAccess(new Map());
-        setServerMenusFor(accountKey);
-        setServerMenusReadFailedFor(null);
-        setServerMenusReadFor(accountKey);
-        accountMenusSettledRef.current = accountKey;
-      });
-      return;
-    }
-    const key = `${accountKey}:${activeWorkspace.restaurantId}`;
-    if (mergedCafeRef.current === key) return;
-    mergedCafeRef.current = key;
-    // Keep the browser-only answers: a local draft is the caller's own row and
-    // belongs to no café, so it must not become read-only on a switch.
-    replaceServerIds(new Set());
-    replaceMenuAccess(
-      new Map([...menuAccessRef.current].filter(([, access]) => access === "local"))
-    );
-    setServerMenusFor(null);
-    setServerMenusReadFor(null);
-    setServerMenusReadFailedFor(null);
-    accountMenusSettledRef.current = null;
-    // Chain onto a merge left over from the previous café instead of letting
-    // the dedupe swallow this one (001).
-    void (mergeRef.current ?? Promise.resolve()).then(() =>
-      mergeAccountMenus(activeWorkspace.restaurantId)
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mergeAccountMenus is intentionally render-scoped: listing it would re-run this café-keyed effect every render, and the mergedCafeRef key guard already dedupes repeat runs
-  }, [accountKey, activeWorkspace, signedIn, workspace.pending]);
 
   // Refresh the sidebar's launch progress when the account, the café, or the
   // screen changes: publishing or a first order moves the count, and the next
@@ -3306,7 +3013,7 @@ function HomeShell() {
       void (async () => {
         await wipeBrowserMenus(intent.menuIds);
         await refreshLibrary();
-        setOriginList(await listDraftOrigins().catch(() => []));
+        await refreshLibrary();
       })();
       return;
     }
@@ -3673,7 +3380,7 @@ function HomeShell() {
                   canManage={activeMenuCanWrite}
                   onServer={activeMenuOnServer}
                   accountCheckFailed={activeMenuAccountCheckFailed}
-                  onRetryAccountCheck={handleRetryAccountCheck}
+                  onRetryAccountCheck={retryAccountCheck}
                   restaurantName={
                     ownedRestaurantsForAccount.find(
                       (restaurant) => restaurant.id === activePublication?.restaurantId
@@ -3696,7 +3403,7 @@ function HomeShell() {
                     error: publishError,
                     inAccount: activeMenuOnServer,
                     accountCheckFailed: activeMenuAccountCheckFailed,
-                    onRetryAccountCheck: handleRetryAccountCheck,
+                    onRetryAccountCheck: retryAccountCheck,
                     liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
                     liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
                     onPublish: () => void handlePublish(),
