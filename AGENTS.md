@@ -187,16 +187,32 @@ errors, or add lint/type suppressions just to make checks pass.
   banner's state and its two explicit answers, the editor's photo URL, and the
   import/export of a menu file. It is the only writer of a menu document, so no
   screen can save behind another one's back, and `healStampedDrafts` pushes the
-  interrupted work of closed menus on a same-account return. It does not file
-  menus: `fileMenu`, `cacheServerDraft` and `pruneSignedOutOthers` are the
-  shell's menu lifecycle arriving as doors, so the café a menu lands in stays
-  decided where the membership is known, and `cannotFileMenus` shapes the
-  import's refusal. Its reads are per document — `getOpenDoc`/`getOpenDocId`
+  interrupted work of closed menus on a same-account return. It also files a
+  menu, because its own autosave is what creates one: `ensureServerTarget`
+  picks the café the editor acts in (or provisions the account's first from
+  the menu title), `cacheServerDraft` makes a fresh server row this browser's
+  draft, and `pruneSignedOutOthers` keeps signed-out use to one menu. A staff
+  shift with no café it may write in therefore files nothing, and
+  `cannotFileMenus` shapes the import's refusal. Its reads are per document —
+  `getOpenDoc`/`getOpenDocId`
   for the units below it, `openBaseline`/`onServerRevision`/`onMenuRenamed` for
   a rename made in the library, `onOpenDoc` to announce a new document so
   publication never has to be imported. `releaseOpenDoc` and `resetActiveMenu`
   are the sign-out pair: the synchronous release that stops pending work before
   the last edits are saved, then the state clear.
+- `src/features/menus/menu-lifecycle.ts` — `useMenuLifecycle`: the library's
+  verbs on a menu row — open, start, rename (with its account push), delete —
+  and the one membership the shell acts in. It works from the library alone, so
+  a rename or a delete can name a menu the editor does not hold, and the open
+  document arrives as doors (`openDoc`, `forgetOpenDoc`, `onMenuRenamed`,
+  `openBaseline`, `onServerRevision`) instead of a second copy. Starting a menu
+  never gates on a name: the row is created by its first change, so leaving now
+  leaves nothing behind. The switcher follows the menu — a deep link into
+  another café selects that membership, but only while its document is the open
+  one, so a document kept in memory while browsing the library cannot drag the
+  context back. Deleting is the row's; resetting publication for it stays in the
+  shell, the only place that can see both units. Tests:
+  `tests/tenancy-workspace.test.ts` covers the membership rules it obeys.
 - `src/features/publishing/use-publication.ts` — `usePublication`: the open
   menu's publication — whether it is live, what diners see now, and the three
   actions that change it. It follows the document the editor holds, flushes the
