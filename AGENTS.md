@@ -153,6 +153,14 @@ errors, or add lint/type suppressions just to make checks pass.
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
+- `src/components/layout/app-shell.tsx` — the frame every app screen sits in:
+  the left column, the brand row that stands in where the column is absent,
+  the workspace switcher, the content measure and footer, the phone tab bar,
+  the More sheet and the order monitor's toasts. It renders chrome only —
+  sections, counts, notices and the page itself arrive already resolved, the
+  page through `children` — so a screen can change without touching the frame.
+  `HomeScreen` still owns the shell's state and hands this component the
+  answers; the frame is covered by `tests/app-shell.test.ts`.
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
