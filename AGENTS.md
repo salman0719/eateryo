@@ -153,6 +153,19 @@ errors, or add lint/type suppressions just to make checks pass.
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
+- `src/app/(app)/layout.tsx` — the one page shell: it mounts the units that
+  outlive a screen in dependency order (session and café → route → library)
+  inside a Suspense whose fallback is the shell's own geometry. The route is
+  read from the URL (`usePathname`, seeded into `NavigationProvider`), so an
+  address is never a prop: every route file under `(app)/` is `<HomeScreen />`
+  and nothing else. `/`, `/menus`, `/orders`, `/assistant`, `/tables` and
+  `/settings` prerender the shell; `/menus/<id>` (plus `reorder`, `preview`,
+  `publish`, `items/<item>`) streams it, because a menu id is not known at
+  build time. The catch-all is retired — one narrow
+  `/menus/<id>/[...rest]` remains so a stale bookmark, or a table QR link from
+  before QR cards moved to Tables, still lands in the library with a message
+  instead of a 404. A new screen is one route file plus its `AppScreen`; no
+  route file parses a route.
 - `src/components/layout/app-shell.tsx` — the frame every app screen sits in:
   the left column, the brand row that stands in where the column is absent,
   the workspace switcher, the content measure and footer, the phone tab bar,
@@ -167,8 +180,10 @@ errors, or add lint/type suppressions just to make checks pass.
   or nothing when the href already matches), follows changes the app did not
   make (back/forward, a typed URL, a `<Link>` push), flushes the open editor's
   pending save before leaving a menu, and holds the dead-publish-link state.
-  Screens call `navigate(route)`; none takes a parsed route as a prop. Moving
-  to the App Router's own URLs later changes this provider, not its callers.
+  Screens call `navigate(route)`; none takes a parsed route as a prop, and the
+  first screen is the one `usePathname()` names (rendered into the HTML, so a
+  hard load paints the right screen rather than flashing capture). Moving to
+  the App Router's own URLs later changes this provider, not its callers.
   Tests: `tests/navigation-history.test.ts`.
 - `src/features/menus/library-context.tsx` — the library and the account's
   answers about it: the browser's menu list, the ids the server proved, the
