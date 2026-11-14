@@ -58,6 +58,8 @@ export interface CapturePageProps {
   previewDoc: MenuDocument | null;
   source: "ai" | "demo";
   draftSave: "idle" | "saving" | "saved" | "unavailable";
+  /** True when the autosaved draft already lives on the account (signed-in server-first). */
+  draftOnServer?: boolean;
   initialReviewCount: number | null;
   onClear: () => void;
   onEdit: () => void;
@@ -113,6 +115,7 @@ export function CapturePage({
   previewDoc,
   source,
   draftSave,
+  draftOnServer = false,
   initialReviewCount,
   onClear,
   onEdit,
@@ -290,6 +293,7 @@ export function CapturePage({
             pageCount={extractProgress.pageCount}
             preparedPages={extractProgress.preparedPages}
             requestStartedAt={extractProgress.requestStartedAt}
+            signedIn={signedIn}
           />
         )}
       </Attention>
@@ -316,7 +320,10 @@ export function CapturePage({
             data={result}
             source={source}
             onStartOver={onClear}
-            onEdit={onEdit}
+            // Onboarding ends at Publish: signed out there is no editor
+            // route at all, so the second path would only dead-end.
+            onEdit={signedIn ? onEdit : undefined}
+            reassureEditable={!signedIn}
             onResolveItem={onResolveItem}
             onResolveAll={onResolveAll}
             onUpdatePrice={onUpdatePrice}
@@ -326,7 +333,9 @@ export function CapturePage({
             previewDoc={previewDoc}
             savedNotice={
               source === "ai" && draftSave === "saved"
-                ? "Draft saved to My menus"
+                ? draftOnServer
+                  ? "Draft saved to your account"
+                  : "Draft saved in this browser"
                 : source === "ai" && draftSave === "saving"
                   ? "Saving draft…"
                   : null

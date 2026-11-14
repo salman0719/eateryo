@@ -278,7 +278,7 @@ export function LaunchChecklist() {
             </Link>
           </div>
           <p className="mt-2 text-xs text-warning-900/80">
-            Offline, nothing leaves this browser and no account is needed.
+            Here, nothing leaves this browser and no account is needed.
           </p>
         </div>
         <ChecklistSteps steps={SIGNED_OUT_STEPS} details={false} />

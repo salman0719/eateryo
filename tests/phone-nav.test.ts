@@ -16,7 +16,6 @@ function ownerSections(overrides: Partial<SectionAccess> = {}) {
     signedIn: true,
     can: (capability) => CAPABILITIES.includes(capability),
     assistantEnabled: false,
-    hasWorkingSet: false,
     ...overrides,
   });
 }
@@ -71,11 +70,17 @@ describe("moreSheetRows", () => {
 
   it("never shows the Assistant signed out, whatever the flag says", () => {
     for (const assistantEnabled of [false, true]) {
-      const rows = moreSheetRows(
-        ownerSections({ signedIn: false, assistantEnabled, hasWorkingSet: true })
-      );
-      expect(rows.map((row) => row.id)).not.toContain("assistant");
+      const rows = moreSheetRows(ownerSections({ signedIn: false, assistantEnabled }));
+      expect(rows).toEqual([]);
     }
+  });
+
+  it("leaves a signed-out visitor with no tab bar at all", () => {
+    // Signed out the shell is a single screen: Capture. A leftover draft is
+    // resumed from its banner, so there is no My menus tab to offer.
+    expect(phoneTabs(ownerSections({ signedIn: false }))).toEqual([
+      { id: "capture", label: "Capture" },
+    ]);
   });
 
   it("hides the Assistant from signed-in accounts while the flag is off", () => {

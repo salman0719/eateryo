@@ -17,11 +17,6 @@ import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
-import {
-  LocalDraftsNotice,
-  LocalDraftsOffer,
-  type LocalDraftClaimNotice,
-} from "@/components/menu-editor/local-drafts-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
 import { MonitorToasts } from "@/components/orders/monitor-toasts";
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
@@ -53,9 +48,10 @@ import {
   updateItem,
 } from "@/features/menu/menu-utils";
 import type { MenuDocument } from "@/features/menu/schema";
-import { createSampleMenuDocument } from "@/features/menu/sample-menu";
+import { createSampleMenuDocument, DEMO_PROVIDER } from "@/features/menu/sample-menu";
 import {
   cacheMenu,
+  deleteImage,
   deleteMenu,
   getImage,
   getMenu,
@@ -67,10 +63,13 @@ import {
   type MenuSummary,
 } from "@/features/menu/storage";
 import {
+  createServerMenu,
   deleteServerMenu,
   fetchCafeMenus,
   fetchServerMenu,
   SyncError,
+  type MembershipAccess,
+  type ServerMenu,
   updateServerMenu,
 } from "@/features/menus/sync";
 import {
@@ -79,11 +78,22 @@ import {
   publishMenu,
   unpublishMenu,
 } from "@/features/publishing/client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import type { PublicationStatus } from "@/features/publishing/schema";
 import type { PublishSetupResult } from "@/features/publishing/setup-schema";
-import { rememberPublishJourney } from "@/features/publishing/wizard-state";
+import {
+  clearWizardLinkSent,
+  clearWizardState,
+  forgetPublishJourney,
+  hasPublishJourney,
+  rememberPublishJourney,
+} from "@/features/publishing/wizard-state";
+import {
+  clearDirectSignInIntent,
+  loadDirectSignInIntent,
+  saveDirectSignInIntent,
+} from "@/features/menus/direct-sign-in";
 import { authClient } from "@/lib/auth-client";
 import {
   ExtractClientError,
@@ -124,6 +134,7 @@ import { createRestaurant } from "@/features/tenancy/client";
 import { moveLocalMenuToAccount, moveLocalMenusToAccount } from "@/features/menus/move-to-account";
 import {
   clearDraftOrigin,
+  collectSignOutDissolveIds,
   decideHeal,
   getDraftOrigin,
   listDraftOrigins,
@@ -131,19 +142,17 @@ import {
   refreshDraftSync,
   stampClaimedMenus,
   stampDraftOrigin,
+  unstampedIds,
   visibleMenuIds,
   type DraftOrigin,
 } from "@/features/menus/draft-origins";
 import {
   accountReadState,
   decideLocalDraftClaimSurface,
+  decidePublishJourneyClaim,
   deriveClaimGate,
-  dismissLocalDraftClaim,
-  loadLocalDraftClaim,
-  markLocalDraftsClaimed,
   resolveAutoClaimTarget,
   resumeBannerReady,
-  type LocalDraftClaimStatus,
 } from "@/features/menus/claim-local-drafts";
 import {
   decideMenuOpen,
@@ -156,6 +165,7 @@ import {
   membershipFlag,
   type MenuMembership,
 } from "@/features/menus/membership";
+
 import {
   docForRoutedMenu,
   forgetPendingNewMenu,
@@ -277,6 +287,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeDocIdRef = useRef<string | null>(null);
   /** Previous session state, so only a real sign-out (not a first load) clears. */
   const wasSignedInRef = useRef(false);
+  /** The account that was signed in, so sign-out can drop its synced rows. */
+  const prevAccountKeyRef = useRef<string | null>(null);
 
   function navigateTo(next: AppRoute, replace = false, flushCurrent = true) {
     const previousMenuId = routeMenuId(routeRef.current);
@@ -305,6 +317,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   // page component already mounted swaps nothing — without this sync the
   // URL moves while the screen stays on the old one.
   const pathname = usePathname();
+  const router = useRouter();
   useEffect(() => {
     const syncFromLocation = () => {
       const next = parseAppRoute(window.location.href);
@@ -496,14 +509,8 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeMenuAccountCheckFailed = activeMenuMembership === "unreachable";
   /** Device-local ownership stamps (which account each draft belongs to). */
   const [originList, setOriginList] = useState<DraftOrigin[]>([]);
-  /** The answer just given here; the stored per-account value is the fallback. */
-  const [claimAnswer, setClaimAnswer] = useState<{
-    accountKey: string;
-    status: LocalDraftClaimStatus;
-  } | null>(null);
-  const [claimBusy, setClaimBusy] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
-  const [claimNotice, setClaimNotice] = useState<LocalDraftClaimNotice | null>(null);
+
   /**
    * Session state of the "Continue getting your link" resume banner (Q7).
    * `null` means *not confirmed yet*: the banner's inputs are read
@@ -690,12 +697,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   useEffect(() => {
     const wasSignedIn = wasSignedInRef.current;
     wasSignedInRef.current = signedIn;
+    if (signedIn && accountKey) prevAccountKeyRef.current = accountKey;
 
     if (!signedIn) {
       // Sign-out is a privacy boundary. An open editor or a result on
       // Capture can hold an account menu, so a real session end dismisses
-      // both and lands on Capture. Nothing is deleted: anonymous drafts
-      // remain in My menus, and the landed screen is the signed-out home.
+      // both and lands on Capture. Anonymous drafts stay for the capture
+      // banner; account copies proved in sync are dissolved below, so the
+      // landed screen never offers a menu that is already on the account.
       const landing = signOutLandingRoute({ wasSignedIn, signedIn });
       if (landing) {
         const openDoc = docRef.current;
@@ -743,6 +752,24 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
       claimEvaluatedRef.current = null;
+      // Server-only at rest: account copies proved in sync leave with the
+      // session, so a later sign-in never asks about a menu that is
+      // already there. Anything unproven stays hidden until the heal (or
+      // the claim) sees it — an interrupted edit is never dissolved.
+      const leavingAccount = prevAccountKeyRef.current;
+      prevAccountKeyRef.current = null;
+      if (leavingAccount) {
+        void (async () => {
+          try {
+            for (const id of await collectSignOutDissolveIds(leavingAccount, getMenu)) {
+              await dissolveBrowserMenu(id);
+            }
+          } catch {
+            // Best-effort: leftovers stay stamped and hidden, never asked about.
+          }
+          await refreshLibrary();
+        })();
+      }
       return;
     }
     // Sign-in: merge account menus into the library, heal interrupted work
@@ -837,6 +864,34 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     });
   }
 
+  /**
+   * An attach just proved this menu lives on the account in a known café:
+   * record both answers now instead of waiting for the café-keyed read,
+   * which only knows the café the shell acts in. Without this a menu
+   * attached into another café reads as on-account with no access — the
+   * library's "View only" dead end. A skipped attach (already on the
+   * server) carries no fresh answer, so the row is read back instead.
+   */
+  async function adoptAttachedMenu(
+    menuId: string,
+    restaurantId: string,
+    access?: MembershipAccess
+  ) {
+    rememberMenuCafe(menuId, restaurantId);
+    if (access) {
+      setMenuAccessFor(menuId, access);
+      return;
+    }
+    try {
+      const server = await fetchServerMenu(menuId);
+      rememberMenuCafe(menuId, server.restaurantId);
+      setMenuAccessFor(menuId, server.access);
+    } catch {
+      // The café-keyed merge covers the common case; this only heals the
+      // attach-into-another-café gap.
+    }
+  }
+
   /** Record one menu's access answer without touching the rest. */
   function setMenuAccessFor(id: string, access: MenuAccess) {
     if (menuAccessRef.current.get(id) === access) return;
@@ -905,7 +960,14 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     const run = (async () => {
       try {
         const { menus: serverMenus } = await fetchCafeMenus(restaurantId);
-        replaceServerIds(new Set(serverMenus.map((menu) => menu.id)));
+        // Same other-café rule as access below: a row provably on the
+        // account stays listed even when it lives in another café.
+        const nextIds = new Set(serverMenus.map((menu) => menu.id));
+        for (const id of serverIdsRef.current) {
+          const knownCafe = menuRestaurantById.get(id);
+          if (knownCafe && knownCafe !== restaurantId) nextIds.add(id);
+        }
+        replaceServerIds(nextIds);
         rememberMenuCafes(serverMenus);
         // The claim offer waits for this: an empty set is only trustworthy
         // once the account has actually been read.
@@ -915,10 +977,20 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         }
         // One answer, no second role lookup: each summary already carries the
         // caller's capabilities. A browser-only menu keeps its local answer
-        // while the server list has nothing to say about it.
+        // while the server list has nothing to say about it. A menu attached
+        // into another café keeps its explicit answer too: this café's list
+        // cannot speak for a row that lives elsewhere.
         const accessById = new Map<string, MenuAccess>(menuAccessById(serverMenus));
         for (const [id, access] of menuAccessRef.current) {
-          if (access === "local" && !accessById.has(id)) accessById.set(id, "local");
+          if (accessById.has(id)) continue;
+          if (access === "local") {
+            accessById.set(id, "local");
+            continue;
+          }
+          const knownCafe = menuRestaurantById.get(id);
+          if (knownCafe && knownCafe !== restaurantId && access !== "none") {
+            accessById.set(id, access);
+          }
         }
         replaceMenuAccess(accessById);
         const localIds = new Set((await listMenus()).map((menu) => menu.id));
@@ -1073,6 +1145,54 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setSaveState(storageSaveState(doc.id));
       return;
     }
+    // Server-only while signed in: the first change to a pending new menu
+    // creates the cloud copy, so a rename-and-return is already on the
+    // account. No local fallback — the error stays visible and the next
+    // change retries, with the edits kept in memory meanwhile.
+    if (isPendingNewMenu(doc.id) && signedInRef.current) {
+      const pendingTarget = await ensureServerTarget(doc.title);
+      if (!pendingTarget) {
+        setSaveState({
+          kind: "error",
+          message: "Couldn't reach your account — edits are kept, and the next change retries.",
+        });
+        return;
+      }
+      try {
+        const created = await createServerMenu(pendingTarget, doc);
+        const cached = await cacheServerDraft(created);
+        forgetPendingNewMenu(cached.id);
+        lastSavedRef.current = JSON.stringify(cached);
+        docRef.current = cached;
+        setActiveDoc(cached);
+        serverBaseRef.current = created.updatedAt;
+        setMenus(await listMenus());
+        setSaveState(savedState("Saved to your account."));
+        return;
+      } catch (error) {
+        if (error instanceof SyncError && error.code === "exists") {
+          try {
+            const existing = await fetchServerMenu(doc.id);
+            const cached = await cacheServerDraft(existing);
+            forgetPendingNewMenu(cached.id);
+            lastSavedRef.current = JSON.stringify(cached);
+            docRef.current = cached;
+            setActiveDoc(cached);
+            serverBaseRef.current = existing.updatedAt;
+            setMenus(await listMenus());
+            setSaveState(savedState("Saved to your account."));
+            return;
+          } catch {
+            // Fall through to the error below.
+          }
+        }
+        setSaveState({
+          kind: "error",
+          message: "Couldn't save to your account — edits are kept, and the next change retries.",
+        });
+        return;
+      }
+    }
     try {
       const saved = await saveMenu(doc);
       lastSavedRef.current = JSON.stringify(saved);
@@ -1175,7 +1295,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       return {
         kind: "saved",
         message: "Not saved yet",
-        detail: "Your first change saves it in this browser.",
+        detail: signedInRef.current
+          ? "Your first change saves it to your account."
+          : "Your first change saves it in this browser.",
       };
     }
     if (serverBaseRef.current) return savedState("Saved to your account.");
@@ -1498,8 +1620,39 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     navigateTo({ screen: "editor", menuId: id, mode: "edit" });
   }
 
+  /**
+   * Single offline menu invariant: after a signed-out save, any other rows
+   * are superseded — their replacement was confirmed where the flow began.
+   * Best-effort: a failed prune leaves the extra row for the next save.
+   */
+  async function pruneSignedOutOthers(keepId: string) {
+    if (signedInRef.current) return;
+    try {
+      const all = await listMenus();
+      await Promise.all(
+        all
+          .filter((menu) => menu.id !== keepId)
+          .map((menu) => deleteMenu(menu.id).catch(() => undefined))
+      );
+    } catch {
+      // The next save retries; the extra row stays visible meanwhile.
+    }
+  }
+
   async function handleNewMenu(suggestedTitle?: string) {
     setLibraryError(null);
+    if (!signedInRef.current) {
+      // Replacement, not accumulation: the old offline draft goes away now
+      // so the new blank slate is the browser's one menu. No confirmation —
+      // starting over is the whole point of this button.
+      try {
+        const all = await listMenus();
+        await Promise.all(all.map((menu) => deleteMenu(menu.id).catch(() => undefined)));
+        await refreshLibrary();
+      } catch {
+        // A failed delete surfaces on the next save's prune instead.
+      }
+    }
     // Q2: never gate on a name — blank menus arrive titled ("Main Menu"
     // first, honest numbering after) and rename inline in the editor.
     const fallback = defaultNewMenuTitle(menus.map((menu) => menu.title));
@@ -1600,43 +1753,35 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   /**
-   * Add one browser-only menu to an owned restaurant. The library row shows
-   * the returned message on failure; success marks the row as on the account
-   * right away, then reconciles with the server list.
-   */
-  async function handleMoveMenuToAccount(
-    menuId: string,
-    restaurantId: string
-  ): Promise<string | null> {
-    const title = visibleMenus.find((menu) => menu.id === menuId)?.title ?? "That menu";
-    const outcome = await moveLocalMenuToAccount(restaurantId, menuId);
-    if (outcome.status === "failed") {
-      return `“${title}” could not be added — ${outcome.reason}`;
-    }
-    addServerId(menuId);
-    const moveActor = accountKeyRef.current;
-    if (moveActor) await stampClaimedMenus([menuId], moveActor, (id) => getMenu(id));
-    await mergeAccountMenus();
-    return null;
-  }
-
-  /**
    * Copy the rest of this browser's menus into one owned restaurant. Shared
-   * by the one-click offer, the automatic import for a brand-new account,
-   * and the import that follows the wizard creating the account's first
-   * café. The local copies stay put; the notice reports per-batch totals.
+   * by the automatic import, the direct sign-in intent, and the import that
+   * follows the wizard creating the account's first café. Freshly imported
+   * rows dissolve; the notice reports per-batch totals.
    */
-  async function runLocalDraftClaim(restaurantId: string, restaurantName: string) {
-    setClaimBusy(true);
+  async function runLocalDraftClaim(restaurantId: string) {
     setClaimError(null);
     try {
       // Only the visible browser-only rows move: hidden rows belong to
-      // another session and are never swept into this account.
-      const report = await moveLocalMenusToAccount(
-        restaurantId,
-        localOnly.map((menu) => menu.id)
-      );
-      [...report.imported, ...report.skipped].forEach((id) => addServerId(id));
+      // another session and are never swept into this account. Sample rows
+      // are disregarded, never imported — signing in must not file demo
+      // data into a real café.
+      const { real, demo } = await partitionRealMenus(localOnly.map((menu) => menu.id));
+      for (const id of demo) await dissolveBrowserMenu(id);
+      if (real.length === 0) {
+        // Nothing but sample rows, already disregarded above: no import,
+        // no notice.
+        await refreshLibrary();
+        return;
+      }
+      const report = await moveLocalMenusToAccount(restaurantId, real);
+      for (const id of report.imported) {
+        addServerId(id);
+        await adoptAttachedMenu(id, restaurantId, report.accessById[id]);
+      }
+      for (const id of report.skipped) {
+        addServerId(id);
+        await adoptAttachedMenu(id, restaurantId);
+      }
       // Claimed rows are provably the account's copies: stamp them so a
       // later sign-out hides them instead of showing stale doppelgängers.
       if (accountKey) {
@@ -1670,66 +1815,252 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           // baseline. Never fail the claim over it.
         }
       }
-      setClaimNotice({
-        imported: report.imported.length,
-        failed: report.failed.length,
-        restaurantName,
-      });
-      if (accountKey) {
-        markLocalDraftsClaimed(accountKey);
-        setClaimAnswer({ accountKey, status: "done" });
+      // Dissolve what the account just took: a leftover row would come
+      // back as an anonymous draft on sign-out. Skipped rows stay — they
+      // may be ahead of the server, and the heal triages those on open.
+      for (const id of report.imported) {
+        await dissolveBrowserMenu(id);
       }
+      // No notice: sign-in claims the drafts silently — the rows simply
+      // appear in My menus, and a stranded row retries next sign-in.
       await refreshLibrary();
       void mergeAccountMenus();
     } catch {
       setClaimError(
-        "We couldn't read the menus saved in this browser. They are still here — try again from My menus."
+        "We couldn't read the menus saved in this browser. They are still here — they will join your account the next time you sign in."
       );
-    } finally {
-      setClaimBusy(false);
     }
   }
 
   /**
-   * An account with no menus adopts this browser's drafts in one go. Where
-   * they land is the account's own café when it has one — an empty café is
-   * still *its* café — and only an account that owns none gets one created,
-   * named from the menu titles rather than a placeholder the owner cannot
-   * recognise. Reusing is what stops a retried claim from minting a second
-   * café next to the first.
+   * Sign-in adopts this browser's drafts in one go, whether or not the
+   * account already holds menus. Where they land is the account's own café
+   * when it has one — an empty café is still *its* café — and only an
+   * account that owns none gets one created, named from the menu titles
+   * rather than a placeholder the owner cannot recognise. Reusing is what
+   * stops a retried claim from minting a second café next to the first.
    */
   async function handleAutoClaim(titles: string[]) {
     if (!accountKey) return;
-    setClaimBusy(true);
     setClaimError(null);
     try {
       const target = resolveAutoClaimTarget(ownedRestaurantsForAccount, titles);
       if (target.kind === "reuse") {
-        await runLocalDraftClaim(target.restaurantId, target.restaurantName);
+        await runLocalDraftClaim(target.restaurantId);
         return;
       }
       const created = await createRestaurant(target.name);
       workspace.addRestaurant(created);
-      await runLocalDraftClaim(created.id, created.name);
+      await runLocalDraftClaim(created.id);
     } catch {
       setClaimError(
-        "We couldn't set up your café automatically. Import your menus from My menus when you're ready."
+        "We couldn't set up your café automatically. Your menus are still in this browser — they will join your account the next time you sign in."
       );
-    } finally {
-      setClaimBusy(false);
     }
   }
 
-  function handleClaimAdd(restaurantId: string) {
-    const restaurant = ownedRestaurantsForAccount.find((item) => item.id === restaurantId);
-    if (!restaurant) return;
-    void runLocalDraftClaim(restaurant.id, restaurant.name);
+  /**
+   * Onboarding promise: the draft opened in the publish wizard attaches to
+   * the owner's workspace on sign-in, with no prior-menu check. Where it
+   * lands: the café the shell acts in when it may file there, else the
+   * owner's first café, else a new café named from the draft (brand-new
+   * accounts). Staff-only sign-ins never reach here — there is no café the
+   * caller may file in.
+   */
+  async function handlePublishJourneyClaim(menuId: string) {
+    const actor = accountKeyRef.current;
+    if (!signedInRef.current || !actor) return;
+    setClaimError(null);
+    try {
+      const draft = await getMenu(menuId).catch(() => null);
+      if (!draft) return;
+      let targetId: string;
+      if (canFileBrowserDrafts && activeRestaurantId) {
+        targetId = activeRestaurantId;
+      } else if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
+        targetId = ownedRestaurantsForAccount[0].id;
+      } else if ((restaurantList?.length ?? 0) === 0) {
+        const created = await createRestaurant(
+          suggestRestaurantName([draft.title]) ?? "My restaurant"
+        );
+        workspace.addRestaurant(created);
+        targetId = created.id;
+      } else {
+        setClaimError(
+          "Your account can't file menus yet — ask the café owner to add this address in Settings → Team."
+        );
+        return;
+      }
+      const outcome = await moveLocalMenuToAccount(targetId, menuId);
+      if (outcome.status === "failed") {
+        setClaimError(`We couldn't add your menu to your account — ${outcome.reason}`);
+        return;
+      }
+      addServerId(menuId);
+      if (outcome.status === "imported") {
+        await adoptAttachedMenu(menuId, targetId, outcome.access);
+      } else {
+        await adoptAttachedMenu(menuId, targetId);
+      }
+      await stampClaimedMenus([menuId], actor, (id) => getMenu(id));
+      // The wizard holds the open row on a null baseline; reconcile it to
+      // the agreed revision so the next save stays on the account.
+      if (docRef.current?.id === menuId) {
+        try {
+          const server = await fetchServerMenu(menuId);
+          if (docRef.current?.id === menuId) {
+            serverBaseRef.current = server.updatedAt;
+            await refreshDraftSync(menuId, actor, server.updatedAt, menuContentHash(server.doc));
+            setOriginList(await listDraftOrigins());
+            setSaveState(savedState("Saved to your account."));
+          }
+        } catch {
+          // The next open reconciles; the attach already succeeded.
+        }
+      }
+      // The account holds the copy now: dissolve the browser row so it
+      // can never resurface as an anonymous draft on sign-out. A skipped
+      // row (already on the server) may be ahead of it, so only a fresh
+      // import dissolves — the heal triages the rest on open.
+      if (outcome.status === "imported") await dissolveBrowserMenu(menuId);
+      // Silent by design: the emailed link already promised this menu joins
+      // the account, so no banner celebrates it.
+      await refreshLibrary();
+      void mergeAccountMenus();
+    } catch {
+      setClaimError(
+        "We couldn't add your menu to your account. It is still saved in this browser — it will join your account the next time you sign in."
+      );
+    }
   }
 
-  function handleDismissClaim() {
-    if (!accountKey) return;
-    dismissLocalDraftClaim(accountKey);
-    setClaimAnswer({ accountKey, status: "dismissed" });
+  /**
+   * Everything the wipe of one browser menu touches: the document and its
+   * image, the account stamp, the publish wizard's form/link/journey marks,
+   * and the pending-new marker. Best-effort per menu so one unreadable row
+   * never blocks the rest.
+   */
+  /**
+   * Dissolve a browser row: the document, its source photo, and its stamp.
+   * Used after a successful attach (the account holds the copy now, so any
+   * leftover would resurface as an anonymous draft on sign-out) and for
+   * demo data (sample rows are never asked about). Wizard and journey marks
+   * stay: an attached menu still exists, on the account.
+   */
+  async function dissolveBrowserMenu(menuId: string) {
+    try {
+      await deleteMenu(menuId);
+    } catch {
+      // The stamp already hides the row; the next save's prune retries.
+    }
+    try {
+      await deleteImage(menuId);
+    } catch {
+      // Source photo only; the account copy is unaffected.
+    }
+    await clearDraftOrigin(menuId);
+  }
+
+  async function wipeBrowserMenus(menuIds: readonly string[]) {
+    for (const menuId of menuIds) {
+      try {
+        await deleteMenu(menuId);
+      } catch {
+        // One stubborn row never blocks the rest.
+      }
+      await clearDraftOrigin(menuId);
+      clearWizardState(menuId);
+      clearWizardLinkSent(menuId);
+      forgetPublishJourney(menuId);
+      forgetPendingNewMenu(menuId);
+    }
+  }
+
+  /**
+   * Split browser rows into the owner's real menus and sample rows. Demo
+   * data is never asked about — signing in disregards it — while an
+   * unreadable row counts as real, so the dialogs still cover it and the
+   * move reports it instead of silently dropping it.
+   */
+  async function partitionRealMenus(ids: readonly string[]): Promise<{
+    real: string[];
+    demo: string[];
+  }> {
+    const real: string[] = [];
+    const demo: string[] = [];
+    for (const id of ids) {
+      try {
+        const doc = await getMenu(id);
+        (doc.source?.provider === DEMO_PROVIDER ? demo : real).push(id);
+      } catch {
+        real.push(id);
+      }
+    }
+    return { real, demo };
+  }
+
+  /**
+   * The plain "Sign in" buttons (brand row, sidebar account, library gate,
+   * publish panel): signed out with a real local menu, the owner chooses
+   * before leaving. Add → the ids attach on login; delete → they are wiped
+   * on login; staying is always one Escape away. Sample rows are
+   * disregarded without asking, stamped rows stay for the claim without
+   * asking; without any anonymous menu the link navigates immediately.
+   */
+  async function requestDirectSignIn() {
+    if (signedInRef.current) {
+      router.push("/sign-in");
+      return;
+    }
+    let existing: MenuSummary[] = [];
+    try {
+      existing = await listMenus();
+    } catch {
+      existing = [];
+    }
+    const titles = new Map(existing.map((menu) => [menu.id, menu.title] as [string, string]));
+    const { real, demo } = await partitionRealMenus(existing.map((menu) => menu.id));
+    // Stamped rows belong to an account — the claim moves them, the heal
+    // triages them — so the choice names only anonymous drafts and never
+    // asks about a menu that is already on one.
+    const askable = unstampedIds(real, await listDraftOrigins().catch(() => []));
+    const realTitles = new Map(
+      real.map((id) => [id, titles.get(id)] as [string, string | undefined])
+    );
+    if (askable.length === 0) {
+      // Only sample rows, stamped rows, or nothing at all: no
+      // confirmation, the demo data is simply disregarded on the way in
+      // and stamped rows stay for the claim.
+      for (const id of demo) await dissolveBrowserMenu(id);
+      router.push("/sign-in");
+      return;
+    }
+    const firstTitle = realTitles.get(askable[0]);
+    const title = firstTitle?.trim() ? `“${firstTitle}”` : "your browser menu";
+    const addIt = await confirm({
+      message: `Add ${title} from this browser to your account when you sign in?`,
+      confirmLabel: "Add it on sign-in",
+      cancelLabel: "Don't add it",
+    });
+    // Sample rows go quietly whichever answer the owner gives; the intent
+    // names only real menus.
+    for (const id of demo) await dissolveBrowserMenu(id);
+    if (addIt) {
+      saveDirectSignInIntent({ decision: "attach", menuIds: askable });
+      router.push("/sign-in");
+      return;
+    }
+    // Signed out there is no library to export from, so the backup
+    // instruction names nothing — the choice is delete or stay.
+    const wipeIt = await confirm({
+      message: `Delete ${title} from this browser and sign in without it? This cannot be undone.`,
+      confirmLabel: "Delete and sign in",
+      cancelLabel: "Stay here",
+      destructive: true,
+    });
+    if (!wipeIt) return;
+    saveDirectSignInIntent({ decision: "discard", menuIds: askable });
+    router.push("/sign-in");
   }
 
   function resetLiveDoc() {
@@ -2027,7 +2358,10 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   /** Start (or restart) a selection from the dropzone — replaces every page. */
   async function selectFiles(incoming: File[]) {
     if (incoming.length === 0) return;
-    if (!(await confirmDiscard())) return;
+    // Signed-out replacement needs no consent: the single offline draft is
+    // superseded once the new capture saves (pruned in autoSaveDraft), and
+    // a failed extraction leaves the old draft standing.
+    if (signedInRef.current && !(await confirmDiscard())) return;
     const check = validateImageBatch(incoming);
     if (!check.valid) {
       setFileError(check.message);
@@ -2055,15 +2389,18 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       setFileError(check.message);
       return;
     }
-    // The add control only exists while pages are selected, so there is
-    // always a previous selection to combine; the guard in confirmDiscard
-    // decides whether there is an extraction result worth confirming.
-    const confirmMessage =
-      `This discards the current extraction result — the images themselves are kept. ` +
-      `A new extraction will run on all ${combined.length} images together: the ` +
-      `${pages.length} already selected plus ${incoming.length} new ` +
-      `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
-    if (!(await confirmDiscard(confirmMessage))) return;
+    if (signedInRef.current) {
+      // The add control only exists while pages are selected, so there is
+      // always a previous selection to combine; the guard in confirmDiscard
+      // decides whether there is an extraction result worth confirming.
+      // Signed-out replacement needs no consent (see selectFiles).
+      const confirmMessage =
+        `This discards the current extraction result — the images themselves are kept. ` +
+        `A new extraction will run on all ${combined.length} images together: the ` +
+        `${pages.length} already selected plus ${incoming.length} new ` +
+        `${incoming.length === 1 ? "page" : "pages"}. Continue?`;
+      if (!(await confirmDiscard(confirmMessage))) return;
+    }
     applySelection(combined);
     void extractFiles(combined);
   }
@@ -2149,7 +2486,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   async function handleDemo() {
-    if (!(await confirmDiscard())) return;
+    if (signedInRef.current && !(await confirmDiscard())) return;
     clearCapture();
     const doc = createSampleMenuDocument();
     setDemoDoc(doc);
@@ -2194,6 +2531,44 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     }
     setDraftSave("saving");
     try {
+      // Server-only while signed in: the draft is a cloud copy from the
+      // start, so a rename-and-return never sits "in this browser". No
+      // local fallback — a failure keeps the in-memory result and the next
+      // Extract press retries.
+      if (signedInRef.current) {
+        const targetId = await ensureServerTarget(doc.title);
+        if (!targetId) {
+          throw new SyncError(
+            "unavailable",
+            "Couldn't reach your account. Check your connection, then press Extract again."
+          );
+        }
+        let server: ServerMenu;
+        try {
+          server = await createServerMenu(targetId, doc);
+        } catch (serverError) {
+          // A retry that landed after an ambiguous failure adopts the row
+          // instead of duplicating it.
+          if (serverError instanceof SyncError && serverError.code === "exists") {
+            server = await fetchServerMenu(doc.id);
+          } else {
+            throw serverError;
+          }
+        }
+        if (primaryPageBlob) {
+          try {
+            await saveImage(server.id, primaryPageBlob);
+          } catch {
+            // Image is optional; the menu matters.
+          }
+        }
+        if (token !== draftTokenRef.current) return;
+        const cached = await cacheServerDraft(server);
+        draftDocRef.current = cached;
+        setDraftSave("saved");
+        await refreshLibrary();
+        return;
+      }
       const saved = await saveMenu(doc);
       if (primaryPageBlob) {
         try {
@@ -2210,6 +2585,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
       // an existing stamp.
       const autosaveActor = signedInRef.current ? accountKeyRef.current : null;
       if (autosaveActor) await stampDraftOrigin(saved.id, autosaveActor, "");
+      await pruneSignedOutOthers(saved.id);
       setDraftSave("saved");
       await refreshLibrary();
     } catch (error) {
@@ -2232,16 +2608,67 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * this without touching the URL, then navigates once to its own mode.
    */
   async function saveResultAndOpen(updateRoute = true): Promise<MenuDocument> {
-    if (source === "ai" && extracted) {
+    // `extracted` is null for a draft resumed after a reload: the stored
+    // document (and `resultDoc`) is the work, so the same path opens it
+    // instead of pretending this is a fresh sample menu.
+    if (source === "ai" && (extracted || resultDoc)) {
       const firstPage = pages[0];
       // Reuse the autosaved draft instead of writing a second record.
       const doc =
         draftDocRef.current ??
-        extractedMenuToDocument(extracted.menu, {
-          provider: extracted.provider,
-          model: extracted.model,
-          originalFileName: firstPage?.file.name,
-        });
+        (extracted
+          ? extractedMenuToDocument(extracted.menu, {
+              provider: extracted.provider,
+              model: extracted.model,
+              originalFileName: firstPage?.file.name,
+            })
+          : resultDoc!);
+      // Server-only while signed in: no browser-only copy is ever written.
+      // A failure throws to the result screen's error path with the data
+      // intact, so the next press retries instead of forking a local copy.
+      if (signedInRef.current) {
+        if (storageDownRef.current) {
+          throw new StorageError(
+            "unavailable",
+            "Browser storage is unavailable, so the menu can't be cached. Try again."
+          );
+        }
+        const alreadyOnServer = serverIdsRef.current.has(doc.id);
+        if (alreadyOnServer) {
+          const access = menuAccessRef.current.get(doc.id);
+          await refreshLibrary();
+          await openDoc(doc, firstPage ? firstPage.file : null, updateRoute, access);
+          return doc;
+        }
+        const targetId = await ensureServerTarget(doc.title);
+        if (!targetId) {
+          throw new StorageError(
+            "unavailable",
+            "Couldn't reach your account. Check your connection and try again."
+          );
+        }
+        let server: ServerMenu;
+        try {
+          server = await createServerMenu(targetId, doc);
+        } catch (serverError) {
+          if (serverError instanceof SyncError && serverError.code === "exists") {
+            server = await fetchServerMenu(doc.id);
+          } else {
+            throw serverError;
+          }
+        }
+        if (firstPage) {
+          try {
+            await saveImage(server.id, firstPage.file);
+          } catch {
+            // Image is optional; the menu matters.
+          }
+        }
+        const cached = await cacheServerDraft(server);
+        await refreshLibrary();
+        await openDoc(cached, firstPage ? firstPage.file : null, updateRoute, server.access);
+        return cached;
+      }
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
       if (firstPage && !storageDownRef.current) {
         try {
@@ -2251,12 +2678,43 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           // Image is optional; the menu matters.
         }
       }
+      await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
       await openDoc(saved, firstPage ? firstPage.file : null, updateRoute, "local");
       return saved;
     }
     const doc = demoDoc ?? createSampleMenuDocument();
+    if (signedInRef.current) {
+      if (storageDownRef.current) {
+        throw new StorageError(
+          "unavailable",
+          "Browser storage is unavailable, so the menu can't be cached. Try again."
+        );
+      }
+      const demoTarget = await ensureServerTarget(doc.title);
+      if (!demoTarget) {
+        throw new StorageError(
+          "unavailable",
+          "Couldn't reach your account. Check your connection and try again."
+        );
+      }
+      let demoServer: ServerMenu;
+      try {
+        demoServer = await createServerMenu(demoTarget, doc);
+      } catch (serverError) {
+        if (serverError instanceof SyncError && serverError.code === "exists") {
+          demoServer = await fetchServerMenu(doc.id);
+        } else {
+          throw serverError;
+        }
+      }
+      const cached = await cacheServerDraft(demoServer);
+      await refreshLibrary();
+      await openDoc(cached, null, updateRoute, demoServer.access);
+      return cached;
+    }
     const saved = storageDownRef.current ? doc : await saveMenu(doc);
+    await pruneSignedOutOthers(saved.id);
     if (!storageDownRef.current) await refreshLibrary();
     await openDoc(saved, null, updateRoute, "local");
     return saved;
@@ -2370,6 +2828,42 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     void persistResultDoc(next);
   }
 
+  /**
+   * The signed-out way back. A reload with a browser draft shows a banner on
+   * Capture, and resuming restores that draft into the capture result screen —
+   * the screen the work happened on — rather than asking for the photo again
+   * or sending anyone to a library that no longer exists signed out.
+   */
+  async function handleResumeCapture(menuId: string) {
+    try {
+      const doc = await getMenu(menuId);
+      const image = await getImage(menuId).catch(() => null);
+      if (image) {
+        const file = new File([image.blob], `${doc.title || "menu"}.jpg`, {
+          type: image.mimeType,
+        });
+        applySelection([file]);
+      } else {
+        // The draft outlives its source photo: the result is still the work.
+        applySelection([]);
+      }
+      draftDocRef.current = doc;
+      setResultDoc(doc);
+      setExtracted(null);
+      setInitialReviewCount(
+        doc.categories.reduce((sum, c) => sum + c.items.filter(isItemFlagged).length, 0)
+      );
+      setSource("ai");
+      setDraftSave("saved");
+      setPhase("done");
+      setResumeDismissed(true);
+      navigateTo({ screen: "capture" });
+      scrollToResult();
+    } catch {
+      setLibraryError("Couldn't reopen that draft. Try again in a moment.");
+    }
+  }
+
   async function handleEditResult() {
     try {
       await saveResultAndOpen();
@@ -2417,7 +2911,43 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     setImportError(null);
     try {
       const doc = parseImportedMenu(await importFile.text());
+      // Server-only while signed in: an import lands straight on the
+      // account. Staff-only sign-ins have no writable café, so the import
+      // is refused instead of stacking a browser-only draft.
+      if (signedInRef.current) {
+        if (storageDownRef.current) {
+          setImportError("Browser storage is unavailable, so the menu can't be cached. Try again.");
+          return;
+        }
+        const importTarget = await ensureServerTarget(doc.title);
+        if (!importTarget) {
+          setImportError(
+            canFileBrowserDrafts === false && (restaurantList?.length ?? 0) > 0
+              ? "Only the restaurant owner can add menus — ask the owner to import this file."
+              : "Couldn't reach your account. Check your connection and try again."
+          );
+          return;
+        }
+        try {
+          const created = await createServerMenu(importTarget, doc);
+          const cached = await cacheServerDraft(created);
+          await refreshLibrary();
+          await openDoc(cached, null, true, created.access);
+          return;
+        } catch (error) {
+          if (error instanceof SyncError && error.code === "exists") {
+            const existing = await fetchServerMenu(doc.id);
+            const cached = await cacheServerDraft(existing);
+            await refreshLibrary();
+            await openDoc(cached, null, true, existing.access);
+            return;
+          }
+          throw error;
+        }
+      }
+      // Single offline menu: the prune after saving supersedes the old draft.
       const saved = storageDownRef.current ? doc : await saveMenu(doc);
+      await pruneSignedOutOthers(saved.id);
       if (!storageDownRef.current) await refreshLibrary();
       await openDoc(saved, null);
     } catch (error) {
@@ -2468,6 +2998,49 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   const activeRestaurantId = activeWorkspace?.restaurantId ?? null;
   const activeRestaurantIdRef = useRef<string | null>(activeRestaurantId);
   activeRestaurantIdRef.current = activeRestaurantId;
+  /**
+   * Server-only creation (signed-in): a new menu is a cloud copy, never a
+   * browser-only draft. Prefers the café the shell acts in when it may file
+   * there, else the owner's first café; a brand-new account gets its café
+   * provisioned from the menu title instead of a local draft (publishing can
+   * no longer be the first server write). Staff-only contexts return null —
+   * there is no café the caller may file in, and nothing is invented behind
+   * anyone's back. The refs mirror the render answer so async saves decide
+   * on the same membership the shell acts in.
+   */
+  const signedInCanWrite = signedIn && accountCan("menus.write");
+  const signedInCanWriteRef = useRef(signedInCanWrite);
+  signedInCanWriteRef.current = signedInCanWrite;
+  async function ensureServerTarget(menuTitle: string): Promise<string | null> {
+    if (!signedInRef.current || !accountKeyRef.current) return null;
+    if (activeRestaurantIdRef.current && signedInCanWriteRef.current) {
+      return activeRestaurantIdRef.current;
+    }
+    if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
+      return ownedRestaurantsForAccount[0].id;
+    }
+    if ((restaurantList?.length ?? 0) > 0) return null;
+    try {
+      const created = await createRestaurant(suggestRestaurantName([menuTitle]) ?? "My restaurant");
+      workspace.addRestaurant(created);
+      return created.id;
+    } catch {
+      return null;
+    }
+  }
+  /**
+   * File a fresh server menu as the local cache: same id, server clock,
+   * stamped to this account so sign-out hides it like any account copy.
+   */
+  async function cacheServerDraft(server: ServerMenu): Promise<MenuDocument> {
+    const cached = storageDownRef.current ? server.doc : await cacheMenu(server.doc);
+    const actor = accountKeyRef.current;
+    if (actor) await refreshDraftSync(cached.id, actor, server.updatedAt, menuContentHash(cached));
+    addServerId(cached.id);
+    setMenuAccessFor(cached.id, server.access);
+    rememberMenuCafe(cached.id, server.restaurantId);
+    return cached;
+  }
   // Refresh the sidebar's launch progress when the account, the café, or the
   // screen changes: publishing or a first order moves the count, and the next
   // navigation is when the owner sees it. It asks for the café the shell is
@@ -2545,28 +3118,16 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }));
   const localOnly = libraryMenus.filter((menu) => !menu.onServer);
   const localOnlyCount = localOnly.length;
-  // A name for the first-run "Name your restaurant" field, guessed from the
-  // titles of the menus the move would copy (null when they say nothing).
-  const suggestedRestaurantName = suggestRestaurantName(localOnly.map((menu) => menu.title));
 
-  // The claim surfaces stay out of the editor: importing the menu that is
-  // open would create an account version the editor is not synced with. The
-  // wizard's own publish handles the open draft, and the post-publish import
-  // above covers the rest.
-  const storedClaimStatus = accountKey ? loadLocalDraftClaim(accountKey) : "unseen";
-  const claimStatus =
-    claimAnswer?.accountKey === accountKey ? claimAnswer.status : storedClaimStatus;
-  // The editor suppresses the *offer* (importing the open menu would fork
-  // the revision the editor is holding), but never the empty-account
-  // auto-import: signing in inside the publish wizard is the onboarding
-  // path, and leaving it ungated strands the draft as anonymous — the next
-  // sign-out resurrects the resume banner for a menu the account owns.
+  // Sign-in claims every browser draft in one go — attach or discard, no
+  // remembered answers, no offer. A claim that ran while a draft was open
+  // reconciles the editor to the agreed revision instead of forking it.
   //
   // "pending" and "unavailable" are real answers, not stand-ins for "none".
   // While the session or the account's inventory is still loading the
   // decision is *unknown* (the resume banner once read that unknown as a
-  // settled "none", passed its `!== "offer"` check and rendered in the load
-  // gap — the flicker). A read that *failed* is unknown too, and must never
+  // settled "none" and rendered in the load gap — the flicker). A read
+  // that *failed* is unknown too, and must never
   // be read as an empty account: that would push this browser's drafts at a
   // server that did not answer. Signed out and settled, the decision really
   // is "none".
@@ -2601,7 +3162,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
           accountMenuCount: serverIds.size,
           restaurantCount: restaurantList?.length ?? 0,
           ownedRestaurantCount: ownedRestaurantsForAccount.length,
-          status: claimStatus,
         },
       })
     : "none";
@@ -2630,6 +3190,87 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     void Promise.resolve().then(() => setResumeDismissed(false));
   }, [resumeReady, resumeDismissed]);
 
+  // Which journey menu already attached this session (one entry per menu).
+  const journeyClaimRef = useRef<string | null>(null);
+
+  // Direct "Sign in" choice: attach the named menus silently, or wipe them,
+  // exactly once. Runs before the journey and generic claims so a discard
+  // wins over any auto-import of the same rows.
+  useEffect(() => {
+    if (!signedIn || !accountKey) return;
+    if (claimGate.pending || claimGate.incomplete) return;
+    const intent = loadDirectSignInIntent();
+    if (!intent || intent.menuIds.length === 0) return;
+    clearDirectSignInIntent();
+    if (intent.decision === "discard") {
+      void (async () => {
+        await wipeBrowserMenus(intent.menuIds);
+        await refreshLibrary();
+        setOriginList(await listDraftOrigins().catch(() => []));
+      })();
+      return;
+    }
+    // The state writes below run in a task, not the effect body, so one
+    // failing row reports without cascading a render off the sign-in sync.
+    void (async () => {
+      for (const menuId of intent.menuIds) {
+        if (serverIdsRef.current.has(menuId)) continue;
+        const mayFile = canFileBrowserDrafts || (restaurantList?.length ?? 0) === 0;
+        if (!mayFile) {
+          setClaimError(
+            "Your account can't file menus yet — ask the café owner to add this address in Settings → Team."
+          );
+          continue;
+        }
+        journeyClaimRef.current = `${accountKey}:${menuId}`;
+        await handlePublishJourneyClaim(menuId);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    signedIn,
+    accountKey,
+    claimGate.pending,
+    claimGate.incomplete,
+    canFileBrowserDrafts,
+    restaurantList,
+  ]);
+
+  // Onboarding promise ("Sign in to publish your menu"): the journey draft
+  // attaches on sign-in with no prior-menu check — the emailed link is
+  // consent for that menu. The generic auto-import below stays as the
+  // fallback for non-journey drafts.
+  useEffect(() => {
+    if (!signedIn || !accountKey) return;
+    if (claimGate.pending || claimGate.incomplete) return;
+    const menuId = routeMenuId(route);
+    if (!menuId || !hasPublishJourney(menuId)) return;
+    if (serverIds.has(menuId)) return;
+    if (
+      !decidePublishJourneyClaim({
+        signedIn,
+        mayFile: canFileBrowserDrafts || (restaurantList?.length ?? 0) === 0,
+        journeyDraftLocal: localOnly.some((menu) => menu.id === menuId),
+        alreadyClaimed: journeyClaimRef.current === `${accountKey}:${menuId}`,
+      })
+    )
+      return;
+    journeyClaimRef.current = `${accountKey}:${menuId}`;
+    void handlePublishJourneyClaim(menuId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    signedIn,
+    accountKey,
+    route,
+    serverIds,
+    localOnly,
+    canFileBrowserDrafts,
+    restaurantList,
+    ownedRestaurantsForAccount,
+    claimGate.pending,
+    claimGate.incomplete,
+  ]);
+
   useEffect(() => {
     if (!signedIn || !accountKey) return;
     // Unknown is not "empty": no server work while a read is in flight, and
@@ -2637,22 +3278,17 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     // successful read in this session can still run it.
     if (claimGate.pending || claimGate.incomplete) return;
     if (claimEvaluatedRef.current === accountKey) return;
-    claimEvaluatedRef.current = accountKey;
     if (localDraftsDecision !== "auto-import") return;
+    // Marked only when the import runs: rows that arrive later (an offline
+    // save while signed in) must still be claimed instead of inheriting a
+    // decision made when the browser held nothing.
+    claimEvaluatedRef.current = accountKey;
     const titles = localOnly.map((menu) => menu.title);
     // Deferred: the effect must not set state synchronously while rendering
     // the frame that made the decision.
     void Promise.resolve().then(() => handleAutoClaim(titles));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    accountKey,
-    claimGate.incomplete,
-    claimGate.pending,
-    claimStatus,
-    localDraftsDecision,
-    screen,
-    signedIn,
-  ]);
+  }, [accountKey, claimGate.incomplete, claimGate.pending, localDraftsDecision, screen, signedIn]);
 
   /**
    * The menu the URL names. Leaving the editor for the library keeps the
@@ -2718,7 +3354,6 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     signedIn,
     can: accountCan,
     assistantEnabled: featureFlags.assistant,
-    hasWorkingSet: libraryMenus.length > 0,
   });
   /**
    * The sidebar renders the same table, with the library's number filled in
@@ -2738,17 +3373,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
    * takes over the name and `/sign-in` at every width.
    *
    * Nothing is assumed while the session or the library is still answering:
-   * `hasWorkingSet` is not a fact until IndexedDB has been read, and the
-   * session is not settled until its read answers, so the column stays off
-   * until both are known instead of flashing account chrome at a visitor.
+   * The library's own read is part of it too: the session is not settled
+   * until its read answers, so the column stays off until both are known
+   * instead of flashing account chrome at a visitor.
    */
   const showShellColumn =
-    !sessionPending &&
-    !libraryLoading &&
-    shellColumnVisible({
-      sessionState,
-      hasWorkingSet: libraryMenus.length > 0,
-    });
+    !sessionPending && !libraryLoading && shellColumnVisible({ sessionState });
   /** Nav waits for the membership read: no provisional tabs, no empty bar. */
   const navReady = !sessionPending && !accountAccessPending;
   /**
@@ -2797,6 +3427,22 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
     if (!availableScreenIds.has(guarded) && landing) {
       navigateTo({ screen: landing }, true);
     }
+  });
+
+  // Signed out there is no My menus, no editor, no Orders or Settings, and
+  // no navigation to get back with: an old bookmark for any of them returns
+  // to Capture, where the resume banner offers any draft left behind. The
+  // onboarding publish step is the one exception — the emailed magic link
+  // returns there — so its URL keeps working for a visitor.
+  useEffect(() => {
+    if (signedIn || sessionPending) return;
+    if (libraryLoading) return;
+    const routed = routeRef.current;
+    const onboarding = routed.screen === "editor" && routed.mode === "publish";
+    if (routed.screen === "capture" || onboarding) return;
+    // Deferred like the other account reads: the effect must not set state
+    // synchronously while rendering the frame that decided it.
+    void Promise.resolve().then(() => navigateTo({ screen: "capture" }, true));
   });
 
   /**
@@ -2871,6 +3517,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               email={email}
               onNavigate={(section) => navigateTo({ screen: section })}
               onSignOut={() => void authClient.signOut()}
+              onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
               onHome={() => navigateTo({ screen: "capture" })}
               outline={sidebarOutline}
               outlineKey={sidebarOutlineKey}
@@ -2889,6 +3536,9 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
               sessionPending={sessionPending}
               className={showShellColumn ? "sm:hidden" : undefined}
               onHome={() => navigateTo({ screen: "capture" })}
+              // Every in-shell sign-in goes through the choice first: attach
+              // the browser draft on login or wipe it on login.
+              onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
             />
             {/* The sidebar names the account, not the café on shift: a second
               membership keeps its "Acting as" strip, which sits above the
@@ -2901,30 +3551,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             <main
               className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6 sm:py-8 ${
                 // The editor is a dense working surface; the other app screens
-                // share the remaining width beside the sidebar instead of
-                // keeping the marketing measure they had under a top bar.
-                screen === "editor" ? "max-w-6xl" : "max-w-5xl"
+                // — including the publish step, which is onboarding rather
+                // than editing — share the brand row's measure so the page
+                // and the lockup start on the same left edge.
+                screen === "editor" && editorMode !== "publish" ? "max-w-6xl" : "max-w-5xl"
               }`}
             >
-              {signedIn && claimNotice && screen !== "editor" && (
-                <LocalDraftsNotice
-                  notice={claimNotice}
-                  onOpenLibrary={() => navigateTo({ screen: "library" })}
-                  onDismiss={() => setClaimNotice(null)}
-                />
-              )}
-              {!claimNotice &&
-                localDraftsDecision === "offer" &&
-                screen !== "editor" &&
-                ownedRestaurantsForAccount.length > 0 && (
-                  <LocalDraftsOffer
-                    count={localOnlyCount}
-                    restaurants={ownedRestaurantsForAccount}
-                    busy={claimBusy}
-                    onAdd={handleClaimAdd}
-                    onDismiss={handleDismissClaim}
-                  />
-                )}
               {signedIn && claimError && (
                 <div
                   role="alert"
@@ -2952,21 +3584,21 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                 </p>
               )}
 
-              {/* Q7 resume banner: the way back for anyone who wandered off (or
-            returns from the magic-link email) with a saved-but-unpublished
-            draft. Whether a draft is unpublished is *server* knowledge, so
-            this renders only after `resumeReady` (session, library and —
-            signed in — an account menu list that answered) and only with a
+              {/* Q7 resume banner, signed out only: the way back for anyone
+            who wandered off with a saved-but-unpublished draft. Signed out
+            there is no library to go back to, so the banner resumes the
+            newest draft on Capture itself — the screen the work happened
+            on. It renders only after the library answers and only with a
             confirmed `resumeDismissed === false`: until then it is
-            invisible, never provisional. Hidden in the editor (it has its
-            own publish entry), while the result is on screen (it IS the
-            continue path), and while the claim surfaces speak. */}
-              {(screen === "capture" || screen === "library") &&
+            invisible, never provisional. Hidden while the result is on
+            screen (it IS the continue path), and signed in it never
+            renders at all — signing in dissolves the rows instead. */}
+              {screen === "capture" &&
+                !signedIn &&
                 result === null &&
                 resumeReady &&
                 resumeDismissed === false &&
                 localOnlyCount > 0 &&
-                !claimNotice &&
                 claimSurfaceQuiet &&
                 (() => {
                   const resumable = localOnly.find((menu) => !menu.corrupt);
@@ -2976,27 +3608,21 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-warning-950">
-                            Finish publishing your menu →
+                            Pick up where you left off
                           </p>
                           <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
                             {localOnlyCount === 1
-                              ? `“${resumable.title}” is saved in this browser, not published yet.`
-                              : `${localOnlyCount} drafts saved in this browser, none published yet. Continuing with “${resumable.title}”.`}
+                              ? `“${resumable.title}” is still saved in this browser — reopen it here and keep going.`
+                              : `${localOnlyCount} menus are saved in this browser — reopen “${resumable.title}” and keep going.`}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              navigateTo({
-                                screen: "editor",
-                                menuId: resumable.id,
-                                mode: "publish",
-                              })
-                            }
+                            onClick={() => void handleResumeCapture(resumable.id)}
                             className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                           >
-                            Continue →
+                            Resume →
                           </button>
                           <button
                             type="button"
@@ -3021,30 +3647,12 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   hasHiddenMenus={hasHiddenMenus}
                   emptyTitle={libraryEmpty?.title}
                   emptyBody={libraryEmpty?.body}
-                  signedIn={signedIn}
-                  importCount={localOnlyCount}
-                  importMenuIds={localOnly.map((menu) => menu.id)}
-                  suggestedName={suggestedRestaurantName}
-                  ownedRestaurants={ownedRestaurantsForAccount}
                   unavailable={storageDown}
                   onOpen={(id) => void handleOpenMenu(id)}
                   onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
                   onRename={(id, title) => void handleRenameMenu(id, title)}
                   onDelete={(id) => void handleDeleteMenu(id)}
-                  onMoveToAccount={handleMoveMenuToAccount}
-                  onMoved={(report) => {
-                    const actor = accountKeyRef.current;
-                    void (async () => {
-                      if (actor) {
-                        await stampClaimedMenus(
-                          [...report.imported, ...report.skipped],
-                          actor,
-                          (id) => getMenu(id)
-                        );
-                      }
-                      await mergeAccountMenus();
-                    })();
-                  }}
+                  onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
                 />
               )}
 
@@ -3218,6 +3826,7 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
                   previewDoc={resultDoc}
                   source={source}
                   draftSave={draftSave}
+                  draftOnServer={resultDoc ? serverIds.has(resultDoc.id) : false}
                   initialReviewCount={initialReviewCount}
                   onClear={clearCapture}
                   onEdit={() => void handleEditResult()}
@@ -3297,13 +3906,13 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
         {/*
         Phone nav: signed in, the tab bar pins Capture · My menus · Orders ·
         More (Orders keeps its home for the R0.3 monitor badge; the rest
-        lives in the More sheet). Signed out, the shell is capture-only:
-        Capture plus My menus only when anonymous drafts exist to continue —
-        no Orders, no More. Sits after the footer so it is the last thing on
-        the page and sticks to the viewport bottom instead of floating above
-        the footer links.
+        lives in the More sheet). Signed out there is no tab bar at all: the
+        only screen is Capture, and a draft left behind is resumed from its
+        banner — no Orders, no More, no My menus. Sits after the footer so it
+        is the last thing on the page and sticks to the viewport bottom
+        instead of floating above the footer links.
       */}
-        {navReady && (signedIn || (!libraryLoading && libraryMenus.length > 0)) ? (
+        {navReady && signedIn ? (
           <nav
             data-print-hide
             aria-label="Sections"

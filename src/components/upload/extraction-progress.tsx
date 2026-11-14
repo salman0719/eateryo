@@ -26,16 +26,18 @@ export interface ExtractionProgressProps {
   preparedPages: number;
   /** Epoch ms when the request started; null while images are prepared. */
   requestStartedAt: number | null;
+  /** Signed-in drafts save straight to the account, never to this browser. */
+  signedIn?: boolean;
 }
 
-const NEXT_STEPS = [
+const SIGNED_OUT_STEPS = [
   {
     title: "A draft you check",
     body: "Sections, items and prices arrive in an editor. Anything unclear is flagged instead of guessed.",
   },
   {
     title: "Saved in this browser",
-    body: "No account needed. The draft waits in My menus on this device.",
+    body: "No account needed. Come back to this browser and the draft is waiting on Capture.",
   },
   {
     title: "Your link, when ready",
@@ -47,7 +49,18 @@ export function ExtractionProgress({
   pageCount,
   preparedPages,
   requestStartedAt,
+  signedIn = false,
 }: ExtractionProgressProps) {
+  const NEXT_STEPS = signedIn
+    ? [
+        SIGNED_OUT_STEPS[0],
+        {
+          title: "Saved to your account",
+          body: "The draft is a cloud copy in your cafe, so your other devices see it too.",
+        },
+        SIGNED_OUT_STEPS[2],
+      ]
+    : SIGNED_OUT_STEPS;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
