@@ -161,6 +161,15 @@ errors, or add lint/type suppressions just to make checks pass.
   page through `children` — so a screen can change without touching the frame.
   `HomeScreen` still owns the shell's state and hands this component the
   answers; the frame is covered by `tests/app-shell.test.ts`.
+- `src/features/navigation/navigation-context.tsx`, `history.ts` — the one
+  owner of "which screen is showing": `NavigationProvider` holds the route,
+  writes the URL through the pure `historyWriteFor` decision (push, replace,
+  or nothing when the href already matches), follows changes the app did not
+  make (back/forward, a typed URL, a `<Link>` push), flushes the open editor's
+  pending save before leaving a menu, and holds the dead-publish-link state.
+  Screens call `navigate(route)`; none takes a parsed route as a prop. Moving
+  to the App Router's own URLs later changes this provider, not its callers.
+  Tests: `tests/navigation-history.test.ts`.
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
