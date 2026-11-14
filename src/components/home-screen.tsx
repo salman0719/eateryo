@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AssistantPage } from "@/components/pages/assistant-page";
@@ -14,15 +14,8 @@ import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
-import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
+import { MenuEditor } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
-import {
-  downloadTextFile,
-  menuFilename,
-  menuToCsv,
-  parseImportedMenu,
-  serializeMenu,
-} from "@/features/menu/import-export";
 import {
   createMenuDocument,
   defaultNewMenuTitle,
@@ -80,6 +73,7 @@ import {
 import { workspaceCan } from "@/features/tenancy/workspace";
 import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-context";
 import { LibraryProvider, useLibrary } from "@/features/menus/library-context";
+import { useActiveMenu } from "@/features/menus/active-menu";
 import { useDraftClaims } from "@/features/menus/draft-claims";
 import { useCapture } from "@/features/capture/use-capture";
 import { usePublication } from "@/features/publishing/use-publication";
@@ -88,7 +82,6 @@ import { createRestaurant } from "@/features/tenancy/client";
 import {
   clearDraftOrigin,
   collectSignOutDissolveIds,
-  decideHeal,
   getDraftOrigin,
   listDraftOrigins,
   menuContentHash,
@@ -96,7 +89,6 @@ import {
   stampDraftOrigin,
   unstampedIds,
   visibleMenuIds,
-  type DraftOrigin,
 } from "@/features/menus/draft-origins";
 import { resumeBannerReady } from "@/features/menus/claim-local-drafts";
 import {
@@ -119,16 +111,6 @@ import {
 } from "@/features/menus/routed-doc";
 
 type Phase = "upload" | "ready" | "extracting" | "done";
-
-/** Save status stays one word; `detail` says where the save went. */
-function savedState(detail: string): SaveState {
-  return { kind: "saved", message: "Saved", detail };
-}
-
-/** Content equality ignoring the save stamp (same rule the sync uses). */
-function sameMenuContent(a: MenuDocument, b: MenuDocument): boolean {
-  return JSON.stringify({ ...a, updatedAt: "" }) === JSON.stringify({ ...b, updatedAt: "" });
-}
 
 function stepIndex(phase: Phase, hasResult: boolean): number {
   if (hasResult || phase === "done") return 2;
@@ -188,7 +170,6 @@ function HomeShell() {
     serverMenusReadFor,
     serverMenusReadFailedFor,
     accountMenusSettledRef,
-    accountMenusReadFailedRef,
     refreshLibrary,
     reportLibraryError,
     mergeAccountMenus,
@@ -226,22 +207,10 @@ function HomeShell() {
 
   const router = useRouter();
 
-  // Editor state: the one open document. The library itself lives in the
-  // provider above the shell.
-  const [activeDoc, setActiveDoc] = useState<MenuDocument | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>(
-    savedState("Saved in this browser. Sign in to use this menu on other devices.")
-  );
-  const [importError, setImportError] = useState<string | null>(null);
-  const [editorImageUrl, setEditorImageUrl] = useState<string | null>(null);
-
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
   const replaceIndexRef = useRef<number | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
-  const docRef = useRef<MenuDocument | null>(null);
-  const lastSavedRef = useRef<string | null>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // The account read and the acting membership belong to the provider above
   // the shell: one read for every screen. What the shell may do is the active
@@ -324,11 +293,44 @@ function HomeShell() {
   const sessionStateRef = useRef<SessionState>("unknown");
   /** Current account id for async work (closures may outlive the render). */
   const accountKeyRef = useRef<string | null>(null);
-  /** The server updatedAt the open menu was last synced at; null = don't push. */
-  const serverBaseRef = useRef<string | null>(null);
-  const [conflict, setConflict] = useState<{ serverUpdatedAt: string | null } | null>(null);
-  const [conflictError, setConflictError] = useState<string | null>(null);
-  const conflictRef = useRef<{ serverUpdatedAt: string | null } | null>(null);
+  // The one open document — its autosave, flush, conflict, photo and the files
+  // it imports — is its own unit. It files a menu through the shell's menu
+  // lifecycle doors, so the café a menu lands in stays decided here.
+  const {
+    doc: activeDoc,
+    saveState,
+    conflict,
+    conflictError,
+    imageUrl: editorImageUrl,
+    importError,
+    getOpenDoc,
+    getOpenDocId,
+    openBaseline,
+    onServerRevision,
+    onClaimedOpenDoc,
+    onMenuRenamed,
+    openDoc,
+    changeDoc: handleDocChange,
+    flushSave,
+    healStampedDrafts,
+    handleLoadServerVersion,
+    handleKeepMyVersion,
+    handleExportJson,
+    handleExportCsv,
+    importFile,
+    forgetOpenDoc,
+    clearImage,
+    showImage,
+    releaseOpenDoc,
+    resetActiveMenu,
+    resyncOpenDoc,
+  } = useActiveMenu({
+    fileMenu: (menuTitle) => ensureServerTarget(menuTitle, activeRestaurantId, signedInCanWrite),
+    cacheServerDraft,
+    pruneSignedOutOthers,
+    cannotFileMenus,
+    onOpenDoc,
+  });
   /**
    * Where the open menu is saved. `null` while the account read is still
    * pending, so nothing claims "this browser only" on a guess (001, 003).
@@ -347,22 +349,6 @@ function HomeShell() {
    * checked, and does not offer the café-creating flow on a guess (016).
    */
   const activeMenuAccountCheckFailed = activeMenuMembership === "unreachable";
-  /**
-   * The claim took the open row over: pin the editor to the agreed revision so
-   * the next save stays on the account instead of forking the one just made.
-   */
-  const onClaimedOpenDoc = useCallback(
-    async (menuId: string) => {
-      const server = await fetchServerMenu(menuId);
-      const actor = accountKeyRef.current;
-      if (docRef.current?.id !== menuId || !actor) return;
-      serverBaseRef.current = server.updatedAt;
-      await refreshDraftSync(menuId, actor, server.updatedAt, menuContentHash(server.doc));
-      await refreshLibrary();
-      setSaveState(savedState("Saved to your account."));
-    },
-    [refreshLibrary]
-  );
   // Draft claims: every browser draft is adopted on sign-in, silently. The
   // unit decides where they land and settles the gate; the editor stays here
   // and is reached through two named doors.
@@ -376,7 +362,7 @@ function HomeShell() {
     partitionRealMenus,
     resetClaimState,
   } = useDraftClaims({
-    getOpenDocId: useCallback(() => docRef.current?.id ?? null, []),
+    getOpenDocId,
     onClaimedOpenDoc,
     routeMenuId: routeMenuId(route),
     screen: route.screen,
@@ -399,15 +385,23 @@ function HomeShell() {
     handleUnpublish,
     handleWizardPublished,
   } = usePublication({
-    getOpenDoc: useCallback(() => docRef.current, []),
+    getOpenDoc,
     flushSave,
-    onServerRevision: (menuId, serverUpdatedAt) => {
-      if (docRef.current?.id === menuId) serverBaseRef.current = serverUpdatedAt;
-    },
+    onServerRevision,
     onPublishedMenu: (menuId) => {
       if (menuId === draftDocId() || menuId === demoDoc?.id) clearCapture();
     },
   });
+
+  /**
+   * The open document changed: publication belongs to one menu, so it retires
+   * the answer it had and asks for this one's. The unit announces the open
+   * document rather than importing a unit that sits below it.
+   */
+  function onOpenDoc(menuId: string) {
+    resetPublication();
+    void refreshPublication(menuId);
+  }
 
   /**
    * Session state of the "Continue getting your link" resume banner (Q7).
@@ -427,531 +421,11 @@ function HomeShell() {
    */
 
   /**
-   * Push interrupted work from closed menus after a same-account return.
-   * Only rows stamped to this account whose server revision is untouched
-   * are pushed; anything diverged on both sides waits for the next open,
-   * which raises the explicit conflict choice instead. Best-effort: every
-   * failure mode leaves the browser copy alone for the offer/manual path.
+   * Whether a refused filing is about permission rather than reach: a staff
+   * shift has no café it may add menus to, so the import can say who can.
    */
-  async function healStampedDrafts() {
-    const actor = accountKeyRef.current;
-    if (!signedInRef.current || !actor) return;
-    let origins: DraftOrigin[];
-    try {
-      origins = await listDraftOrigins();
-    } catch {
-      return;
-    }
-    let healedAny = false;
-    for (const origin of origins.filter((item) => item.accountId === actor)) {
-      if (docRef.current?.id === origin.menuId) continue;
-      if (!accessCan(menuAccessRef.current.get(origin.menuId), "menus.write")) continue;
-      try {
-        const local = await getMenu(origin.menuId);
-        const server = await fetchServerMenu(origin.menuId);
-        const healedLocalHash = menuContentHash(local);
-        if (sameMenuContent(server.doc, local)) {
-          await refreshDraftSync(origin.menuId, actor, server.updatedAt, healedLocalHash);
-          continue;
-        }
-        const decision = decideHeal({
-          contentEqual: false,
-          localUpdatedAt: local.updatedAt,
-          lastSyncedUpdatedAt: origin.lastSyncedUpdatedAt,
-          serverUpdatedAt: server.updatedAt,
-          localHash: healedLocalHash,
-          serverHash: menuContentHash(server.doc),
-          lastSyncedHash: origin.lastSyncedHash ?? "",
-        });
-        if (decision !== "push") continue;
-        const pushed = await updateServerMenu(local.id, local, server.updatedAt);
-        await refreshDraftSync(local.id, actor, pushed.updatedAt, healedLocalHash);
-        healedAny = true;
-      } catch {
-        // Never on the server, unreachable, or unreadable: the offer/manual
-        // path or the next open handles it. Never throw from the heal.
-        continue;
-      }
-    }
-    if (healedAny) await refreshLibrary();
-  }
-
-  // --- Autosave -----------------------------------------------------------
-
-  async function doSave() {
-    const doc = docRef.current;
-    if (!doc || storageDownRef.current) return;
-    const json = JSON.stringify(doc);
-    if (json === lastSavedRef.current) {
-      setSaveState(storageSaveState(doc.id));
-      return;
-    }
-    // Server-only while signed in: the first change to a pending new menu
-    // creates the cloud copy, so a rename-and-return is already on the
-    // account. No local fallback — the error stays visible and the next
-    // change retries, with the edits kept in memory meanwhile.
-    if (isPendingNewMenu(doc.id) && signedInRef.current) {
-      const pendingTarget = await ensureServerTarget(
-        doc.title,
-        activeRestaurantId,
-        signedInCanWrite
-      );
-      if (!pendingTarget) {
-        setSaveState({
-          kind: "error",
-          message: "Couldn't reach your account — edits are kept, and the next change retries.",
-        });
-        return;
-      }
-      try {
-        const created = await createServerMenu(pendingTarget, doc);
-        const cached = await cacheServerDraft(created);
-        forgetPendingNewMenu(cached.id);
-        lastSavedRef.current = JSON.stringify(cached);
-        docRef.current = cached;
-        setActiveDoc(cached);
-        serverBaseRef.current = created.updatedAt;
-        await refreshLibrary();
-        setSaveState(savedState("Saved to your account."));
-        return;
-      } catch (error) {
-        if (error instanceof SyncError && error.code === "exists") {
-          try {
-            const existing = await fetchServerMenu(doc.id);
-            const cached = await cacheServerDraft(existing);
-            forgetPendingNewMenu(cached.id);
-            lastSavedRef.current = JSON.stringify(cached);
-            docRef.current = cached;
-            setActiveDoc(cached);
-            serverBaseRef.current = existing.updatedAt;
-            await refreshLibrary();
-            setSaveState(savedState("Saved to your account."));
-            return;
-          } catch {
-            // Fall through to the error below.
-          }
-        }
-        setSaveState({
-          kind: "error",
-          message: "Couldn't save to your account — edits are kept, and the next change retries.",
-        });
-        return;
-      }
-    }
-    try {
-      const saved = await saveMenu(doc);
-      lastSavedRef.current = JSON.stringify(saved);
-      // Record whose work this is while the session is live. The stamp
-      // keeps the last agreed revision when there is no new baseline, so a
-      // later return can tell interrupted work from a stale cache.
-      const actor = signedInRef.current ? accountKeyRef.current : null;
-      if (actor && accessCan(menuAccessRef.current.get(saved.id), "menus.write")) {
-        await stampDraftOrigin(saved.id, actor, serverBaseRef.current ?? "");
-      }
-      await refreshLibrary();
-      if (!(await pushToAccount(saved))) {
-        setSaveState(
-          conflictRef.current
-            ? {
-                ...savedState("Saved in this browser."),
-                kind: "error",
-                message: "Changed on your other device — choose which version wins above.",
-              }
-            : savedState("Saved in this browser.")
-        );
-      }
-    } catch (error) {
-      setSaveState({
-        kind: "error",
-        message:
-          error instanceof StorageError ? error.message : "Save failed — edits are kept in memory.",
-      });
-    }
-  }
-
-  /**
-   * Push a just-saved document to the account (Step 8). Returns false when
-   * the save stays in this browser — signed out, menu not added to the
-   * account yet, or a conflict awaiting an explicit decision — in which
-   * case the caller sets the status. Otherwise the save state is set here
-   * and true is returned.
-   */
-  async function pushToAccount(saved: MenuDocument): Promise<boolean> {
-    if (!signedInRef.current || serverBaseRef.current === null) return false;
-    // Staff access is view-only: keep the local copy, never push an edit.
-    if (!accessCan(menuAccessRef.current.get(saved.id), "menus.write")) return false;
-    if (conflictRef.current) return false;
-    setSaveState({ kind: "saving", message: "Saving to your account…" });
-    try {
-      const pushed = await updateServerMenu(saved.id, saved, serverBaseRef.current);
-      serverBaseRef.current = pushed.updatedAt;
-      const actor = accountKeyRef.current;
-      if (actor) await refreshDraftSync(saved.id, actor, pushed.updatedAt, menuContentHash(saved));
-      setSaveState(savedState("Saved to your account."));
-      return true;
-    } catch (error) {
-      if (error instanceof SyncError && error.code === "conflict") {
-        // Someone else wrote first. Keep the local edits, stop pushing, and
-        // let the banner ask which version wins — never overwrite silently.
-        conflictRef.current = { serverUpdatedAt: error.currentUpdatedAt };
-        setConflict(conflictRef.current);
-        setConflictError(null);
-        setSaveState({
-          kind: "error",
-          message: "Changed on your other device — choose which version wins above.",
-        });
-        return true;
-      }
-      if (error instanceof SyncError && error.code === "unauthorized") {
-        serverBaseRef.current = null;
-        setSaveState(
-          savedState("Saved in this browser — sign in again to save it to your account.")
-        );
-        return true;
-      }
-      if (error instanceof SyncError && error.code === "forbidden") {
-        serverBaseRef.current = null;
-        setSaveState(
-          savedState("Saved in this browser — you don't have write access to this menu.")
-        );
-        return true;
-      }
-      if (error instanceof SyncError && error.code === "not_found") {
-        serverBaseRef.current = null;
-        removeServerId(saved.id);
-        setSaveState(savedState("Saved in this browser — this menu is no longer in your account."));
-        return true;
-      }
-      // Offline / server down: the browser copy is safe and retried next save.
-      setSaveState(savedState("Saved in this browser — your account can't be reached right now."));
-      return true;
-    }
-  }
-
-  /**
-   * Where this document's saves go, as far as the client can honestly say.
-   * Before the account's list settles the answer is "checking", not "in this
-   * browser": the latter is false for every account menu (003).
-   */
-  function storageSaveState(id: string): SaveState {
-    // A menu that has never changed has never been saved: saying "Saved"
-    // would promise a row the library does not have.
-    if (isPendingNewMenu(id)) {
-      return {
-        kind: "saved",
-        message: "Not saved yet",
-        detail: signedInRef.current
-          ? "Your first change saves it to your account."
-          : "Your first change saves it in this browser.",
-      };
-    }
-    if (serverBaseRef.current) return savedState("Saved to your account.");
-    const membership = decideMenuMembership({
-      signedIn: signedInRef.current,
-      readSettled: accountMenusSettledRef.current === accountKeyRef.current,
-      readFailed: accountMenusReadFailedRef.current === accountKeyRef.current,
-      onServer: serverIdsRef.current.has(id),
-    });
-    if (membership === "account") return savedState("Saved to your account.");
-    if (membership === "unknown") {
-      return { kind: "checking", message: "Checking your account…" };
-    }
-    if (membership === "unreachable") {
-      return savedState("Saved here — your account couldn't be checked.");
-    }
-    return savedState("Saved in this browser.");
-  }
-
-  async function flushSave() {
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-      saveTimer.current = null;
-    }
-    await doSave();
-  }
-
-  /** Every editor change flows through here: update state + debounced save. */
-  function handleDocChange(next: MenuDocument) {
-    // The first change retires the pending marker: whatever happens next,
-    // this menu is a real draft and resolves like one.
-    forgetPendingNewMenu(next.id);
-    setActiveDoc(next);
-    docRef.current = next;
-    if (storageDownRef.current) {
-      setSaveState({
-        kind: "error",
-        message: "Storage unavailable — edits are kept in memory only.",
-      });
-      return;
-    }
-    setSaveState({ kind: "saving", message: "Saving…" });
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => void doSave(), 600);
-  }
-
-  function setEditorImage(url: string | null) {
-    setEditorImageUrl((old) => {
-      if (old) URL.revokeObjectURL(old);
-      return url;
-    });
-  }
-
-  async function openDoc(
-    doc: MenuDocument,
-    imageBlob: Blob | null,
-    updateRoute = true,
-    accessHint?: MenuAccess
-  ) {
-    resetPublication();
-    void refreshPublication(doc.id);
-    // A caller that already knows the answer (a server route open, or a menu
-    // created here) hands it over so the first frame is decided, not guessed.
-    if (accessHint) setMenuAccessFor(doc.id, accessHint);
-    docRef.current = doc;
-    lastSavedRef.current = JSON.stringify(doc);
-    setActiveDoc(doc);
-    setSaveState(
-      storageDownRef.current
-        ? { kind: "error", message: "Storage unavailable — edits are kept in memory only." }
-        : storageSaveState(doc.id)
-    );
-    setImportError(null);
-    setEditorImage(imageBlob ? URL.createObjectURL(imageBlob) : null);
-    if (updateRoute) navigate({ screen: "editor", menuId: doc.id, mode: "edit" });
-    void syncWithAccount(doc);
-  }
-
-  /**
-   * Reconcile a just-opened menu with the account (signed in only). The
-   * account is authoritative: when it holds a different revision, adopt it
-   * and keep IndexedDB in step as the cache. Menus that were never added to
-   * the account stay in this browser — "Add to account" is the explicit path
-   * for those.
-   */
-  async function syncWithAccount(localDoc: MenuDocument) {
-    serverBaseRef.current = null;
-    conflictRef.current = null;
-    setConflict(null);
-    setConflictError(null);
-    if (!signedInRef.current) return;
-    try {
-      const serverMenu = await fetchServerMenu(localDoc.id);
-      rememberMenuCafe(localDoc.id, serverMenu.restaurantId);
-      const serverAccess = serverMenu.access;
-      // A write-capable caller may be editable as soon as access is known. A
-      // read-only caller waits for the server's document to replace whatever
-      // this browser cached, so a stale draft is never painted as preview.
-      const serverCanWrite = accessCan(serverAccess, "menus.write");
-      if (serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
-      if (docRef.current?.id !== localDoc.id) return;
-      const actor = signedInRef.current ? accountKeyRef.current : null;
-      const staffOnly = !serverCanWrite;
-      const origin = actor ? await getDraftOrigin(localDoc.id).catch(() => undefined) : undefined;
-      if (origin && actor && origin.accountId !== actor) {
-        // Another account's cached row on this device: never touch its
-        // draft. The exception is a published menu the server just listed
-        // for this read-only caller — that is the shared live snapshot, and
-        // the next step replaces the cached draft with it.
-        if (!isPublishedOnlyAccess(serverAccess)) {
-          removeServerId(localDoc.id);
-          setMenuAccessFor(localDoc.id, "none");
-          setSaveState(savedState("Saved in this browser — not in your account."));
-          return;
-        }
-      }
-      const equal = sameMenuContent(serverMenu.doc, localDoc);
-      const localHash = menuContentHash(localDoc);
-      const decision = equal
-        ? "none"
-        : decideHeal({
-            contentEqual: false,
-            localUpdatedAt: localDoc.updatedAt,
-            lastSyncedUpdatedAt: origin?.lastSyncedUpdatedAt ?? "",
-            serverUpdatedAt: serverMenu.updatedAt,
-            localHash,
-            serverHash: menuContentHash(serverMenu.doc),
-            lastSyncedHash: origin?.lastSyncedHash ?? "",
-          });
-      if (decision === "push" && actor && !staffOnly) {
-        // Interrupted work (expired session, dropped connection) outranks an
-        // untouched server revision: push it instead of adopting over it.
-        try {
-          const pushed = await updateServerMenu(localDoc.id, localDoc, serverMenu.updatedAt);
-          if (docRef.current?.id !== localDoc.id) return;
-          serverBaseRef.current = pushed.updatedAt;
-          addServerId(localDoc.id);
-          await refreshDraftSync(localDoc.id, actor, pushed.updatedAt, localHash);
-          setSaveState(savedState("Saved to your account."));
-          await refreshLibrary();
-        } catch (pushError) {
-          if (docRef.current?.id !== localDoc.id) return;
-          if (pushError instanceof SyncError && pushError.code === "conflict") {
-            conflictRef.current = { serverUpdatedAt: pushError.currentUpdatedAt };
-            setConflict(conflictRef.current);
-            setConflictError(null);
-            setSaveState({
-              kind: "error",
-              message: "Changed on your other device — choose which version wins above.",
-            });
-          } else if (pushError instanceof SyncError && pushError.code === "forbidden") {
-            serverBaseRef.current = null;
-            setSaveState(
-              savedState("Saved in this browser — you don't have write access to this menu.")
-            );
-          } else {
-            setSaveState(
-              savedState("Saved in this browser — your account can't be reached right now.")
-            );
-          }
-        }
-        return;
-      }
-      serverBaseRef.current = serverMenu.updatedAt;
-      addServerId(localDoc.id);
-      if (decision === "conflict") {
-        // Both sides moved since the last agreement: an explicit choice,
-        // never a silent adopt over unsynced work.
-        setMenuAccessFor(localDoc.id, serverAccess);
-        conflictRef.current = { serverUpdatedAt: serverMenu.updatedAt };
-        setConflict(conflictRef.current);
-        setConflictError(null);
-        setSaveState({
-          kind: "error",
-          message: "Changed on your other device — choose which version wins above.",
-        });
-        return;
-      }
-      if (!equal) {
-        let next: MenuDocument = serverMenu.doc;
-        if (!storageDownRef.current) {
-          next = await saveMenu(serverMenu.doc).catch(() => serverMenu.doc);
-        }
-        if (docRef.current?.id !== localDoc.id) return;
-        docRef.current = next;
-        lastSavedRef.current = JSON.stringify(next);
-        setActiveDoc(next);
-        if (!serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
-        if (actor && !staffOnly)
-          await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, menuContentHash(next));
-        setSaveState(savedState("Showing the version from your account."));
-        await refreshLibrary();
-        return;
-      }
-      if (!serverCanWrite) setMenuAccessFor(localDoc.id, serverAccess);
-      if (actor && !staffOnly)
-        await refreshDraftSync(localDoc.id, actor, serverMenu.updatedAt, localHash);
-      setSaveState(savedState("Saved to your account."));
-    } catch (error) {
-      if (docRef.current?.id !== localDoc.id) return;
-      if (error instanceof SyncError && error.code === "not_found") {
-        removeServerId(localDoc.id);
-        // The server has no row: a stamp for this account, or the local answer
-        // already recorded, means a browser-only draft. Anything else is a
-        // cached menu this account may not read, so its content stays shut
-        // instead of rendering a stale draft.
-        const originNow = await getDraftOrigin(localDoc.id).catch(() => undefined);
-        const localDraft =
-          menuAccessRef.current.get(localDoc.id) === "local" ||
-          (originNow != null && originNow.accountId === accountKeyRef.current);
-        setMenuAccessFor(localDoc.id, localDraft ? "local" : "none");
-        // The server finding nothing is expected for a menu that was never
-        // saved — it is not news, so the status keeps saying so.
-        if (isPendingNewMenu(localDoc.id)) {
-          setSaveState({
-            kind: "saved",
-            message: "Not saved yet",
-            detail: "Your first change saves it in this browser.",
-          });
-          return;
-        }
-        setSaveState(
-          localDraft
-            ? savedState("Saved in this browser — not in your account yet.")
-            : savedState("This menu isn't available to your account.")
-        );
-        return;
-      }
-      if (error instanceof SyncError && error.code === "unauthorized") {
-        setMenuAccessFor(localDoc.id, "none");
-        setSaveState(
-          savedState("Saved in this browser — sign in again to save it to your account.")
-        );
-        return;
-      }
-      setSaveState(savedState("Saved in this browser — your account can't be reached right now."));
-    }
-  }
-
-  /** Conflict action: adopt the account's revision, discarding local edits. */
-  async function handleLoadServerVersion() {
-    const doc = docRef.current;
-    if (!doc) return;
-    setConflictError(null);
-    try {
-      const serverMenu = await fetchServerMenu(doc.id);
-      setMenuAccessFor(doc.id, serverMenu.access);
-      let next: MenuDocument = serverMenu.doc;
-      if (!storageDownRef.current) {
-        next = await saveMenu(serverMenu.doc).catch(() => serverMenu.doc);
-      }
-      if (docRef.current?.id !== doc.id) return;
-      docRef.current = next;
-      lastSavedRef.current = JSON.stringify(next);
-      setActiveDoc(next);
-      serverBaseRef.current = serverMenu.updatedAt;
-      conflictRef.current = null;
-      setConflict(null);
-      const loadActor = accountKeyRef.current;
-      if (loadActor && accessCan(serverMenu.access, "menus.write")) {
-        await refreshDraftSync(doc.id, loadActor, serverMenu.updatedAt, menuContentHash(next));
-      }
-      setSaveState(savedState("Showing the version from your account."));
-      await refreshLibrary();
-    } catch (error) {
-      if (error instanceof SyncError && error.code === "not_found") {
-        conflictRef.current = { serverUpdatedAt: null };
-        setConflict({ serverUpdatedAt: null });
-        setConflictError("This menu is no longer in your account — keeping your version is safe.");
-        return;
-      }
-      setConflictError(
-        "Could not load the version from your account. Check your connection and try again."
-      );
-    }
-  }
-
-  /** Conflict action: push the local revision over the account's, explicitly. */
-  async function handleKeepMyVersion() {
-    const doc = docRef.current;
-    const expected = conflict?.serverUpdatedAt ?? null;
-    if (!doc || expected === null) return;
-    setConflictError(null);
-    try {
-      const pushed = await updateServerMenu(doc.id, doc, expected);
-      serverBaseRef.current = pushed.updatedAt;
-      const keepActor = accountKeyRef.current;
-      if (keepActor)
-        await refreshDraftSync(doc.id, keepActor, pushed.updatedAt, menuContentHash(doc));
-      conflictRef.current = null;
-      setConflict(null);
-      setSaveState(savedState("Saved to your account."));
-    } catch (error) {
-      if (error instanceof SyncError && error.code === "conflict") {
-        conflictRef.current = { serverUpdatedAt: error.currentUpdatedAt };
-        setConflict(conflictRef.current);
-        setConflictError("It changed again while you were deciding — review and choose once more.");
-        return;
-      }
-      if (error instanceof SyncError && error.code === "not_found") {
-        conflictRef.current = { serverUpdatedAt: null };
-        setConflict({ serverUpdatedAt: null });
-        setConflictError(
-          "This menu is no longer in your account — your version stays saved in this browser."
-        );
-        return;
-      }
-      setConflictError("Could not save to your account. Your edits are safe in this browser.");
-    }
+  function cannotFileMenus(): boolean {
+    return canFileBrowserDrafts === false && (restaurantList?.length ?? 0) > 0;
   }
 
   // --- Library actions ----------------------------------------------------
@@ -1020,21 +494,13 @@ function HomeShell() {
       if (renameActor && accessCan(menuAccessRef.current.get(id), "menus.write")) {
         // Keep the existing baseline when this menu is not open: the
         // editor's baseline belongs to another document.
-        await stampDraftOrigin(
-          id,
-          renameActor,
-          docRef.current?.id === id ? (serverBaseRef.current ?? "") : ""
-        );
+        await stampDraftOrigin(id, renameActor, openBaseline(id));
       }
       if (signedInRef.current && serverIdsRef.current.has(id)) {
         await pushRenameToAccount(renamed);
       }
       await refreshLibrary();
-      if (docRef.current?.id === id) {
-        docRef.current = renamed;
-        lastSavedRef.current = JSON.stringify(renamed);
-        setActiveDoc(renamed);
-      }
+      onMenuRenamed(renamed);
     } catch (error) {
       reportLibraryError(
         error instanceof StorageError ? error.message : "Could not rename that menu."
@@ -1054,7 +520,7 @@ function HomeShell() {
       const serverMenu = await fetchServerMenu(renamed.id);
       try {
         const pushed = await updateServerMenu(renamed.id, renamed, serverMenu.updatedAt);
-        if (docRef.current?.id === renamed.id) serverBaseRef.current = pushed.updatedAt;
+        onServerRevision(renamed.id, pushed.updatedAt);
         const renameSyncActor = accountKeyRef.current;
         if (renameSyncActor)
           await refreshDraftSync(
@@ -1192,15 +658,7 @@ function HomeShell() {
       await deleteMenu(id);
       await clearDraftOrigin(id);
       removeServerId(id);
-      if (docRef.current?.id === id) {
-        docRef.current = null;
-        lastSavedRef.current = null;
-        serverBaseRef.current = null;
-        conflictRef.current = null;
-        setConflict(null);
-        setActiveDoc(null);
-        setEditorImage(null);
-      }
+      forgetOpenDoc(id);
       resetPublication();
       await refreshLibrary();
       if (accountNote) reportLibraryError(accountNote);
@@ -1214,7 +672,7 @@ function HomeShell() {
 
   async function handleBackToLibrary() {
     await flushSave();
-    setEditorImage(null);
+    clearImage();
     await refreshLibrary();
     void mergeAccountMenus(activeRestaurantId);
     navigate({ screen: "library" }, { flushCurrent: false });
@@ -1385,80 +843,6 @@ function HomeShell() {
       navigate({ screen: "editor", menuId: saved.id, mode: "publish" });
     } catch (error) {
       showOpenError(error);
-    }
-  }
-
-  // --- Import / export ----------------------------------------------------
-
-  function handleExportJson() {
-    const doc = docRef.current;
-    if (!doc) return;
-    try {
-      downloadTextFile(menuFilename(doc.title, "json"), serializeMenu(doc), "application/json");
-    } catch {
-      setImportError("Export failed: the menu data is invalid.");
-    }
-  }
-
-  function handleExportCsv() {
-    const doc = docRef.current;
-    if (!doc) return;
-    try {
-      downloadTextFile(menuFilename(doc.title, "csv"), menuToCsv(doc), "text/csv");
-    } catch {
-      setImportError("Export failed: the menu data is invalid.");
-    }
-  }
-
-  async function handleImportFile(importFile: File) {
-    setImportError(null);
-    try {
-      const doc = parseImportedMenu(await importFile.text());
-      // Server-only while signed in: an import lands straight on the
-      // account. Staff-only sign-ins have no writable café, so the import
-      // is refused instead of stacking a browser-only draft.
-      if (signedInRef.current) {
-        if (storageDownRef.current) {
-          setImportError("Browser storage is unavailable, so the menu can't be cached. Try again.");
-          return;
-        }
-        const importTarget = await ensureServerTarget(
-          doc.title,
-          activeRestaurantId,
-          signedInCanWrite
-        );
-        if (!importTarget) {
-          setImportError(
-            canFileBrowserDrafts === false && (restaurantList?.length ?? 0) > 0
-              ? "Only the restaurant owner can add menus — ask the owner to import this file."
-              : "Couldn't reach your account. Check your connection and try again."
-          );
-          return;
-        }
-        try {
-          const created = await createServerMenu(importTarget, doc);
-          const cached = await cacheServerDraft(created);
-          await refreshLibrary();
-          await openDoc(cached, null, true, created.access);
-          return;
-        } catch (error) {
-          if (error instanceof SyncError && error.code === "exists") {
-            const existing = await fetchServerMenu(doc.id);
-            const cached = await cacheServerDraft(existing);
-            await refreshLibrary();
-            await openDoc(cached, null, true, existing.access);
-            return;
-          }
-          throw error;
-        }
-      }
-      // Single offline menu: the prune after saving supersedes the old draft.
-      const saved = storageDownRef.current ? doc : await saveMenu(doc);
-      await pruneSignedOutOthers(saved.id);
-      if (!storageDownRef.current) await refreshLibrary();
-      await openDoc(saved, null);
-    } catch (error) {
-      setImportError(error instanceof Error ? error.message : "Could not import that file.");
     }
   }
 
@@ -1827,7 +1211,7 @@ function HomeShell() {
     if (!navigationReady || !routeMenuId(route) || sessionState === "unknown") return;
     const menuId = routeMenuId(route);
     if (!menuId) return;
-    if (docRef.current?.id === menuId) {
+    if (getOpenDocId() === menuId) {
       openedRouteMenuRef.current = menuId;
       // Fast path: the doc is already in memory (editor mode switches, and
       // returns to a menu that was left open). "Back to library" releases
@@ -1837,8 +1221,8 @@ function HomeShell() {
       void (async () => {
         try {
           const stored = await getImage(menuId);
-          if (imageCancelled || docRef.current?.id !== menuId) return;
-          setEditorImage(stored?.blob ? URL.createObjectURL(stored.blob) : null);
+          if (imageCancelled || getOpenDocId() !== menuId) return;
+          showImage(stored?.blob ? URL.createObjectURL(stored.blob) : null);
         } catch {
           // The editor is fully usable without the image; the next full
           // open of this menu retries the read.
@@ -1941,8 +1325,10 @@ function HomeShell() {
     navigationReady,
     navigate,
     markMissingPublish,
-    // The library's own answers: two stable refs and two stable callbacks, so
+    // The open document's id and the library's own answers: stable reads, so
     // listing them never re-runs this effect on a render of its own.
+    getOpenDocId,
+    showImage,
     accountMenusSettledRef,
     menuAccessRef,
     refreshLibrary,
@@ -1962,28 +1348,10 @@ function HomeShell() {
       // banner; account copies proved in sync are dissolved below, so the
       // landed screen never offers a menu that is already on the account.
       const landing = signOutLandingRoute({ wasSignedIn, signedIn });
-      if (landing) {
-        const openDoc = docRef.current;
-        if (openDoc) {
-          // Release the open document before saving it. Pending account
-          // work (sync, publication, the route opener) checks docRef and
-          // bails once it is null, so nothing can reopen the editor. The
-          // direct save still keeps the latest local edits.
-          docRef.current = null;
-          lastSavedRef.current = null;
-          serverBaseRef.current = null;
-          conflictRef.current = null;
-          if (saveTimer.current) {
-            clearTimeout(saveTimer.current);
-            saveTimer.current = null;
-          }
-          // A menu with no changes was never created: persisting it here
-          // would mint exactly the phantom the transient flow avoids.
-          if (!storageDownRef.current && JSON.stringify(openDoc) !== lastSavedRef.current) {
-            void saveMenu(openDoc).catch(() => undefined);
-          }
-        }
-      }
+      // Release the document before anything else: a menu the session no
+      // longer owns must not stay open, and pending account work bails once
+      // the unit's ref is null. The unit keeps the latest local edits.
+      if (landing) releaseOpenDoc();
       accountMenusSettledRef.current = null;
       // State is compared with accountKey when read, so a stale value from
       // the previous session can never authorise an import for this one.
@@ -1995,10 +1363,7 @@ function HomeShell() {
       // the gap, and a microtask still lands before the next paint.
       void Promise.resolve().then(() => {
         if (landing) {
-          setActiveDoc(null);
-          setEditorImage(null);
-          setConflict(null);
-          setConflictError(null);
+          resetActiveMenu();
           resetPublication();
           if (resultDoc !== null || pages.length > 0) applySelection([]);
           navigate(landing, { replace: true, flushCurrent: false });
@@ -2034,11 +1399,10 @@ function HomeShell() {
     // stays null), so this cannot loop.
     void Promise.resolve().then(refreshLibrary);
     void Promise.resolve().then(healStampedDrafts);
-    const doc = docRef.current;
-    if (doc && serverBaseRef.current === null && !conflictRef.current) {
-      void syncWithAccount(doc);
-    }
-    if (doc) void refreshPublication(doc.id);
+    // The document that was already open reconciles itself; the shell only
+    // follows it with the publication answer.
+    const openDocId = resyncOpenDoc();
+    if (openDocId) void refreshPublication(openDocId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
@@ -2363,7 +1727,7 @@ function HomeShell() {
                   imageUrl={editorImageUrl}
                   onExportJson={handleExportJson}
                   onExportCsv={handleExportCsv}
-                  onImportFile={(f) => void handleImportFile(f)}
+                  onImportFile={(f) => void importFile(f)}
                   importError={importError}
                   onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
                   onBack={() => void handleBackToLibrary()}
