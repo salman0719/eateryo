@@ -181,6 +181,16 @@ errors, or add lint/type suppressions just to make checks pass.
   here, so no screen can hold a second opinion about what the account owns.
   `refreshLibrary` and the café map are stable callbacks, so the shell's route
   opener can name them as dependencies without re-running every render.
+- `src/features/capture/use-capture.ts` — `useCapture`: the capture document —
+  the pages selected, the extraction, the result under review, the draft saved
+  as it goes, and the review edits (resolve, price, rename). It stops where the
+  menu begins: `documentForSave` hands the screen the document to persist, so
+  the menu lifecycle and the editor stay out of it. What it needs from its
+  neighbours arrives as doors, not shared state — the confirm dialog before a
+  discard, the menu lifecycle that files a new menu (`ensureServerTarget`,
+  `cacheServerDraft`, `pruneSignedOutOthers`), the screen's `revealResult`
+  scroll, and `reportError`. A resumed draft comes back as a document for the
+  banner to navigate with, instead of the hook navigating on its own.
 - `src/features/menus/draft-claims.ts` — `useDraftClaims`: what happens to a
   menu that lives only in this browser when an account appears. Sign-in adopts
   every draft in one go (no remembered answers, no offer), so this unit owns
