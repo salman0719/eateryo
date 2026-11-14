@@ -179,9 +179,16 @@ errors, or add lint/type suppressions just to make checks pass.
   `serverMenusReadFailedFor` so surfaces can say the account could not be
   checked (016). The café-keyed merge, the retry and the sign-out reset live
   here, so no screen can hold a second opinion about what the account owns.
-  The shell keeps the one open document; drafts awaiting a claim move next.
   `refreshLibrary` and the café map are stable callbacks, so the shell's route
   opener can name them as dependencies without re-running every render.
+- `src/features/menus/draft-claims.ts` — `useDraftClaims`: what happens to a
+  menu that lives only in this browser when an account appears. Sign-in adopts
+  every draft in one go (no remembered answers, no offer), so this unit owns
+  the claim gate's tri-state, the adopt/disregard decision, the café a draft
+  lands in, the stamp that makes it the account's, and the dissolving of the
+  browser copy the account just took. The editor's two facts arrive as named
+  doors — `getOpenDocId` and `onClaimedOpenDoc` — so neither side mirrors the
+  other; an open row is pinned to the agreed revision instead of forking it.
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
