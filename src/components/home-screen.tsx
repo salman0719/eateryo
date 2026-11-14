@@ -2,25 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { BrandBar } from "@/components/layout/brand-bar";
-import { SiteFooter } from "@/components/layout/site-footer";
-import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
+import { AppShell } from "@/components/layout/app-shell";
 import { AssistantPage } from "@/components/pages/assistant-page";
 import { CapturePage } from "@/components/pages/capture-page";
 import { MenusPage } from "@/components/pages/menus-page";
 import { OrdersPage } from "@/components/pages/orders-page";
 import { SettingsPage } from "@/components/pages/settings-page";
 import { TablesPage } from "@/components/pages/tables-page";
-import { BookIcon, CameraIcon, ChecklistIcon, MoreIcon, ReceiptIcon } from "@/components/ui/icons";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
-import { MonitorToasts } from "@/components/orders/monitor-toasts";
-import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
-import { OrderMonitorProvider, useOrderMonitor } from "@/features/orders/monitor";
 import { MenuEditor, SaveState } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
 import type {
@@ -109,13 +102,11 @@ import {
   parseAppRoute,
   phoneTabs,
   routeMenuId,
-  sectionForScreen,
   shellColumnVisible,
   signOutLandingRoute,
   unresolvableMenuMessage,
   type AppRoute,
   type AppScreen,
-  type AppSectionId,
   type EditorMode,
 } from "@/features/navigation/routes";
 import { useFeatureFlags } from "@/features/flags/client";
@@ -189,39 +180,6 @@ function stepIndex(phase: Phase, hasResult: boolean): number {
   if (hasResult || phase === "done") return 2;
   if (phase === "ready" || phase === "extracting") return 1;
   return 0;
-}
-
-/** Tells the monitor whether the board is open (opening it counts as seeing). */
-function ViewingTracker({ viewing }: { viewing: boolean }) {
-  const { setViewingBoard } = useOrderMonitor();
-  useEffect(() => {
-    setViewingBoard(viewing);
-  }, [viewing, setViewingBoard]);
-  return null;
-}
-
-/** New-order toasts above the tab bar; tapping opens the Orders tab. */
-function MonitorToastStack({ onOpen }: { onOpen: () => void }) {
-  const { toasts, dismissToast } = useOrderMonitor();
-  return <MonitorToasts toasts={toasts} onOpen={onOpen} onDismiss={dismissToast} />;
-}
-
-/**
- * The phone tab bar's glyphs come from the shared icon set, never emoji. The
- * bar only ever carries the sections marked `phone: "bar"`; the other ids are
- * unreachable here and draw nothing.
- */
-function PhoneTabIcon({ id }: { id: AppSectionId }) {
-  switch (id) {
-    case "capture":
-      return <CameraIcon size={22} />;
-    case "library":
-      return <BookIcon size={22} />;
-    case "orders":
-      return <ReceiptIcon size={22} />;
-    default:
-      return null;
-  }
 }
 
 /**
@@ -3495,96 +3453,78 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
   }
 
   return (
-    <OrderMonitorProvider
+    <AppShell
+      dialog={dialog}
+      screen={screen}
+      // The editor is the dense working surface; the publish step is
+      // onboarding and keeps the content measure.
+      wideMeasure={screen === "editor" && editorMode !== "publish"}
+      signedIn={signedIn}
+      sessionPending={sessionPending}
+      email={email}
       userId={userId}
       restaurantId={activeWorkspace?.restaurantId ?? null}
-      pending={sessionPending || accountAccessPending}
+      monitorPending={sessionPending || accountAccessPending}
+      showColumn={showShellColumn}
+      sidebar={{
+        sections: navReady ? navSections : [],
+        ready: navReady,
+        outline: sidebarOutline,
+        outlineKey: sidebarOutlineKey,
+        onOutlineSelect: scrollToMenuSection,
+        launch: sidebarLaunch,
+        menusPending: sidebarMenuCountPending,
+      }}
+      workspaces={workspaces}
+      activeWorkspace={activeWorkspace}
+      onSwitchWorkspace={handleSwitchWorkspace}
+      phone={{
+        ready: navReady,
+        tabs: phoneTabList,
+        moreRows,
+        moreOpen,
+        onToggleMore: () => setMoreOpen((open) => !open),
+        onCloseMore: () => setMoreOpen(false),
+        screenInMore,
+        canGetStarted,
+        launchHint: sheetLaunchHint,
+      }}
+      onNavigate={(section) => navigateTo({ screen: section })}
+      onHome={() => navigateTo({ screen: "capture" })}
+      // Every in-shell sign-in goes through the choice first: attach the
+      // browser draft on login or wipe it on login.
+      onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
+      onSignOut={() => void authClient.signOut()}
+      onOpenOrders={() => navigateTo({ screen: "orders" })}
     >
-      <div className="flex min-h-full flex-1 flex-col">
-        {dialog}
-        <ViewingTracker viewing={signedIn && screen === "orders"} />
-        {/* Default stretch: the content column fills the row, so its flex-1 main
-          absorbs the spare height and the footer rests on the viewport bottom
-          instead of floating under short content. */}
-        <div className="flex w-full flex-1">
-          {showShellColumn ? (
-            <AppSidebar
-              sections={navReady ? navSections : []}
-              activeSection={sectionForScreen(screen)}
-              sessionPending={sessionPending}
-              sectionsPending={!navReady}
-              signedIn={signedIn}
-              email={email}
-              onNavigate={(section) => navigateTo({ screen: section })}
-              onSignOut={() => void authClient.signOut()}
-              onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
-              onHome={() => navigateTo({ screen: "capture" })}
-              outline={sidebarOutline}
-              outlineKey={sidebarOutlineKey}
-              onOutlineSelect={scrollToMenuSection}
-              launch={sidebarLaunch}
-              menusPending={sidebarMenuCountPending}
-            />
-          ) : null}
-          <div className="flex min-w-0 flex-1 flex-col">
-            {/* Wherever the column is absent the row carries the brand, and
-              signed out it carries the only sign-in path. It hides itself
-              below `sm` only when the sidebar is already showing the lockup;
-              nothing here is sticky, so no screen loses height twice. */}
-            <BrandBar
-              signedIn={signedIn}
-              sessionPending={sessionPending}
-              className={showShellColumn ? "sm:hidden" : undefined}
-              onHome={() => navigateTo({ screen: "capture" })}
-              // Every in-shell sign-in goes through the choice first: attach
-              // the browser draft on login or wipe it on login.
-              onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
-            />
-            {/* The sidebar names the account, not the café on shift: a second
-              membership keeps its "Acting as" strip, which sits above the
-              content now that the old header row is gone. */}
-            <WorkspaceSwitcher
-              workspaces={workspaces}
-              active={activeWorkspace}
-              onSwitch={handleSwitchWorkspace}
-            />
-            <main
-              className={`mx-auto flex w-full flex-1 flex-col gap-6 px-4 pt-2 pb-8 sm:px-6 sm:py-8 ${
-                // The editor is a dense working surface; the other app screens
-                // — including the publish step, which is onboarding rather
-                // than editing — share the brand row's measure so the page
-                // and the lockup start on the same left edge.
-                screen === "editor" && editorMode !== "publish" ? "max-w-6xl" : "max-w-5xl"
-              }`}
+      {signedIn && claimError && (
+        <div
+          role="alert"
+          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p>{claimError}</p>
+            <button
+              type="button"
+              onClick={() => setClaimError(null)}
+              className="text-xs font-medium underline underline-offset-2 hover:text-danger-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
             >
-              {signedIn && claimError && (
-                <div
-                  role="alert"
-                  className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p>{claimError}</p>
-                    <button
-                      type="button"
-                      onClick={() => setClaimError(null)}
-                      className="text-xs font-medium underline underline-offset-2 hover:text-danger-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
-              {/* A failed account read is no longer silent: the gate settles, the
+      {/* A failed account read is no longer silent: the gate settles, the
             server paths stay off, and this says so once. */}
-              {signedIn && claimGate.incomplete && screen !== "editor" && (
-                <p className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
-                  We couldn&apos;t check your account just now, so nothing was imported from this
-                  browser. Reload when you&apos;re back online and it will try again.
-                </p>
-              )}
+      {signedIn && claimGate.incomplete && screen !== "editor" && (
+        <p className="rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-xs leading-5 text-ink-600">
+          We couldn&apos;t check your account just now, so nothing was imported from this browser.
+          Reload when you&apos;re back online and it will try again.
+        </p>
+      )}
 
-              {/* Q7 resume banner, signed out only: the way back for anyone
+      {/* Q7 resume banner, signed out only: the way back for anyone
             who wandered off with a saved-but-unpublished draft. Signed out
             there is no library to go back to, so the banner resumes the
             newest draft on Capture itself — the screen the work happened
@@ -3593,461 +3533,306 @@ function HomeShell({ initialRoute }: { initialRoute: AppRoute }) {
             invisible, never provisional. Hidden while the result is on
             screen (it IS the continue path), and signed in it never
             renders at all — signing in dissolves the rows instead. */}
-              {screen === "capture" &&
-                !signedIn &&
-                result === null &&
-                resumeReady &&
-                resumeDismissed === false &&
-                localOnlyCount > 0 &&
-                claimSurfaceQuiet &&
-                (() => {
-                  const resumable = localOnly.find((menu) => !menu.corrupt);
-                  if (!resumable) return null;
-                  return (
-                    <HeightReveal>
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-warning-950">
-                            Pick up where you left off
-                          </p>
-                          <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
-                            {localOnlyCount === 1
-                              ? `“${resumable.title}” is still saved in this browser — reopen it here and keep going.`
-                              : `${localOnlyCount} menus are saved in this browser — reopen “${resumable.title}” and keep going.`}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleResumeCapture(resumable.id)}
-                            className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                          >
-                            Resume →
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setResumeDismissed(true)}
-                            className="rounded-full px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:text-accent-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                          >
-                            Dismiss
-                          </button>
-                        </div>
-                      </div>
-                    </HeightReveal>
-                  );
-                })()}
-
-              {screen === "library" && (
-                <MenusPage
-                  error={visibleLibraryError}
-                  menus={libraryMenus}
-                  loading={libraryLoading || libraryAccountPending}
-                  accountMode={libraryAccountMode}
-                  canCreate={!signedIn || accountCan("menus.write")}
-                  hasHiddenMenus={hasHiddenMenus}
-                  emptyTitle={libraryEmpty?.title}
-                  emptyBody={libraryEmpty?.body}
-                  unavailable={storageDown}
-                  onOpen={(id) => void handleOpenMenu(id)}
-                  onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
-                  onRename={(id, title) => void handleRenameMenu(id, title)}
-                  onDelete={(id) => void handleDeleteMenu(id)}
-                  onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
-                />
-              )}
-
-              {screen === "orders" && <OrdersPage />}
-
-              {screen === "assistant" && (
-                <AssistantPage
-                  signedIn={signedIn}
-                  sessionPending={sessionPending}
-                  pending={assistantPending}
-                  enabled={featureFlags.assistant}
-                  proposalsEnabled={featureFlags.assistantProposals}
-                  menusLoading={libraryLoading}
-                  menus={workspaceMenus
-                    .filter(
-                      (menu) =>
-                        serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
-                    )
-                    .map((menu) => ({ id: menu.id, title: menu.title }))}
-                  onBackToCapture={() => navigateTo({ screen: "capture" })}
-                />
-              )}
-
-              {screen === "tables" && <TablesPage />}
-
-              {screen === "settings" && <SettingsPage />}
-
-              {screen === "editor" && routedDoc && (
-                <>
-                  {conflict && (
-                    <ConflictBanner
-                      serverUpdatedAt={conflict.serverUpdatedAt}
-                      error={conflictError}
-                      onReloadServer={() => void handleLoadServerVersion()}
-                      onKeepMine={() => void handleKeepMyVersion()}
-                    />
-                  )}
-                  {activeMenuAccessDenied ? (
-                    <section className="rounded-2xl border border-line-200 bg-surface-base p-6">
-                      <h1 className="font-medium text-ink-900">This menu isn’t available</h1>
-                      <p className="mt-2 max-w-md text-sm leading-6 text-ink-600">
-                        Your account can’t open this menu. Ask the restaurant owner if you think
-                        that’s a mistake.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => void handleBackToLibrary()}
-                        className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                      >
-                        Back to my menus
-                      </button>
-                    </section>
-                  ) : activeMenuAccessPending ? (
-                    <section
-                      role="status"
-                      aria-busy="true"
-                      aria-label="Checking access"
-                      className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
-                    >
-                      <span className="sr-only">Checking your access to this menu…</span>
-                      <Skeleton className="h-6 w-48" />
-                      <Skeleton className="h-40 w-full" />
-                    </section>
-                  ) : (
-                    <>
-                      {activeMenuIsStaff && (
-                        <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
-                          You have staff access to this restaurant — menus are view-only for staff.
-                          Ask an owner to make changes.
-                        </p>
-                      )}
-                      {editorMode === "publish" && activeMenuCanPublish ? (
-                        <PublishWizard
-                          key={routedDoc.id}
-                          doc={routedDoc}
-                          signedIn={signedIn}
-                          sessionPending={sessionPending}
-                          accountKey={accountKey}
-                          ownedRestaurants={ownedRestaurantsForAccount}
-                          restaurantsLoading={restaurantsLoading}
-                          onPublished={handleWizardPublished}
-                          onBack={() =>
-                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
-                          }
-                          onOpenTables={() => navigateTo({ screen: "tables" })}
-                          onOpenEditor={() =>
-                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
-                          }
-                        />
-                      ) : (
-                        <MenuEditor
-                          doc={routedDoc}
-                          selectedItemId={selectedItemId}
-                          mode={activeMenuCanWrite ? editorMode : "preview"}
-                          onModeChange={(mode) =>
-                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
-                          }
-                          onChange={handleDocChange}
-                          saveState={saveState}
-                          syncMode={signedIn ? "account" : "local"}
-                          canManage={activeMenuCanWrite}
-                          onServer={activeMenuOnServer}
-                          accountCheckFailed={activeMenuAccountCheckFailed}
-                          onRetryAccountCheck={handleRetryAccountCheck}
-                          restaurantName={
-                            ownedRestaurantsForAccount.find(
-                              (restaurant) => restaurant.id === activePublication?.restaurantId
-                            )?.name ?? null
-                          }
-                          onStartPublish={() =>
-                            navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
-                          }
-                          imageUrl={editorImageUrl}
-                          onExportJson={handleExportJson}
-                          onExportCsv={handleExportCsv}
-                          onImportFile={(f) => void handleImportFile(f)}
-                          importError={importError}
-                          onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
-                          onBack={() => void handleBackToLibrary()}
-                          publishing={{
-                            status: activePublication,
-                            loaded: activePublicationLoaded,
-                            busy: publishBusy,
-                            error: publishError,
-                            inAccount: activeMenuOnServer,
-                            accountCheckFailed: activeMenuAccountCheckFailed,
-                            onRetryAccountCheck: handleRetryAccountCheck,
-                            liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
-                            liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
-                            onPublish: () => void handlePublish(),
-                            onUnpublish: () => void handleUnpublish(),
-                          }}
-                          onPreviewOpen={() => void refreshPublication(routedDoc.id)}
-                        />
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-
-              {screen === "capture" && !shellReady && pages.length === 0 && result === null && (
-                <div role="status" aria-busy="true" className="flex flex-col gap-4">
-                  <span className="sr-only">Loading…</span>
-                  <Skeleton className="h-9 w-2/3 max-w-md" />
-                  <Skeleton className="h-5 w-full max-w-xl" />
-                  <Skeleton className="h-40 w-full" />
+      {screen === "capture" &&
+        !signedIn &&
+        result === null &&
+        resumeReady &&
+        resumeDismissed === false &&
+        localOnlyCount > 0 &&
+        claimSurfaceQuiet &&
+        (() => {
+          const resumable = localOnly.find((menu) => !menu.corrupt);
+          if (!resumable) return null;
+          return (
+            <HeightReveal>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-warning-950">
+                    Pick up where you left off
+                  </p>
+                  <p className="mt-0.5 max-w-xl text-xs leading-5 text-warning-900">
+                    {localOnlyCount === 1
+                      ? `“${resumable.title}” is still saved in this browser — reopen it here and keep going.`
+                      : `${localOnlyCount} menus are saved in this browser — reopen “${resumable.title}” and keep going.`}
+                  </p>
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleResumeCapture(resumable.id)}
+                    className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  >
+                    Resume →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResumeDismissed(true)}
+                    className="rounded-full px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:text-accent-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </HeightReveal>
+          );
+        })()}
 
-              {screen === "capture" && (shellReady || pages.length > 0 || result !== null) && (
-                <CapturePage
+      {screen === "library" && (
+        <MenusPage
+          error={visibleLibraryError}
+          menus={libraryMenus}
+          loading={libraryLoading || libraryAccountPending}
+          accountMode={libraryAccountMode}
+          canCreate={!signedIn || accountCan("menus.write")}
+          hasHiddenMenus={hasHiddenMenus}
+          emptyTitle={libraryEmpty?.title}
+          emptyBody={libraryEmpty?.body}
+          unavailable={storageDown}
+          onOpen={(id) => void handleOpenMenu(id)}
+          onNew={(suggestedTitle?: string) => void handleNewMenu(suggestedTitle)}
+          onRename={(id, title) => void handleRenameMenu(id, title)}
+          onDelete={(id) => void handleDeleteMenu(id)}
+          onSignIn={!signedIn ? () => void requestDirectSignIn() : undefined}
+        />
+      )}
+
+      {screen === "orders" && <OrdersPage />}
+
+      {screen === "assistant" && (
+        <AssistantPage
+          signedIn={signedIn}
+          sessionPending={sessionPending}
+          pending={assistantPending}
+          enabled={featureFlags.assistant}
+          proposalsEnabled={featureFlags.assistantProposals}
+          menusLoading={libraryLoading}
+          menus={workspaceMenus
+            .filter(
+              (menu) => serverIds.has(menu.id) && accessCan(menuAccess.get(menu.id), "menus.write")
+            )
+            .map((menu) => ({ id: menu.id, title: menu.title }))}
+          onBackToCapture={() => navigateTo({ screen: "capture" })}
+        />
+      )}
+
+      {screen === "tables" && <TablesPage />}
+
+      {screen === "settings" && <SettingsPage />}
+
+      {screen === "editor" && routedDoc && (
+        <>
+          {conflict && (
+            <ConflictBanner
+              serverUpdatedAt={conflict.serverUpdatedAt}
+              error={conflictError}
+              onReloadServer={() => void handleLoadServerVersion()}
+              onKeepMine={() => void handleKeepMyVersion()}
+            />
+          )}
+          {activeMenuAccessDenied ? (
+            <section className="rounded-2xl border border-line-200 bg-surface-base p-6">
+              <h1 className="font-medium text-ink-900">This menu isn’t available</h1>
+              <p className="mt-2 max-w-md text-sm leading-6 text-ink-600">
+                Your account can’t open this menu. Ask the restaurant owner if you think that’s a
+                mistake.
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleBackToLibrary()}
+                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                Back to my menus
+              </button>
+            </section>
+          ) : activeMenuAccessPending ? (
+            <section
+              role="status"
+              aria-busy="true"
+              aria-label="Checking access"
+              className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-6"
+            >
+              <span className="sr-only">Checking your access to this menu…</span>
+              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-40 w-full" />
+            </section>
+          ) : (
+            <>
+              {activeMenuIsStaff && (
+                <p className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900">
+                  You have staff access to this restaurant — menus are view-only for staff. Ask an
+                  owner to make changes.
+                </p>
+              )}
+              {editorMode === "publish" && activeMenuCanPublish ? (
+                <PublishWizard
+                  key={routedDoc.id}
+                  doc={routedDoc}
                   signedIn={signedIn}
                   sessionPending={sessionPending}
-                  step={activeStep}
-                  phase={phase}
-                  pages={pages}
-                  fileError={fileError}
-                  addInputRef={addInputRef}
-                  replaceInputRef={replaceInputRef}
-                  replaceIndexRef={replaceIndexRef}
-                  resultRef={resultRef}
-                  onSelectFiles={selectFiles}
-                  onDemo={handleDemo}
-                  onAddPages={addPages}
-                  onReplacePageAt={replacePageAt}
-                  onRemovePage={removePage}
-                  onExtract={handleExtract}
-                  extractProgress={extractProgress}
-                  extractError={extractError}
-                  result={result}
-                  previewDoc={resultDoc}
-                  source={source}
-                  draftSave={draftSave}
-                  draftOnServer={resultDoc ? serverIds.has(resultDoc.id) : false}
-                  initialReviewCount={initialReviewCount}
-                  onClear={clearCapture}
-                  onEdit={() => void handleEditResult()}
-                  onResolveItem={handleResolveResultItem}
-                  onResolveAll={handleResolveAllResultItems}
-                  onUpdatePrice={handleUpdateResultPrice}
-                  onRenameTitle={handleRenameResultTitle}
-                  onPublish={
-                    source === "demo" || draftSave === "saved"
-                      ? () => void handleStartPublish()
-                      : undefined
+                  accountKey={accountKey}
+                  ownedRestaurants={ownedRestaurantsForAccount}
+                  restaurantsLoading={restaurantsLoading}
+                  onPublished={handleWizardPublished}
+                  onBack={() =>
+                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
+                  }
+                  onOpenTables={() => navigateTo({ screen: "tables" })}
+                  onOpenEditor={() =>
+                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
                   }
                 />
-              )}
-
-              {screen === "editor" && !routedDoc && missingPublishMenuId && (
-                <MissingDraftCard
-                  onOpenLibrary={() => navigateTo({ screen: "library" })}
-                  onStartFresh={() => navigateTo({ screen: "capture" })}
+              ) : (
+                <MenuEditor
+                  doc={routedDoc}
+                  selectedItemId={selectedItemId}
+                  mode={activeMenuCanWrite ? editorMode : "preview"}
+                  onModeChange={(mode) =>
+                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode })
+                  }
+                  onChange={handleDocChange}
+                  saveState={saveState}
+                  syncMode={signedIn ? "account" : "local"}
+                  canManage={activeMenuCanWrite}
+                  onServer={activeMenuOnServer}
+                  accountCheckFailed={activeMenuAccountCheckFailed}
+                  onRetryAccountCheck={handleRetryAccountCheck}
+                  restaurantName={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activePublication?.restaurantId
+                    )?.name ?? null
+                  }
+                  onStartPublish={() =>
+                    navigateTo({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
+                  }
+                  imageUrl={editorImageUrl}
+                  onExportJson={handleExportJson}
+                  onExportCsv={handleExportCsv}
+                  onImportFile={(f) => void handleImportFile(f)}
+                  importError={importError}
+                  onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
+                  onBack={() => void handleBackToLibrary()}
+                  publishing={{
+                    status: activePublication,
+                    loaded: activePublicationLoaded,
+                    busy: publishBusy,
+                    error: publishError,
+                    inAccount: activeMenuOnServer,
+                    accountCheckFailed: activeMenuAccountCheckFailed,
+                    onRetryAccountCheck: handleRetryAccountCheck,
+                    liveDoc: liveDocMenuId === routedDoc.id ? liveDoc : null,
+                    liveDocState: liveDocMenuId === routedDoc.id ? liveDocState : "idle",
+                    onPublish: () => void handlePublish(),
+                    onUnpublish: () => void handleUnpublish(),
+                  }}
+                  onPreviewOpen={() => void refreshPublication(routedDoc.id)}
                 />
               )}
-              {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
-                <section className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
-                  <h1 className="font-medium text-ink-900">Checking your session…</h1>
-                  <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
-                    We couldn’t reach your account just now, so this menu hasn’t been opened. Your
-                    draft is still saved in this browser — nothing is lost.
-                  </p>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={workspace.retrySession}
-                      className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                    >
-                      Try again
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => navigateTo({ screen: "library" })}
-                      className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                    >
-                      Back to My menus
-                    </button>
-                  </div>
-                </section>
-              )}
-              {screen === "editor" &&
-                !routedDoc &&
-                !missingPublishMenuId &&
-                !sessionCheckGaveUp && (
-                  <div role="status" aria-busy="true" className="flex flex-col gap-4">
-                    <span className="sr-only">Opening menu…</span>
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-8 w-28 rounded-full" />
-                      <Skeleton className="h-4 w-40" />
-                    </div>
-                    <div className="grid items-start gap-4 lg:grid-cols-2">
-                      <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
-                        <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-                          <Skeleton className="h-9" />
-                          <Skeleton className="h-9" />
-                        </div>
-                        <Skeleton className="mt-3 h-28" />
-                      </div>
-                      <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
-                        <Skeleton className="h-4 w-28" />
-                        <Skeleton className="mt-2 h-3 w-3/5" />
-                        <Skeleton className="mt-4 h-9" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </main>
-            <SiteFooter />
+            </>
+          )}
+        </>
+      )}
+
+      {screen === "capture" && !shellReady && pages.length === 0 && result === null && (
+        <div role="status" aria-busy="true" className="flex flex-col gap-4">
+          <span className="sr-only">Loading…</span>
+          <Skeleton className="h-9 w-2/3 max-w-md" />
+          <Skeleton className="h-5 w-full max-w-xl" />
+          <Skeleton className="h-40 w-full" />
+        </div>
+      )}
+
+      {screen === "capture" && (shellReady || pages.length > 0 || result !== null) && (
+        <CapturePage
+          signedIn={signedIn}
+          sessionPending={sessionPending}
+          step={activeStep}
+          phase={phase}
+          pages={pages}
+          fileError={fileError}
+          addInputRef={addInputRef}
+          replaceInputRef={replaceInputRef}
+          replaceIndexRef={replaceIndexRef}
+          resultRef={resultRef}
+          onSelectFiles={selectFiles}
+          onDemo={handleDemo}
+          onAddPages={addPages}
+          onReplacePageAt={replacePageAt}
+          onRemovePage={removePage}
+          onExtract={handleExtract}
+          extractProgress={extractProgress}
+          extractError={extractError}
+          result={result}
+          previewDoc={resultDoc}
+          source={source}
+          draftSave={draftSave}
+          draftOnServer={resultDoc ? serverIds.has(resultDoc.id) : false}
+          initialReviewCount={initialReviewCount}
+          onClear={clearCapture}
+          onEdit={() => void handleEditResult()}
+          onResolveItem={handleResolveResultItem}
+          onResolveAll={handleResolveAllResultItems}
+          onUpdatePrice={handleUpdateResultPrice}
+          onRenameTitle={handleRenameResultTitle}
+          onPublish={
+            source === "demo" || draftSave === "saved" ? () => void handleStartPublish() : undefined
+          }
+        />
+      )}
+
+      {screen === "editor" && !routedDoc && missingPublishMenuId && (
+        <MissingDraftCard
+          onOpenLibrary={() => navigateTo({ screen: "library" })}
+          onStartFresh={() => navigateTo({ screen: "capture" })}
+        />
+      )}
+      {screen === "editor" && !routedDoc && !missingPublishMenuId && sessionCheckGaveUp && (
+        <section className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
+          <h1 className="font-medium text-ink-900">Checking your session…</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
+            We couldn’t reach your account just now, so this menu hasn’t been opened. Your draft is
+            still saved in this browser — nothing is lost.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={workspace.retrySession}
+              className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              Try again
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo({ screen: "library" })}
+              className="rounded-full px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+            >
+              Back to My menus
+            </button>
+          </div>
+        </section>
+      )}
+      {screen === "editor" && !routedDoc && !missingPublishMenuId && !sessionCheckGaveUp && (
+        <div role="status" aria-busy="true" className="flex flex-col gap-4">
+          <span className="sr-only">Opening menu…</span>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-8 w-28 rounded-full" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+              <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+                <Skeleton className="h-9" />
+                <Skeleton className="h-9" />
+              </div>
+              <Skeleton className="mt-3 h-28" />
+            </div>
+            <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="mt-2 h-3 w-3/5" />
+              <Skeleton className="mt-4 h-9" />
+            </div>
           </div>
         </div>
-        {/*
-        Phone nav: signed in, the tab bar pins Capture · My menus · Orders ·
-        More (Orders keeps its home for the R0.3 monitor badge; the rest
-        lives in the More sheet). Signed out there is no tab bar at all: the
-        only screen is Capture, and a draft left behind is resumed from its
-        banner — no Orders, no More, no My menus. Sits after the footer so it
-        is the last thing on the page and sticks to the viewport bottom
-        instead of floating above the footer links.
-      */}
-        {navReady && signedIn ? (
-          <nav
-            data-print-hide
-            aria-label="Sections"
-            className="sticky bottom-0 z-30 border-t border-line-200 bg-surface-base/95 backdrop-blur-sm sm:hidden"
-            style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-          >
-            <div className="flex px-2 pt-1">
-              {phoneTabList.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    navigateTo({ screen: tab.id });
-                  }}
-                  aria-current={screen === tab.id ? "page" : undefined}
-                  className={`relative flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                    screen === tab.id ? "text-accent-700" : "text-ink-500"
-                  }`}
-                >
-                  {tab.id === "orders" && <NewOrdersBadge tone="bar" />}
-                  <span aria-hidden="true" className="flex h-[22px] items-center">
-                    <PhoneTabIcon id={tab.id} />
-                  </span>
-                  {tab.label}
-                </button>
-              ))}
-              {signedIn && (moreRows.length > 0 || canGetStarted) && (
-                <button
-                  type="button"
-                  onClick={() => setMoreOpen((open) => !open)}
-                  aria-expanded={moreOpen}
-                  aria-current={screenInMore ? "page" : undefined}
-                  className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                    moreOpen || screenInMore ? "text-accent-700" : "text-ink-500"
-                  }`}
-                >
-                  <span aria-hidden="true" className="flex h-[22px] items-center">
-                    <MoreIcon size={22} />
-                  </span>
-                  More
-                </button>
-              )}
-            </div>
-          </nav>
-        ) : null}
-        {signedIn && moreOpen && (
-          <div className="sm:hidden">
-            <div
-              aria-hidden="true"
-              onClick={() => setMoreOpen(false)}
-              className="fixed inset-0 z-40 bg-scrim"
-            />
-            <div
-              role="dialog"
-              aria-label="More"
-              className="fixed inset-x-0 bottom-0 z-50 rounded-t-3xl border border-line-200 bg-surface-base px-4 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-            >
-              <div
-                aria-hidden="true"
-                className="mx-auto mb-1 h-1.5 w-11 rounded-full bg-surface-200"
-              />
-              {moreRows.map((row) => (
-                <button
-                  key={row.id}
-                  type="button"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    navigateTo({ screen: row.id });
-                  }}
-                  className="flex min-h-[52px] w-full flex-col justify-center rounded-xl px-2 text-left transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  <span className="text-sm font-semibold text-ink-900">{row.label}</span>
-                  <span className="text-xs font-normal text-ink-500">{row.why}</span>
-                </button>
-              ))}
-              {/* The checklist is progress, not another destination: its own
-                card above the rule, with the count the sidebar shows. It
-                stays an owner's surface (`settings.manage`), like the Get
-                started link it replaces. */}
-              {canGetStarted && (
-                <a
-                  href="/launch"
-                  className="mt-2 flex min-h-[56px] items-center gap-3 rounded-xl border border-line-200 bg-surface-50 px-3 py-2.5 transition-colors hover:bg-surface-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-base text-ink-600"
-                  >
-                    <ChecklistIcon size={18} />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-ink-900">
-                      Launch checklist
-                    </span>
-                    <span className="block text-xs font-normal text-ink-500">
-                      {sheetLaunchHint}
-                    </span>
-                  </span>
-                  {sidebarLaunch ? (
-                    <span
-                      aria-hidden="true"
-                      className="shrink-0 rounded-full bg-surface-base px-2 py-0.5 text-[11px] font-semibold text-ink-600"
-                    >
-                      {sidebarLaunch.done}/{sidebarLaunch.total}
-                    </span>
-                  ) : null}
-                  {sidebarLaunch ? (
-                    <span className="sr-only">
-                      {sidebarLaunch.done} of {sidebarLaunch.total} steps done
-                    </span>
-                  ) : null}
-                </a>
-              )}
-              {/* The app has no top bar on a phone, so the account lives here:
-                one place to see who is signed in and to end the session. It
-                is the last thing in the sheet, under the destinations. */}
-              <div className="mt-2 border-t border-line-200 pt-1">
-                <p className="truncate px-2 pt-1 text-[11px] text-ink-500">{email}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    void authClient.signOut();
-                  }}
-                  className="flex min-h-[44px] w-full items-center rounded-xl px-2 text-left text-sm font-medium text-ink-700 transition-colors hover:bg-surface-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  Sign out
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        <MonitorToastStack onOpen={() => navigateTo({ screen: "orders" })} />
-      </div>
-    </OrderMonitorProvider>
+      )}
+    </AppShell>
   );
 }
