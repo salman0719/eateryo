@@ -50,16 +50,8 @@ import {
   type ServerMenu,
   updateServerMenu,
 } from "@/features/menus/sync";
-import {
-  fetchLiveMenuDoc,
-  fetchPublication,
-  publishMenu,
-  unpublishMenu,
-} from "@/features/publishing/client";
 import { useRouter } from "next/navigation";
 
-import type { PublicationStatus } from "@/features/publishing/schema";
-import type { PublishSetupResult } from "@/features/publishing/setup-schema";
 import { rememberPublishJourney } from "@/features/publishing/wizard-state";
 import { saveDirectSignInIntent } from "@/features/menus/direct-sign-in";
 import { authClient } from "@/lib/auth-client";
@@ -90,6 +82,7 @@ import { WorkspaceProvider, useWorkspace } from "@/features/tenancy/workspace-co
 import { LibraryProvider, useLibrary } from "@/features/menus/library-context";
 import { useDraftClaims } from "@/features/menus/draft-claims";
 import { useCapture } from "@/features/capture/use-capture";
+import { usePublication } from "@/features/publishing/use-publication";
 import { NavigationProvider, useNavigation } from "@/features/navigation/navigation-context";
 import { createRestaurant } from "@/features/tenancy/client";
 import {
@@ -388,6 +381,33 @@ function HomeShell() {
     routeMenuId: routeMenuId(route),
     screen: route.screen,
   });
+  // Publication follows the open document: whether it is live, what diners see
+  // now, and the actions that change it. It reaches the editor through two
+  // doors so neither side mirrors the other.
+  const {
+    publication,
+    publicationMenuId,
+    publicationLoaded,
+    publishBusy,
+    publishError,
+    liveDoc,
+    liveDocMenuId,
+    liveDocState,
+    resetPublication,
+    refreshPublication,
+    handlePublish,
+    handleUnpublish,
+    handleWizardPublished,
+  } = usePublication({
+    getOpenDoc: useCallback(() => docRef.current, []),
+    flushSave,
+    onServerRevision: (menuId, serverUpdatedAt) => {
+      if (docRef.current?.id === menuId) serverBaseRef.current = serverUpdatedAt;
+    },
+    onPublishedMenu: (menuId) => {
+      if (menuId === draftDocId() || menuId === demoDoc?.id) clearCapture();
+    },
+  });
 
   /**
    * Session state of the "Continue getting your link" resume banner (Q7).
@@ -398,24 +418,6 @@ function HomeShell() {
    * is only ever written by Dismiss.
    */
   const [resumeDismissed, setResumeDismissed] = useState<boolean | null>(null);
-
-  // Publishing (Step 9): the open menu's public-link state, loaded on open
-  // and refreshed whenever the preview is shown (that is when an owner looks
-  // for "are my changes live?").
-  const [publication, setPublication] = useState<PublicationStatus | null>(null);
-  /** Which menu the loaded publication belongs to (guards against leaks). */
-  const [publicationMenuId, setPublicationMenuId] = useState<string | null>(null);
-  const [publicationLoaded, setPublicationLoaded] = useState(false);
-  const [publishBusy, setPublishBusy] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  /**
-   * The snapshot diners see now, read only while the draft is ahead of it.
-   * The publish panel diffs it against the draft so the owner sees what
-   * "Publish changes" actually changes.
-   */
-  const [liveDoc, setLiveDoc] = useState<MenuDocument | null>(null);
-  const [liveDocMenuId, setLiveDocMenuId] = useState<string | null>(null);
-  const [liveDocState, setLiveDocState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   /**
    * Café-keyed read: the library is one café's list, so a different membership
@@ -700,11 +702,7 @@ function HomeShell() {
     updateRoute = true,
     accessHint?: MenuAccess
   ) {
-    setPublication(null);
-    setPublicationMenuId(null);
-    setPublicationLoaded(false);
-    setPublishError(null);
-    resetLiveDoc();
+    resetPublication();
     void refreshPublication(doc.id);
     // A caller that already knows the answer (a server route open, or a menu
     // created here) hands it over so the first frame is decided, not guessed.
@@ -1161,196 +1159,6 @@ function HomeShell() {
     router.push("/sign-in");
   }
 
-  function resetLiveDoc() {
-    setLiveDoc(null);
-    setLiveDocMenuId(null);
-    setLiveDocState("idle");
-  }
-
-  /**
-   * Read the live snapshot, but only while the draft is ahead of it: with no
-   * unpublished changes there is nothing to compare, and a paused or
-   * never-published menu has no serving version at all.
-   */
-  async function refreshLiveDoc(menuId: string, status: PublicationStatus | null) {
-    if (!status?.isLive || !status.hasUnpublishedChanges) {
-      resetLiveDoc();
-      return;
-    }
-    setLiveDocMenuId(menuId);
-    setLiveDocState("loading");
-    try {
-      const doc = await fetchLiveMenuDoc(menuId);
-      if (docRef.current?.id !== menuId) return;
-      setLiveDoc(doc);
-      setLiveDocState("ready");
-    } catch (error) {
-      if (docRef.current?.id !== menuId) return;
-      if (error instanceof SyncError && error.code === "not_found") {
-        setLiveDoc(null);
-        setLiveDocState("ready");
-        return;
-      }
-      setLiveDoc(null);
-      setLiveDocState("error");
-    }
-  }
-
-  /** Load the open menu's publication state (signed in only). */
-  async function refreshPublication(menuId: string) {
-    if (!signedInRef.current) {
-      setPublication(null);
-      setPublicationMenuId(null);
-      setPublicationLoaded(false);
-      resetLiveDoc();
-      return;
-    }
-    setPublicationMenuId(menuId);
-    try {
-      const status = await fetchPublication(menuId);
-      if (docRef.current?.id !== menuId) return;
-      setPublication(status);
-      setPublishError(null);
-      void refreshLiveDoc(menuId, status);
-    } catch (error) {
-      if (docRef.current?.id !== menuId) return;
-      if (error instanceof SyncError && error.code === "not_found") {
-        setPublication(null);
-      } else {
-        setPublishError("Could not check the menu’s status. Try again in a moment.");
-      }
-      resetLiveDoc();
-    } finally {
-      if (docRef.current?.id === menuId) setPublicationLoaded(true);
-    }
-  }
-
-  function publishErrorMessage(error: unknown): string {
-    if (error instanceof SyncError) {
-      switch (error.code) {
-        case "unauthorized":
-          return "Sign in again to publish this menu.";
-        case "forbidden":
-          return "Only the restaurant owner can publish this menu.";
-        case "not_found":
-          return "This menu is no longer in your account. Open it again to reconcile.";
-        case "slug_taken":
-          return "That link is already used by another menu at this café — pick another link name.";
-        case "not_published":
-          return "This menu is not published.";
-        case "invalid":
-          return error.message;
-        default:
-          return "Could not reach the server. Try again when you are online.";
-      }
-    }
-    return "Something went wrong. Your edits are safe in this browser.";
-  }
-
-  /**
-   * Publish (or publish changes): flush the pending save first so the
-   * snapshot is of what the owner just saw, never of a stale draft.
-   */
-  async function handlePublish() {
-    const doc = docRef.current;
-    if (!doc) return;
-    setPublishError(null);
-    setPublishBusy(true);
-    try {
-      await flushSave();
-      // An unread account list is not an answer, so ask this menu's own
-      // endpoint rather than refusing on an empty set (003). Only a definite
-      // "no such menu" refuses; an unreachable server is left to the publish
-      // call, whose errors are already honest.
-      let onAccount = serverIdsRef.current.has(doc.id);
-      if (
-        !onAccount &&
-        signedInRef.current &&
-        accountMenusSettledRef.current !== accountKeyRef.current
-      ) {
-        onAccount = await fetchServerMenu(doc.id).then(
-          () => true,
-          (error: unknown) => !(error instanceof SyncError && error.code === "not_found")
-        );
-        if (onAccount) addServerId(doc.id);
-      }
-      if (!onAccount) {
-        setPublishError("Add this menu to your account first, then publish it.");
-        return;
-      }
-      const status = await publishMenu(doc.id);
-      setPublication(status);
-      setPublicationLoaded(true);
-      // Nothing is unpublished any more, so there is nothing left to compare.
-      void refreshLiveDoc(doc.id, status);
-    } catch (error) {
-      setPublishError(publishErrorMessage(error));
-    } finally {
-      setPublishBusy(false);
-    }
-  }
-
-  async function handleUnpublish() {
-    const doc = docRef.current;
-    if (!doc) return;
-    setPublishError(null);
-    setPublishBusy(true);
-    try {
-      setPublication(await unpublishMenu(doc.id));
-    } catch (error) {
-      setPublishError(publishErrorMessage(error));
-    } finally {
-      setPublishBusy(false);
-    }
-  }
-
-  /**
-   * The wizard published (or attached) this menu. Make the shell agree with
-   * the server immediately: the library chip, the publication panel and the
-   * next save's conflict baseline.
-   */
-  function handleWizardPublished(result: PublishSetupResult) {
-    const menuId = result.publication.menuId;
-    addServerId(menuId);
-    setPublication(result.publication);
-    setPublicationMenuId(menuId);
-    setPublicationLoaded(true);
-    setPublishError(null);
-    resetLiveDoc();
-    void (async () => {
-      try {
-        const server = await fetchServerMenu(menuId);
-        if (docRef.current?.id === menuId) serverBaseRef.current = server.updatedAt;
-        // The wizard is how onboarding menus reach the account. Stamp the
-        // agreed revision so this row stays the account's — signed out, it
-        // must never resurface as an anonymous draft.
-        const publishActor = accountKeyRef.current;
-        if (publishActor) {
-          await refreshDraftSync(
-            menuId,
-            publishActor,
-            server.updatedAt,
-            menuContentHash(server.doc)
-          );
-          await refreshLibrary();
-        }
-      } catch {
-        // The next editor open reconciles the baseline; publishing already
-        // succeeded, so this must not surface as a failure.
-      }
-    })();
-    void mergeAccountMenus(activeRestaurantId);
-    void refreshLibrary();
-    // Auto-import happens at sign-in only. Publishing never sweeps the
-    // browser: anything left over stays put for the offer/manual path.
-    // The published menu may be the capture draft: once it has a link,
-    // Capture goes back to a fresh upload instead of showing the old draft
-    // as if it were still being worked on. Other menus leave capture alone.
-    if (menuId === draftDocId() || menuId === demoDoc?.id) {
-      clearCapture();
-    }
-  }
-
   async function handleDeleteMenu(id: string) {
     const access = menuAccessRef.current.get(id);
     if (signedInRef.current && access !== "local" && !accessCan(access, "menus.write")) {
@@ -1393,11 +1201,7 @@ function HomeShell() {
         setActiveDoc(null);
         setEditorImage(null);
       }
-      setPublication(null);
-      setPublicationMenuId(null);
-      setPublicationLoaded(false);
-      setPublishError(null);
-      resetLiveDoc();
+      resetPublication();
       await refreshLibrary();
       if (accountNote) reportLibraryError(accountNote);
       navigate({ screen: "library" }, { flushCurrent: false });
@@ -2195,11 +1999,7 @@ function HomeShell() {
           setEditorImage(null);
           setConflict(null);
           setConflictError(null);
-          setPublication(null);
-          setPublicationMenuId(null);
-          setPublicationLoaded(false);
-          setPublishError(null);
-          resetLiveDoc();
+          resetPublication();
           if (resultDoc !== null || pages.length > 0) applySelection([]);
           navigate(landing, { replace: true, flushCurrent: false });
         }
