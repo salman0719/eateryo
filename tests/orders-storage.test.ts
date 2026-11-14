@@ -30,6 +30,7 @@ function line(overrides: Partial<Parameters<typeof createOrder>[0]["lines"][numb
     menuItemId: "item-1",
     name: "Espresso",
     variantName: "Small" as string | null,
+    options: [] as { groupName: string; choiceName: string; priceDelta: null }[],
     unitPrice: 2 as number | null,
     quantity: 2,
     menuId: null as string | null,

@@ -39,10 +39,47 @@ export const menuOptionChoiceSchema = z.object({
   priceDelta: z.number().nullable(),
 });
 
-export const menuOptionSchema = z.object({
-  name: z.string().min(1),
-  choices: z.array(menuOptionChoiceSchema).default([]),
-});
+/**
+ * Stored groups predate the min/max-only contract: early documents carry
+ * `required` and `selection`. Presence of either key marks a legacy shape and
+ * folds it into min/max with identical behavior (required ⇒ at least one;
+ * single-pick ⇒ at most one); canonical groups pass through untouched.
+ * Unknown keys are then stripped, so re-saving a migrated group is stable.
+ */
+function migrateOptionGroupShape(input: unknown): unknown {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
+  const record = input as Record<string, unknown>;
+  if (!("required" in record) && !("selection" in record)) return input;
+  const { required, selection, ...rest } = record;
+  const restRecord = rest as Record<string, unknown>;
+  const min = typeof restRecord.min === "number" ? restRecord.min : 0;
+  // The old default was single-pick, so only an explicit "many" keeps the
+  // max; anything else (including a missing key) behaved as at most one.
+  const many = selection === "many";
+  return {
+    ...rest,
+    min: required === true ? Math.max(1, min) : min,
+    max: many ? (restRecord.max ?? null) : 1,
+  };
+}
+
+export const menuOptionSchema = z.preprocess(
+  migrateOptionGroupShape,
+  z.object({
+    name: z.string().min(1),
+    /**
+     * Fewest choices accepted. This is also the required switch: 0 means the
+     * diner may skip the group, 1 or more means they must pick that many.
+     */
+    min: z.number().int().min(0).default(0),
+    /**
+     * Most choices accepted (null = no upper bound beyond the choice list).
+     * 1 renders radios, anything else checkboxes — the widget follows the rule.
+     */
+    max: z.number().int().min(1).nullable().default(null),
+    choices: z.array(menuOptionChoiceSchema).default([]),
+  })
+);
 
 /**
  * One stored copy of a dish photo, as served from the file host's CDN.
@@ -135,6 +172,13 @@ export const menuDocumentSchema = z.object({
   title: z.string().min(1),
   currency: z.string().min(1).nullable(),
   categories: z.array(menuCategorySchema).default([]),
+  /**
+   * Reusable option-group definitions ("Pizza sauces", "Toppings").
+   * Applying a template copies the group onto dishes — dishes never
+   * reference templates, so old documents (field absent) stay valid and
+   * published snapshots keep working without resolving anything.
+   */
+  modifierTemplates: z.array(menuOptionSchema).default([]),
   source: menuSourceSchema.optional(),
   updatedAt: z.string().min(1),
 });
@@ -142,6 +186,8 @@ export const menuDocumentSchema = z.object({
 export type StoredMenuItemPhoto = z.infer<typeof storedMenuItemPhotoSchema>;
 export type MenuItemImage = z.infer<typeof menuItemImageSchema>;
 export type MenuVariant = z.infer<typeof menuVariantSchema>;
+/** A named option group kept in the library; same shape as a dish's group. */
+export type MenuModifierTemplate = z.infer<typeof menuOptionSchema>;
 export type MenuOptionChoice = z.infer<typeof menuOptionChoiceSchema>;
 export type MenuOption = z.infer<typeof menuOptionSchema>;
 export type MenuItem = z.infer<typeof menuItemSchema>;

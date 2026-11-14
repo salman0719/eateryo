@@ -91,6 +91,7 @@ describe("summarizeMenuChanges", () => {
       availability: 0,
       description: 0,
       labels: 0,
+      options: 0,
       moved: 0,
     });
     expect(summary.rows).toEqual([
@@ -139,6 +140,56 @@ describe("summarizeMenuChanges", () => {
       { kind: "description", name: "Latte", detail: "removed" },
     ]);
     expect(summarizeMenuChanges(bare, bare).counts.description).toBe(0);
+  });
+
+  it("reports option-group edits on the dish they belong to", () => {
+    const before = doc([
+      category("c1", "Drinks", [
+        item("i1", "Latte", 4.5, {
+          options: [
+            {
+              name: "Milk",
+              min: 0,
+              max: 1,
+              choices: [{ name: "Oat", priceDelta: 0 }],
+            },
+          ],
+        }),
+      ]),
+    ]);
+    const after = doc([
+      category("c1", "Drinks", [
+        item("i1", "Latte", 4.5, {
+          options: [
+            {
+              name: "Milk",
+              min: 1,
+              max: 1,
+              choices: [
+                { name: "Oat", priceDelta: 0.5 },
+                { name: "Soy", priceDelta: 0 },
+              ],
+            },
+            {
+              name: "Shots",
+              min: 0,
+              max: 2,
+              choices: [{ name: "Extra", priceDelta: 1 }],
+            },
+          ],
+        }),
+      ]),
+    ]);
+
+    const summary = summarizeMenuChanges(before, after);
+    expect(summary.rows).toEqual([
+      {
+        kind: "options",
+        name: "Latte",
+        detail: "Milk now required · Oat +0.00 → +0.50 · Soy added to Milk · Shots added",
+      },
+    ]);
+    expect(summary.counts.options).toBe(1);
   });
 
   it("reports dietary label changes on the dish they belong to", () => {

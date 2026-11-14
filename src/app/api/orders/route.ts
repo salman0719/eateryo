@@ -21,9 +21,10 @@ import { logEvent, requestIdFrom } from "@/lib/observability/log";
  * POST /api/orders — place an order from a public table link. Anonymous by
  * design: no session, no cookie, nothing about the diner stored.
  *
- * The body carries item ids, variants, and quantities only. Names, prices,
- * and the total are resolved server-side from the published snapshot (the
- * menu the diner actually saw). Guards on this untrusted endpoint:
+ * The body carries item ids, variants, option picks, and quantities only.
+ * Names, prices, deltas, and the total are resolved server-side from the
+ * published snapshot (the menu the diner actually saw). Guards on this
+ * untrusted endpoint:
  * - payload caps (header size, 30 lines, 20 per line, 280-char note),
  * - a honeypot field humans never fill,
  * - a fixed-window rate limit per hashed caller+minute, stored in the DB so
@@ -35,11 +36,18 @@ import { logEvent, requestIdFrom } from "@/lib/observability/log";
  * orders. Personalised data is never cached.
  */
 
-const MAX_BODY_BYTES = 8 * 1024;
+const MAX_BODY_BYTES = 16 * 1024;
+
+const orderLineOptionBodySchema = z.object({
+  groupName: z.string().trim().min(1).max(64),
+  choiceName: z.string().trim().min(1).max(64),
+});
 
 const orderLineBodySchema = z.object({
   menuItemId: z.string().min(1).max(64),
   variantName: z.string().min(1).max(48).nullable().optional(),
+  /** Picked add-ons (names only — deltas resolve server-side from the snapshot). */
+  options: z.array(orderLineOptionBodySchema).max(20).optional(),
   quantity: z.number().int().min(1).max(20),
   /** Which menu this line comes from — required on the table path. */
   menuSlug: z.string().trim().min(1).max(64).nullable().optional(),
@@ -175,6 +183,7 @@ export async function POST(request: Request) {
           lines: parsed.data.lines.map((line) => ({
             menuItemId: line.menuItemId,
             variantName: line.variantName,
+            options: line.options,
             quantity: line.quantity,
           })),
         })
@@ -187,6 +196,7 @@ export async function POST(request: Request) {
               menuSlug: line.menuSlug ?? "",
               menuItemId: line.menuItemId,
               variantName: line.variantName,
+              options: line.options,
               quantity: line.quantity,
             })),
           })

@@ -19,7 +19,7 @@
  */
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { formatPreviewPrice, formatPriceDelta } from "@/features/menu/preview-utils";
 import { itemImageKey } from "@/features/item-images/ref";
 
 export type MenuChangeKind =
@@ -34,6 +34,7 @@ export type MenuChangeKind =
   | "availability"
   | "description"
   | "labels"
+  | "options"
   | "moved";
 
 export interface MenuChange {
@@ -60,6 +61,7 @@ export const MENU_CHANGE_ORDER: MenuChangeKind[] = [
   "availability",
   "description",
   "labels",
+  "options",
   "moved",
   "category",
   "title",
@@ -75,6 +77,7 @@ export const MENU_CHANGE_LABEL: Record<MenuChangeKind, string> = {
   availability: "status",
   description: "description",
   labels: "label",
+  options: "options",
   moved: "moved",
   category: "section",
   title: "title",
@@ -130,8 +133,75 @@ function emptyCounts(): Record<MenuChangeKind, number> {
     availability: 0,
     description: 0,
     labels: 0,
+    options: 0,
     moved: 0,
   };
+}
+
+/** Bound text for a min/max rule: null max means no upper bound. */
+function boundLabel(bound: number | null): string {
+  return bound === null ? "no limit" : String(bound);
+}
+
+/**
+ * Add-on changes for one item: groups and choices matched by name (extraction
+ * produces names, not ids), one row per dish so a pizza rebuild stays one
+ * line. Rule flips that change what the diner must or may pick are reported
+ * like any other visible change — a min crossing above zero gates Add.
+ */
+function optionsDetail(before: MenuItem, after: MenuItem): string | null {
+  const parts: string[] = [];
+  const previousGroups = new Map(before.options.map((group) => [group.name, group]));
+  const nextGroups = new Map(after.options.map((group) => [group.name, group]));
+  for (const group of after.options) {
+    const previous = previousGroups.get(group.name);
+    if (!previous) {
+      parts.push(`${group.name} added`);
+      continue;
+    }
+    if (previous.min !== group.min) {
+      if (previous.min === 0 && group.min > 0) {
+        parts.push(`${group.name} now required`);
+      } else if (previous.min > 0 && group.min === 0) {
+        parts.push(`${group.name} now optional`);
+      } else {
+        parts.push(`${group.name}: at least ${previous.min} → ${group.min}`);
+      }
+    }
+    if (previous.max !== group.max) {
+      if (previous.max !== 1 && group.max === 1) {
+        parts.push(`${group.name} now takes one pick`);
+      } else if (previous.max === 1 && group.max !== 1) {
+        parts.push(`${group.name} no longer limited to one pick`);
+      } else {
+        parts.push(`${group.name}: at most ${boundLabel(previous.max)} → ${boundLabel(group.max)}`);
+      }
+    }
+    const previousChoices = new Map(
+      previous.choices.map((choice) => [choice.name, choice.priceDelta])
+    );
+    for (const choice of group.choices) {
+      if (!previousChoices.has(choice.name)) {
+        parts.push(`${choice.name} added to ${group.name}`);
+        continue;
+      }
+      const oldDelta = previousChoices.get(choice.name) ?? null;
+      if (oldDelta !== choice.priceDelta) {
+        parts.push(
+          `${choice.name} ${formatPriceDelta(oldDelta) || "—"} → ${formatPriceDelta(choice.priceDelta) || "—"}`
+        );
+      }
+    }
+    for (const choice of previous.choices) {
+      if (!group.choices.some((candidate) => candidate.name === choice.name)) {
+        parts.push(`${choice.name} removed from ${group.name}`);
+      }
+    }
+  }
+  for (const group of before.options) {
+    if (!nextGroups.has(group.name)) parts.push(`${group.name} removed`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 /** A blank description is no description, exactly as the diner page reads it. */
@@ -266,6 +336,10 @@ export function summarizeMenuChanges(before: MenuDocument, after: MenuDocument):
           name: item.name,
           detail: `${labelList(previous.dietaryLabels)} → ${labelList(item.dietaryLabels)}`,
         });
+      }
+      const optionChanges = optionsDetail(previous, item);
+      if (optionChanges) {
+        rows.push({ kind: "options", name: item.name, detail: optionChanges });
       }
     }
   }

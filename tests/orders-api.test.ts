@@ -87,6 +87,11 @@ function bodyWithLine(overrides: Partial<typeof validBody> = {}) {
   return { ...validBody, ...overrides };
 }
 
+/** A line carrying option picks (kept outside the literal so the array type widens). */
+function lineWithOptions(menuItemId: string, options: { groupName: string; choiceName: string }[]) {
+  return { menuItemId, quantity: 1, options };
+}
+
 function orderParams(orderId: string): { params: Promise<{ orderId: string }> } {
   return { params: Promise.resolve({ orderId }) };
 }
@@ -144,6 +149,43 @@ describe("POST /api/orders", () => {
     expect(order.lines[0].name).not.toBe("Free lunch");
     const rows = await holder.db!.select({ total: orderTable.totalCents }).from(orderTable);
     expect(rows[0].total).not.toBe(0);
+  });
+
+  it("accepts option picks and resolves their deltas server-side", async () => {
+    holder.userId = null; // a diner has no account
+    const latte = publishedDoc.categories
+      .flatMap((category) => category.items)
+      .find((candidate) => candidate.name === "Oat Milk Latte")!;
+
+    const res = await placeOrderRoute(
+      orderRequest(
+        bodyWithLine({
+          lines: [lineWithOptions(latte.id, [{ groupName: "Size", choiceName: "Regular" }])],
+        })
+      )
+    );
+    expect(res.status).toBe(201);
+    const { order } = await res.json();
+    expect(order.lines[0].options).toEqual([
+      { groupName: "Size", choiceName: "Regular", priceDelta: null },
+    ]);
+  });
+
+  it("refuses unknown option picks without touching the board", async () => {
+    holder.userId = null;
+    const latte = publishedDoc.categories
+      .flatMap((category) => category.items)
+      .find((candidate) => candidate.name === "Oat Milk Latte")!;
+
+    const res = await placeOrderRoute(
+      orderRequest(
+        bodyWithLine({
+          lines: [lineWithOptions(latte.id, [{ groupName: "Size", choiceName: "Venti" }])],
+        })
+      )
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("invalid_body");
   });
 
   it("refuses an unpublished menu and unknown items", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 
 import { Collapse } from "@/components/ui/collapse";
 import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
@@ -17,6 +17,8 @@ import { itemImageCopy } from "@/features/item-images/ref";
 
 import { CommitInput, CommitNumber, CommitTags } from "./fields";
 import { ItemImagePanel } from "./item-image-panel";
+import { OptionGroupForm } from "./option-group-form";
+import { addModifierTemplate } from "@/features/menu/modifier-templates";
 
 interface ItemEditorProps {
   doc: MenuDocument;
@@ -85,14 +87,17 @@ export const ItemEditor = memo(function ItemEditor({
   /**
    * What the closed row says under the name: the description when the menu has
    * one, then the shape of the dish — so a row whose fields are hidden still
-   * says it has sizes behind it.
-   *
-   * Option groups belong here too, but the form no longer collects them (see
-   * the parked block below), so the closed row must not advertise them either.
+   * says it has sizes and option groups behind it.
    */
   const shape: string[] = [];
   if (item.variants.length > 0) {
     shape.push(`${item.variants.length} ${item.variants.length === 1 ? "size" : "sizes"}`);
+  }
+  if (item.options.length > 0) {
+    const choiceCount = item.options.reduce((sum, group) => sum + group.choices.length, 0);
+    shape.push(
+      `${item.options.length} ${item.options.length === 1 ? "option group" : "option groups"} · ${choiceCount} ${choiceCount === 1 ? "choice" : "choices"}`
+    );
   }
   const rowSummary = [item.description?.trim() ?? "", shape.join(" · ")]
     .filter((part) => part.length > 0)
@@ -101,6 +106,13 @@ export const ItemEditor = memo(function ItemEditor({
   function patch(patch: Parameters<typeof updateItem>[3]) {
     actions.change(updateItem(doc, categoryId, item.id, patch));
   }
+
+  // Library templates not already on this dish, offered for one-tap apply.
+  const appliableTemplates = doc.modifierTemplates.filter(
+    (template) => !item.options.some((group) => group.name === template.name)
+  );
+  const [applyPick, setApplyPick] = useState("");
+  const pickedTemplate = appliableTemplates.find((template) => template.name === applyPick);
 
   return (
     <li
@@ -307,14 +319,12 @@ export const ItemEditor = memo(function ItemEditor({
             </button>
           </div>
 
-          {/* Options / add-ons are parked until the rest of the feature exists.
-              Nothing renders an option group on the diner page and an order
-              line cannot carry a choice, so this block would only collect data
-              the product cannot serve. Hidden with CSS — not deleted — so the
-              capture UI comes back intact once table ordering supports choices
-              (local/issues/020); re-enable by dropping `hidden` here and
-              restoring the row's option count in `shape` above. */}
-          <div className="mt-3 hidden rounded-lg bg-surface-50 p-3">
+          {/* Options / add-ons: groups of add-on choices (sauces, toppings)
+              the diner picks at order time. Rules live on the group so the
+              diner page and the server enforce the same contract: required
+              groups gate Add, single-pick renders radios, multi-pick renders
+              checkboxes, and deltas price server-side from the snapshot. */}
+          <div className="mt-3 rounded-lg bg-surface-50 p-3">
             <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
               Options / add-ons
             </p>
@@ -323,121 +333,90 @@ export const ItemEditor = memo(function ItemEditor({
                 None — add a group if the menu shows choices.
               </p>
             )}
-            <ul className="mt-2 space-y-3">
-              {item.options.map((option, oIndex) => (
-                <li
-                  key={`${option.name}-${oIndex}`}
-                  className="rounded-lg border border-line-200 bg-surface-base p-2.5"
-                >
-                  <div className="grid grid-cols-[1fr_auto] items-end gap-2">
-                    <CommitInput
-                      label="Option group"
-                      value={option.name}
-                      onCommit={(name) =>
-                        patch({
-                          options: item.options.map((o, i) =>
-                            i === oIndex ? { ...o, name: name.trim() } : o
-                          ),
-                        })
-                      }
-                    />
-                    <button
-                      type="button"
-                      aria-label={`Remove option group ${option.name}`}
-                      onClick={() =>
-                        patch({ options: item.options.filter((_, i) => i !== oIndex) })
-                      }
-                      className={smallButton}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <ul className="mt-2 space-y-2">
-                    {option.choices.map((choice, cIndex) => (
-                      <li
-                        key={`${choice.name}-${cIndex}`}
-                        className="grid grid-cols-1 items-end gap-2 pl-3 sm:grid-cols-[1fr_110px_auto]"
-                      >
-                        <CommitInput
-                          label="Choice"
-                          value={choice.name}
-                          onCommit={(name) =>
-                            patch({
-                              options: item.options.map((o, i) =>
-                                i === oIndex
-                                  ? {
-                                      ...o,
-                                      choices: o.choices.map((c, j) =>
-                                        j === cIndex ? { ...c, name: name.trim() } : c
-                                      ),
-                                    }
-                                  : o
-                              ),
-                            })
-                          }
-                        />
-                        <CommitNumber
-                          label="Extra"
-                          value={choice.priceDelta}
-                          onCommit={(priceDelta) =>
-                            patch({
-                              options: item.options.map((o, i) =>
-                                i === oIndex
-                                  ? {
-                                      ...o,
-                                      choices: o.choices.map((c, j) =>
-                                        j === cIndex ? { ...c, priceDelta } : c
-                                      ),
-                                    }
-                                  : o
-                              ),
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          aria-label={`Remove choice ${choice.name}`}
-                          onClick={() =>
-                            patch({
-                              options: item.options.map((o, i) =>
-                                i === oIndex
-                                  ? { ...o, choices: o.choices.filter((_, j) => j !== cIndex) }
-                                  : o
-                              ),
-                            })
-                          }
-                          className={smallButton}
-                        >
-                          ✕
-                        </button>
-                      </li>
+            {appliableTemplates.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <label className="min-w-[160px] flex-1 text-xs text-ink-600">
+                  Apply an add-on set
+                  <select
+                    value={applyPick}
+                    onChange={(event) => setApplyPick(event.target.value)}
+                    className="mt-1 w-full rounded-lg border border-line-300 bg-surface-base px-2 py-1.5 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                  >
+                    <option value="">Choose…</option>
+                    {appliableTemplates.map((template) => (
+                      <option key={template.name} value={template.name}>
+                        {template.name}
+                      </option>
                     ))}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() =>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  disabled={!pickedTemplate}
+                  onClick={() => {
+                    if (!pickedTemplate) return;
+                    patch({ options: [...item.options, pickedTemplate] });
+                    setApplyPick("");
+                  }}
+                  className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  Apply
+                </button>
+              </div>
+            )}
+            <ul className="mt-2 space-y-3">
+              {item.options.map((option, oIndex) => {
+                const inLibrary = doc.modifierTemplates.some(
+                  (template) => template.name === option.name
+                );
+                return (
+                  <OptionGroupForm
+                    key={`${option.name}-${oIndex}`}
+                    group={option}
+                    onChange={(next) =>
                       patch({
-                        options: item.options.map((o, i) =>
-                          i === oIndex
-                            ? {
-                                ...o,
-                                choices: [...o.choices, { name: "New choice", priceDelta: null }],
-                              }
-                            : o
-                        ),
+                        options: item.options.map((o, i) => (i === oIndex ? next : o)),
                       })
                     }
-                    className={`${smallButton} mt-2`}
-                  >
-                    + Add choice
-                  </button>
-                </li>
-              ))}
+                    onRemove={() => patch({ options: item.options.filter((_, i) => i !== oIndex) })}
+                    removeLabel={`Remove option group ${option.name}`}
+                    footer={
+                      inLibrary ? (
+                        <p className="mt-2 text-[11px] text-ink-500">
+                          Saved in the add-on sets library.
+                        </p>
+                      ) : (
+                        <button
+                          type="button"
+                          title="Copy this group into the add-on sets so other dishes can use it"
+                          onClick={() => actions.change(addModifierTemplate(doc, option))}
+                          className={`${smallButton} mt-2`}
+                        >
+                          Save as add-on set
+                        </button>
+                      )
+                    }
+                  />
+                );
+              })}
             </ul>
             <button
               type="button"
               onClick={() =>
-                patch({ options: [...item.options, { name: "New option", choices: [] }] })
+                patch({
+                  options: [
+                    ...item.options,
+                    {
+                      name: "New option",
+                      min: 0,
+                      max: null,
+                      // A group is never left empty: an empty group is a dead
+                      // end the diner cannot satisfy, so it arrives with one
+                      // choice to rename and price.
+                      choices: [{ name: "New choice", priceDelta: null }],
+                    },
+                  ],
+                })
               }
               className={`${smallButton} mt-2`}
             >

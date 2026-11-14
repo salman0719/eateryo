@@ -6,6 +6,7 @@
  * counts as seeing them); the × dismisses without navigating.
  */
 
+import { formatSelectionsSummary } from "@/features/menu/option-groups";
 import { orderCode, type Order } from "@/features/orders/schema";
 import { formatTableLabel } from "@/features/orders/table-links";
 
@@ -48,7 +49,10 @@ export function MonitorToasts({
             <p className="truncate text-xs text-ink-300">
               {order.lines
                 .slice(0, 2)
-                .map((line) => `${line.quantity}× ${line.name}`)
+                .map((line) => {
+                  const picks = formatSelectionsSummary(line.options);
+                  return `${line.quantity}× ${line.name}${picks ? ` (${picks})` : ""}`;
+                })
                 .join(", ")}
               {order.lines.length > 2 ? ` +${order.lines.length - 2} more` : ""}
             </p>
