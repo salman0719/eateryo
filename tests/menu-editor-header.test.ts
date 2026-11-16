@@ -94,7 +94,11 @@ describe("MenuEditor tab strip", () => {
     expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
     const afterSelected = html.split('aria-selected="true"')[1] ?? "";
     expect(afterSelected.slice(0, 400)).toContain("Settings");
-    expect(html).toContain("Settings &amp; hours moves here");
+    // Step 10: the tab renders the real management surface, not a
+    // placeholder — identity first, then data and danger controls.
+    expect(html).toContain("Menu title");
+    expect(html).toContain("Export JSON");
+    expect(html).toContain("Delete menu");
   });
 
   it("marks the mode tab selected outside edit mode", () => {
