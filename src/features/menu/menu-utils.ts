@@ -83,6 +83,7 @@ export function createMenuDocument(input?: {
     currency: input?.currency ?? null,
     categories: [],
     modifierTemplates: [],
+    labelMeanings: {},
     updatedAt: nowIso(),
   };
 }
@@ -160,6 +161,8 @@ export function addCategory(doc: MenuDocument, input: NewCategoryInput): MenuDoc
     id: generateId(),
     name: requireNonEmpty(input.name, "Category name"),
     sortOrder: next.categories.length,
+    description: input.description ?? "",
+    cover: input.cover ?? null,
     items: [],
   });
   return finalize(next);
