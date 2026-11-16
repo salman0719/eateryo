@@ -126,8 +126,9 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
 - `src/components/layout/app-sidebar.tsx`, `sidebar-preference.ts` — the app's
   left column: destinations from `availableSections` (signed-out gating included),
-  the open menu's outline in the edit workspace, the account, and a
-  rail/expanded toggle whose choice is remembered. Widths are CSS driven by
+  the account, and a rail/expanded toggle whose choice is remembered. It
+  carries no menu outline: the editor's tab strip and category pills own
+  switching (step 12 retired the "In this menu" list). Widths are CSS driven by
   `data-sidebar` on `<html>`, set before paint by the boot script in
   `layout.tsx` so a saved choice never flashes. The app shell has no desktop
   header; `site-header.tsx` stays for content pages (launch, legal, dev).
