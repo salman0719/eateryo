@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { menuDocumentSchema } from "../src/features/menu/schema";
 import {
   acceptItemUnpriced,
   addCategory,
@@ -25,6 +26,7 @@ import {
   setCategoryCover,
   setCategoryDescription,
   setItemAvailability,
+  setLabelMeaning,
   suggestRestaurantName,
   suggestSecondMenuNames,
   updateItem,
@@ -377,6 +379,21 @@ describe("category descriptions and covers", () => {
     const after = deleteCategory(seeded, drinksId);
     expect(after.categories.some((c) => c.id === drinksId)).toBe(false);
     expect(after.categories).toHaveLength(1);
+  });
+
+  it("writes, trims, and clears custom label meanings", () => {
+    const { doc } = setupTwoCategoryMenu();
+    const written = setLabelMeaning(doc, "  low-alcohol ", " Under 1.2% ABV. ");
+    expect(written.labelMeanings).toEqual({ "low-alcohol": "Under 1.2% ABV." });
+    expect(setLabelMeaning(written, "low-alcohol", "   ").labelMeanings).toEqual({});
+    expect(() => setLabelMeaning(doc, "   ", "x")).toThrow();
+  });
+
+  it("carries custom label meanings through a schema round trip", () => {
+    const { doc } = setupTwoCategoryMenu();
+    const seeded = setLabelMeaning(doc, "low-alcohol", "Under 1.2% ABV.");
+    const revived = menuDocumentSchema.parse(JSON.parse(JSON.stringify(seeded)));
+    expect(revived.labelMeanings).toEqual({ "low-alcohol": "Under 1.2% ABV." });
   });
 
   it("guards duplicate category names except the category itself", () => {
