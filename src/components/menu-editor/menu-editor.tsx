@@ -42,7 +42,8 @@ import {
   writeFoldState,
   type FoldState,
 } from "@/features/menu/fold";
-import { searchMenu } from "@/features/menu/search";
+import { flatSearchRows, searchMenu, type SearchResultRow } from "@/features/menu/search";
+import { CategoryPills, SearchResultsList } from "./category-pills";
 import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
@@ -225,6 +226,32 @@ export function MenuEditor({
   }, [modifiersOpen]);
   const search = useMemo(() => searchMenu(doc, query), [doc, query]);
   const isFiltering = query.trim().length > 0;
+  const flatRows = useMemo(() => flatSearchRows(doc, query), [doc, query]);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+
+  // "/" focuses the search wherever the editor is showing it; typing in a
+  // field is never hijacked. The input only exists in Categories, so the
+  // ref is null (and this a no-op) anywhere else.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (!searchInputRef.current) return;
+      searchInputRef.current.focus();
+      event.preventDefault();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // Which dishes have their form open (fold.ts). Remembered per menu, and
   // kept with the menu id it belongs to so switching menus never paints the
@@ -238,6 +265,42 @@ export function MenuEditor({
   function applyFold(next: FoldState) {
     writeFoldState(doc.id, next);
     setFold({ menuId: doc.id, state: next });
+  }
+
+  function scrollToSection(categoryId: string) {
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`menu-section-${categoryId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  /**
+   * A pill names its section: clear the search, open that section, show it.
+   * The search is cleared first so a pill always shows the category itself,
+   * never a filtered shadow of it.
+   */
+  function handlePillSelect(categoryId: string) {
+    setQuery("");
+    setActiveCategoryId(categoryId);
+    const allIds = doc.categories.map((category) => category.id);
+    applyFold(setCategoriesOpen(setCategoriesOpen(foldState, allIds, false), [categoryId], true));
+    scrollToSection(categoryId);
+  }
+
+  /**
+   * A result jumps to its dish: clear the search, reveal the dish in its
+   * section, and scroll it into view once the section has opened.
+   */
+  function handleResultPick(row: SearchResultRow) {
+    setQuery("");
+    setActiveCategoryId(row.categoryId);
+    applyFold(revealItem(foldState, row.item.id, row.categoryId));
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`menu-item-${row.item.id}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
   }
 
   /** Every section and every dish at once — the two buttons by the search. */
@@ -1074,12 +1137,26 @@ export function MenuEditor({
               </ul>
             </section>
           )}
+          {doc.categories.length > 0 && (
+            <CategoryPills
+              pills={doc.categories.map((category) => ({
+                id: category.id,
+                name: category.name,
+                dishCount: category.items.length,
+                open: isCategoryOpen(foldState, category.id),
+              }))}
+              onSelect={handlePillSelect}
+            />
+          )}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
             <label htmlFor="menu-search" className="sr-only">
               Search the menu
             </label>
             <input
               id="menu-search"
+              ref={searchInputRef}
+              aria-keyshortcuts="/"
+              title="Search the menu (press / to focus)"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -1171,49 +1248,52 @@ export function MenuEditor({
               </button>
             </div>
           )}
-          {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
-            <div
-              className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
-                selected.length === 0 ? "sticky top-0" : ""
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => stepCategory(-1)}
-                  aria-label="Previous category"
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  ‹
-                </button>
-                <label className="flex min-h-[44px] min-w-0 flex-1 items-center">
-                  <span className="sr-only">Category</span>
-                  <select
-                    value={activeMatch.category.id}
-                    onChange={(event) => setActiveCategoryId(event.target.value)}
-                    className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
+          {!isFiltering &&
+            doc.categories.length > 0 &&
+            search.categories.length > 0 &&
+            activeMatch && (
+              <div
+                className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
+                  selected.length === 0 ? "sticky top-0" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => stepCategory(-1)}
+                    aria-label="Previous category"
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
-                    {search.categories.map(({ category, items }) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name} ({items.length})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={() => stepCategory(1)}
-                  aria-label="Next category"
-                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  ›
-                </button>
+                    ‹
+                  </button>
+                  <label className="flex min-h-[44px] min-w-0 flex-1 items-center">
+                    <span className="sr-only">Category</span>
+                    <select
+                      value={activeMatch.category.id}
+                      onChange={(event) => setActiveCategoryId(event.target.value)}
+                      className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
+                    >
+                      {search.categories.map(({ category, items }) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name} ({items.length})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => stepCategory(1)}
+                    aria-label="Next category"
+                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  >
+                    ›
+                  </button>
+                </div>
+                <p className="mt-1 text-center text-xs text-ink-500">
+                  Category {activeIndex + 1} of {search.categories.length}
+                </p>
               </div>
-              <p className="mt-1 text-center text-xs text-ink-500">
-                Category {activeIndex + 1} of {search.categories.length}
-              </p>
-            </div>
-          )}
+            )}
           {doc.categories.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
               <p className="font-medium text-ink-900">No categories yet</p>
@@ -1221,16 +1301,8 @@ export function MenuEditor({
                 Add a category below, then add items to it.
               </p>
             </div>
-          ) : search.categories.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
-              <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
-              <p className="mt-1 text-sm text-ink-600">
-                {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
-              </p>
-              <button type="button" onClick={() => setQuery("")} className={`${smallButton} mt-3`}>
-                Clear search
-              </button>
-            </div>
+          ) : isFiltering ? (
+            <SearchResultsList rows={flatRows} currency={doc.currency} onPick={handleResultPick} />
           ) : (
             search.categories.map(({ category, items }) => {
               const index = doc.categories.findIndex((c) => c.id === category.id);
