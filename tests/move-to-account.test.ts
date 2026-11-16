@@ -102,6 +102,8 @@ describe("moveLocalMenusToAccount", () => {
           id: "cat-1",
           name: "Brunch",
           sortOrder: 0,
+          description: "",
+          cover: null,
           items: [
             {
               id: "item-1",

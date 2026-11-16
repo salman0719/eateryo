@@ -47,6 +47,8 @@ describe("menuToCsv", () => {
         id: "c1",
         name: 'Mains, "Specials"',
         sortOrder: 0,
+        description: "",
+        cover: null,
         items: [
           {
             id: "i1",
