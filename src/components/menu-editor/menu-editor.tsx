@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
-import { Collapse } from "@/components/ui/collapse";
-import { ChevronDownIcon, ChevronUpIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
@@ -29,21 +27,17 @@ import {
 import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import {
-  isCategoryOpen,
-  isItemOpen,
-  pruneFoldState,
-  readFoldState,
-  revealItem,
-  setCategoriesOpen,
-  setItemsOpen,
-  toggleCategory,
-  toggleItem,
-  writeFoldState,
-  type FoldState,
-} from "@/features/menu/fold";
+  readSelection,
+  resolveSelection,
+  selectCategory,
+  selectItem,
+  writeSelection,
+  type EditorSelection,
+} from "@/features/menu/editor-selection";
 import { flatSearchRows, searchMenu, type SearchResultRow } from "@/features/menu/search";
 import { CategoryHeader } from "./category-header";
 import { CategoryPills, SearchResultsList } from "./category-pills";
+import { CategoryStrip } from "./category-strip";
 import { DuplicateReview } from "./duplicate-review";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
@@ -241,132 +235,63 @@ export function MenuEditor({
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  // Which dishes have their form open (fold.ts). Remembered per menu, and
-  // kept with the menu id it belongs to so switching menus never paints the
-  // previous menu's rows first.
-  const [fold, setFold] = useState<{ menuId: string; state: FoldState }>(() => ({
-    menuId: doc.id,
-    state: readFoldState(doc.id),
-  }));
-  const foldState = fold.menuId === doc.id ? fold.state : readFoldState(doc.id);
-
-  function applyFold(next: FoldState) {
-    writeFoldState(doc.id, next);
-    setFold({ menuId: doc.id, state: next });
-  }
-
-  function scrollToSection(categoryId: string) {
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`menu-section-${categoryId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-  }
-
   /**
-   * A pill names its section: clear the search, open that section, show it.
-   * The search is cleared first so a pill always shows the category itself,
-   * never a filtered shadow of it.
+   * The Categories tab's selection (editor-selection.ts): one category on the
+   * canvas and one dish in the inspector. Remembered per menu like the
+   * sub-tab, seeded by a dish deep link, and resolved against the live
+   * document on every render — a deleted dish or category can never leave the
+   * tab pointing at nothing.
    */
-  function handlePillSelect(categoryId: string) {
+  const selectionKey = `${doc.id}::${selectedItemId ?? ""}`;
+  const [selectionOverride, setSelectionOverride] = useState<{
+    key: string;
+    value: EditorSelection;
+  } | null>(null);
+  const selection =
+    selectionOverride && selectionOverride.key === selectionKey
+      ? resolveSelection(doc, selectionOverride.value)
+      : selectedItemId
+        ? selectItem(doc, selectedItemId)
+        : resolveSelection(doc, readSelection(doc.id));
+
+  function applySelection(next: EditorSelection) {
+    writeSelection(doc.id, next);
+    setSelectionOverride({ key: selectionKey, value: next });
+  }
+
+  /** A tab names its category: clear the search so the tab shows it whole. */
+  function handleCategorySelect(categoryId: string) {
     setQuery("");
-    setActiveCategoryId(categoryId);
-    const allIds = doc.categories.map((category) => category.id);
-    applyFold(setCategoriesOpen(setCategoriesOpen(foldState, allIds, false), [categoryId], true));
-    scrollToSection(categoryId);
+    applySelection(selectCategory(doc, categoryId));
   }
 
-  /**
-   * A result jumps to its dish: clear the search, reveal the dish in its
-   * section, and scroll it into view once the section has opened.
-   */
+  /** A search result shows its dish in its own category, inspector and all. */
   function handleResultPick(row: SearchResultRow) {
     setQuery("");
-    setActiveCategoryId(row.categoryId);
-    applyFold(revealItem(foldState, row.item.id, row.categoryId));
-    requestAnimationFrame(() => {
-      document
-        .getElementById(`menu-item-${row.item.id}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }
-
-  /** Every section and every dish at once — the two buttons by the search. */
-  function setEverythingOpen(open: boolean) {
-    const categoryIds = doc.categories.map((category) => category.id);
-    const itemIds = doc.categories.flatMap((category) => category.items.map((item) => item.id));
-    applyFold(setItemsOpen(setCategoriesOpen(foldState, categoryIds, open), itemIds, open));
+    applySelection(selectItem(doc, row.item.id));
   }
 
   /**
-   * Add a dish and open its form, so naming it is the next keystroke instead
-   * of a scroll and a click.
+   * Add a dish and select it, so naming it is the next keystroke instead of a
+   * scroll and a click.
    */
   function handleAddItem(categoryId: string) {
     const next = addItem(doc, categoryId, { name: "New item" });
     const created = next.categories.find((c) => c.id === categoryId)?.items;
     const last = created?.[created.length - 1];
-    if (last) {
-      applyFold(revealItem(foldState, last.id, categoryId));
-      setActiveCategoryId(categoryId);
-    }
     onChange(next);
+    if (last) applySelection({ categoryId, itemId: last.id });
   }
 
-  // Category navigation (R0: the One-at-a-time/All toggle is deleted).
-  // Phones show one section behind the stepper; larger screens show the full
-  // menu and search covers everything. The active category resolves against
-  // the visible (search-filtered) list, so a deleted category — or one
-  // filtered out of a search — falls back to the first visible category
-  // instead of blanking.
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
-  const activeMatch =
-    search.categories.find((match) => match.category.id === activeCategoryId) ??
-    search.categories[0] ??
-    null;
-  const activeIndex = Math.max(
-    0,
-    search.categories.findIndex((match) => match.category.id === activeMatch?.category.id)
-  );
-
-  /**
-   * True below Tailwind's `sm`, where the page shows one section at a time
-   * behind the stepper. There the stepper *is* the fold: a section has no fold
-   * of its own, and the chevron that would reopen one is hidden, so the
-   * visible section must stay open even when the desktop list left it
-   * collapsed. Read from the same width as the `sm:` styles so the two cannot
-   * disagree, and guarded so it stays quiet where `matchMedia` does not exist
-   * (the server render and the tests).
-   */
-  const [phoneWidth, setPhoneWidth] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia("(max-width: 639.98px)");
-    const update = () => setPhoneWidth(query.matches);
-    update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
-  }, []);
-
-  /** Step through the visible categories from the phone stepper. */
-  function stepCategory(delta: 1 | -1) {
-    const ids = search.categories.map((match) => match.category.id);
-    if (ids.length === 0) return;
-    const current = ids.indexOf(activeMatch?.category.id ?? "");
-    const next = ids[(current + delta + ids.length) % ids.length];
-    if (next) setActiveCategoryId(next);
-  }
-
-  useEffect(() => {
-    if (!selectedItemId) return;
-    const frame = requestAnimationFrame(() =>
-      document.getElementById(`menu-item-${selectedItemId}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      })
-    );
-    return () => cancelAnimationFrame(frame);
-  }, [selectedItemId]);
+  /** The category on the canvas, and what its band needs to say. */
+  const selectedCategory =
+    doc.categories.find((category) => category.id === selection.categoryId) ?? null;
+  const selectedCategoryIndex = selectedCategory
+    ? doc.categories.findIndex((category) => category.id === selectedCategory.id)
+    : -1;
+  const selectedToCheck = selectedCategory
+    ? selectedCategory.items.filter(isItemFlagged).length
+    : 0;
 
   // Duplicate review (flags only, never auto-deletes — see duplicates.ts).
   // Dismissals are remembered per document, in session state and localStorage.
@@ -424,19 +349,20 @@ export function MenuEditor({
     if (!ok) return;
     const next = deleteCategory(doc, category.id);
     setUndo(captureDeleteUndo(doc, next, `deleted category “${category.name}”`));
-    // Fold memory outlives the document in storage: drop the deleted
-    // section and its dishes, or a same-id stranger would inherit them.
-    applyFold(pruneFoldState(foldState, next));
-    // Keep the stepper on the category that takes this one's place (or the
-    // new last one); null when the menu is now empty.
-    setActiveCategoryId(next.categories[Math.min(index, next.categories.length - 1)]?.id ?? null);
+    applySelection(
+      resolveSelection(next, {
+        categoryId: next.categories[Math.min(index, next.categories.length - 1)]?.id ?? null,
+        itemId: null,
+      })
+    );
     onChange(next);
   }
 
   /** Add a category and open it straight away. */
   function handleAddCategory() {
     const next = addCategory(doc, { name: "New category" });
-    setActiveCategoryId(next.categories[next.categories.length - 1]?.id ?? null);
+    const created = next.categories[next.categories.length - 1];
+    if (created) applySelection({ categoryId: created.id, itemId: null });
     onChange(next);
   }
 
@@ -606,19 +532,23 @@ export function MenuEditor({
   // The row handlers, created once. They read the live editor state through a
   // ref, so React.memo(ItemEditor) holds: a fold toggle re-renders the one row
   // whose `open` changed and leaves the other forty-four alone.
-  const liveRef = useRef({ doc, foldState, onChange, confirm });
+  const liveRef = useRef({ doc, selection, selectionKey, onChange, confirm });
   useEffect(() => {
-    liveRef.current = { doc, foldState, onChange, confirm };
-  }, [doc, foldState, onChange, confirm]);
+    liveRef.current = { doc, selection, selectionKey, onChange, confirm };
+  }, [doc, selection, selectionKey, onChange, confirm]);
 
   const itemActions = useMemo<ItemActions>(
     () => ({
       change: (next) => liveRef.current.onChange(next),
+      /** Open this dish's form, or close it when it is already open. */
       toggleOpen: (itemId) => {
         const live = liveRef.current;
-        const next = toggleItem(live.foldState, itemId);
-        writeFoldState(live.doc.id, next);
-        setFold({ menuId: live.doc.id, state: next });
+        const next =
+          live.selection.itemId === itemId
+            ? { categoryId: live.selection.categoryId, itemId: null }
+            : selectItem(live.doc, itemId);
+        writeSelection(live.doc.id, next);
+        setSelectionOverride({ key: live.selectionKey, value: next });
       },
       toggleSelected: (itemId) => {
         setSelectedIds((prev) => {
@@ -1114,67 +1044,22 @@ export function MenuEditor({
             onDeleteCopy={(categoryId, item) => void removeItem(categoryId, item)}
           />
           {doc.categories.length > 0 && (
-            <CategoryPills
-              pills={doc.categories.map((category) => ({
+            <CategoryStrip
+              tabs={doc.categories.map((category) => ({
                 id: category.id,
                 name: category.name,
                 dishCount: category.items.length,
-                open: isCategoryOpen(foldState, category.id),
               }))}
-              onSelect={handlePillSelect}
+              selectedId={selection.categoryId}
+              onSelect={handleCategorySelect}
+              query={query}
+              onQueryChange={setQuery}
+              searchInputRef={searchInputRef}
+              onAddCategory={handleAddCategory}
+              matchCount={search.matchCount}
+              totalItems={search.totalItems}
             />
           )}
-          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
-            <label htmlFor="menu-search" className="sr-only">
-              Search the menu
-            </label>
-            <input
-              id="menu-search"
-              ref={searchInputRef}
-              aria-keyshortcuts="/"
-              title="Search the menu (press / to focus)"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape" && query) setQuery("");
-              }}
-              placeholder="Search items, descriptions, or categories…"
-              className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
-            />
-            {isFiltering && (
-              <button type="button" onClick={() => setQuery("")} className={smallButton}>
-                Clear
-              </button>
-            )}
-            <p role="status" className="text-xs font-medium text-ink-500">
-              {isFiltering
-                ? `${search.matchCount} of ${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`
-                : `${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`}
-            </p>
-            {doc.categories.length > 0 && (
-              <div className="flex items-center gap-2">
-                {/* Below `sm` a section cannot fold — the stepper is the fold — so
-                only the dish forms answer here, and the label says which. */}
-                <button
-                  type="button"
-                  onClick={() => setEverythingOpen(true)}
-                  className={smallButton}
-                >
-                  <span className="sm:hidden">Open every dish</span>
-                  <span className="hidden sm:inline">Expand all</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEverythingOpen(false)}
-                  className={smallButton}
-                >
-                  <span className="sm:hidden">Close every dish</span>
-                  <span className="hidden sm:inline">Collapse all</span>
-                </button>
-              </div>
-            )}
-          </div>
           {selected.length > 0 && (
             <div
               role="region"
@@ -1224,203 +1109,119 @@ export function MenuEditor({
               </button>
             </div>
           )}
-          {!isFiltering &&
-            doc.categories.length > 0 &&
-            search.categories.length > 0 &&
-            activeMatch && (
-              <div
-                className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
-                  selected.length === 0 ? "sticky top-0" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => stepCategory(-1)}
-                    aria-label="Previous category"
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                  >
-                    ‹
-                  </button>
-                  <label className="flex min-h-[44px] min-w-0 flex-1 items-center">
-                    <span className="sr-only">Category</span>
-                    <select
-                      value={activeMatch.category.id}
-                      onChange={(event) => setActiveCategoryId(event.target.value)}
-                      className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
-                    >
-                      {search.categories.map(({ category, items }) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name} ({items.length})
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => stepCategory(1)}
-                    aria-label="Next category"
-                    className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                  >
-                    ›
-                  </button>
-                </div>
-                <p className="mt-1 text-center text-xs text-ink-500">
-                  Category {activeIndex + 1} of {search.categories.length}
-                </p>
-              </div>
-            )}
           {doc.categories.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
               <p className="font-medium text-ink-900">No categories yet</p>
               <p className="mt-1 text-sm text-ink-600">
-                Add a category below, then add items to it.
+                Add a category above, then add items to it.
               </p>
             </div>
           ) : isFiltering ? (
-            <SearchResultsList rows={flatRows} currency={doc.currency} onPick={handleResultPick} />
-          ) : (
-            search.categories.map(({ category, items }) => {
-              const index = doc.categories.findIndex((c) => c.id === category.id);
-              // R0: phones show the stepper's category only, always open (see
-              // `phoneWidth`); sm+ shows every section with its own fold.
-              const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
-              // Searching always shows what it found: a match inside a collapsed
-              // section would be a result the page refuses to reveal.
-              const categoryOpen =
-                isFiltering || phoneWidth || isCategoryOpen(foldState, category.id);
-              const categoryPanelId = `menu-category-panel-${category.id}`;
-              const toCheck = items.filter(isItemFlagged).length;
-              return (
-                <section
-                  key={category.id}
-                  data-menu-section={category.id}
-                  id={`menu-section-${category.id}`}
-                  aria-label={`Category ${category.name}`}
-                  className={`${phoneOnly}scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
+            <div className="flex flex-col gap-2">
+              <p role="status" className="text-xs font-medium text-ink-500">
+                {search.matchCount} of {search.totalItems}{" "}
+                {search.totalItems === 1 ? "item" : "items"}
+              </p>
+              <SearchResultsList
+                rows={flatRows}
+                currency={doc.currency}
+                onPick={handleResultPick}
+              />
+            </div>
+          ) : selectedCategory ? (
+            <section
+              data-menu-section={selectedCategory.id}
+              id={`menu-section-${selectedCategory.id}`}
+              aria-label={`Category ${selectedCategory.name}`}
+              className="scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+            >
+              {/* One category on the canvas: its band holds the name, the
+              count, and the two things that act on the category itself. */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
+                <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
+                  {selectedCategory.name || "Untitled category"}
+                </h2>
+                <p className="shrink-0 text-xs text-ink-500">
+                  {selectedCategory.items.length}{" "}
+                  {selectedCategory.items.length === 1 ? "item" : "items"}
+                  {selectedToCheck > 0 && (
+                    <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
+                      {selectedToCheck} to check
+                    </span>
+                  )}
+                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label={`Move ${selectedCategory.name} up`}
+                    disabled={selectedCategoryIndex === 0}
+                    onClick={() =>
+                      onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex - 1))
+                    }
+                    className={tinyButton}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${selectedCategory.name} down`}
+                    disabled={selectedCategoryIndex === doc.categories.length - 1}
+                    onClick={() =>
+                      onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex + 1))
+                    }
+                    className={tinyButton}
+                  >
+                    ↓
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCategory(selectedCategory, selectedCategoryIndex)}
+                  className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
                 >
-                  {/* The band says what the section is and how much is in it, and
-                  holds its own actions — so a collapsed section is still
-                  legible and still manageable. */}
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => applyFold(toggleCategory(foldState, category.id))}
-                      disabled={isFiltering}
-                      aria-expanded={categoryOpen}
-                      aria-controls={categoryOpen ? categoryPanelId : undefined}
-                      title={
-                        isFiltering
-                          ? "Search shows every matching section"
-                          : categoryOpen
-                            ? "Collapse this section"
-                            : "Expand this section"
-                      }
-                      className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
-                    >
-                      {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                    </button>
-                    <div className="min-w-[9rem] flex-1">
-                      <span className="block truncate px-1 py-1 text-base font-semibold text-ink-900">
-                        {category.name || "Untitled category"}
-                      </span>
-                    </div>
-                    <p className="shrink-0 text-xs text-ink-500">
-                      {items.length} {items.length === 1 ? "item" : "items"}
-                      {toCheck > 0 && (
-                        <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
-                          {toCheck} to check
-                        </span>
-                      )}
-                    </p>
-                    {/* Inline reordering shows only where the list does. A phone
-                    shows one section at a time, so ↑ moved a category the
-                    owner could not watch move, right beside the stepper's
-                    ‹ › — two axes, one apparent control. Arranging on a phone
-                    belongs to the reorder view, which lists every category. */}
-                    <div className="hidden shrink-0 items-center gap-1 sm:flex">
-                      <button
-                        type="button"
-                        aria-label={`Move ${category.name} up`}
-                        disabled={index === 0}
-                        onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
-                        className={tinyButton}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Move ${category.name} down`}
-                        disabled={index === doc.categories.length - 1}
-                        onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
-                        className={tinyButton}
-                      >
-                        ↓
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteCategory(category, index)}
-                      className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                  <Collapse open={categoryOpen}>
-                    <div id={categoryPanelId} className="p-4">
-                      {!isFiltering && (
-                        <CategoryHeader
-                          doc={doc}
-                          category={category}
-                          canUpload={canUploadItemImages}
-                          onChange={onChange}
-                        />
-                      )}
-                      {items.length === 0 ? (
-                        <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
-                          No items — add the first one below.
-                        </p>
-                      ) : (
-                        <ul className="mt-3 space-y-3">
-                          {items.map((item) => (
-                            <ItemEditor
-                              key={item.id}
-                              isRouteTarget={selectedItemId === item.id}
-                              // A pasted /menus/<id>/items/<itemId> link opens the
-                              // dish without rewriting what the owner folded.
-                              open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
-                              doc={doc}
-                              categoryId={category.id}
-                              item={item}
-                              categories={categoryChoices}
-                              actions={itemActions}
-                              duplicate={duplicateIds.has(item.id)}
-                              selected={selectedIds.has(item.id)}
-                              canUploadImage={canUploadItemImages}
-                            />
-                          ))}
-                        </ul>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => handleAddItem(category.id)}
-                        className={`${smallButton} mt-3`}
-                      >
-                        + Add item
-                      </button>
-                    </div>
-                  </Collapse>
-                </section>
-              );
-            })
-          )}
-          <button
-            type="button"
-            onClick={handleAddCategory}
-            className="rounded-2xl border-2 border-dashed border-line-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-          >
-            + Add category
-          </button>
+                  Delete
+                </button>
+              </div>
+              <div className="p-4">
+                <CategoryHeader
+                  doc={doc}
+                  category={selectedCategory}
+                  canUpload={canUploadItemImages}
+                  onChange={onChange}
+                />
+                {selectedCategory.items.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
+                    No items — add the first one below.
+                  </p>
+                ) : (
+                  <ul className="mt-3 space-y-2">
+                    {selectedCategory.items.map((item) => (
+                      <ItemEditor
+                        key={item.id}
+                        isRouteTarget={false}
+                        open={item.id === selection.itemId}
+                        doc={doc}
+                        categoryId={selectedCategory.id}
+                        item={item}
+                        categories={categoryChoices}
+                        actions={itemActions}
+                        duplicate={duplicateIds.has(item.id)}
+                        selected={selectedIds.has(item.id)}
+                        canUploadImage={canUploadItemImages}
+                      />
+                    ))}
+                  </ul>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleAddItem(selectedCategory.id)}
+                  className={`${smallButton} mt-3`}
+                >
+                  + Add item
+                </button>
+              </div>
+            </section>
+          ) : null}
         </>
       ) : subTab === "settings" ? (
         <>
