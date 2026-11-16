@@ -16,7 +16,6 @@ import {
   isItemFlagged,
   moveCategory,
   moveItem,
-  moveItemToCategory,
   moveItemsToCategory,
   setItemImage,
 } from "@/features/menu/menu-utils";
@@ -52,8 +51,13 @@ import {
   defaultEditorSubTab,
   editorTabCounts,
   readEditorSubTab,
+  readReorderCategory,
+  readReorderScope,
   writeEditorSubTab,
+  writeReorderCategory,
+  writeReorderScope,
   type EditorSubTab,
+  type ReorderScope,
 } from "@/features/menu/editor-tabs";
 import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
 import { ExtractClientError, extractMenuFromFiles } from "@/lib/extract-client";
@@ -468,6 +472,36 @@ export function MenuEditor({
     writeEditorSubTab(doc.id, next);
   }
 
+  // Reorder scope + category (redesign step 11): Categories arranges the
+  // whole list, Items arranges the dishes inside one category picked from
+  // the pills. Remembered per menu like fold state, so switching menus
+  // restores each menu's arrangement view; a stored category the document
+  // no longer holds falls back to the first category. Derived during
+  // render like the sub-tab, so the first paint is already right.
+  const [reorderOverride, setReorderOverride] = useState<{
+    key: string;
+    scope: ReorderScope;
+    categoryId: string | null;
+  } | null>(null);
+  const reorderScope: ReorderScope =
+    reorderOverride && reorderOverride.key === doc.id
+      ? reorderOverride.scope
+      : (readReorderScope(doc.id) ?? "categories");
+  const storedReorderCategory =
+    reorderOverride && reorderOverride.key === doc.id
+      ? reorderOverride.categoryId
+      : readReorderCategory(doc.id);
+  const activeReorderCategory =
+    doc.categories.find((category) => category.id === storedReorderCategory) ??
+    doc.categories[0] ??
+    null;
+
+  function chooseReorder(scope: ReorderScope, categoryId: string | null) {
+    setReorderOverride({ key: doc.id, scope, categoryId });
+    writeReorderScope(doc.id, scope);
+    if (categoryId) writeReorderCategory(doc.id, categoryId);
+  }
+
   /** The draft is ahead of what table ordering serves right now. */
   const needsPublish =
     publishing?.status?.isLive === true && publishing.status.hasUnpublishedChanges;
@@ -765,146 +799,160 @@ export function MenuEditor({
         {tabStrip}
         <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <h2 className="text-base font-semibold text-ink-900">Reorder items</h2>
+            <h2 className="text-base font-semibold text-ink-900">Reorder</h2>
             <p className="text-xs text-ink-500">
-              A compact list for arranging — the full editing boxes stay on the edit screen.
-              {isFiltering && " Search is paused here; every item is shown."}
+              Drag rows by the grip, or nudge with ↑ ↓ — every row keeps its steppers.
+              {isFiltering && " Search is paused here; every row is shown."}
             </p>
+          </div>
+          <div
+            role="group"
+            aria-label="Reorder scope"
+            className="mt-3 inline-flex rounded-full border border-line-300 bg-surface-base p-0.5"
+          >
+            {(
+              [
+                { value: "categories", label: "Categories" },
+                { value: "items", label: "Items" },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={reorderScope === option.value}
+                onClick={() => chooseReorder(option.value, activeReorderCategory?.id ?? null)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                  reorderScope === option.value
+                    ? "bg-accent-700 text-on-accent"
+                    : "text-ink-600 hover:text-ink-900"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
           {doc.categories.length === 0 ? (
             <p className="mt-3 text-sm text-ink-500">
               No categories yet — add one on the edit screen.
             </p>
-          ) : (
-            <ol className="mt-3 space-y-4">
+          ) : reorderScope === "categories" ? (
+            <ol className="mt-3 space-y-2">
               {doc.categories.map((category, categoryIndex) => (
-                <li key={category.id} className="overflow-hidden rounded-xl border border-line-200">
-                  <div className="flex items-center gap-1.5 border-b border-line-100 bg-surface-50 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
-                      {category.name || "Untitled category"}
-                      <span className="ml-2 font-normal text-ink-500">
-                        {category.items.length} {category.items.length === 1 ? "item" : "items"}
-                      </span>
+                <li
+                  key={category.id}
+                  className="flex items-center gap-1.5 rounded-xl border border-line-200 px-3 py-2"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
+                    {category.name || "Untitled category"}
+                    <span className="ml-2 font-normal text-ink-500">
+                      {category.items.length} {category.items.length === 1 ? "item" : "items"}
                     </span>
-                    <button
-                      type="button"
-                      disabled={categoryIndex <= 0}
-                      onClick={() => onChange(moveCategory(doc, category.id, categoryIndex - 1))}
-                      aria-label={`Move ${category.name || "category"} up`}
-                      className={tinyButton}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      disabled={categoryIndex >= doc.categories.length - 1}
-                      onClick={() => onChange(moveCategory(doc, category.id, categoryIndex + 1))}
-                      aria-label={`Move ${category.name || "category"} down`}
-                      className={tinyButton}
-                    >
-                      ↓
-                    </button>
-                  </div>
-                  {category.items.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-ink-500">No items.</p>
-                  ) : (
-                    <ol>
-                      {category.items.map((item, index) => {
-                        const label = item.name.trim() ? item.name : "Untitled item";
-                        return (
-                          <li
-                            key={item.id}
-                            className="flex items-center gap-1.5 border-b border-line-100 px-3 py-1.5 last:border-0"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="w-6 shrink-0 text-right text-xs text-ink-500"
-                            >
-                              {index + 1}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
-                              {label}
-                            </span>
-                            {duplicateIds.has(item.id) && (
-                              <span
-                                title="This name appears more than once — see the duplicate review on the Categories tab."
-                                className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
-                              >
-                                duplicate
-                              </span>
-                            )}
-                            {item.reviewNotes.length > 0 && (
-                              <span
-                                title={item.reviewNotes.join("\n")}
-                                className="shrink-0 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
-                              >
-                                {hasAnyPrice(item) ? "couldn't read" : "check price"}
-                              </span>
-                            )}
-                            <span className="shrink-0 text-xs whitespace-nowrap text-ink-500">
-                              {formatItemPrice(item, doc.currency)}
-                            </span>
-                            <button
-                              type="button"
-                              disabled={index <= 0}
-                              onClick={() =>
-                                onChange(moveItem(doc, category.id, item.id, index - 1))
-                              }
-                              aria-label={`Move ${label} up`}
-                              className={tinyButton}
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              disabled={index >= category.items.length - 1}
-                              onClick={() =>
-                                onChange(moveItem(doc, category.id, item.id, index + 1))
-                              }
-                              aria-label={`Move ${label} down`}
-                              className={tinyButton}
-                            >
-                              ↓
-                            </button>
-                            {doc.categories.length > 1 && (
-                              <select
-                                aria-label={`Move ${label} to another category`}
-                                defaultValue=""
-                                onChange={(event) => {
-                                  if (event.target.value) {
-                                    onChange(
-                                      moveItemToCategory(
-                                        doc,
-                                        category.id,
-                                        event.target.value,
-                                        item.id,
-                                        index
-                                      )
-                                    );
-                                    event.target.value = "";
-                                  }
-                                }}
-                                className="shrink-0 rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                              >
-                                <option value="">Move to…</option>
-                                {doc.categories
-                                  .filter((c) => c.id !== category.id)
-                                  .map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                      {c.name || "Untitled category"}
-                                    </option>
-                                  ))}
-                              </select>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ol>
-                  )}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={categoryIndex <= 0}
+                    onClick={() => onChange(moveCategory(doc, category.id, categoryIndex - 1))}
+                    aria-label={`Move ${category.name || "category"} up`}
+                    className={tinyButton}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={categoryIndex >= doc.categories.length - 1}
+                    onClick={() => onChange(moveCategory(doc, category.id, categoryIndex + 1))}
+                    aria-label={`Move ${category.name || "category"} down`}
+                    className={tinyButton}
+                  >
+                    ↓
+                  </button>
                 </li>
               ))}
             </ol>
-          )}
+          ) : activeReorderCategory ? (
+            <>
+              <div className="mt-3">
+                <CategoryPills
+                  pills={doc.categories.map((category) => ({
+                    id: category.id,
+                    name: category.name,
+                    dishCount: category.items.length,
+                    open: category.id === activeReorderCategory.id,
+                  }))}
+                  onSelect={(categoryId) => chooseReorder("items", categoryId)}
+                />
+              </div>
+              {activeReorderCategory.items.length === 0 ? (
+                <p className="mt-3 rounded-xl border border-dashed border-line-200 px-4 py-3 text-center text-sm text-ink-500">
+                  No dishes in {activeReorderCategory.name || "this category"} yet — add one on the
+                  Categories tab.
+                </p>
+              ) : (
+                <ol className="mt-3 space-y-2">
+                  {activeReorderCategory.items.map((item, index) => {
+                    const label = item.name.trim() ? item.name : "Untitled item";
+                    return (
+                      <li
+                        key={item.id}
+                        className="flex items-center gap-1.5 rounded-xl border border-line-200 px-3 py-1.5"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="w-6 shrink-0 text-right text-xs text-ink-500"
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
+                          {label}
+                        </span>
+                        {duplicateIds.has(item.id) && (
+                          <span
+                            title="This name appears more than once — see the duplicate review on the Categories tab."
+                            className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
+                          >
+                            duplicate
+                          </span>
+                        )}
+                        {item.reviewNotes.length > 0 && (
+                          <span
+                            title={item.reviewNotes.join("\n")}
+                            className="shrink-0 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
+                          >
+                            {hasAnyPrice(item) ? "couldn't read" : "check price"}
+                          </span>
+                        )}
+                        <span className="shrink-0 text-xs whitespace-nowrap text-ink-500">
+                          {formatItemPrice(item, doc.currency)}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={index <= 0}
+                          onClick={() =>
+                            onChange(moveItem(doc, activeReorderCategory.id, item.id, index - 1))
+                          }
+                          aria-label={`Move ${label} up`}
+                          className={tinyButton}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          disabled={index >= activeReorderCategory.items.length - 1}
+                          onClick={() =>
+                            onChange(moveItem(doc, activeReorderCategory.id, item.id, index + 1))
+                          }
+                          aria-label={`Move ${label} down`}
+                          className={tinyButton}
+                        >
+                          ↓
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </>
+          ) : null}
         </div>
       </div>
     );

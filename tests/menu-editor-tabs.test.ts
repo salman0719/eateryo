@@ -4,7 +4,11 @@ import {
   defaultEditorSubTab,
   editorTabCounts,
   readEditorSubTab,
+  readReorderCategory,
+  readReorderScope,
   writeEditorSubTab,
+  writeReorderCategory,
+  writeReorderScope,
 } from "../src/features/menu/editor-tabs";
 import { addItem, createMenuDocument } from "../src/features/menu/menu-utils";
 
@@ -89,5 +93,49 @@ describe("editor sub-tab persistence", () => {
   it("never throws without storage", () => {
     expect(readEditorSubTab("menu-1")).toBeNull();
     expect(() => writeEditorSubTab("menu-1", "settings")).not.toThrow();
+  });
+});
+
+describe("reorder scope persistence", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubStorage() {
+    const store = new Map<string, string>();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    });
+  }
+
+  it("remembers the scope and category per menu", () => {
+    stubStorage();
+    expect(readReorderScope("menu-1")).toBeNull();
+    expect(readReorderCategory("menu-1")).toBeNull();
+    writeReorderScope("menu-1", "items");
+    writeReorderCategory("menu-1", "c9");
+    expect(readReorderScope("menu-1")).toBe("items");
+    expect(readReorderCategory("menu-1")).toBe("c9");
+    // A second menu is unaffected.
+    expect(readReorderScope("menu-2")).toBeNull();
+    expect(readReorderCategory("menu-2")).toBeNull();
+  });
+
+  it("ignores stored values that are not a scope", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "reorder", setItem: () => {} });
+    expect(readReorderScope("menu-1")).toBeNull();
+  });
+
+  it("ignores a blank stored category", () => {
+    vi.stubGlobal("localStorage", { getItem: () => "", setItem: () => {} });
+    expect(readReorderCategory("menu-1")).toBeNull();
+  });
+
+  it("never throws without storage", () => {
+    expect(readReorderScope("menu-1")).toBeNull();
+    expect(readReorderCategory("menu-1")).toBeNull();
+    expect(() => writeReorderScope("menu-1", "items")).not.toThrow();
+    expect(() => writeReorderCategory("menu-1", "c9")).not.toThrow();
   });
 });

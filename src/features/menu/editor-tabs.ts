@@ -96,3 +96,51 @@ export function writeEditorSubTab(menuId: string, tab: EditorSubTab): void {
     // A browser with storage blocked simply opens on the entry rule.
   }
 }
+
+/**
+ * The Reorder tab's scope (menu-config redesign, step 11): whole
+ * categories, or the dishes inside one category. Remembered per menu like
+ * the sub-tab, so switching menus restores each menu's arrangement view.
+ */
+export type ReorderScope = "categories" | "items";
+
+const REORDER_SCOPE_PREFIX = "menu-editor-reorder-scope:";
+const REORDER_CATEGORY_PREFIX = "menu-editor-reorder-category:";
+
+function isReorderScope(value: unknown): value is ReorderScope {
+  return value === "categories" || value === "items";
+}
+
+/** The remembered reorder scope for a menu, or null when there is none. */
+export function readReorderScope(menuId: string): ReorderScope | null {
+  const raw = storage()?.getItem(REORDER_SCOPE_PREFIX + menuId);
+  return isReorderScope(raw) ? raw : null;
+}
+
+/** Remember the reorder scope for a menu; never throws. */
+export function writeReorderScope(menuId: string, scope: ReorderScope): void {
+  try {
+    storage()?.setItem(REORDER_SCOPE_PREFIX + menuId, scope);
+  } catch {
+    // A browser with storage blocked simply opens on categories.
+  }
+}
+
+/**
+ * The remembered reorder category for a menu, or null when there is none.
+ * Callers check the id against the live document — a deleted category is
+ * not a selection.
+ */
+export function readReorderCategory(menuId: string): string | null {
+  const raw = storage()?.getItem(REORDER_CATEGORY_PREFIX + menuId);
+  return typeof raw === "string" && raw.length > 0 ? raw : null;
+}
+
+/** Remember the reorder category for a menu; never throws. */
+export function writeReorderCategory(menuId: string, categoryId: string): void {
+  try {
+    storage()?.setItem(REORDER_CATEGORY_PREFIX + menuId, categoryId);
+  } catch {
+    // A browser with storage blocked simply opens on the first category.
+  }
+}
