@@ -85,9 +85,10 @@ export const ItemEditor = memo(function ItemEditor({
   const copy = itemImageCopy(item.image);
   const panelId = `menu-item-panel-${item.id}`;
   /**
-   * What the closed row says under the name: the description when the menu has
-   * one, then the shape of the dish — so a row whose fields are hidden still
-   * says it has sizes and option groups behind it.
+   * What the closed row says under the name: the shape of the dish only, so
+   * a row whose fields are hidden still says it has sizes and option groups
+   * behind it. The description lives in the open form (and in search), not
+   * in every shut row.
    */
   const shape: string[] = [];
   if (item.variants.length > 0) {
@@ -99,9 +100,7 @@ export const ItemEditor = memo(function ItemEditor({
       `${item.options.length} ${item.options.length === 1 ? "option group" : "option groups"} · ${choiceCount} ${choiceCount === 1 ? "choice" : "choices"}`
     );
   }
-  const rowSummary = [item.description?.trim() ?? "", shape.join(" · ")]
-    .filter((part) => part.length > 0)
-    .join(" · ");
+  const rowShape = shape.join(" · ");
 
   function patch(patch: Parameters<typeof updateItem>[3]) {
     actions.change(updateItem(doc, categoryId, item.id, patch));
@@ -119,10 +118,12 @@ export const ItemEditor = memo(function ItemEditor({
       id={`menu-item-${item.id}`}
       className={`rounded-xl border bg-surface-base ${isRouteTarget ? "border-accent-600 ring-2 ring-accent-200" : "border-line-200"}`}
     >
-      {/* The row is the dish: name, price, and the flags that need attention,
-          so nothing important is hidden behind the collapse. */}
+      {/* The row is the dish: name, shape, price, and the flags that need
+          attention, so nothing important is hidden behind the collapse. The
+          open row takes the accent wash with a left rule, so the form below
+          reads as its detail. */}
       <div
-        className={`flex items-center gap-2 px-2 py-1.5 sm:px-3 ${open ? "" : "rounded-xl"} ${selected ? "bg-warning-50/70" : ""}`}
+        className={`flex items-center gap-2 border-l-2 px-2 py-1.5 sm:px-3 ${open ? "" : "rounded-xl"} ${open && !selected ? "border-l-accent-700 bg-accent-50" : "border-l-transparent"} ${selected ? "bg-warning-50/70" : ""}`}
       >
         <label
           title="Select for bulk move"
@@ -171,8 +172,8 @@ export const ItemEditor = memo(function ItemEditor({
                 </span>
               )}
             </span>
-            {!open && rowSummary && (
-              <span className="mt-0.5 block truncate text-xs text-ink-500">{rowSummary}</span>
+            {!open && rowShape && (
+              <span className="mt-0.5 block truncate text-xs text-ink-500">{rowShape}</span>
             )}
           </span>
           <span className="shrink-0 text-sm whitespace-nowrap tabular-nums text-ink-600">
@@ -225,22 +226,53 @@ export const ItemEditor = memo(function ItemEditor({
                 patch({ description: description.trim() ? description : null })
               }
             />
-            <label className="block">
-              <span className="mb-1 block text-xs font-medium text-ink-500">Availability</span>
-              <select
-                aria-label={`Availability of ${item.name}`}
-                value={item.available === null ? "unknown" : item.available ? "yes" : "no"}
-                onChange={(event) => {
-                  const v = event.target.value;
-                  patch({ available: v === "unknown" ? null : v === "yes" });
-                }}
-                className="w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 focus:border-accent-700 focus:outline-none"
+            <div className="block">
+              <span
+                id={`availability-label-${item.id}`}
+                className="mb-1 block text-xs font-medium text-ink-500"
               >
-                <option value="unknown">Unknown</option>
-                <option value="yes">Available</option>
-                <option value="no">Unavailable</option>
-              </select>
-            </label>
+                Availability
+              </span>
+              <div
+                role="group"
+                aria-labelledby={`availability-label-${item.id}`}
+                className="inline-flex rounded-full border border-line-300 bg-surface-base p-0.5"
+              >
+                {(
+                  [
+                    { value: "unknown", label: "Unknown" },
+                    { value: "available", label: "Available" },
+                    { value: "unavailable", label: "Unavailable" },
+                  ] as const
+                ).map((option) => {
+                  const pressed =
+                    option.value ===
+                    (item.available === null
+                      ? "unknown"
+                      : item.available
+                        ? "available"
+                        : "unavailable");
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={pressed}
+                      onClick={() =>
+                        patch({
+                          available:
+                            option.value === "unknown" ? null : option.value === "available",
+                        })
+                      }
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                        pressed ? "bg-accent-700 text-on-accent" : "text-ink-600 hover:text-ink-900"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
           <div className="mt-3">
