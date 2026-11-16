@@ -4,6 +4,7 @@ import {
   EMPTY_FOLD,
   isCategoryOpen,
   isItemOpen,
+  pruneFoldState,
   readFoldState,
   revealItem,
   setCategoriesOpen,
@@ -84,6 +85,20 @@ describe("revealItem", () => {
     const revealed = revealItem(closedSection, "toast", "breakfast");
     expect(isItemOpen(revealed, "toast")).toBe(true);
     expect(isCategoryOpen(revealed, "breakfast")).toBe(true);
+  });
+});
+
+describe("pruneFoldState", () => {
+  it("drops fold memory for deleted categories and their dishes", () => {
+    const closed = setCategoryOpen(EMPTY_FOLD, "gone", false);
+    const state = setItemOpen(closed, "toast", true);
+    const kept = revealItem(state, "latte", "drinks");
+    expect(isCategoryOpen(kept, "gone")).toBe(false);
+    expect(isItemOpen(kept, "toast")).toBe(true);
+    const pruned = pruneFoldState(kept, {
+      categories: [{ id: "drinks", items: [{ id: "latte" }] }],
+    });
+    expect(pruned).toEqual({ closedCategoryIds: [], openItemIds: ["latte"] });
   });
 });
 
