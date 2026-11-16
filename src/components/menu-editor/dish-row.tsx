@@ -15,6 +15,10 @@ import { itemImageCopy } from "@/features/item-images/ref";
  * it, not in a form that unfolds underneath. Selecting the row shows the dish
  * in the inspector; nothing in the row itself changes the document.
  *
+ * The selected row runs the theme's wash left to right (`accent-100` is the
+ * prototype's `--wash`) and keeps the accent rule on its left edge, so the
+ * dish the inspector is editing is obvious without a second highlight colour.
+ *
  * Memoized: a menu can hold a few hundred dishes, and selecting one must not
  * re-render the others.
  */
@@ -70,7 +74,7 @@ export const DishRow = memo(function DishRow({
       id={`menu-item-${item.id}`}
       className={`flex items-center gap-2 border-l-2 pl-1 transition-colors sm:pl-2 ${
         selected
-          ? "border-l-accent-700 bg-accent-50"
+          ? "border-l-accent-700 bg-linear-to-r from-accent-100 to-surface-base"
           : bulkSelected
             ? "border-l-transparent bg-warning-50/70"
             : "border-l-transparent"

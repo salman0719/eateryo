@@ -17,7 +17,7 @@ function setupMenu() {
 }
 
 describe("CategoryPills", () => {
-  it("names every category with its dish count and marks the open one", () => {
+  it("names every category with its dish count and marks the chosen one", () => {
     const doc = setupMenu();
     const html = renderToStaticMarkup(
       createElement(CategoryPills, {
@@ -25,7 +25,7 @@ describe("CategoryPills", () => {
           id: category.id,
           name: category.name,
           dishCount: category.items.length,
-          open: index === 0,
+          selected: index === 0,
         })),
         onSelect: () => {},
       })

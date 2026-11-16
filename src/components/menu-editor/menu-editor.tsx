@@ -876,7 +876,7 @@ export function MenuEditor({
                     id: category.id,
                     name: category.name,
                     dishCount: category.items.length,
-                    open: category.id === activeReorderCategory.id,
+                    selected: category.id === activeReorderCategory.id,
                   }))}
                   onSelect={(categoryId) => chooseReorder("items", categoryId)}
                 />
@@ -1130,7 +1130,7 @@ export function MenuEditor({
               >
                 {/* One category on the canvas: its band holds the name, the
               count, and the two things that act on the category itself. */}
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2">
                   <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
                     {selectedCategory.name || "Untitled category"}
                   </h2>

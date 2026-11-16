@@ -24,6 +24,11 @@ import { CommitInput } from "./fields";
  * pipeline — same shapes, same sizes, same UploadThing route — so the
  * sweep keeps treating category covers as referenced photos and removal
  * only clears the reference, exactly like dish photos.
+ *
+ * The card carries the theme's wash at its top: `accent-100` is the
+ * prototype's `--wash`, fading into the card's own surface, so the section
+ * head reads as the same surface as the rows rather than a grey box above
+ * them.
  */
 
 const smallButton =
@@ -72,7 +77,7 @@ export function CategoryHeader({
   }
 
   return (
-    <div className="rounded-xl border border-line-200 bg-surface-50 p-3">
+    <div className="rounded-xl border border-line-200 bg-linear-to-b from-accent-100 to-surface-base p-3">
       <div className="flex gap-3">
         {copy ? (
           // Plain CDN img, the same rule as dish photos: the optimizer must

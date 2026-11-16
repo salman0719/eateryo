@@ -47,9 +47,10 @@ describe("DishRow", () => {
     expect(html).toContain("Select Espresso for bulk move");
   });
 
-  it("marks the open dish with the left rule and aria-current", () => {
+  it("marks the open dish with the wash, the left rule and aria-current", () => {
     const html = renderRow(1, { selected: true });
     expect(html).toContain("border-l-accent-700");
+    expect(html).toContain("from-accent-100");
     expect(html).toContain('aria-current="true"');
     expect(renderRow(1)).not.toContain('aria-current="true"');
   });
