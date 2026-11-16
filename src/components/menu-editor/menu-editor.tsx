@@ -18,7 +18,6 @@ import {
   moveItem,
   moveItemToCategory,
   moveItemsToCategory,
-  renameCategory,
   setItemImage,
 } from "@/features/menu/menu-utils";
 import { formatItemPrice } from "@/features/menu/preview-utils";
@@ -33,6 +32,7 @@ import { appendExtractionToDocument } from "@/features/menu/convert";
 import {
   isCategoryOpen,
   isItemOpen,
+  pruneFoldState,
   readFoldState,
   revealItem,
   setCategoriesOpen,
@@ -43,6 +43,7 @@ import {
   type FoldState,
 } from "@/features/menu/fold";
 import { flatSearchRows, searchMenu, type SearchResultRow } from "@/features/menu/search";
+import { CategoryHeader } from "./category-header";
 import { CategoryPills, SearchResultsList } from "./category-pills";
 import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import { describeExtractionSource } from "@/features/menu/source-label";
@@ -436,6 +437,9 @@ export function MenuEditor({
     if (!ok) return;
     const next = deleteCategory(doc, category.id);
     setUndo(captureDeleteUndo(doc, next, `deleted category “${category.name}”`));
+    // Fold memory outlives the document in storage: drop the deleted
+    // section and its dishes, or a same-id stranger would inherit them.
+    applyFold(pruneFoldState(foldState, next));
     // Keep the stepper on the category that takes this one's place (or the
     // new last one); null when the menu is now empty.
     setActiveCategoryId(next.categories[Math.min(index, next.categories.length - 1)]?.id ?? null);
@@ -1345,13 +1349,9 @@ export function MenuEditor({
                       {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
                     </button>
                     <div className="min-w-[9rem] flex-1">
-                      <CommitInput
-                        label={`Category ${index + 1}`}
-                        value={category.name}
-                        hideLabel
-                        inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-line-300 focus:border-accent-700 focus:bg-surface-base"
-                        onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
-                      />
+                      <span className="block truncate px-1 py-1 text-base font-semibold text-ink-900">
+                        {category.name || "Untitled category"}
+                      </span>
                     </div>
                     <p className="shrink-0 text-xs text-ink-500">
                       {items.length} {items.length === 1 ? "item" : "items"}
@@ -1396,6 +1396,14 @@ export function MenuEditor({
                   </div>
                   <Collapse open={categoryOpen}>
                     <div id={categoryPanelId} className="p-4">
+                      {!isFiltering && (
+                        <CategoryHeader
+                          doc={doc}
+                          category={category}
+                          canUpload={canUploadItemImages}
+                          onChange={onChange}
+                        />
+                      )}
                       {items.length === 0 ? (
                         <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
                           No items — add the first one below.
