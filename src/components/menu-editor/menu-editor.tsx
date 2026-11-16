@@ -10,6 +10,7 @@ import {
   deleteCategory,
   deleteItem,
   deleteItems,
+  duplicateItem,
   hasAnyPrice,
   isItemFlagged,
   moveCategory,
@@ -27,6 +28,7 @@ import {
 import type { MenuCategory, MenuDocument, MenuItem } from "@/features/menu/schema";
 import { appendExtractionToDocument } from "@/features/menu/convert";
 import {
+  adjacentItemId,
   readSelection,
   resolveSelection,
   selectCategory,
@@ -69,7 +71,8 @@ import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
-import { ItemEditor, type ItemActions } from "./item-editor";
+import { DishRow, type DishRowActions } from "./dish-row";
+import { ItemInspector } from "./item-inspector";
 import { ModifiersPanel } from "./modifiers-panel";
 import { PublishPanel, type PublishingControls } from "./publish-panel";
 
@@ -292,6 +295,27 @@ export function MenuEditor({
   const selectedToCheck = selectedCategory
     ? selectedCategory.items.filter(isItemFlagged).length
     : 0;
+  /** The dish in the inspector (the selection always names a live one). */
+  const selectedItem =
+    selectedCategory && selection.itemId
+      ? (selectedCategory.items.find((item) => item.id === selection.itemId) ?? null)
+      : null;
+  const selectedItemIndex =
+    selectedItem && selectedCategory
+      ? selectedCategory.items.findIndex((item) => item.id === selectedItem.id)
+      : -1;
+
+  /** Close the inspector, leaving its category on the canvas. */
+  function closeInspector() {
+    applySelection({ categoryId: selection.categoryId, itemId: null });
+  }
+
+  /** The next dish in this category (wrapping) — the inspector's review step. */
+  function nextDish() {
+    if (!selectedCategory || !selectedItem) return;
+    const nextId = adjacentItemId(doc, selectedCategory.id, selectedItem.id, 1);
+    if (nextId) applySelection({ categoryId: selectedCategory.id, itemId: nextId });
+  }
 
   // Duplicate review (flags only, never auto-deletes — see duplicates.ts).
   // Dismissals are remembered per document, in session state and localStorage.
@@ -537,16 +561,11 @@ export function MenuEditor({
     liveRef.current = { doc, selection, selectionKey, onChange, confirm };
   }, [doc, selection, selectionKey, onChange, confirm]);
 
-  const itemActions = useMemo<ItemActions>(
+  const rowActions = useMemo<DishRowActions>(
     () => ({
-      change: (next) => liveRef.current.onChange(next),
-      /** Open this dish's form, or close it when it is already open. */
-      toggleOpen: (itemId) => {
+      select: (itemId) => {
         const live = liveRef.current;
-        const next =
-          live.selection.itemId === itemId
-            ? { categoryId: live.selection.categoryId, itemId: null }
-            : selectItem(live.doc, itemId);
+        const next = selectItem(live.doc, itemId);
         writeSelection(live.doc.id, next);
         setSelectionOverride({ key: live.selectionKey, value: next });
       },
@@ -557,33 +576,6 @@ export function MenuEditor({
           else next.add(itemId);
           return next;
         });
-      },
-      delete: (categoryId, itemId) => {
-        void (async () => {
-          const item = liveRef.current.doc.categories
-            .find((category) => category.id === categoryId)
-            ?.items.find((candidate) => candidate.id === itemId);
-          if (!item) return;
-          const ok = await liveRef.current.confirm({
-            message: `Delete “${item.name}”? You can undo this until your next change.`,
-            confirmLabel: "Delete",
-            destructive: true,
-          });
-          if (!ok) return;
-          // Re-read after the dialog: the document may have moved on meanwhile.
-          const latest = liveRef.current.doc;
-          const next = deleteItem(latest, categoryId, itemId);
-          setUndo(captureDeleteUndo(latest, next, `deleted “${item.name}”`));
-          liveRef.current.onChange(next);
-        })();
-      },
-      attachImage: (itemId, image) => {
-        const current = liveRef.current.doc;
-        const category = current.categories.find((candidate) =>
-          candidate.items.some((item) => item.id === itemId)
-        );
-        if (!category) return;
-        liveRef.current.onChange(setItemImage(current, category.id, itemId, image));
       },
     }),
     []
@@ -1129,98 +1121,124 @@ export function MenuEditor({
               />
             </div>
           ) : selectedCategory ? (
-            <section
-              data-menu-section={selectedCategory.id}
-              id={`menu-section-${selectedCategory.id}`}
-              aria-label={`Category ${selectedCategory.name}`}
-              className="scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
-            >
-              {/* One category on the canvas: its band holds the name, the
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+              <section
+                data-menu-section={selectedCategory.id}
+                id={`menu-section-${selectedCategory.id}`}
+                aria-label={`Category ${selectedCategory.name}`}
+                className="scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+              >
+                {/* One category on the canvas: its band holds the name, the
               count, and the two things that act on the category itself. */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
-                <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
-                  {selectedCategory.name || "Untitled category"}
-                </h2>
-                <p className="shrink-0 text-xs text-ink-500">
-                  {selectedCategory.items.length}{" "}
-                  {selectedCategory.items.length === 1 ? "item" : "items"}
-                  {selectedToCheck > 0 && (
-                    <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
-                      {selectedToCheck} to check
-                    </span>
-                  )}
-                </p>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
+                  <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
+                    {selectedCategory.name || "Untitled category"}
+                  </h2>
+                  <p className="shrink-0 text-xs text-ink-500">
+                    {selectedCategory.items.length}{" "}
+                    {selectedCategory.items.length === 1 ? "item" : "items"}
+                    {selectedToCheck > 0 && (
+                      <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
+                        {selectedToCheck} to check
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label={`Move ${selectedCategory.name} up`}
+                      disabled={selectedCategoryIndex === 0}
+                      onClick={() =>
+                        onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex - 1))
+                      }
+                      className={tinyButton}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${selectedCategory.name} down`}
+                      disabled={selectedCategoryIndex === doc.categories.length - 1}
+                      onClick={() =>
+                        onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex + 1))
+                      }
+                      className={tinyButton}
+                    >
+                      ↓
+                    </button>
+                  </div>
                   <button
                     type="button"
-                    aria-label={`Move ${selectedCategory.name} up`}
-                    disabled={selectedCategoryIndex === 0}
-                    onClick={() =>
-                      onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex - 1))
-                    }
-                    className={tinyButton}
+                    onClick={() => handleDeleteCategory(selectedCategory, selectedCategoryIndex)}
+                    className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
                   >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Move ${selectedCategory.name} down`}
-                    disabled={selectedCategoryIndex === doc.categories.length - 1}
-                    onClick={() =>
-                      onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex + 1))
-                    }
-                    className={tinyButton}
-                  >
-                    ↓
+                    Delete
                   </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteCategory(selectedCategory, selectedCategoryIndex)}
-                  className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
-                >
-                  Delete
-                </button>
-              </div>
-              <div className="p-4">
-                <CategoryHeader
-                  doc={doc}
-                  category={selectedCategory}
-                  canUpload={canUploadItemImages}
-                  onChange={onChange}
-                />
-                {selectedCategory.items.length === 0 ? (
-                  <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
-                    No items — add the first one below.
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {selectedCategory.items.map((item) => (
-                      <ItemEditor
-                        key={item.id}
-                        isRouteTarget={false}
-                        open={item.id === selection.itemId}
-                        doc={doc}
-                        categoryId={selectedCategory.id}
-                        item={item}
-                        categories={categoryChoices}
-                        actions={itemActions}
-                        duplicate={duplicateIds.has(item.id)}
-                        selected={selectedIds.has(item.id)}
-                        canUploadImage={canUploadItemImages}
-                      />
-                    ))}
-                  </ul>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleAddItem(selectedCategory.id)}
-                  className={`${smallButton} mt-3`}
-                >
-                  + Add item
-                </button>
-              </div>
-            </section>
+                <div className="p-4">
+                  <CategoryHeader
+                    doc={doc}
+                    category={selectedCategory}
+                    canUpload={canUploadItemImages}
+                    onChange={onChange}
+                  />
+                  {selectedCategory.items.length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
+                      No items — add the first one below.
+                    </p>
+                  ) : (
+                    <ul className="mt-3 space-y-2">
+                      {selectedCategory.items.map((item) => (
+                        <DishRow
+                          key={item.id}
+                          item={item}
+                          currency={doc.currency}
+                          selected={item.id === selection.itemId}
+                          bulkSelected={selectedIds.has(item.id)}
+                          duplicate={duplicateIds.has(item.id)}
+                          actions={rowActions}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleAddItem(selectedCategory.id)}
+                    className={`${smallButton} mt-3`}
+                  >
+                    + Add item
+                  </button>
+                </div>
+              </section>
+              {selectedItem && selectedCategory ? (
+                <div className="lg:sticky lg:top-4">
+                  <ItemInspector
+                    doc={doc}
+                    categoryId={selectedCategory.id}
+                    categoryName={selectedCategory.name}
+                    item={selectedItem}
+                    categories={categoryChoices}
+                    position={selectedItemIndex + 1}
+                    count={selectedCategory.items.length}
+                    canUploadImage={canUploadItemImages}
+                    onChange={onChange}
+                    onAttachImage={(image) =>
+                      onChange(setItemImage(doc, selectedCategory.id, selectedItem.id, image))
+                    }
+                    onDuplicate={() =>
+                      onChange(duplicateItem(doc, selectedCategory.id, selectedItem.id))
+                    }
+                    onDelete={() => void removeItem(selectedCategory.id, selectedItem)}
+                    onDone={closeInspector}
+                    onNext={nextDish}
+                  />
+                </div>
+              ) : (
+                <p className="hidden rounded-2xl border border-dashed border-line-200 bg-surface-base px-4 py-6 text-center text-sm text-ink-500 lg:block">
+                  Pick a dish to edit it here.
+                </p>
+              )}
+            </div>
           ) : null}
         </>
       ) : subTab === "settings" ? (
