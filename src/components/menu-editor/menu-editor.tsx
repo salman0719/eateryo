@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Collapse } from "@/components/ui/collapse";
@@ -46,6 +46,13 @@ import { searchMenu } from "@/features/menu/search";
 import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
+import {
+  defaultEditorSubTab,
+  editorTabCounts,
+  readEditorSubTab,
+  writeEditorSubTab,
+  type EditorSubTab,
+} from "@/features/menu/editor-tabs";
 import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
 import { ExtractClientError, extractMenuFromFiles } from "@/lib/extract-client";
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
@@ -390,6 +397,28 @@ export function MenuEditor({
     onModeChange(next);
   }
 
+  // Sub-tabs inside edit mode (redesign step 2): Settings & hours,
+  // Categories, and Add-on sets switch client state; Reorder and Preview
+  // are URL modes and navigate as before. The entry rule picks the first
+  // tab per menu — a pasted dish link always opens Categories — and the
+  // choice is remembered per menu like fold state.
+  // The entry rule re-runs when the menu (or dish link) changes; a manual
+  // tab switch overrides it until then. Derived during render, so no effect
+  // or render-phase setState is needed and the first paint is already right.
+  const entryTab =
+    selectedItemId !== null && selectedItemId !== undefined
+      ? ("categories" as const)
+      : (readEditorSubTab(doc.id) ?? defaultEditorSubTab(doc));
+  const tabKey = `${doc.id}::${selectedItemId ?? ""}`;
+  const [tabOverride, setTabOverride] = useState<{ key: string; tab: EditorSubTab } | null>(null);
+  const subTab = tabOverride && tabOverride.key === tabKey ? tabOverride.tab : entryTab;
+
+  function goSubTab(next: EditorSubTab) {
+    if (mode !== "edit") changeMode("edit");
+    setTabOverride({ key: tabKey, tab: next });
+    writeEditorSubTab(doc.id, next);
+  }
+
   /** The draft is ahead of what table ordering serves right now. */
   const needsPublish =
     publishing?.status?.isLive === true && publishing.status.hasUnpublishedChanges;
@@ -591,27 +620,64 @@ export function MenuEditor({
         {saveState.detail && <span className="sr-only"> — {saveState.detail}</span>}
       </div>
       <span className="flex-1" />
-      {!canManage ? (
-        <>
-          {mode !== "preview" && (
-            <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-              Preview order page
-            </button>
-          )}
-        </>
-      ) : mode === "edit" ? (
-        <>
-          <button type="button" onClick={() => setModifiersOpen(true)} className={smallButton}>
-            Add-on sets
-          </button>
-          <button type="button" onClick={() => changeMode("reorder")} className={smallButton}>
-            ↕ Reorder
-          </button>
-          <button type="button" onClick={() => changeMode("preview")} className={smallButton}>
-            Preview order page
-          </button>
-        </>
-      ) : null}
+    </div>
+  );
+
+  // One tab strip for every mode, under the publish strip. Staff never saw
+  // the Reorder/Add-on-sets buttons, so those tabs stay owner-only too.
+  const tabCounts = editorTabCounts(doc);
+  const countPill = (count: number) => (
+    <span className="rounded-full bg-surface-100 px-1.5 text-[11px] font-semibold text-ink-600">
+      {count}
+    </span>
+  );
+  const tabStrip = (
+    <div
+      role="tablist"
+      aria-label="Menu sections"
+      data-print-hide
+      className="flex flex-wrap gap-x-1 border-b border-line-200"
+    >
+      <EditorTab
+        label="Settings & hours"
+        selected={mode === "edit" && subTab === "settings"}
+        onSelect={() => goSubTab("settings")}
+      />
+      <EditorTab
+        label="Categories"
+        selected={mode === "edit" && subTab === "categories"}
+        onSelect={() => goSubTab("categories")}
+        badge={
+          <>
+            {countPill(tabCounts.dishes)}
+            {tabCounts.toCheck > 0 && (
+              <span className="rounded-full border border-warning-300 bg-warning-50 px-1.5 text-[11px] font-bold text-warning-900">
+                {tabCounts.toCheck} to check
+              </span>
+            )}
+          </>
+        }
+      />
+      {canManage && (
+        <EditorTab
+          label="↕ Reorder"
+          selected={mode === "reorder"}
+          onSelect={() => changeMode("reorder")}
+        />
+      )}
+      <EditorTab
+        label="Preview order page"
+        selected={mode === "preview"}
+        onSelect={() => changeMode("preview")}
+      />
+      {canManage && (
+        <EditorTab
+          label="Add-on sets"
+          selected={mode === "edit" && subTab === "addons"}
+          onSelect={() => goSubTab("addons")}
+          badge={tabCounts.sets > 0 ? countPill(tabCounts.sets) : undefined}
+        />
+      )}
     </div>
   );
 
@@ -619,6 +685,7 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
+        {tabStrip}
         {publishing && canManage && (
           <PublishPanel
             signedIn={syncMode === "account"}
@@ -646,6 +713,7 @@ export function MenuEditor({
     return (
       <div className="flex flex-col gap-4">
         {headerRow}
+        {tabStrip}
         <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <h2 className="text-base font-semibold text-ink-900">Reorder items</h2>
@@ -796,605 +864,641 @@ export function MenuEditor({
   return (
     <div className="flex flex-col gap-4">
       {headerRow}
-      <div className="rounded-2xl border border-line-200 bg-surface-base px-4 py-3 text-xs leading-5 text-ink-600">
-        {onStartPublish && accountCheckFailed ? (
-          <p>
-            We couldn&apos;t check your account just now, so publishing is paused.{" "}
-            {onRetryAccountCheck && (
-              <button
-                type="button"
-                onClick={onRetryAccountCheck}
-                className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Try again
-              </button>
-            )}
-            {onRetryAccountCheck ? "." : null}
-          </p>
-        ) : onStartPublish && onServer === null ? (
-          <div role="status" aria-busy="true">
-            <span className="sr-only">Checking where this menu is saved…</span>
-            <Skeleton className="h-3 w-3/4" />
-          </div>
-        ) : onStartPublish && onServer === false ? (
-          <p>
-            Once your menu is set,{" "}
-            <button
-              type="button"
-              onClick={onStartPublish}
-              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              set up table ordering
-            </button>{" "}
-            — we create your café if you don&apos;t have one yet. Or{" "}
-            <button
-              type="button"
-              onClick={() => changeMode("preview")}
-              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              preview the order page
-            </button>
-            .
-          </p>
-        ) : (
-          <p>
-            Once your menu is set,{" "}
-            <button
-              type="button"
-              onClick={() => changeMode("preview")}
-              className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              go to Preview
-            </button>{" "}
-            to publish it for your tables.
-          </p>
-        )}
-      </div>
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
-          <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-            <CommitInput
-              label="Menu title"
-              value={doc.title}
-              onCommit={(title) => onChange({ ...doc, title: title.trim() })}
-            />
-            <CommitInput
-              label="Currency"
-              value={doc.currency ?? ""}
-              validate={() => null}
-              placeholder="e.g. USD"
-              onCommit={(currency) =>
-                onChange({ ...doc, currency: currency.trim() ? currency.trim() : null })
-              }
-            />
-          </div>
-          {sourceLabel &&
-            (doc.source?.provider === "demo" ? (
-              <p className="mt-2 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
-                Demo data
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-ink-500">
-                {sourceLabel}
-                {doc.source?.originalFileName && (
-                  <span className="text-ink-500"> · {doc.source.originalFileName}</span>
-                )}
-              </p>
-            ))}
-          {(imageUrl || canManage) && (
-            <div className="mt-3">
-              {imageUrl && <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>}
-              <div className="flex items-stretch gap-3">
-                {imageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element -- source image is a local blob object URL, which the optimizer cannot handle
-                  <img
-                    src={imageUrl}
-                    alt="Original uploaded menu"
-                    className="max-h-28 w-auto self-center rounded-lg border border-line-200 object-contain"
-                  />
-                )}
-                {canManage && (
-                  <label
-                    className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-accent-700 hover:bg-accent-50 focus-within:border-accent-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="text-xl leading-none font-bold text-ink-500"
-                    >
-                      +
-                    </span>
-                    <span className="text-xs font-semibold text-ink-700">
-                      {addPages.status === "working" ? "Reading pages…" : "Add pages"}
-                    </span>
-                    <span className="text-[11px] leading-4 text-ink-500">
-                      Photograph more pages of this menu to add their items
-                    </span>
-                    <input
-                      ref={addPagesInputRef}
-                      type="file"
-                      multiple
-                      accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-                      className="sr-only"
-                      disabled={addPages.status === "working"}
-                      onChange={(event) => {
-                        const files = Array.from(event.target.files ?? []);
-                        event.target.value = "";
-                        if (files.length > 0) void handleAddPages(files);
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-          )}
-          {reviewCount > 0 && (
-            <p className="mt-2 text-xs font-medium text-warning-800">
-              {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
-            </p>
-          )}
-        </div>
-        <AvailabilityPanel
-          key={doc.id}
-          menuId={doc.id}
-          // Opening hours live with the menu in your account: a browser-only
-          // menu has no availability row to fetch, account mode or not.
-          syncMode={onServer ? "account" : "local"}
-          canManage={canManage}
-        />
-      </div>
-      {duplicateGroups.length > 0 && (
-        <section
-          aria-label="Possible duplicates"
-          className="rounded-2xl border border-warning-300 bg-warning-50/70 p-4"
-        >
-          <p className="text-sm font-semibold text-warning-900">
-            {duplicateGroups.length === 1
-              ? "1 possible duplicate found — review it; nothing is deleted automatically."
-              : `${duplicateGroups.length} possible duplicates found — review them; nothing is deleted automatically.`}
-          </p>
-          <ul className="mt-3 space-y-3">
-            {duplicateGroups.map((group) => (
-              <li
-                key={group.key}
-                className="rounded-xl border border-warning-200 bg-surface-base p-3"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-ink-900">
-                    “{group.displayName}” appears {group.occurrences.length} times
-                  </p>
-                  <span className="flex-1" />
+      {tabStrip}
+      {subTab === "categories" ? (
+        <>
+          <div className="rounded-2xl border border-line-200 bg-surface-base px-4 py-3 text-xs leading-5 text-ink-600">
+            {onStartPublish && accountCheckFailed ? (
+              <p>
+                We couldn&apos;t check your account just now, so publishing is paused.{" "}
+                {onRetryAccountCheck && (
                   <button
                     type="button"
-                    onClick={() => dismissGroup(group.key)}
-                    className={smallButton}
+                    onClick={onRetryAccountCheck}
+                    className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
-                    Keep all
+                    Try again
                   </button>
-                </div>
-                <ul className="mt-2 space-y-1.5">
-                  {group.occurrences.map((occurrence) => (
-                    <li
-                      key={occurrence.item.id}
-                      className="flex flex-wrap items-center gap-2 text-sm text-ink-700"
-                    >
-                      <span className="min-w-[160px] flex-1">
-                        {occurrence.item.name}
-                        <span className="text-xs text-ink-500">
-                          {" "}
-                          in {occurrence.categoryName}
-                          {occurrence.item.price !== null &&
-                            ` · ${occurrence.item.currency ?? doc.currency ?? ""}${occurrence.item.price}`}
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(occurrence.categoryId, occurrence.item)}
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-                      >
-                        Delete this copy
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
-        <label htmlFor="menu-search" className="sr-only">
-          Search the menu
-        </label>
-        <input
-          id="menu-search"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && query) setQuery("");
-          }}
-          placeholder="Search items, descriptions, or categories…"
-          className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
-        />
-        {isFiltering && (
-          <button type="button" onClick={() => setQuery("")} className={smallButton}>
-            Clear
-          </button>
-        )}
-        <p role="status" className="text-xs font-medium text-ink-500">
-          {isFiltering
-            ? `${search.matchCount} of ${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`
-            : `${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`}
-        </p>
-        {doc.categories.length > 0 && (
-          <div className="flex items-center gap-2">
-            {/* Below `sm` a section cannot fold — the stepper is the fold — so
-                only the dish forms answer here, and the label says which. */}
-            <button type="button" onClick={() => setEverythingOpen(true)} className={smallButton}>
-              <span className="sm:hidden">Open every dish</span>
-              <span className="hidden sm:inline">Expand all</span>
-            </button>
-            <button type="button" onClick={() => setEverythingOpen(false)} className={smallButton}>
-              <span className="sm:hidden">Close every dish</span>
-              <span className="hidden sm:inline">Collapse all</span>
-            </button>
-          </div>
-        )}
-      </div>
-      {selected.length > 0 && (
-        <div
-          role="region"
-          aria-label="Bulk actions"
-          className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-300 bg-warning-50/95 p-3 shadow-sm backdrop-blur"
-        >
-          <p className="text-xs font-semibold text-warning-900">
-            {selected.length} {selected.length === 1 ? "item" : "items"} selected
-          </p>
-          <label className="flex items-center gap-1.5 text-xs text-warning-900">
-            Move to
-            <select
-              aria-label="Category to move selected items to"
-              value={bulkTarget}
-              onChange={(event) => setBulkTarget(event.target.value)}
-              className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-            >
-              <option value="">Category…</option>
-              {doc.categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={!bulkTarget}
-            onClick={handleBulkMove}
-            className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-          >
-            Move selected
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleBulkDelete()}
-            className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-          >
-            Delete selected
-          </button>
-          <button type="button" onClick={() => setSelectedIds(new Set())} className={smallButton}>
-            Clear
-          </button>
-        </div>
-      )}
-      {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
-        <div
-          className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
-            selected.length === 0 ? "sticky top-0" : ""
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => stepCategory(-1)}
-              aria-label="Previous category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              ‹
-            </button>
-            <label className="flex min-h-[44px] min-w-0 flex-1 items-center">
-              <span className="sr-only">Category</span>
-              <select
-                value={activeMatch.category.id}
-                onChange={(event) => setActiveCategoryId(event.target.value)}
-                className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
-              >
-                {search.categories.map(({ category, items }) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name} ({items.length})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => stepCategory(1)}
-              aria-label="Next category"
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              ›
-            </button>
-          </div>
-          <p className="mt-1 text-center text-xs text-ink-500">
-            Category {activeIndex + 1} of {search.categories.length}
-          </p>
-        </div>
-      )}
-      {doc.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
-          <p className="font-medium text-ink-900">No categories yet</p>
-          <p className="mt-1 text-sm text-ink-600">Add a category below, then add items to it.</p>
-        </div>
-      ) : search.categories.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
-          <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
-          <p className="mt-1 text-sm text-ink-600">
-            {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
-          </p>
-          <button type="button" onClick={() => setQuery("")} className={`${smallButton} mt-3`}>
-            Clear search
-          </button>
-        </div>
-      ) : (
-        search.categories.map(({ category, items }) => {
-          const index = doc.categories.findIndex((c) => c.id === category.id);
-          // R0: phones show the stepper's category only, always open (see
-          // `phoneWidth`); sm+ shows every section with its own fold.
-          const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
-          // Searching always shows what it found: a match inside a collapsed
-          // section would be a result the page refuses to reveal.
-          const categoryOpen = isFiltering || phoneWidth || isCategoryOpen(foldState, category.id);
-          const categoryPanelId = `menu-category-panel-${category.id}`;
-          const toCheck = items.filter(isItemFlagged).length;
-          return (
-            <section
-              key={category.id}
-              data-menu-section={category.id}
-              id={`menu-section-${category.id}`}
-              aria-label={`Category ${category.name}`}
-              className={`${phoneOnly}scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
-            >
-              {/* The band says what the section is and how much is in it, and
-                  holds its own actions — so a collapsed section is still
-                  legible and still manageable. */}
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
+                )}
+                {onRetryAccountCheck ? "." : null}
+              </p>
+            ) : onStartPublish && onServer === null ? (
+              <div role="status" aria-busy="true">
+                <span className="sr-only">Checking where this menu is saved…</span>
+                <Skeleton className="h-3 w-3/4" />
+              </div>
+            ) : onStartPublish && onServer === false ? (
+              <p>
+                Once your menu is set,{" "}
                 <button
                   type="button"
-                  onClick={() => applyFold(toggleCategory(foldState, category.id))}
-                  disabled={isFiltering}
-                  aria-expanded={categoryOpen}
-                  aria-controls={categoryOpen ? categoryPanelId : undefined}
-                  title={
-                    isFiltering
-                      ? "Search shows every matching section"
-                      : categoryOpen
-                        ? "Collapse this section"
-                        : "Expand this section"
-                  }
-                  className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                  onClick={onStartPublish}
+                  className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                 >
-                  {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                  set up table ordering
+                </button>{" "}
+                — we create your café if you don&apos;t have one yet. Or{" "}
+                <button
+                  type="button"
+                  onClick={() => changeMode("preview")}
+                  className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  preview the order page
                 </button>
-                <div className="min-w-[9rem] flex-1">
-                  <CommitInput
-                    label={`Category ${index + 1}`}
-                    value={category.name}
-                    hideLabel
-                    inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-line-300 focus:border-accent-700 focus:bg-surface-base"
-                    onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
-                  />
-                </div>
-                <p className="shrink-0 text-xs text-ink-500">
-                  {items.length} {items.length === 1 ? "item" : "items"}
-                  {toCheck > 0 && (
-                    <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
-                      {toCheck} to check
-                    </span>
+                .
+              </p>
+            ) : (
+              <p>
+                Once your menu is set,{" "}
+                <button
+                  type="button"
+                  onClick={() => changeMode("preview")}
+                  className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  go to Preview
+                </button>{" "}
+                to publish it for your tables.
+              </p>
+            )}
+          </div>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+              <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+                <CommitInput
+                  label="Menu title"
+                  value={doc.title}
+                  onCommit={(title) => onChange({ ...doc, title: title.trim() })}
+                />
+                <CommitInput
+                  label="Currency"
+                  value={doc.currency ?? ""}
+                  validate={() => null}
+                  placeholder="e.g. USD"
+                  onCommit={(currency) =>
+                    onChange({ ...doc, currency: currency.trim() ? currency.trim() : null })
+                  }
+                />
+              </div>
+              {sourceLabel &&
+                (doc.source?.provider === "demo" ? (
+                  <p className="mt-2 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
+                    Demo data
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-ink-500">
+                    {sourceLabel}
+                    {doc.source?.originalFileName && (
+                      <span className="text-ink-500"> · {doc.source.originalFileName}</span>
+                    )}
+                  </p>
+                ))}
+              {(imageUrl || canManage) && (
+                <div className="mt-3">
+                  {imageUrl && (
+                    <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>
                   )}
+                  <div className="flex items-stretch gap-3">
+                    {imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element -- source image is a local blob object URL, which the optimizer cannot handle
+                      <img
+                        src={imageUrl}
+                        alt="Original uploaded menu"
+                        className="max-h-28 w-auto self-center rounded-lg border border-line-200 object-contain"
+                      />
+                    )}
+                    {canManage && (
+                      <label
+                        className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-accent-700 hover:bg-accent-50 focus-within:border-accent-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="text-xl leading-none font-bold text-ink-500"
+                        >
+                          +
+                        </span>
+                        <span className="text-xs font-semibold text-ink-700">
+                          {addPages.status === "working" ? "Reading pages…" : "Add pages"}
+                        </span>
+                        <span className="text-[11px] leading-4 text-ink-500">
+                          Photograph more pages of this menu to add their items
+                        </span>
+                        <input
+                          ref={addPagesInputRef}
+                          type="file"
+                          multiple
+                          accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
+                          className="sr-only"
+                          disabled={addPages.status === "working"}
+                          onChange={(event) => {
+                            const files = Array.from(event.target.files ?? []);
+                            event.target.value = "";
+                            if (files.length > 0) void handleAddPages(files);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
+              {reviewCount > 0 && (
+                <p className="mt-2 text-xs font-medium text-warning-800">
+                  {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
                 </p>
-                {/* Inline reordering shows only where the list does. A phone
+              )}
+            </div>
+            <AvailabilityPanel
+              key={doc.id}
+              menuId={doc.id}
+              // Opening hours live with the menu in your account: a browser-only
+              // menu has no availability row to fetch, account mode or not.
+              syncMode={onServer ? "account" : "local"}
+              canManage={canManage}
+            />
+          </div>
+          {duplicateGroups.length > 0 && (
+            <section
+              aria-label="Possible duplicates"
+              className="rounded-2xl border border-warning-300 bg-warning-50/70 p-4"
+            >
+              <p className="text-sm font-semibold text-warning-900">
+                {duplicateGroups.length === 1
+                  ? "1 possible duplicate found — review it; nothing is deleted automatically."
+                  : `${duplicateGroups.length} possible duplicates found — review them; nothing is deleted automatically.`}
+              </p>
+              <ul className="mt-3 space-y-3">
+                {duplicateGroups.map((group) => (
+                  <li
+                    key={group.key}
+                    className="rounded-xl border border-warning-200 bg-surface-base p-3"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-ink-900">
+                        “{group.displayName}” appears {group.occurrences.length} times
+                      </p>
+                      <span className="flex-1" />
+                      <button
+                        type="button"
+                        onClick={() => dismissGroup(group.key)}
+                        className={smallButton}
+                      >
+                        Keep all
+                      </button>
+                    </div>
+                    <ul className="mt-2 space-y-1.5">
+                      {group.occurrences.map((occurrence) => (
+                        <li
+                          key={occurrence.item.id}
+                          className="flex flex-wrap items-center gap-2 text-sm text-ink-700"
+                        >
+                          <span className="min-w-[160px] flex-1">
+                            {occurrence.item.name}
+                            <span className="text-xs text-ink-500">
+                              {" "}
+                              in {occurrence.categoryName}
+                              {occurrence.item.price !== null &&
+                                ` · ${occurrence.item.currency ?? doc.currency ?? ""}${occurrence.item.price}`}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeItem(occurrence.categoryId, occurrence.item)}
+                            className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                          >
+                            Delete this copy
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3">
+            <label htmlFor="menu-search" className="sr-only">
+              Search the menu
+            </label>
+            <input
+              id="menu-search"
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && query) setQuery("");
+              }}
+              placeholder="Search items, descriptions, or categories…"
+              className="min-w-[200px] flex-1 rounded-full border border-line-300 bg-surface-base px-4 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+            />
+            {isFiltering && (
+              <button type="button" onClick={() => setQuery("")} className={smallButton}>
+                Clear
+              </button>
+            )}
+            <p role="status" className="text-xs font-medium text-ink-500">
+              {isFiltering
+                ? `${search.matchCount} of ${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`
+                : `${search.totalItems} ${search.totalItems === 1 ? "item" : "items"}`}
+            </p>
+            {doc.categories.length > 0 && (
+              <div className="flex items-center gap-2">
+                {/* Below `sm` a section cannot fold — the stepper is the fold — so
+                only the dish forms answer here, and the label says which. */}
+                <button
+                  type="button"
+                  onClick={() => setEverythingOpen(true)}
+                  className={smallButton}
+                >
+                  <span className="sm:hidden">Open every dish</span>
+                  <span className="hidden sm:inline">Expand all</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEverythingOpen(false)}
+                  className={smallButton}
+                >
+                  <span className="sm:hidden">Close every dish</span>
+                  <span className="hidden sm:inline">Collapse all</span>
+                </button>
+              </div>
+            )}
+          </div>
+          {selected.length > 0 && (
+            <div
+              role="region"
+              aria-label="Bulk actions"
+              className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-300 bg-warning-50/95 p-3 shadow-sm backdrop-blur"
+            >
+              <p className="text-xs font-semibold text-warning-900">
+                {selected.length} {selected.length === 1 ? "item" : "items"} selected
+              </p>
+              <label className="flex items-center gap-1.5 text-xs text-warning-900">
+                Move to
+                <select
+                  aria-label="Category to move selected items to"
+                  value={bulkTarget}
+                  onChange={(event) => setBulkTarget(event.target.value)}
+                  className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                >
+                  <option value="">Category…</option>
+                  {doc.categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={!bulkTarget}
+                onClick={handleBulkMove}
+                className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+              >
+                Move selected
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkDelete()}
+                className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+              >
+                Delete selected
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(new Set())}
+                className={smallButton}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+          {doc.categories.length > 0 && search.categories.length > 0 && activeMatch && (
+            <div
+              className={`z-20 -mx-4 bg-background/95 px-4 py-2 backdrop-blur-sm sm:hidden ${
+                selected.length === 0 ? "sticky top-0" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => stepCategory(-1)}
+                  aria-label="Previous category"
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  ‹
+                </button>
+                <label className="flex min-h-[44px] min-w-0 flex-1 items-center">
+                  <span className="sr-only">Category</span>
+                  <select
+                    value={activeMatch.category.id}
+                    onChange={(event) => setActiveCategoryId(event.target.value)}
+                    className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2.5 text-sm font-semibold text-ink-900 focus:border-accent-700 focus:outline-none"
+                  >
+                    {search.categories.map(({ category, items }) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name} ({items.length})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => stepCategory(1)}
+                  aria-label="Next category"
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-line-300 bg-surface-base text-lg font-bold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  ›
+                </button>
+              </div>
+              <p className="mt-1 text-center text-xs text-ink-500">
+                Category {activeIndex + 1} of {search.categories.length}
+              </p>
+            </div>
+          )}
+          {doc.categories.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
+              <p className="font-medium text-ink-900">No categories yet</p>
+              <p className="mt-1 text-sm text-ink-600">
+                Add a category below, then add items to it.
+              </p>
+            </div>
+          ) : search.categories.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
+              <p className="font-medium text-ink-900">No items match “{query.trim()}”</p>
+              <p className="mt-1 text-sm text-ink-600">
+                {search.totalItems} {search.totalItems === 1 ? "item" : "items"} in this menu.
+              </p>
+              <button type="button" onClick={() => setQuery("")} className={`${smallButton} mt-3`}>
+                Clear search
+              </button>
+            </div>
+          ) : (
+            search.categories.map(({ category, items }) => {
+              const index = doc.categories.findIndex((c) => c.id === category.id);
+              // R0: phones show the stepper's category only, always open (see
+              // `phoneWidth`); sm+ shows every section with its own fold.
+              const phoneOnly = category.id === activeMatch?.category.id ? "" : "hidden sm:block ";
+              // Searching always shows what it found: a match inside a collapsed
+              // section would be a result the page refuses to reveal.
+              const categoryOpen =
+                isFiltering || phoneWidth || isCategoryOpen(foldState, category.id);
+              const categoryPanelId = `menu-category-panel-${category.id}`;
+              const toCheck = items.filter(isItemFlagged).length;
+              return (
+                <section
+                  key={category.id}
+                  data-menu-section={category.id}
+                  id={`menu-section-${category.id}`}
+                  aria-label={`Category ${category.name}`}
+                  className={`${phoneOnly}scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
+                >
+                  {/* The band says what the section is and how much is in it, and
+                  holds its own actions — so a collapsed section is still
+                  legible and still manageable. */}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-surface-100 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => applyFold(toggleCategory(foldState, category.id))}
+                      disabled={isFiltering}
+                      aria-expanded={categoryOpen}
+                      aria-controls={categoryOpen ? categoryPanelId : undefined}
+                      title={
+                        isFiltering
+                          ? "Search shows every matching section"
+                          : categoryOpen
+                            ? "Collapse this section"
+                            : "Expand this section"
+                      }
+                      className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line-300 bg-surface-base text-sm text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 disabled:cursor-not-allowed disabled:opacity-40 sm:flex"
+                    >
+                      {categoryOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                    </button>
+                    <div className="min-w-[9rem] flex-1">
+                      <CommitInput
+                        label={`Category ${index + 1}`}
+                        value={category.name}
+                        hideLabel
+                        inputClassName="border-transparent bg-transparent px-1 py-1 text-base font-semibold hover:border-line-300 focus:border-accent-700 focus:bg-surface-base"
+                        onCommit={(name) => onChange(renameCategory(doc, category.id, name.trim()))}
+                      />
+                    </div>
+                    <p className="shrink-0 text-xs text-ink-500">
+                      {items.length} {items.length === 1 ? "item" : "items"}
+                      {toCheck > 0 && (
+                        <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
+                          {toCheck} to check
+                        </span>
+                      )}
+                    </p>
+                    {/* Inline reordering shows only where the list does. A phone
                     shows one section at a time, so ↑ moved a category the
                     owner could not watch move, right beside the stepper's
                     ‹ › — two axes, one apparent control. Arranging on a phone
                     belongs to the reorder view, which lists every category. */}
-                <div className="hidden shrink-0 items-center gap-1 sm:flex">
-                  <button
-                    type="button"
-                    aria-label={`Move ${category.name} up`}
-                    disabled={index === 0}
-                    onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
-                    className={tinyButton}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Move ${category.name} down`}
-                    disabled={index === doc.categories.length - 1}
-                    onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
-                    className={tinyButton}
-                  >
-                    ↓
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteCategory(category, index)}
-                  className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
-                >
-                  Delete
-                </button>
-              </div>
-              <Collapse open={categoryOpen}>
-                <div id={categoryPanelId} className="p-4">
-                  {items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
-                      No items — add the first one below.
-                    </p>
-                  ) : (
-                    <ul className="mt-3 space-y-3">
-                      {items.map((item) => (
-                        <ItemEditor
-                          key={item.id}
-                          isRouteTarget={selectedItemId === item.id}
-                          // A pasted /menus/<id>/items/<itemId> link opens the
-                          // dish without rewriting what the owner folded.
-                          open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
-                          doc={doc}
-                          categoryId={category.id}
-                          item={item}
-                          categories={categoryChoices}
-                          actions={itemActions}
-                          labelVocabulary={labelVocabulary}
-                          duplicate={duplicateIds.has(item.id)}
-                          selected={selectedIds.has(item.id)}
-                          canUploadImage={canUploadItemImages}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleAddItem(category.id)}
-                    className={`${smallButton} mt-3`}
-                  >
-                    + Add item
-                  </button>
-                </div>
-              </Collapse>
-            </section>
-          );
-        })
-      )}
-      <button
-        type="button"
-        onClick={handleAddCategory}
-        className="rounded-2xl border-2 border-dashed border-line-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-      >
-        + Add category
-      </button>
-      <div className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
-        <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">Menu</span>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={onExportJson} className={smallButton}>
-            Export JSON
-          </button>
-          <button type="button" onClick={onExportCsv} className={smallButton}>
-            Export CSV
-          </button>
-          <label
-            className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}
+                    <div className="hidden shrink-0 items-center gap-1 sm:flex">
+                      <button
+                        type="button"
+                        aria-label={`Move ${category.name} up`}
+                        disabled={index === 0}
+                        onClick={() => onChange(moveCategory(doc, category.id, index - 1))}
+                        className={tinyButton}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${category.name} down`}
+                        disabled={index === doc.categories.length - 1}
+                        onClick={() => onChange(moveCategory(doc, category.id, index + 1))}
+                        className={tinyButton}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(category, index)}
+                      className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <Collapse open={categoryOpen}>
+                    <div id={categoryPanelId} className="p-4">
+                      {items.length === 0 ? (
+                        <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
+                          No items — add the first one below.
+                        </p>
+                      ) : (
+                        <ul className="mt-3 space-y-3">
+                          {items.map((item) => (
+                            <ItemEditor
+                              key={item.id}
+                              isRouteTarget={selectedItemId === item.id}
+                              // A pasted /menus/<id>/items/<itemId> link opens the
+                              // dish without rewriting what the owner folded.
+                              open={isItemOpen(foldState, item.id) || item.id === selectedItemId}
+                              doc={doc}
+                              categoryId={category.id}
+                              item={item}
+                              categories={categoryChoices}
+                              actions={itemActions}
+                              labelVocabulary={labelVocabulary}
+                              duplicate={duplicateIds.has(item.id)}
+                              selected={selectedIds.has(item.id)}
+                              canUploadImage={canUploadItemImages}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleAddItem(category.id)}
+                        className={`${smallButton} mt-3`}
+                      >
+                        + Add item
+                      </button>
+                    </div>
+                  </Collapse>
+                </section>
+              );
+            })
+          )}
+          <button
+            type="button"
+            onClick={handleAddCategory}
+            className="rounded-2xl border-2 border-dashed border-line-300 bg-surface-base px-4 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
-            Import JSON
-            <input
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) onImportFile(file);
-                event.target.value = "";
-              }}
-            />
-          </label>
-        </div>
-        <span aria-hidden="true" className="hidden flex-1 sm:block" />
-        <button
-          type="button"
-          onClick={async () => {
-            const ok = await confirm({
-              message: `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`,
-              confirmLabel: "Delete menu",
-              destructive: true,
-            });
-            if (ok) onDeleteMenu();
-          }}
-          className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:self-auto"
-        >
-          Delete menu
-        </button>
-      </div>
-      {importError && (
-        <p
-          role="alert"
-          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-        >
-          {importError}
-        </p>
-      )}
-      {addPages.status === "working" && (
-        <p
-          role="status"
-          className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900"
-        >
-          Reading the new pages… keep this tab open. Your edits are safe.
-        </p>
-      )}
-      {addPages.status === "added" && (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-xl border border-line-200 bg-surface-base px-4 py-3 text-sm text-ink-700"
-        >
-          <span
-            aria-hidden="true"
-            className="mt-1.5 size-1.5 shrink-0 rounded-full bg-success-700"
-          />
-          <span>
-            Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in{" "}
-            {addPages.categories} {addPages.categories === 1 ? "category" : "categories"} from the
-            new pages. Repeats with the existing menu appear in the duplicate review.
-          </span>
-        </p>
-      )}
-      {addPages.status === "error" && (
-        <p
-          role="alert"
-          className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
-        >
-          {addPages.message}
-        </p>
-      )}{" "}
-      <div className="text-xs leading-5 text-ink-500">
-        {onServer === null && accountCheckFailed ? (
-          <p>
-            This browser has your menu saved. We couldn&apos;t check your account just now, so it
-            may also be there — nothing was lost either way.{" "}
-            {onRetryAccountCheck && (
-              <button
-                type="button"
-                onClick={onRetryAccountCheck}
-                className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Try again
+            + Add category
+          </button>
+          <div className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+            <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">Menu</span>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={onExportJson} className={smallButton}>
+                Export JSON
               </button>
-            )}
-          </p>
-        ) : onServer === null ? (
-          <div role="status" aria-busy="true" className="flex flex-col gap-2">
-            <span className="sr-only">
-              Checking where this menu is saved. Your edits are saved either way.
-            </span>
-            <Skeleton className="h-3 w-2/3" />
+              <button type="button" onClick={onExportCsv} className={smallButton}>
+                Export CSV
+              </button>
+              <label
+                className={`${smallButton} inline-flex cursor-pointer items-center pointer-coarse:min-h-[44px]`}
+              >
+                Import JSON
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) onImportFile(file);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <span aria-hidden="true" className="hidden flex-1 sm:block" />
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await confirm({
+                  message: `Delete “${doc.title}” permanently from this browser? Export a JSON backup first if it matters.`,
+                  confirmLabel: "Delete menu",
+                  destructive: true,
+                });
+                if (ok) onDeleteMenu();
+              }}
+              className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700 sm:self-auto"
+            >
+              Delete menu
+            </button>
           </div>
-        ) : (
-          <p>
-            {onServer
-              ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a working copy until you sign out."
-              : syncMode === "account"
-                ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
-                : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
-          </p>
-        )}
-      </div>
+          {importError && (
+            <p
+              role="alert"
+              className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+            >
+              {importError}
+            </p>
+          )}
+          {addPages.status === "working" && (
+            <p
+              role="status"
+              className="rounded-xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900"
+            >
+              Reading the new pages… keep this tab open. Your edits are safe.
+            </p>
+          )}
+          {addPages.status === "added" && (
+            <p
+              role="status"
+              className="flex items-start gap-2 rounded-xl border border-line-200 bg-surface-base px-4 py-3 text-sm text-ink-700"
+            >
+              <span
+                aria-hidden="true"
+                className="mt-1.5 size-1.5 shrink-0 rounded-full bg-success-700"
+              />
+              <span>
+                Added {addPages.items} {addPages.items === 1 ? "item" : "items"} in{" "}
+                {addPages.categories} {addPages.categories === 1 ? "category" : "categories"} from
+                the new pages. Repeats with the existing menu appear in the duplicate review.
+              </span>
+            </p>
+          )}
+          {addPages.status === "error" && (
+            <p
+              role="alert"
+              className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-800"
+            >
+              {addPages.message}
+            </p>
+          )}{" "}
+          <div className="text-xs leading-5 text-ink-500">
+            {onServer === null && accountCheckFailed ? (
+              <p>
+                This browser has your menu saved. We couldn&apos;t check your account just now, so
+                it may also be there — nothing was lost either way.{" "}
+                {onRetryAccountCheck && (
+                  <button
+                    type="button"
+                    onClick={onRetryAccountCheck}
+                    className="font-medium text-accent-800 underline underline-offset-2 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  >
+                    Try again
+                  </button>
+                )}
+              </p>
+            ) : onServer === null ? (
+              <div role="status" aria-busy="true" className="flex flex-col gap-2">
+                <span className="sr-only">
+                  Checking where this menu is saved. Your edits are saved either way.
+                </span>
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            ) : (
+              <p>
+                {onServer
+                  ? "This menu is saved to your account, so signing in on another device shows the same menu. This browser keeps a working copy until you sign out."
+                  : syncMode === "account"
+                    ? "This menu is saved in this browser only. Add it to your account to use it on other devices, or export a JSON backup."
+                    : "This menu is saved in this browser only — it doesn't appear on other devices. Sign in to save it to your account, or export a JSON backup."}
+              </p>
+            )}
+          </div>
+        </>
+      ) : subTab === "settings" ? (
+        <EditorSubTabPlaceholder
+          title="Settings & hours moves here"
+          body="Menu title, opening hours, import, export, and delete land on this tab in a later step. Everything is still under Categories."
+          actionLabel="Go to Categories"
+          onAction={() => goSubTab("categories")}
+        />
+      ) : (
+        <EditorSubTabPlaceholder
+          title="Add-on sets move here"
+          body="The inline set editor lands on this tab in a later step. The existing dialog still works meanwhile."
+          actionLabel="Open add-on sets"
+          onAction={() => setModifiersOpen(true)}
+        />
+      )}
       {modifiersOpen && canManage && (
         <div
           className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-scrim p-4 sm:items-center"
@@ -1420,6 +1524,66 @@ export function MenuEditor({
         </div>
       )}
       {dialog}
+    </div>
+  );
+}
+
+/** One tab in the editor strip: underline + bold dark text when active, so
+ * the underline is never the only signal (§7). */
+function EditorTab({
+  label,
+  selected,
+  onSelect,
+  badge,
+}: {
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+  badge?: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+        selected
+          ? "border-accent-700 font-bold text-accent-800"
+          : "border-transparent font-medium text-ink-500 hover:border-line-300 hover:text-ink-900"
+      }`}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        {label}
+        {badge}
+      </span>
+    </button>
+  );
+}
+
+/** Standing in for a sub-tab whose content lands in a later build step. */
+function EditorSubTabPlaceholder({
+  title,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  body: string;
+  actionLabel: string;
+  onAction: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-line-200 bg-surface-base p-6 text-center">
+      <p className="text-sm font-semibold text-ink-900">{title}</p>
+      <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-ink-500">{body}</p>
+      <button
+        type="button"
+        onClick={onAction}
+        className="mt-3 rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+      >
+        {actionLabel}
+      </button>
     </div>
   );
 }
