@@ -140,8 +140,6 @@ describe("selection persistence", () => {
 
   it("never throws without storage", () => {
     expect(readSelection("menu-1")).toBeNull();
-    expect(() =>
-      writeSelection("menu-1", { categoryId: "c1", itemId: null })
-    ).not.toThrow();
+    expect(() => writeSelection("menu-1", { categoryId: "c1", itemId: null })).not.toThrow();
   });
 });

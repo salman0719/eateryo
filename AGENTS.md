@@ -122,11 +122,11 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/components/menu-editor/category-strip.tsx`, `dish-row.tsx`,
   `item-inspector.tsx`, `src/features/menu/editor-selection.ts` — the
   Categories tab's shape: one strip (category tabs · menu-wide search ·
-  + Category), one category on the canvas, and the selected dish in a sticky
-  340px inspector (one column below `lg`, where a selected dish replaces the
-  list). Selection is per-menu device state, resolved against the live
-  document every render, and replaces the old fold model (`fold.ts`, retired):
-  nothing in this tab collapses, so a dish's form never unfolds under a row.
+  - Category), one category on the canvas, and the selected dish in a sticky
+    340px inspector (one column below `lg`, where a selected dish replaces the
+    list). Selection is per-menu device state, resolved against the live
+    document every render, and replaces the old fold model (`fold.ts`, retired):
+    nothing in this tab collapses, so a dish's form never unfolds under a row.
 - `src/components/tables/restaurant-tables.tsx` — the signed-in Tables tab:
   restaurant picker for owners and staff; one QR per table, scoped to the
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
