@@ -1284,6 +1284,103 @@ export function MenuEditor({
           >
             + Add category
           </button>
+        </>
+      ) : subTab === "settings" ? (
+        <>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
+              <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+                <CommitInput
+                  label="Menu title"
+                  value={doc.title}
+                  onCommit={(title) => onChange({ ...doc, title: title.trim() })}
+                />
+                <CommitInput
+                  label="Currency"
+                  value={doc.currency ?? ""}
+                  validate={() => null}
+                  placeholder="e.g. USD"
+                  onCommit={(currency) =>
+                    onChange({ ...doc, currency: currency.trim() ? currency.trim() : null })
+                  }
+                />
+              </div>
+              {sourceLabel &&
+                (doc.source?.provider === "demo" ? (
+                  <p className="mt-2 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
+                    Demo data
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-ink-500">
+                    {sourceLabel}
+                    {doc.source?.originalFileName && (
+                      <span className="text-ink-500"> · {doc.source.originalFileName}</span>
+                    )}
+                  </p>
+                ))}
+              {(imageUrl || canManage) && (
+                <div className="mt-3">
+                  {imageUrl && (
+                    <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>
+                  )}
+                  <div className="flex items-stretch gap-3">
+                    {imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element -- source image is a local blob object URL, which the optimizer cannot handle
+                      <img
+                        src={imageUrl}
+                        alt="Original uploaded menu"
+                        className="max-h-28 w-auto self-center rounded-lg border border-line-200 object-contain"
+                      />
+                    )}
+                    {canManage && (
+                      <label
+                        className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-accent-700 hover:bg-accent-50 focus-within:border-accent-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="text-xl leading-none font-bold text-ink-500"
+                        >
+                          +
+                        </span>
+                        <span className="text-xs font-semibold text-ink-700">
+                          {addPages.status === "working" ? "Reading pages…" : "Add pages"}
+                        </span>
+                        <span className="text-[11px] leading-4 text-ink-500">
+                          Photograph more pages of this menu to add their items
+                        </span>
+                        <input
+                          ref={addPagesInputRef}
+                          type="file"
+                          multiple
+                          accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
+                          className="sr-only"
+                          disabled={addPages.status === "working"}
+                          onChange={(event) => {
+                            const files = Array.from(event.target.files ?? []);
+                            event.target.value = "";
+                            if (files.length > 0) void handleAddPages(files);
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              )}
+              {reviewCount > 0 && (
+                <p className="mt-2 text-xs font-medium text-warning-800">
+                  {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
+                </p>
+              )}
+            </div>
+            <AvailabilityPanel
+              key={doc.id}
+              menuId={doc.id}
+              // Opening hours live with the menu in your account: a browser-only
+              // menu has no availability row to fetch, account mode or not.
+              syncMode={onServer ? "account" : "local"}
+              canManage={canManage}
+            />
+          </div>
           <div className="flex flex-col gap-3 rounded-2xl border border-line-200 bg-surface-base p-4 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
             <span className="text-xs font-semibold tracking-wide text-ink-500 uppercase">Menu</span>
             <div className="flex flex-wrap gap-2">
@@ -1398,99 +1495,6 @@ export function MenuEditor({
             )}
           </div>
         </>
-      ) : subTab === "settings" ? (
-        <div className="grid items-start gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-line-200 bg-surface-base p-5">
-            <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-              <CommitInput
-                label="Menu title"
-                value={doc.title}
-                onCommit={(title) => onChange({ ...doc, title: title.trim() })}
-              />
-              <CommitInput
-                label="Currency"
-                value={doc.currency ?? ""}
-                validate={() => null}
-                placeholder="e.g. USD"
-                onCommit={(currency) =>
-                  onChange({ ...doc, currency: currency.trim() ? currency.trim() : null })
-                }
-              />
-            </div>
-            {sourceLabel &&
-              (doc.source?.provider === "demo" ? (
-                <p className="mt-2 inline-block rounded-full bg-info-100 px-2.5 py-0.5 text-xs font-semibold text-info-900">
-                  Demo data
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-ink-500">
-                  {sourceLabel}
-                  {doc.source?.originalFileName && (
-                    <span className="text-ink-500"> · {doc.source.originalFileName}</span>
-                  )}
-                </p>
-              ))}
-            {(imageUrl || canManage) && (
-              <div className="mt-3">
-                {imageUrl && <p className="mb-1 text-xs font-medium text-ink-500">Source image</p>}
-                <div className="flex items-stretch gap-3">
-                  {imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element -- source image is a local blob object URL, which the optimizer cannot handle
-                    <img
-                      src={imageUrl}
-                      alt="Original uploaded menu"
-                      className="max-h-28 w-auto self-center rounded-lg border border-line-200 object-contain"
-                    />
-                  )}
-                  {canManage && (
-                    <label
-                      className={`flex min-w-36 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-300 bg-surface-50 px-4 py-2 text-center transition-colors hover:border-accent-700 hover:bg-accent-50 focus-within:border-accent-700 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent-700 ${addPages.status === "working" ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="text-xl leading-none font-bold text-ink-500"
-                      >
-                        +
-                      </span>
-                      <span className="text-xs font-semibold text-ink-700">
-                        {addPages.status === "working" ? "Reading pages…" : "Add pages"}
-                      </span>
-                      <span className="text-[11px] leading-4 text-ink-500">
-                        Photograph more pages of this menu to add their items
-                      </span>
-                      <input
-                        ref={addPagesInputRef}
-                        type="file"
-                        multiple
-                        accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-                        className="sr-only"
-                        disabled={addPages.status === "working"}
-                        onChange={(event) => {
-                          const files = Array.from(event.target.files ?? []);
-                          event.target.value = "";
-                          if (files.length > 0) void handleAddPages(files);
-                        }}
-                      />
-                    </label>
-                  )}
-                </div>
-              </div>
-            )}
-            {reviewCount > 0 && (
-              <p className="mt-2 text-xs font-medium text-warning-800">
-                {reviewCount} {reviewCount === 1 ? "item" : "items"} to check below.
-              </p>
-            )}
-          </div>
-          <AvailabilityPanel
-            key={doc.id}
-            menuId={doc.id}
-            // Opening hours live with the menu in your account: a browser-only
-            // menu has no availability row to fetch, account mode or not.
-            syncMode={onServer ? "account" : "local"}
-            canManage={canManage}
-          />
-        </div>
       ) : (
         <ModifiersPanel doc={doc} canManage={canManage} onChange={onChange} />
       )}
