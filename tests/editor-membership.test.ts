@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MenuEditor } from "@/components/menu-editor/menu-editor";
 import { PublishPanel } from "@/components/menu-editor/publish-panel";
@@ -17,8 +17,28 @@ import { createSampleMenuDocument } from "@/features/menu/sample-menu";
  * and never the café-creating flow.
  */
 
-function renderEditor(onServer: boolean | null, accountCheckFailed = false): string {
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/**
+ * Which tab the editor shows. The sample menu has dishes, so the entry rule
+ * lands on Categories; pass "settings" to read the management surface the
+ * Settings tab owns since step 10 (identity, hours, footnote).
+ */
+function renderEditor(
+  onServer: boolean | null,
+  accountCheckFailed = false,
+  tab: "settings" | null = null
+): string {
   const doc = createSampleMenuDocument();
+  if (tab) {
+    const store = new Map<string, string>([[`menu-editor-subtab:${doc.id}`, tab]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    });
+  }
   return renderToStaticMarkup(
     createElement(MenuEditor, {
       doc,
@@ -102,36 +122,48 @@ describe("editor storage copy", () => {
   });
 
   it("offers the move once a read proved the menu is browser-only", () => {
-    const html = renderEditor(false);
-    expect(html).toContain("Add it to your account");
-    expect(html).toContain("we create your café");
-    expect(html).not.toContain("Checking where this menu is saved");
+    // The footnote lives on Settings since step 10; the publish hint stays
+    // on Categories. Same state, one tab each — switching tabs is the only
+    // difference.
+    const settings = renderEditor(false, false, "settings");
+    expect(settings).toContain("Add it to your account");
+    const categories = renderEditor(false);
+    expect(categories).toContain("we create your café");
+    expect(categories).not.toContain("Checking where this menu is saved");
+    // And neither surface leaks onto the other's tab.
+    expect(categories).not.toContain("Add it to your account");
+    expect(settings).not.toContain("we create your café");
   });
 
   it("says the account owns it when it does", () => {
-    const html = renderEditor(true);
-    expect(html).toContain("saved to your account");
-    expect(html).not.toContain("Add it to your account");
-    expect(html).toContain("to publish it for your tables");
+    const settings = renderEditor(true, false, "settings");
+    expect(settings).toContain("saved to your account");
+    expect(settings).not.toContain("Add it to your account");
+    const categories = renderEditor(true);
+    expect(categories).toContain("to publish it for your tables");
   });
 });
 
 describe("editor copy after a failed account read", () => {
   it("says the account couldn't be checked instead of claiming the browser", () => {
-    const html = renderEditor(null, true);
-    expect(html).toContain("Saved here");
-    expect(html).toContain("We couldn");
-    expect(html).toContain("may also be there");
+    const settings = renderEditor(null, true, "settings");
+    expect(settings).toContain("Saved here");
+    expect(settings).toContain("We couldn");
+    expect(settings).toContain("may also be there");
     // An answer is not a wait, so the placeholders are gone.
-    expect(html).not.toContain("Checking where this menu is saved");
-    expect(html).not.toContain("animate-pulse");
+    expect(settings).not.toContain("Checking where this menu is saved");
+    expect(settings).not.toContain("animate-pulse");
     // Neither false claim: no browser-only sentence, no move offer, and no
     // café-creating publish flow offered on a guess (007).
-    expect(html).not.toContain("browser only");
-    expect(html).not.toContain("Add it to your account");
-    expect(html).not.toContain("we create your café");
-    // The retry is the only way forward, and it is offered on every surface.
-    expect(html.match(/Try again/g)).toHaveLength(2);
+    expect(settings).not.toContain("browser only");
+    expect(settings).not.toContain("Add it to your account");
+    expect(settings).not.toContain("we create your café");
+    // The retry is the only way forward, and it is offered on both tabs.
+    expect(settings.match(/Try again/g)).toHaveLength(1);
+    const categories = renderEditor(null, true);
+    expect(categories).not.toContain("Checking where this menu is saved");
+    expect(categories).not.toContain("we create your café");
+    expect(categories.match(/Try again/g)).toHaveLength(1);
   });
 });
 
