@@ -9,14 +9,22 @@ import {
   hasAnyPrice,
   isItemFlagged,
   moveItemToCategory,
+  setLabelMeaning,
   updateItem,
 } from "@/features/menu/menu-utils";
+import {
+  cleanDietaryLabel,
+  dedupeDietaryLabels,
+  dietaryLabelMeaning,
+  isStarterDietaryLabel,
+} from "@/features/menu/dietary-labels";
 import { formatItemPrice } from "@/features/menu/preview-utils";
 import type { MenuDocument, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { itemImageCopy } from "@/features/item-images/ref";
 
-import { CommitInput, CommitNumber, CommitTags } from "./fields";
+import { CommitInput, CommitNumber } from "./fields";
 import { ItemImagePanel } from "./item-image-panel";
+import { LabelPicker } from "./label-picker";
 import { OptionGroupForm } from "./option-group-form";
 import { addModifierTemplate } from "@/features/menu/modifier-templates";
 
@@ -35,8 +43,6 @@ interface ItemEditorProps {
    * component's memo actually hold when a fold toggle re-renders the editor.
    */
   actions: ItemActions;
-  /** Labels this menu already uses, computed once for the whole editor. */
-  labelVocabulary: readonly string[];
   /** Flagged by duplicate detection (review-only badge, see duplicates.ts). */
   duplicate: boolean;
   /**
@@ -74,7 +80,6 @@ export const ItemEditor = memo(function ItemEditor({
   item,
   categories,
   actions,
-  labelVocabulary,
   duplicate,
   open,
   selected,
@@ -112,6 +117,40 @@ export const ItemEditor = memo(function ItemEditor({
   );
   const [applyPick, setApplyPick] = useState("");
   const pickedTemplate = appliableTemplates.find((template) => template.name === applyPick);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const chips = dedupeDietaryLabels(item.dietaryLabels);
+
+  function toggleLabel(code: string, on: boolean) {
+    const key = cleanDietaryLabel(code).toLowerCase();
+    const current = dedupeDietaryLabels(item.dietaryLabels);
+    const next = on
+      ? current.some((label) => label.toLowerCase() === key)
+        ? current
+        : [...current, cleanDietaryLabel(code)]
+      : current.filter((label) => label.toLowerCase() !== key);
+    patch({ dietaryLabels: next });
+  }
+
+  /**
+   * Add-new from the picker: the label lands on this dish, and a custom
+   * code's meaning lands on the menu in the same document — one change, so
+   * the two can never half-save. Starter codes keep their dictionary
+   * explanations.
+   */
+  function addNewLabel(code: string, meaning: string) {
+    const label = cleanDietaryLabel(code);
+    const key = label.toLowerCase();
+    const current = dedupeDietaryLabels(item.dietaryLabels);
+    const next = current.some((entry) => entry.toLowerCase() === key)
+      ? current
+      : [...current, label];
+    const withLabel = updateItem(doc, categoryId, item.id, { dietaryLabels: next });
+    actions.change(
+      !isStarterDietaryLabel(label) && cleanDietaryLabel(meaning) !== ""
+        ? setLabelMeaning(withLabel, label, meaning)
+        : withLabel
+    );
+  }
 
   return (
     <li
@@ -284,15 +323,51 @@ export const ItemEditor = memo(function ItemEditor({
           </div>
 
           <div className="mt-3">
-            <CommitTags
-              label="Dietary labels"
-              value={item.dietaryLabels}
-              suggestions={labelVocabulary}
-              placeholder="Add a label…"
-              hint="Only labels the menu itself shows — never inferred."
-              onCommit={(dietaryLabels) => patch({ dietaryLabels })}
-            />
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">
+                Dietary labels
+              </p>
+              <span className="flex-1" />
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                onClick={() => setPickerOpen(true)}
+                className={smallButton}
+              >
+                {chips.length > 0 ? "Edit labels" : "+ Add labels"}
+              </button>
+            </div>
+            {chips.length > 0 ? (
+              <p className="mt-1.5 flex flex-wrap gap-1.5">
+                {chips.map((label) => {
+                  const meaning = dietaryLabelMeaning(doc, label);
+                  return (
+                    <span
+                      key={label}
+                      tabIndex={0}
+                      title={meaning ?? undefined}
+                      className="rounded-full bg-surface-100 px-2.5 py-0.5 text-xs font-medium text-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                    >
+                      {label}
+                    </span>
+                  );
+                })}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-ink-500">
+                No labels — only labels the menu itself shows, never inferred.
+              </p>
+            )}
           </div>
+          {pickerOpen && (
+            <LabelPicker
+              doc={doc}
+              applied={chips}
+              onToggle={toggleLabel}
+              onAddNew={addNewLabel}
+              onClose={() => setPickerOpen(false)}
+            />
+          )}
 
           <div className="mt-3 rounded-lg bg-surface-50 p-3">
             <p className="text-xs font-semibold tracking-wide text-ink-600 uppercase">

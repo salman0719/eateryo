@@ -45,7 +45,6 @@ import {
 import { flatSearchRows, searchMenu, type SearchResultRow } from "@/features/menu/search";
 import { CategoryHeader } from "./category-header";
 import { CategoryPills, SearchResultsList } from "./category-pills";
-import { dietaryLabelVocabulary } from "@/features/menu/dietary-labels";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
 import {
@@ -204,7 +203,6 @@ export function MenuEditor({
     () => doc.categories.map((category) => ({ id: category.id, name: category.name })),
     [doc.categories]
   );
-  const labelVocabulary = useMemo(() => dietaryLabelVocabulary([doc]), [doc]);
 
   // Search box: pure client-side filter, see search.ts for the rules.
   const [query, setQuery] = useState("");
@@ -1422,7 +1420,6 @@ export function MenuEditor({
                               item={item}
                               categories={categoryChoices}
                               actions={itemActions}
-                              labelVocabulary={labelVocabulary}
                               duplicate={duplicateIds.has(item.id)}
                               selected={selectedIds.has(item.id)}
                               canUploadImage={canUploadItemImages}
