@@ -1153,12 +1153,12 @@ export function MenuEditor({
             <div
               role="region"
               aria-label="Bulk actions"
-              className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-300 bg-warning-50/95 p-3 shadow-sm backdrop-blur"
+              className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3 shadow-sm"
             >
-              <p className="text-xs font-semibold text-warning-900">
+              <p className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-semibold text-accent-800">
                 {selected.length} {selected.length === 1 ? "item" : "items"} selected
               </p>
-              <label className="flex items-center gap-1.5 text-xs text-warning-900">
+              <label className="flex items-center gap-1.5 text-xs text-ink-600">
                 Move to
                 <select
                   aria-label="Category to move selected items to"
@@ -1185,7 +1185,7 @@ export function MenuEditor({
               <button
                 type="button"
                 onClick={() => void handleBulkDelete()}
-                className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                className={`${smallButton} hover:border-danger-700 hover:text-danger-800`}
               >
                 Delete selected
               </button>
