@@ -43,11 +43,14 @@ export const DIETARY_LABEL_MEANINGS: Record<(typeof STARTER_DIETARY_LABELS)[numb
 
 /** The shape a suggestion list is derived from: a menu document, or anything
  * that carries categories of items. Structural, so this module needs no import
- * of the canonical schema and cannot drift with it. */
+ * of the canonical schema and cannot drift with it. `labelMeanings` keys
+ * count as vocabulary too, so a stored custom meaning outlives the last dish
+ * that carried it instead of vanishing with it. */
 export interface DietaryLabelSource {
   categories: ReadonlyArray<{
     items: ReadonlyArray<{ dietaryLabels: readonly string[] }>;
   }>;
+  labelMeanings?: Readonly<Record<string, string>>;
 }
 
 /** Collapse whitespace and trim. Labels come from photos, CSV and typing. */
@@ -106,6 +109,16 @@ export function dietaryLabelUsage(docs: readonly DietaryLabelSource[]): DietaryL
       }
     }
   }
+  for (const doc of docs) {
+    const meanings = doc.labelMeanings;
+    if (!meanings) continue;
+    for (const key of Object.keys(meanings)) {
+      const label = cleanDietaryLabel(key);
+      if (!label) continue;
+      const lower = label.toLowerCase();
+      if (!counts.has(lower)) counts.set(lower, { label, count: 0 });
+    }
+  }
   for (const label of STARTER_DIETARY_LABELS) {
     const key = label.toLowerCase();
     if (!counts.has(key)) counts.set(key, { label, count: 0 });
@@ -120,6 +133,15 @@ export function dietaryLabelUsage(docs: readonly DietaryLabelSource[]): DietaryL
  */
 export function dietaryLabelVocabulary(docs: readonly DietaryLabelSource[]): string[] {
   return dietaryLabelUsage(docs).map((entry) => entry.label);
+}
+
+/** Whether a code resolves from the built-in dictionary (no stored meaning
+ * needed). Case-insensitive, like everything else about labels. */
+export function isStarterDietaryLabel(code: string): boolean {
+  return (
+    (DIETARY_LABEL_MEANINGS as Record<string, string>)[cleanDietaryLabel(code).toLowerCase()] !==
+    undefined
+  );
 }
 
 /** The shape meaning resolution reads: a menu document, or anything carrying
