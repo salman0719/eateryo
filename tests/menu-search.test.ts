@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { addCategory, addItem, createMenuDocument } from "../src/features/menu/menu-utils";
-import { searchMenu } from "../src/features/menu/search";
+import { flatSearchRows, searchMenu } from "../src/features/menu/search";
 
 function setupMenu() {
   let doc = createMenuDocument({ title: "Café" });
@@ -65,5 +65,27 @@ describe("searchMenu", () => {
     expect(result.categories).toEqual([]);
     expect(result.matchCount).toBe(0);
     expect(result.totalItems).toBe(3);
+  });
+});
+
+describe("flatSearchRows", () => {
+  it("flattens matches into document-order rows carrying their category", () => {
+    const doc = setupMenu();
+    const rows = flatSearchRows(doc, "e");
+    expect(rows.map((row) => row.item.name)).toEqual(["Espresso", "Latte", "Toastie"]);
+    expect(rows.map((row) => row.categoryName)).toEqual(["Coffee", "Coffee", "Food"]);
+    expect(rows[0].categoryId).toBe(doc.categories[0].id);
+    // Identity survives flattening: a pick jumps to the real dish.
+    expect(rows[1].item.id).toBe(doc.categories[0].items[1].id);
+  });
+
+  it("includes every item when the category name matches", () => {
+    const doc = setupMenu();
+    const rows = flatSearchRows(doc, "coffee");
+    expect(rows.map((row) => row.item.name)).toEqual(["Espresso", "Latte"]);
+  });
+
+  it("returns no rows when nothing matches", () => {
+    expect(flatSearchRows(setupMenu(), "zzz-not-on-this-menu")).toEqual([]);
   });
 });
