@@ -1126,7 +1126,7 @@ export function MenuEditor({
                 data-menu-section={selectedCategory.id}
                 id={`menu-section-${selectedCategory.id}`}
                 aria-label={`Category ${selectedCategory.name}`}
-                className="scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+                className={`${selection.itemId ? "hidden lg:block " : ""}scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
               >
                 {/* One category on the canvas: its band holds the name, the
               count, and the two things that act on the category itself. */}
