@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 import { Collapse } from "@/components/ui/collapse";
@@ -59,6 +59,7 @@ import {
   type EditorSubTab,
   type ReorderScope,
 } from "@/features/menu/editor-tabs";
+import { dropInsertIndex, type DropEdge } from "@/features/menu/reorder";
 import { SUPPORTED_IMAGE_MIME_TYPES, validateImageBatch } from "@/lib/image-constraints";
 import { ExtractClientError, extractMenuFromFiles } from "@/lib/extract-client";
 import { PrepareImageError, prepareImageForUpload } from "@/lib/prepare-image";
@@ -502,6 +503,70 @@ export function MenuEditor({
     if (categoryId) writeReorderCategory(doc.id, categoryId);
   }
 
+  // HTML5 drag-and-drop for the Reorder tab (redesign step 11): rows carry
+  // a grip, the row under the pointer shows an accent insertion line above
+  // or below it, and the drop commits through the move helpers — the same
+  // commit the steppers make, so the save state updates the same way.
+  // Steppers stay on every row as the touch and keyboard path (SPEC §7).
+  // Only our own rows are droppable: anything else (e.g. files) is left
+  // for the browser, and a foreign row id never reaches the drop math.
+  const ROW_MIME = "text/menu-row";
+  const [dropTarget, setDropTarget] = useState<{
+    overId: string;
+    edge: DropEdge;
+  } | null>(null);
+
+  function startRowDrag(event: DragEvent<HTMLLIElement>, id: string) {
+    event.dataTransfer.setData(ROW_MIME, id);
+    event.dataTransfer.effectAllowed = "move";
+  }
+
+  function rowEdge(event: DragEvent<HTMLLIElement>): DropEdge {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  }
+
+  function overRow(event: DragEvent<HTMLLIElement>, id: string) {
+    if (!event.dataTransfer.types.includes(ROW_MIME)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const edge = rowEdge(event);
+    setDropTarget((prev) =>
+      prev && prev.overId === id && prev.edge === edge ? prev : { overId: id, edge }
+    );
+  }
+
+  function endRowDrag() {
+    setDropTarget(null);
+  }
+
+  function dropLine(id: string, edge: DropEdge) {
+    return dropTarget && dropTarget.overId === id && dropTarget.edge === edge ? (
+      <div aria-hidden="true" className="mx-3 h-0.5 rounded-full bg-accent-700" />
+    ) : null;
+  }
+
+  function dropCategoryRow(event: DragEvent<HTMLLIElement>, targetId: string) {
+    event.preventDefault();
+    const draggedId = event.dataTransfer.getData(ROW_MIME);
+    setDropTarget(null);
+    const ids = doc.categories.map((category) => category.id);
+    if (!draggedId || !ids.includes(draggedId)) return;
+    const at = dropInsertIndex(ids, draggedId, targetId, rowEdge(event));
+    if (at !== null) onChange(moveCategory(doc, draggedId, at));
+  }
+
+  function dropItemRow(event: DragEvent<HTMLLIElement>, targetId: string) {
+    event.preventDefault();
+    const draggedId = event.dataTransfer.getData(ROW_MIME);
+    setDropTarget(null);
+    if (!activeReorderCategory) return;
+    const ids = activeReorderCategory.items.map((item) => item.id);
+    if (!draggedId || !ids.includes(draggedId)) return;
+    const at = dropInsertIndex(ids, draggedId, targetId, rowEdge(event));
+    if (at !== null) onChange(moveItem(doc, activeReorderCategory.id, draggedId, at));
+  }
+
   /** The draft is ahead of what table ordering serves right now. */
   const needsPublish =
     publishing?.status?.isLive === true && publishing.status.hasUnpublishedChanges;
@@ -840,32 +905,44 @@ export function MenuEditor({
               {doc.categories.map((category, categoryIndex) => (
                 <li
                   key={category.id}
-                  className="flex items-center gap-1.5 rounded-xl border border-line-200 px-3 py-2"
+                  draggable
+                  onDragStart={(event) => startRowDrag(event, category.id)}
+                  onDragOver={(event) => overRow(event, category.id)}
+                  onDrop={(event) => dropCategoryRow(event, category.id)}
+                  onDragEnd={endRowDrag}
+                  className="rounded-xl border border-line-200"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
-                    {category.name || "Untitled category"}
-                    <span className="ml-2 font-normal text-ink-500">
-                      {category.items.length} {category.items.length === 1 ? "item" : "items"}
+                  {dropLine(category.id, "before")}
+                  <div className="flex items-center gap-1.5 px-3 py-2">
+                    <span aria-hidden="true" className="shrink-0 cursor-grab text-ink-400">
+                      ⋮⋮
                     </span>
-                  </span>
-                  <button
-                    type="button"
-                    disabled={categoryIndex <= 0}
-                    onClick={() => onChange(moveCategory(doc, category.id, categoryIndex - 1))}
-                    aria-label={`Move ${category.name || "category"} up`}
-                    className={tinyButton}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    disabled={categoryIndex >= doc.categories.length - 1}
-                    onClick={() => onChange(moveCategory(doc, category.id, categoryIndex + 1))}
-                    aria-label={`Move ${category.name || "category"} down`}
-                    className={tinyButton}
-                  >
-                    ↓
-                  </button>
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-900">
+                      {category.name || "Untitled category"}
+                      <span className="ml-2 font-normal text-ink-500">
+                        {category.items.length} {category.items.length === 1 ? "item" : "items"}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={categoryIndex <= 0}
+                      onClick={() => onChange(moveCategory(doc, category.id, categoryIndex - 1))}
+                      aria-label={`Move ${category.name || "category"} up`}
+                      className={tinyButton}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      disabled={categoryIndex >= doc.categories.length - 1}
+                      onClick={() => onChange(moveCategory(doc, category.id, categoryIndex + 1))}
+                      aria-label={`Move ${category.name || "category"} down`}
+                      className={tinyButton}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  {dropLine(category.id, "after")}
                 </li>
               ))}
             </ol>
@@ -894,58 +971,70 @@ export function MenuEditor({
                     return (
                       <li
                         key={item.id}
-                        className="flex items-center gap-1.5 rounded-xl border border-line-200 px-3 py-1.5"
+                        draggable
+                        onDragStart={(event) => startRowDrag(event, item.id)}
+                        onDragOver={(event) => overRow(event, item.id)}
+                        onDrop={(event) => dropItemRow(event, item.id)}
+                        onDragEnd={endRowDrag}
+                        className="rounded-xl border border-line-200"
                       >
-                        <span
-                          aria-hidden="true"
-                          className="w-6 shrink-0 text-right text-xs text-ink-500"
-                        >
-                          {index + 1}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
-                          {label}
-                        </span>
-                        {duplicateIds.has(item.id) && (
-                          <span
-                            title="This name appears more than once — see the duplicate review on the Categories tab."
-                            className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
-                          >
-                            duplicate
+                        {dropLine(item.id, "before")}
+                        <div className="flex items-center gap-1.5 px-3 py-1.5">
+                          <span aria-hidden="true" className="shrink-0 cursor-grab text-ink-400">
+                            ⋮⋮
                           </span>
-                        )}
-                        {item.reviewNotes.length > 0 && (
                           <span
-                            title={item.reviewNotes.join("\n")}
-                            className="shrink-0 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
+                            aria-hidden="true"
+                            className="w-6 shrink-0 text-right text-xs text-ink-500"
                           >
-                            {hasAnyPrice(item) ? "couldn't read" : "check price"}
+                            {index + 1}
                           </span>
-                        )}
-                        <span className="shrink-0 text-xs whitespace-nowrap text-ink-500">
-                          {formatItemPrice(item, doc.currency)}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={index <= 0}
-                          onClick={() =>
-                            onChange(moveItem(doc, activeReorderCategory.id, item.id, index - 1))
-                          }
-                          aria-label={`Move ${label} up`}
-                          className={tinyButton}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          disabled={index >= activeReorderCategory.items.length - 1}
-                          onClick={() =>
-                            onChange(moveItem(doc, activeReorderCategory.id, item.id, index + 1))
-                          }
-                          aria-label={`Move ${label} down`}
-                          className={tinyButton}
-                        >
-                          ↓
-                        </button>
+                          <span className="min-w-0 flex-1 truncate text-sm text-ink-800">
+                            {label}
+                          </span>
+                          {duplicateIds.has(item.id) && (
+                            <span
+                              title="This name appears more than once — see the duplicate review on the Categories tab."
+                              className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
+                            >
+                              duplicate
+                            </span>
+                          )}
+                          {item.reviewNotes.length > 0 && (
+                            <span
+                              title={item.reviewNotes.join("\n")}
+                              className="shrink-0 rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-600"
+                            >
+                              {hasAnyPrice(item) ? "couldn't read" : "check price"}
+                            </span>
+                          )}
+                          <span className="shrink-0 text-xs whitespace-nowrap text-ink-500">
+                            {formatItemPrice(item, doc.currency)}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={index <= 0}
+                            onClick={() =>
+                              onChange(moveItem(doc, activeReorderCategory.id, item.id, index - 1))
+                            }
+                            aria-label={`Move ${label} up`}
+                            className={tinyButton}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            disabled={index >= activeReorderCategory.items.length - 1}
+                            onClick={() =>
+                              onChange(moveItem(doc, activeReorderCategory.id, item.id, index + 1))
+                            }
+                            aria-label={`Move ${label} down`}
+                            className={tinyButton}
+                          >
+                            ↓
+                          </button>
+                        </div>
+                        {dropLine(item.id, "after")}
                       </li>
                     );
                   })}
