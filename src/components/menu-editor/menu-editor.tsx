@@ -45,6 +45,7 @@ import {
 import { flatSearchRows, searchMenu, type SearchResultRow } from "@/features/menu/search";
 import { CategoryHeader } from "./category-header";
 import { CategoryPills, SearchResultsList } from "./category-pills";
+import { DuplicateReview } from "./duplicate-review";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
 import {
@@ -843,7 +844,7 @@ export function MenuEditor({
                             </span>
                             {duplicateIds.has(item.id) && (
                               <span
-                                title="This name appears more than once — see the duplicate review on the edit screen."
+                                title="This name appears more than once — see the duplicate review on the Categories tab."
                                 className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900"
                               >
                                 duplicate
@@ -1080,65 +1081,12 @@ export function MenuEditor({
               canManage={canManage}
             />
           </div>
-          {duplicateGroups.length > 0 && (
-            <section
-              aria-label="Possible duplicates"
-              className="rounded-2xl border border-warning-300 bg-warning-50/70 p-4"
-            >
-              <p className="text-sm font-semibold text-warning-900">
-                {duplicateGroups.length === 1
-                  ? "1 possible duplicate found — review it; nothing is deleted automatically."
-                  : `${duplicateGroups.length} possible duplicates found — review them; nothing is deleted automatically.`}
-              </p>
-              <ul className="mt-3 space-y-3">
-                {duplicateGroups.map((group) => (
-                  <li
-                    key={group.key}
-                    className="rounded-xl border border-warning-200 bg-surface-base p-3"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-medium text-ink-900">
-                        “{group.displayName}” appears {group.occurrences.length} times
-                      </p>
-                      <span className="flex-1" />
-                      <button
-                        type="button"
-                        onClick={() => dismissGroup(group.key)}
-                        className={smallButton}
-                      >
-                        Keep all
-                      </button>
-                    </div>
-                    <ul className="mt-2 space-y-1.5">
-                      {group.occurrences.map((occurrence) => (
-                        <li
-                          key={occurrence.item.id}
-                          className="flex flex-wrap items-center gap-2 text-sm text-ink-700"
-                        >
-                          <span className="min-w-[160px] flex-1">
-                            {occurrence.item.name}
-                            <span className="text-xs text-ink-500">
-                              {" "}
-                              in {occurrence.categoryName}
-                              {occurrence.item.price !== null &&
-                                ` · ${occurrence.item.currency ?? doc.currency ?? ""}${occurrence.item.price}`}
-                            </span>
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeItem(occurrence.categoryId, occurrence.item)}
-                            className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-                          >
-                            Delete this copy
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+          <DuplicateReview
+            groups={duplicateGroups}
+            currency={doc.currency}
+            onKeepGroup={dismissGroup}
+            onDeleteCopy={(categoryId, item) => void removeItem(categoryId, item)}
+          />
           {doc.categories.length > 0 && (
             <CategoryPills
               pills={doc.categories.map((category) => ({
