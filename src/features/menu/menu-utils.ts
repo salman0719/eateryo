@@ -17,6 +17,7 @@ import {
   type MenuItemImage,
 } from "./schema";
 import type { ItemPatch, NewCategoryInput, NewItemInput } from "./types";
+import { cleanDietaryLabel } from "./dietary-labels";
 
 export function generateId(): string {
   const cryptoObj = globalThis.crypto;
@@ -217,6 +218,23 @@ export function setCategoryCover(
 ): MenuDocument {
   const next = clone(doc);
   findCategory(next, categoryId).cover = cover;
+  return finalize(next);
+}
+
+/**
+ * Write (or, with a blank meaning, clear) a custom label meaning on the
+ * menu. Built-in codes never need this — they resolve from the dictionary —
+ * but the picker stores custom codes here so tooltips survive reloads.
+ */
+export function setLabelMeaning(doc: MenuDocument, code: string, meaning: string): MenuDocument {
+  const label = cleanDietaryLabel(code);
+  if (!label) throw new Error("Label code must not be empty.");
+  const next = clone(doc);
+  const meanings = { ...next.labelMeanings };
+  const cleaned = cleanDietaryLabel(meaning);
+  if (!cleaned) delete meanings[label];
+  else meanings[label] = cleaned;
+  next.labelMeanings = meanings;
   return finalize(next);
 }
 

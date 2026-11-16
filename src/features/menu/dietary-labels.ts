@@ -25,6 +25,22 @@ export const STARTER_DIETARY_LABELS = [
   "spicy",
 ] as const;
 
+/**
+ * Built-in diner-facing explanations for the starter codes. Short on
+ * purpose: they are tooltips and diner-page hints, not articles. Anything
+ * else resolves from the menu's own `labelMeanings`, written in the picker.
+ */
+export const DIETARY_LABEL_MEANINGS: Record<(typeof STARTER_DIETARY_LABELS)[number], string> = {
+  vegan: "No animal products.",
+  vegetarian: "No meat or fish.",
+  "gluten-free": "No wheat, barley or rye — ask about prep.",
+  "dairy-free": "No milk, cheese or butter.",
+  "nut-free": "No peanuts or tree nuts — ask about prep.",
+  halal: "Prepared to halal standards — ask for details.",
+  kosher: "Prepared to kosher standards — ask for details.",
+  spicy: "Has heat — ask how much.",
+};
+
 /** The shape a suggestion list is derived from: a menu document, or anything
  * that carries categories of items. Structural, so this module needs no import
  * of the canonical schema and cannot drift with it. */
@@ -62,13 +78,20 @@ export function sameDietaryLabels(a: readonly string[], b: readonly string[]): b
   return a.length === b.length && a.every((label, index) => label === b[index]);
 }
 
+/** One vocabulary row: the label, kept in its first-seen spelling, and how
+ * many dishes carry it (zero for unused starter codes). */
+export interface DietaryLabelUsage {
+  label: string;
+  count: number;
+}
+
 /**
- * Every label these documents already use, most-used first, then alphabetical
- * (so a steady menu keeps a stable order as the owner types). Labels already
- * in use are never repeated by the starter vocabulary.
+ * Every label these documents use with its usage count, most-used first then
+ * alphabetical — plus the unused starter codes at zero, so the picker can
+ * show the whole vocabulary with counts in one pass.
  */
-export function dietaryLabelVocabulary(docs: readonly DietaryLabelSource[]): string[] {
-  const counts = new Map<string, { label: string; count: number }>();
+export function dietaryLabelUsage(docs: readonly DietaryLabelSource[]): DietaryLabelUsage[] {
+  const counts = new Map<string, DietaryLabelUsage>();
   for (const doc of docs) {
     for (const category of doc.categories) {
       for (const item of category.items) {
@@ -87,9 +110,47 @@ export function dietaryLabelVocabulary(docs: readonly DietaryLabelSource[]): str
     const key = label.toLowerCase();
     if (!counts.has(key)) counts.set(key, { label, count: 0 });
   }
-  return [...counts.values()]
-    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label))
-    .map((entry) => entry.label);
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/**
+ * Every label these documents already use, most-used first, then alphabetical
+ * (so a steady menu keeps a stable order as the owner types). Labels already
+ * in use are never repeated by the starter vocabulary.
+ */
+export function dietaryLabelVocabulary(docs: readonly DietaryLabelSource[]): string[] {
+  return dietaryLabelUsage(docs).map((entry) => entry.label);
+}
+
+/** The shape meaning resolution reads: a menu document, or anything carrying
+ * the per-menu custom meanings the picker writes. */
+export interface DietaryLabelMeaningsSource {
+  labelMeanings?: Readonly<Record<string, string>>;
+}
+
+/**
+ * What a label means to a diner: the menu's own meaning first (custom
+ * codes), then the built-in dictionary, else null — never invented.
+ * Lookup is case-insensitive; stored meanings keep their own spelling.
+ */
+export function dietaryLabelMeaning(
+  source: DietaryLabelMeaningsSource,
+  code: string
+): string | null {
+  const cleaned = cleanDietaryLabel(code);
+  if (!cleaned) return null;
+  const own = source.labelMeanings;
+  if (own) {
+    const exact = own[cleaned];
+    if (exact && cleanDietaryLabel(exact)) return cleanDietaryLabel(exact);
+    const lower = cleaned.toLowerCase();
+    for (const [key, value] of Object.entries(own)) {
+      if (key.toLowerCase() === lower && value && cleanDietaryLabel(value)) {
+        return cleanDietaryLabel(value);
+      }
+    }
+  }
+  return (DIETARY_LABEL_MEANINGS as Record<string, string>)[cleaned.toLowerCase()] ?? null;
 }
 
 interface SuggestOptions {
