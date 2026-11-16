@@ -34,6 +34,9 @@ import { OptionGroupForm } from "./option-group-form";
  *
  * The row keeps the flags (`Couldn't read`, `Possible duplicate`); the editor
  * keeps the document and the selection. This component only edits.
+ *
+ * Its header takes the same wash as the category header — `accent-100`, the
+ * prototype's `--wash` — so the two columns read as one themed surface.
  */
 
 const smallButton =
@@ -131,7 +134,7 @@ export function ItemInspector({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
-      <div className="flex items-start gap-2 border-b border-line-200 bg-surface-50 px-3 py-2.5">
+      <div className="flex items-start gap-2 border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold tracking-wide text-ink-500 uppercase">
             {categoryName || "Untitled category"} · dish {position} of {count}

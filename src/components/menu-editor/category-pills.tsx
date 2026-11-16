@@ -4,22 +4,27 @@ import { formatItemPrice } from "@/features/menu/preview-utils";
 import type { SearchResultRow } from "@/features/menu/search";
 
 /**
- * Step 3 of the redesign: the category pill row and Results mode.
+ * The category pill row, and Results mode.
  *
- * The pills name every category with its dish count; picking one jumps to
- * that section (the editor clears the search first, so a pill always shows
- * the category, never a filtered shadow of it). While a search is active the
- * sections give way to `SearchResultsList`: one flat list where every row
- * carries its category pill, and picking a row jumps to that dish.
+ * The Reorder tab uses the pills to choose which category's dishes are being
+ * arranged — a scope choice, which is what `selected` means. The Categories
+ * tab no longer uses this row: its strip (`category-strip.tsx`) is a tab row
+ * that scrolls and carries the search and the add button, because there one
+ * category is on the canvas at a time.
  *
- * Presentational only — the editor owns query, fold, and scrolling.
+ * While a search is active the rows give way to `SearchResultsList`: one flat
+ * list where every row carries its category pill, and picking a row selects
+ * that dish.
+ *
+ * Presentational only — the editor owns query and selection.
  */
 
 export interface CategoryPill {
   id: string;
   name: string;
   dishCount: number;
-  open: boolean;
+  /** The category this row currently applies to (the reorder scope). */
+  selected: boolean;
 }
 
 export function CategoryPills({
@@ -36,10 +41,10 @@ export function CategoryPills({
         <button
           key={pill.id}
           type="button"
-          aria-pressed={pill.open}
+          aria-pressed={pill.selected}
           onClick={() => onSelect(pill.id)}
           className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-            pill.open
+            pill.selected
               ? "border-accent-700 bg-accent-50 text-accent-900"
               : "border-line-300 bg-surface-base text-ink-600 hover:border-accent-700 hover:text-accent-900"
           }`}
@@ -47,7 +52,7 @@ export function CategoryPills({
           <span className="max-w-40 truncate">{pill.name || "Untitled category"}</span>
           <span
             className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-              pill.open ? "bg-accent-100 text-accent-900" : "bg-surface-100 text-ink-500"
+              pill.selected ? "bg-accent-100 text-accent-900" : "bg-surface-100 text-ink-500"
             }`}
           >
             {pill.dishCount}
