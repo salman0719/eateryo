@@ -29,7 +29,6 @@ function renderRow(itemIndex: number, open: boolean): string {
         delete: noop,
         attachImage: noop,
       },
-      labelVocabulary: [],
       duplicate: false,
       open,
       selected: false,
@@ -52,6 +51,14 @@ describe("item row compaction", () => {
     expect(html).toContain("bg-accent-50");
     expect(html).toContain("border-l-accent-700");
     expect(html).toContain("Double shot, syrupy and bright.");
+  });
+
+  it("shows display-only chips with meanings and an edit entry", () => {
+    const html = renderRow(1, true);
+    expect(html).toContain("Oat Milk Latte");
+    expect(html).toContain("vegan");
+    expect(html).toContain('title="No animal products."');
+    expect(html).toContain("Edit labels");
   });
 
   it("renders availability as a pressed-state segment group", () => {
