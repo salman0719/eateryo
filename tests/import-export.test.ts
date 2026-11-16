@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { setCategoryCover, setCategoryDescription } from "../src/features/menu/menu-utils";
 import { createSampleMenuDocument } from "../src/features/menu/sample-menu";
 import {
   menuFilename,
@@ -19,6 +20,26 @@ describe("menu JSON round-trip", () => {
     // Re-importing creates a copy: fresh document id, preserved inner ids.
     expect(revived.id).not.toBe(original.id);
     expect(revived.categories[0].id).toBe(original.categories[0].id);
+  });
+
+  it("carries category descriptions and covers across the round trip", () => {
+    const original = createSampleMenuDocument();
+    const categoryId = original.categories[0].id;
+    const seeded = setCategoryCover(
+      setCategoryDescription(original, categoryId, "Small plates to open."),
+      categoryId,
+      {
+        url: "https://cdn.example/dish-abc-display.webp",
+        key: "dish-abc-display.webp",
+        width: 1024,
+        height: 640,
+        thumb: null,
+      }
+    );
+    const revived = parseImportedMenu(serializeMenu(seeded));
+    const category = revived.categories.find((c) => c.id === categoryId)!;
+    expect(category.description).toBe("Small plates to open.");
+    expect(category.cover?.key).toBe("dish-abc-display.webp");
   });
 
   it("rejects non-JSON and schema-invalid files with helpful errors", () => {

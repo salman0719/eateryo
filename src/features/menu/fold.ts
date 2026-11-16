@@ -135,6 +135,26 @@ export function revealItem(state: FoldState, itemId: string, categoryId: string)
   return setCategoryOpen(setItemOpen(state, itemId, true), categoryId, true);
 }
 
+/**
+ * Drop fold memory for categories and dishes that no longer exist — the
+ * delete-category half of the header's meta contract (descriptions and
+ * covers ride the category itself and vanish with it; fold ids need
+ * pruning because they outlive the document in storage).
+ */
+export function pruneFoldState(
+  state: FoldState,
+  doc: { categories: ReadonlyArray<{ id: string; items: ReadonlyArray<{ id: string }> }> }
+): FoldState {
+  const liveCategories = new Set(doc.categories.map((category) => category.id));
+  const liveItems = new Set(
+    doc.categories.flatMap((category) => category.items.map((item) => item.id))
+  );
+  return {
+    closedCategoryIds: state.closedCategoryIds.filter((id) => liveCategories.has(id)),
+    openItemIds: state.openItemIds.filter((id) => liveItems.has(id)),
+  };
+}
+
 // --- Persistence (tiny per-document preference) ----------------------------
 
 /** Remembered fold state for one document; never throws. */

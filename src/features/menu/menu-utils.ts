@@ -174,6 +174,52 @@ export function renameCategory(doc: MenuDocument, categoryId: string, name: stri
   return finalize(next);
 }
 
+/**
+ * Whether another category already uses this name (case-insensitive,
+ * whitespace-insensitive). The header's name input uses it as its
+ * duplicate guard; the category itself is always excepted.
+ */
+export function isCategoryNameTaken(
+  doc: Pick<MenuDocument, "categories">,
+  name: string,
+  exceptCategoryId?: string
+): boolean {
+  const wanted = name.trim().toLowerCase();
+  if (!wanted) return false;
+  return doc.categories.some(
+    (category) => category.id !== exceptCategoryId && category.name.trim().toLowerCase() === wanted
+  );
+}
+
+/**
+ * Replace a category's description. Descriptions ride the category id, so a
+ * rename migrates them automatically and a delete drops them with it.
+ */
+export function setCategoryDescription(
+  doc: MenuDocument,
+  categoryId: string,
+  description: string
+): MenuDocument {
+  const next = clone(doc);
+  findCategory(next, categoryId).description = description;
+  return finalize(next);
+}
+
+/**
+ * Attach, replace, or (null) remove a category's cover photo. Removal clears
+ * the reference only — the stored file is kept on purpose, exactly like
+ * dish photos, because a published revision may still be serving it.
+ */
+export function setCategoryCover(
+  doc: MenuDocument,
+  categoryId: string,
+  cover: MenuCategory["cover"]
+): MenuDocument {
+  const next = clone(doc);
+  findCategory(next, categoryId).cover = cover;
+  return finalize(next);
+}
+
 /** Delete a category and all its items. Callers must confirm with the user first. */
 export function deleteCategory(doc: MenuDocument, categoryId: string): MenuDocument {
   const next = clone(doc);
