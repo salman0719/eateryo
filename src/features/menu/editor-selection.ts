@@ -62,9 +62,7 @@ export function selectCategory(doc: SelectionDoc, categoryId: string): EditorSel
 
 /** Show one dish: its own category comes with it. */
 export function selectItem(doc: SelectionDoc, itemId: string): EditorSelection {
-  const category = doc.categories.find((entry) =>
-    entry.items.some((item) => item.id === itemId)
-  );
+  const category = doc.categories.find((entry) => entry.items.some((item) => item.id === itemId));
   if (!category) return resolveSelection(doc, null);
   return { categoryId: category.id, itemId };
 }

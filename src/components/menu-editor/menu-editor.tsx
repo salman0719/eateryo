@@ -321,7 +321,7 @@ export function MenuEditor({
   // Dismissals are remembered per document, in session state and localStorage.
   const [dismissedMap, setDismissedMap] = useState<Record<string, string[]>>({});
   // One storage read per document, not one per render: the fallback used to
-  // run a JSON.parse on every keystroke and every fold toggle.
+  // run a JSON.parse on every keystroke and every selection change.
   const dismissedKeys = useMemo(
     () => dismissedMap[doc.id] ?? loadDismissedDuplicateKeys(doc.id),
     [dismissedMap, doc.id]
@@ -554,8 +554,8 @@ export function MenuEditor({
   }
 
   // The row handlers, created once. They read the live editor state through a
-  // ref, so React.memo(ItemEditor) holds: a fold toggle re-renders the one row
-  // whose `open` changed and leaves the other forty-four alone.
+  // ref, so React.memo(DishRow) holds: selecting a dish re-renders the two
+  // rows whose highlight changed and leaves the other forty-four alone.
   const liveRef = useRef({ doc, selection, selectionKey, onChange, confirm });
   useEffect(() => {
     liveRef.current = { doc, selection, selectionKey, onChange, confirm };

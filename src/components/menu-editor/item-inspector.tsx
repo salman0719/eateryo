@@ -26,7 +26,7 @@ import { OptionGroupForm } from "./option-group-form";
 /**
  * Step 14 of the redesign: the inspector for one dish.
  *
- * This is the half of the old `ItemEditor` that unfolded underneath the row,
+ * This is the half of the dish form that used to unfold underneath the row,
  * moved to its own column and compacted: identity and price first, then the
  * things a menu actually shows (description, photo, availability, labels,
  * sizes, add-ons), then the two facts that need deciding. Nothing here is

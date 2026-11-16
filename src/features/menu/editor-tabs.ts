@@ -8,7 +8,7 @@
  * touches the URL and back/forward keeps working.
  *
  * Everything here is pure except the tiny per-menu persistence, which
- * follows `fold.ts`: a localStorage preference that never throws.
+ * follows `editor-selection.ts`: a localStorage preference that never throws.
  */
 
 import { hasAnyPrice } from "./menu-utils";
