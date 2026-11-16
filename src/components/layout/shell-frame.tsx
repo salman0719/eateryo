@@ -2,7 +2,7 @@
 
 import { useEffect, type ReactNode } from "react";
 
-import { AppSidebar, type SidebarOutlineItem } from "@/components/layout/app-sidebar";
+import { AppSidebar } from "@/components/layout/app-sidebar";
 import { BrandBar } from "@/components/layout/brand-bar";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
@@ -94,9 +94,6 @@ export interface ShellFrameProps {
     sections: AppSection[];
     /** The destination list has an answer (session and membership settled). */
     ready: boolean;
-    outline: SidebarOutlineItem[] | null;
-    outlineKey: string;
-    onOutlineSelect: (categoryId: string) => void;
     launch: { done: number; total: number } | null;
     menusPending: boolean;
   };
@@ -172,9 +169,6 @@ export function ShellFrame({
               onSignOut={onSignOut}
               onSignIn={onSignIn}
               onHome={onHome}
-              outline={sidebar.outline}
-              outlineKey={sidebar.outlineKey}
-              onOutlineSelect={sidebar.onOutlineSelect}
               launch={sidebar.launch}
               menusPending={sidebar.menusPending}
             />

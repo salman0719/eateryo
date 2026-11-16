@@ -845,20 +845,6 @@ export function AppShell() {
   })();
 
   /**
-   * The sidebar's contextual half: the open menu's sections, only while the
-   * edit workspace is showing. Reorder and preview have their own shape, and
-   * a publish wizard has no sections to jump between.
-   */
-  const sidebarOutline =
-    screen === "editor" && editorMode === "edit" && routedDoc
-      ? routedDoc.categories.map((category) => ({
-          id: category.id,
-          name: category.name.trim() || "Untitled category",
-          itemCount: category.items.length,
-        }))
-      : null;
-  const sidebarOutlineKey = sidebarOutline?.map((section) => section.id).join("|") ?? "";
-  /**
    * Unfinished checklist for this account **and this café** only: another
    * membership's count is never shown, and complete or unknown hides the row.
    */
@@ -887,11 +873,6 @@ export function AppShell() {
   const sidebarMenuCountPending =
     !sessionPending &&
     (libraryLoading || (signedIn && !libraryCountKnown && serverMenusReadFailedFor !== accountKey));
-
-  /** Jump the editor list to the section chosen in the sidebar. */
-  function scrollToMenuSection(categoryId: string) {
-    document.getElementById(`menu-section-${categoryId}`)?.scrollIntoView({ block: "start" });
-  }
 
   // The route opener has to act with the latest `openDoc` without re-running
   // whenever a render recreates it; an effect event is the supported way to
@@ -1232,9 +1213,6 @@ export function AppShell() {
       sidebar={{
         sections: navReady ? navSections : [],
         ready: navReady,
-        outline: sidebarOutline,
-        outlineKey: sidebarOutlineKey,
-        onOutlineSelect: scrollToMenuSection,
         launch: sidebarLaunch,
         menusPending: sidebarMenuCountPending,
       }}
