@@ -43,6 +43,15 @@ function Glyph({
   );
 }
 
+/** Back: a left-pointing chevron, as in a browser's back affordance. */
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M14.5 6.5 9 12l5.5 5.5" />
+    </Glyph>
+  );
+}
+
 /** Disclosure, closed. */
 export function ChevronDownIcon(props: IconProps) {
   return (
