@@ -9,7 +9,9 @@
  * A new order (status `new`, created after the last seen moment) badges the
  * Orders tab, raises a toast, and — when the staffer opted in with a click —
  * chimes. Opening the Orders tab counts as seeing them: toasts clear and the
- * badge resets, and arrivals while the board is open stay silent.
+ * badge resets. The chime is not tied to what is on screen: a ticket that
+ * lands while the board is open still makes the sound, because the person at
+ * the pass may be looking at the fryer, not the list.
  *
  * Chime needs a prior user gesture (autoplay policy), so sound defaults off
  * with an explicit toggle; system notifications additionally need a granted
@@ -69,7 +71,11 @@ interface MonitorValue {
   notificationsAvailable: boolean;
   notificationPermission: NotificationPermission | "unsupported";
   requestNotifications: () => Promise<void>;
-  /** The board is open: arrivals stay silent and the unseen markers advance. */
+  /**
+   * The board is open: unseen markers advance and toasts clear. The chime
+   * still plays on arrival — only the toast and system notification depend
+   * on the list not being in front of the reader.
+   */
   setViewingBoard: (viewing: boolean) => void;
   refresh: () => void;
   /** Board status writes: guard the id through the PATCH, then adopt/revert. */
@@ -232,9 +238,13 @@ export function OrderMonitorProvider({
         setOrders((current) => mergeBoardOrders(current, result.orders, guardedRef.current));
         if (arrivals.length > 0) {
           setHasArrived(true);
+          // Sound follows the toggle, not the screen: a board left open on a
+          // counter must still announce a ticket. Toasts and system
+          // notifications stay for the other-screen case, where the ticket is
+          // not already in front of the reader.
+          if (soundOnRef.current) playOrderChime();
           if (!viewingRef.current) {
             for (const order of arrivals) pushToast(order);
-            if (soundOnRef.current) playOrderChime();
             if (permissionRef.current === "granted") {
               try {
                 for (const order of arrivals) {
