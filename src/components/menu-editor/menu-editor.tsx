@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
@@ -653,9 +654,9 @@ export function MenuEditor({
   const tabStrip = (
     <div
       data-print-hide
-      className="flex flex-wrap items-end justify-between gap-x-3 border-b border-line-200"
+      className="flex items-end justify-between gap-x-3 border-b border-line-200"
     >
-      <div role="tablist" aria-label="Menu sections" className="flex flex-wrap gap-x-1">
+      <ScrollArrowStrip as="tablist" label="Menu sections">
         <EditorTab
           label="Settings & hours"
           selected={mode === "edit" && subTab === "settings"}
@@ -696,8 +697,8 @@ export function MenuEditor({
             badge={tabCounts.sets > 0 ? countPill(tabCounts.sets) : undefined}
           />
         )}
-      </div>
-      <div className="flex min-w-0 items-center gap-2 pb-1.5">
+      </ScrollArrowStrip>
+      <div className="flex min-w-0 shrink-0 items-center gap-2 pb-1.5">
         {undoLabel && (
           <button
             type="button"
@@ -1437,7 +1438,7 @@ function EditorTab({
       role="tab"
       aria-selected={selected}
       onClick={onSelect}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+      className={`shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
         selected
           ? "border-accent-700 font-bold text-accent-800"
           : "border-transparent font-medium text-ink-500 hover:border-line-300 hover:text-ink-900"

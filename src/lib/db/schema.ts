@@ -471,6 +471,34 @@ export const orderLineOption = pgTable(
 );
 
 /**
+ * Read-only tracking tokens for diners (order tracking v1).
+ *
+ * One row per issued token: only the SHA-256 hash is stored, never the raw
+ * token. The token is scoped to a single order, read-only, and expires via
+ * `expiresAt` (7-day hard cap) plus a lazy terminal grace check in the repo
+ * (24h after served/cancelled). Rows cascade with the order.
+ */
+export const orderTracking = pgTable(
+  "order_tracking",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => order.id, { onDelete: "cascade" }),
+    /** SHA-256 hex of the bearer token; the raw token is returned once only. */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenUnique: uniqueIndex("order_tracking_token_unique").on(t.tokenHash),
+    orderIdx: index("order_tracking_order_idx").on(t.orderId),
+  })
+);
+
+/**
  * Fixed-window counters for the anonymous order endpoint (Step 10).
  * `key` is a one-way hash of the caller's address plus the window minute, so
  * no raw IP is stored; rows are tiny and can be swept by age in Step 11.
@@ -604,6 +632,7 @@ export const schema = {
   order,
   orderLine,
   orderLineOption,
+  orderTracking,
   orderRateLimit,
   orderEmailLog,
   extractionUsage,
