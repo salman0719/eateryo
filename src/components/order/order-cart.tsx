@@ -19,8 +19,11 @@
 
 import { useSyncExternalStore } from "react";
 
+import { selectionsKey } from "@/features/menu/option-groups";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import type { OrderLine } from "@/features/orders/schema";
+
+import { OrderLineOptions } from "./option-groups";
 
 /** Tailwind's `lg` — the width at which the page grid grows its cart column. */
 const WIDE_LAYOUT_QUERY = "(min-width: 1024px)";
@@ -54,9 +57,13 @@ export function useWideLayout(): boolean {
   return useSyncExternalStore(subscribe, () => mediaQuery()?.matches ?? false, serverSnapshot);
 }
 
-/** Unique per cart row: the same item in two menus is two rows. */
+/**
+ * Unique per cart row: the same item in two menus is two rows, and two
+ * add-on combinations of one dish are two rows — merging them would charge
+ * one price for two different dishes.
+ */
 export function orderLineKey(line: OrderLine): string {
-  return `${line.menuId ?? ""}:${line.menuItemId}:${line.variantName ?? "base"}`;
+  return `${line.menuId ?? ""}:${line.menuItemId}:${line.variantName ?? "base"}:${selectionsKey(line.options)}`;
 }
 
 /**
@@ -98,6 +105,7 @@ export function OrderCartLines({
                       </span>
                     )}
                   </span>
+                  <OrderLineOptions options={line.options} currency={currency} />
                   {showMenuBadges && line.menuTitle && (
                     <span className="mt-0.5 inline-block rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                       {line.menuTitle.trim() || "Menu"}

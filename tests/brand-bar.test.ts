@@ -6,7 +6,7 @@ import { BrandBar } from "@/components/layout/brand-bar";
 import { BrandLockup } from "@/components/ui/brand";
 import { shellColumnVisible } from "@/features/navigation/routes";
 
-function render(props: { signedIn: boolean; sessionPending: boolean }) {
+function render(props: { signedIn: boolean; sessionPending: boolean; onSignIn?: () => void }) {
   return renderToStaticMarkup(createElement(BrandBar, props));
 }
 
@@ -33,6 +33,12 @@ describe("BrandBar", () => {
     expect(html).toContain("Sign in");
   });
 
+  it("asks about the browser draft first when the shell takes the sign-in path", () => {
+    const html = render({ signedIn: false, sessionPending: false, onSignIn: () => {} });
+    expect(html).toContain("Sign in");
+    expect(html).not.toContain('href="/sign-in"');
+  });
+
   it("claims nothing while the session is unanswered", () => {
     const html = render({ signedIn: false, sessionPending: true });
     expect(html).not.toContain('href="/sign-in"');
@@ -43,6 +49,15 @@ describe("BrandBar", () => {
     const html = render({ signedIn: true, sessionPending: false });
     expect(html).not.toContain('href="/sign-in"');
     expect(html).not.toContain("Sign in");
+  });
+
+  it("carries no destinations of its own while signed out", () => {
+    // A signed-out visitor has nothing to browse: the row is the lockup and
+    // the one sign-in path, and a leftover draft is resumed on Capture.
+    const html = render({ signedIn: false, sessionPending: false });
+    expect(html).not.toContain("My menus");
+    expect(html).not.toContain("Capture");
+    expect(html).not.toContain("Orders");
   });
 });
 
@@ -82,19 +97,14 @@ describe("BrandLockup destination", () => {
  */
 describe("shellColumnVisible", () => {
   it("keeps the column for a signed-in account", () => {
-    expect(shellColumnVisible({ sessionState: "signed-in", hasWorkingSet: false })).toBe(true);
+    expect(shellColumnVisible({ sessionState: "signed-in" })).toBe(true);
   });
 
-  it("drops it for a settled visitor with nothing to show", () => {
-    expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: false })).toBe(false);
-  });
-
-  it("keeps it for a visitor with drafts, because My menus is a destination", () => {
-    expect(shellColumnVisible({ sessionState: "signed-out", hasWorkingSet: true })).toBe(true);
+  it("never shows it to a settled visitor, drafts or not", () => {
+    expect(shellColumnVisible({ sessionState: "signed-out" })).toBe(false);
   });
 
   it("hides it while the session is unanswered", () => {
-    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: false })).toBe(false);
-    expect(shellColumnVisible({ sessionState: "unknown", hasWorkingSet: true })).toBe(false);
+    expect(shellColumnVisible({ sessionState: "unknown" })).toBe(false);
   });
 });

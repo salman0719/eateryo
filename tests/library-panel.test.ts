@@ -3,7 +3,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { LibraryPanel, type LibraryMenu } from "@/components/menu-editor/library-panel";
-import type { RestaurantOption } from "@/features/tenancy/client";
 
 /**
  * 001 — the library called account menus "This browser only" for the first
@@ -27,15 +26,12 @@ function menu(overrides: Partial<LibraryMenu> = {}): LibraryMenu {
   };
 }
 
-const restaurants: RestaurantOption[] = [{ id: "r-1", name: "Corner Café", role: "owner" }];
-
 function render(
   overrides: {
     menus?: LibraryMenu[];
     loading?: boolean;
     accountMode?: boolean;
     canCreate?: boolean;
-    withMoveTarget?: boolean;
   } = {}
 ): string {
   return renderToStaticMarkup(
@@ -44,8 +40,6 @@ function render(
       loading: overrides.loading ?? false,
       accountMode: overrides.accountMode ?? false,
       canCreate: overrides.canCreate ?? true,
-      ownedRestaurants: overrides.withMoveTarget ? restaurants : [],
-      onMoveToAccount: overrides.withMoveTarget ? async () => null : undefined,
       unavailable: false,
       onOpen: () => {},
       onNew: () => {},
@@ -64,37 +58,29 @@ describe("LibraryPanel account chips", () => {
     expect(html).not.toContain("This browser only");
   });
 
-  it("names the membership a finished read proved", () => {
+  it("names no membership for any row — the tags are retired", () => {
+    // Sign-in claims every browser draft, so a leftover browser-only row
+    // is just a row: no chip, only the manual move offers the fix.
     const onAccount = render({ accountMode: true, menus: [menu({ onServer: true })] });
-    expect(onAccount).toContain("On your account");
+    expect(onAccount).not.toContain("On your account");
     expect(onAccount).not.toContain("This browser only");
 
     const browserOnly = render({ accountMode: true, menus: [menu({ onServer: false })] });
-    expect(browserOnly).toContain("This browser only");
+    expect(browserOnly).not.toContain("This browser only");
     expect(browserOnly).not.toContain("On your account");
   });
 
-  it("offers the move only to a row the read proved is missing", () => {
-    const unknown = render({
-      accountMode: false,
-      menus: [menu({ onServer: false })],
-      withMoveTarget: true,
-    });
-    expect(unknown).not.toContain("Add to account");
-
+  it("offers no manual move anywhere — sign-in claims the rows", () => {
+    // The "Add to account" button and the "Import from this browser"
+    // section are gone: browser drafts join the account at sign-in, so a
+    // leftover row is just a row with Open, Rename and Delete.
     const missing = render({
       accountMode: true,
       menus: [menu({ onServer: false })],
-      withMoveTarget: true,
     });
-    expect(missing).toContain("Add to account");
-
-    const present = render({
-      accountMode: true,
-      menus: [menu({ onServer: true })],
-      withMoveTarget: true,
-    });
-    expect(present).not.toContain("Add to account");
+    expect(missing).not.toContain("Add to account");
+    expect(missing).not.toContain("Import from this browser");
+    expect(missing).toContain("Open");
   });
 });
 

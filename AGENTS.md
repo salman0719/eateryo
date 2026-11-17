@@ -119,6 +119,14 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/app/api/extract-menu/` — API route (Agent C owns)
 - `src/components/menu-editor/`, `src/features/menu/indexeddb.ts`,
   `storage.ts`, `import-export.ts` — editor + persistence (Agent D owns)
+- `src/components/menu-editor/category-strip.tsx`, `dish-row.tsx`,
+  `item-inspector.tsx`, `src/features/menu/editor-selection.ts` — the
+  Categories tab's shape: one strip (category tabs · menu-wide search ·
+  - Category), one category on the canvas, and the selected dish in a sticky
+    340px inspector (one column below `lg`, where a selected dish replaces the
+    list). Selection is per-menu device state, resolved against the live
+    document every render, and replaces the old fold model (`fold.ts`, retired):
+    nothing in this tab collapses, so a dish's form never unfolds under a row.
 - `src/components/tables/restaurant-tables.tsx` — the signed-in Tables tab:
   restaurant picker for owners and staff; one QR per table, scoped to the
   restaurant (`/r/<slug>/t/<label>`), never to one menu. `table-qr-panel.tsx`
@@ -126,28 +134,181 @@ errors, or add lint/type suppressions just to make checks pass.
 - `src/components/upload/`, layout — shell + upload (Agent B owns)
 - `src/components/layout/app-sidebar.tsx`, `sidebar-preference.ts` — the app's
   left column: destinations from `availableSections` (signed-out gating included),
-  the open menu's outline in the edit workspace, the account, and a
-  rail/expanded toggle whose choice is remembered. Widths are CSS driven by
+  the account, and a rail/expanded toggle whose choice is remembered. It
+  carries no menu outline: the editor's tab strip and category pills own
+  switching (step 12 retired the "In this menu" list). Widths are CSS driven by
   `data-sidebar` on `<html>`, set before paint by the boot script in
   `layout.tsx` so a saved choice never flashes. The app shell has no desktop
   header; `site-header.tsx` stays for content pages (launch, legal, dev).
   The column belongs to the account: `shellColumnVisible` (`navigation/routes.ts`)
-  drops it once the session has settled as signed out with nothing in the
-  library, because a column holding the single row "Capture" reads as a broken
-  menu, not as a front door. It stays off while the session or the library is
-  still answering — an unanswered read is neither signed in nor signed out,
-  so the shell holds a neutral placeholder instead of guessing — and for a
-  visitor holding drafts, whose My menus is a real destination. The brand wrapper inside it must stay a
+  never shows it signed out, because a column holding "Capture" reads as a
+  broken menu, not as a front door. It stays off while the session or the
+  library is still answering — an unanswered read is neither signed in nor
+  signed out, so the shell holds a neutral placeholder instead of guessing.
+  Signed out there is no navigation at all (`availableSections` is Capture
+  only): no My menus, no phone tab bar, no More sheet, and a URL for an
+  account surface returns to Capture — `/menus`, `/menus/<id>` and the item
+  pages included. The one exception is `/menus/<id>/publish`, the onboarding
+  publish step, because the emailed magic link returns there. A leftover
+  signed-out draft is resumed from the signed-out capture banner instead,
+  which reopens it in the capture result screen (newest first when several
+  linger); signed in there is no resume banner. The browser is server-only
+  at rest: sign-out dissolves account copies proved in sync
+  (`collectSignOutDissolveIds`, hash-matched stamps only — an interrupted
+  edit is never dissolved), and the pre-sign-in choice names only
+  anonymous drafts (`unstampedIds`), so re-sign-in never asks about a menu
+  that is already on an account. The
+  brand wrapper inside it must stay a
   flex container — the rail centres it with `justify-content` alone, so a
   block wrapper puts the tile at the padding edge while the icons below stay
   centred (`tests/sidebar-brand.test.ts` holds that).
+- `src/app/(app)/layout.tsx` — the one page shell: it mounts the units that
+  outlive a screen in dependency order (session and café → route → library)
+  inside a Suspense whose fallback is the shell's own geometry. The route is
+  read from the URL (`usePathname`, seeded into `NavigationProvider`), so an
+  address is never a prop: every route file under `(app)/` is `<AppShell />`
+  and nothing else. `/`, `/menus`, `/orders`, `/assistant`, `/tables` and
+  `/settings` prerender the shell; `/menus/<id>` (plus `reorder`, `preview`,
+  `publish`, `items/<item>`) streams it, because a menu id is not known at
+  build time. The catch-all is retired — one narrow
+  `/menus/<id>/[...rest]` remains so a stale bookmark, or a table QR link from
+  before QR cards moved to Tables, still lands in the library with a message
+  instead of a 404. A new screen is one route file plus its `AppScreen`; no
+  route file parses a route. The screen itself still renders from one switch in
+  the shell — the navigation entry below says why that is deliberate.
+- `src/components/layout/app-shell.tsx` — the app's shell, and what every
+  `(app)/` route file renders: it owns the units whose life is a screen rather
+  than a session (the open document, capture, publication, the row verbs, the
+  draft claims) and makes the screen decision, guards included — a signed-out
+  account URL goes back to Capture, a membership is sent to a surface it may
+  use, a dead publish link gets its card. It renders no chrome of its own; the
+  frame it wraps is `ShellFrame`.
+- `src/components/layout/shell-frame.tsx` — the frame every app screen sits in:
+  the left column, the brand row that stands in where the column is absent,
+  the workspace switcher, the content measure and footer, the phone tab bar,
+  the More sheet and the order monitor's toasts. It renders chrome only —
+  sections, counts, notices and the page itself arrive already resolved, the
+  page through `children` — so a screen can change without touching the frame.
+  `AppShell` owns the shell's state and hands this component the answers; the
+  frame is covered by `tests/shell-frame.test.ts`.
+- `src/features/navigation/navigation-context.tsx`, `history.ts` — the one
+  owner of "which screen is showing": `NavigationProvider` holds the route,
+  writes the URL through the pure `historyWriteFor` decision (push, replace,
+  or nothing when the href already matches), follows changes the app did not
+  make (back/forward, a typed URL, a `<Link>` push), flushes the open editor's
+  pending save before leaving a menu, and holds the dead-publish-link state.
+  Screens call `navigate(route)`; none takes a parsed route as a prop, and the
+  first screen is the one `usePathname()` names (rendered into the HTML, so a
+  hard load paints the right screen rather than flashing capture). Moving to
+  the App Router's own URLs later changes this provider, not its callers.
+
+  **Why the screens still render from one switch.** Every page file is per
+  route, but the child each returns is the shell, which picks the screen from
+  `route.screen`. Two decisions put it there, and changing either moves
+  behaviour. First, `navigate` writes the URL with `history.pushState` rather
+  than pushing a Next `<Link>`: Next does not re-render a page on pushState, so
+  the page tree is built once per load and the visible screen has to be
+  something that re-renders on route state — the shell is that component. A
+  Next push was avoided because it remounts the page component, which is where
+  the open menu's document, its pending autosave, the conflict banner and the
+  capture review live. Second, the screen is not a function of the URL alone:
+  the guards turn an account URL back to Capture when signed out (the publish
+  step excepted, for the magic link), send a membership to its first surface
+  when the URL names one it cannot use, and hold the dead-publish-link
+  recovery; `item`, `reorder`, `preview` and `publish` are modes of the editor
+  rather than screens of their own, and an editor URL whose document has not
+  arrived yet is its skeleton.
+  Rendering per route instead would want the document and capture state hoisted
+  above the pages (a menu left open while the reader sits in Settings, with the
+  sign-out and café-switch rules that follow), `navigate` on `router.push`, and
+  a new home for the guards — server redirects, so a round trip per guarded
+  URL. It would buy per-route code splitting, prefetch, and route-level
+  `loading`/`error` files, and retire the `AppScreen` union. That is a
+  behaviour change, not a move: its own branch, and a browser pass.
+
+  Tests: `tests/navigation-history.test.ts`.
+
+- `src/features/menus/library-context.tsx` — the library and the account's
+  answers about it: the browser's menu list, the ids the server proved, the
+  café each row belongs to, the per-menu access map and the device's draft
+  stamps, behind `useLibrary()`. The markers are tri-state and settle together
+  — an empty id set before `serverMenusReadFor` lands means "not asked yet",
+  never "this browser only" (001), and a read that ended by failing sets
+  `serverMenusReadFailedFor` so surfaces can say the account could not be
+  checked (016). The café-keyed merge, the retry and the sign-out reset live
+  here, so no screen can hold a second opinion about what the account owns.
+  `refreshLibrary` and the café map are stable callbacks, so the shell's route
+  opener can name them as dependencies without re-running every render.
+- `src/features/menus/active-menu.ts` — `useActiveMenu`: the one open menu
+  document — its debounced autosave, `flushSave` (what navigation calls before
+  leaving a menu), the account revision the next push is based on, the conflict
+  banner's state and its two explicit answers, the editor's photo URL, and the
+  import/export of a menu file. It is the only writer of a menu document, so no
+  screen can save behind another one's back, and `healStampedDrafts` pushes the
+  interrupted work of closed menus on a same-account return. It also files a
+  menu, because its own autosave is what creates one: `ensureServerTarget`
+  picks the café the editor acts in (or provisions the account's first from
+  the menu title), `cacheServerDraft` makes a fresh server row this browser's
+  draft, and `pruneSignedOutOthers` keeps signed-out use to one menu. A staff
+  shift with no café it may write in therefore files nothing, and
+  `cannotFileMenus` shapes the import's refusal. Its reads are per document —
+  `getOpenDoc`/`getOpenDocId`
+  for the units below it, `openBaseline`/`onServerRevision`/`onMenuRenamed` for
+  a rename made in the library, `onOpenDoc` to announce a new document so
+  publication never has to be imported. `releaseOpenDoc` and `resetActiveMenu`
+  are the sign-out pair: the synchronous release that stops pending work before
+  the last edits are saved, then the state clear.
+- `src/features/menus/menu-lifecycle.ts` — `useMenuLifecycle`: the library's
+  verbs on a menu row — open, start, rename (with its account push), delete —
+  and the one membership the shell acts in. It works from the library alone, so
+  a rename or a delete can name a menu the editor does not hold, and the open
+  document arrives as doors (`openDoc`, `forgetOpenDoc`, `onMenuRenamed`,
+  `openBaseline`, `onServerRevision`) instead of a second copy. Starting a menu
+  never gates on a name: the row is created by its first change, so leaving now
+  leaves nothing behind. The switcher follows the menu — a deep link into
+  another café selects that membership, but only while its document is the open
+  one, so a document kept in memory while browsing the library cannot drag the
+  context back. Deleting is the row's; resetting publication for it stays in the
+  shell, the only place that can see both units. Tests:
+  `tests/tenancy-workspace.test.ts` covers the membership rules it obeys.
+- `src/features/publishing/use-publication.ts` — `usePublication`: the open
+  menu's publication — whether it is live, what diners see now, and the three
+  actions that change it. It follows the document the editor holds, flushes the
+  pending save before a snapshot, and never shows a status loaded for a different
+  menu (`publicationMenuId` guards every read). The editor is reached through
+  doors: `getOpenDoc`, `flushSave`, `onServerRevision` (the wizard's agreed
+  revision) and `onPublishedMenu` (a published capture draft resets capture).
+  `resetPublication()` is the one five-line reset the shell used to repeat.
+- `src/features/capture/use-capture.ts` — `useCapture`: the capture document —
+  the pages selected, the extraction, the result under review, the draft saved
+  as it goes, and the review edits (resolve, price, rename). It stops where the
+  menu begins: `documentForSave` hands the screen the document to persist, so
+  the menu lifecycle and the editor stay out of it. What it needs from its
+  neighbours arrives as doors, not shared state — the confirm dialog before a
+  discard, the menu lifecycle that files a new menu (`ensureServerTarget`,
+  `cacheServerDraft`, `pruneSignedOutOthers`), the screen's `revealResult`
+  scroll, and `reportError`. A resumed draft comes back as a document for the
+  banner to navigate with, instead of the hook navigating on its own.
+- `src/features/menus/draft-claims.ts` — `useDraftClaims`: what happens to a
+  menu that lives only in this browser when an account appears. Sign-in adopts
+  every draft in one go (no remembered answers, no offer), so this unit owns
+  the claim gate's tri-state, the adopt/disregard decision, the café a draft
+  lands in, the stamp that makes it the account's, and the dissolving of the
+  browser copy the account just took. The editor's two facts arrive as named
+  doors — `getOpenDocId` and `onClaimedOpenDoc` — so neither side mirrors the
+  other; an open row is pinned to the agreed revision instead of forking it.
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
   one brand lockup (tile + name, role tokens only) and the row that carries it
   wherever the column is absent: below `sm` always, and at every width for a
-  visitor. Signed out it is the only sign-in path there is — the sidebar's
-  account block is desktop-only and the More sheet is signed-in only — so it
-  carries `/sign-in` itself, and it shows nothing extra while the session is
-  unanswered. The chosen identity (concept 7, "The Hidden Eat") is not applied
+  visitor. Signed out it is the only sign-in path there is — the sidebar never
+  shows without an account and the More sheet is signed-in only — so it
+  carries `/sign-in` itself and nothing else: there are no destinations to
+  browse, and it shows nothing at all while the session is
+  unanswered. Every in-shell sign-in path (brand row, sidebar account, library
+  gate) asks about the browser draft first while signed out with one: attach
+  it on login, or wipe it on login — staying is one Escape away (`direct-
+sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
+  flow attaches its journey draft silently instead). The chosen identity (concept 7, "The Hidden Eat") is not applied
   yet: the theme landed first, then the drawn lockup replaces the text in
   `brand.tsx` only.
 - `src/components/pages/capture-page.tsx` — the capture screen, and therefore
@@ -156,6 +317,10 @@ errors, or add lint/type suppressions just to make checks pass.
   keeps; two columns from `lg`, one on a phone so the field is never below the
   fold). The moment a photo exists — or the visitor is known to be signed in —
   it returns to the plain working layout, and an owner never sees the entry.
+  Signed out, the review result is the whole journey: the inline price and
+  "check this" fixes stay, the "Fine-tune in the editor" second path does not
+  (there is no signed-out editor route), and the First look carries the bold
+  reassurance that everything stays editable once signed in.
 - `src/app/theme.css` — design tokens: palette ramps (legacy, being migrated)
   plus the role ramps components use; the Theme Studio edits this file. Colour
   and font decisions belong here, never inline in a component.
@@ -244,10 +409,12 @@ errors, or add lint/type suppressions just to make checks pass.
   inside its frame, so it always uses the sheet, never the column.
 - `src/features/menus/` — Step 8 server menus: `repo.ts` (tenancy-scoped,
   conditional-UPDATE `updatedAt` conflict detection), `sync.ts` (typed
-  browser client with `SyncError` codes), `move-to-account.ts` (one-way
-  local import, one menu or the whole library); routes in
-  `src/app/api/menus/`; editor UI in
-  `src/components/menu-editor/conflict-banner.tsx` + `move-to-account-panel.tsx`
+  browser client with `SyncError` codes), `move-to-account.ts` (the one-way
+  local import the sign-in claim runs — there is no manual import UI, and no
+  "Import from this browser" option anywhere); routes in
+  `src/app/api/menus/`; claim decisions in `claim-local-drafts.ts`
+  (sign-in auto-imports every browser draft; no remembered answers, no
+  offer); editor UI in `src/components/menu-editor/conflict-banner.tsx`
 - `tests/helpers/pg-test-db.ts`, `tests/tenancy.test.ts`,
   `tests/auth-magic-link.test.ts` — Step 7 isolation/auth tests (PGlite);
   `tests/menus-repo.test.ts`, `tests/menus-api.test.ts`,

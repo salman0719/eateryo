@@ -17,6 +17,14 @@ import { SyncError, type SyncErrorCode } from "@/features/menus/sync";
 import { orderSchema, type Order, type OrderStatus } from "./schema";
 
 const orderEnvelope = z.object({ order: orderSchema });
+const placedEnvelope = z.object({
+  order: orderSchema,
+  tracking: z.object({ token: z.string().min(1), expiresAt: z.string().min(1) }).optional(),
+});
+const trackEnvelope = z.object({
+  order: orderSchema,
+  serverTime: z.string().min(1),
+});
 const boardEnvelope = z.object({
   orders: z.array(orderSchema),
   serverTime: z.string().min(1),
@@ -41,6 +49,7 @@ export interface PlaceOrderRequest {
     menuSlug?: string;
     menuItemId: string;
     variantName: string | null;
+    options?: { groupName: string; choiceName: string }[];
     quantity: number;
   }[];
   /** Honeypot — always empty for a human; the server refuses filled values. */
@@ -126,10 +135,35 @@ function jsonInit(method: string, body: unknown): RequestInit {
 
 /** Place an order from a public table link (no account required). */
 export async function placeOrder(input: PlaceOrderRequest): Promise<Order> {
-  return requestJson(
-    "/api/orders",
-    jsonInit("POST", input),
-    (payload) => orderEnvelope.parse(payload).order
+  const placed = await placeOrderWithTracking(input);
+  return placed.order;
+}
+
+export interface PlacedOrder {
+  order: Order;
+  /** Present only on server-placed orders; absent on legacy/demo flows. */
+  tracking: { token: string; expiresAt: string } | null;
+}
+
+/** Place an order and keep the one-time tracking token when the server issues one. */
+export async function placeOrderWithTracking(input: PlaceOrderRequest): Promise<PlacedOrder> {
+  return requestJson("/api/orders", jsonInit("POST", input), (payload) => {
+    const parsed = placedEnvelope.parse(payload);
+    return { order: parsed.order, tracking: parsed.tracking ?? null };
+  });
+}
+
+/**
+ * Public diner status read: resolve one tracking token to its order.
+ * Generic 404 when the link is unknown or expired — the copy stays
+ * "ask staff", never "this order exists but the token is wrong".
+ */
+export async function fetchTrackedOrder(
+  token: string
+): Promise<{ order: Order; serverTime: string }> {
+  const params = new URLSearchParams({ token });
+  return requestJson(`/api/orders/track?${params.toString()}`, undefined, (payload) =>
+    trackEnvelope.parse(payload)
   );
 }
 

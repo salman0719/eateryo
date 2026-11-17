@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { closeDatabase, DB_NAME } from "../src/features/menu/indexeddb";
 import {
   clearDraftOrigin,
+  collectSignOutDissolveIds,
   decideHeal,
   getDraftOrigin,
   listDraftOrigins,
@@ -12,6 +13,7 @@ import {
   refreshDraftSync,
   stampClaimedMenus,
   stampDraftOrigin,
+  unstampedIds,
   visibleMenuIds,
 } from "../src/features/menus/draft-origins";
 import { createMenuDocument } from "../src/features/menu/menu-utils";
@@ -66,6 +68,42 @@ describe("draft origins", () => {
     await stampDraftOrigin("m1", "user-a", "");
     expect((await getDraftOrigin("m1"))?.lastSyncedUpdatedAt).toBe("s0");
     expect((await getDraftOrigin("m1"))?.lastSyncedHash).toBe("h0");
+  });
+
+  it("names only rows no account has stamped for the sign-in choice", () => {
+    // A stamped row belongs to an account — the claim moves it, the heal
+    // triages it — so the pre-sign-in choice never asks about one, even
+    // the row the last session left behind.
+    expect(unstampedIds(["a", "b", "c"], [{ menuId: "b" }, { menuId: "c" }])).toEqual(["a"]);
+    expect(unstampedIds(["a"], [])).toEqual(["a"]);
+  });
+
+  it("drops only account copies proved in sync at sign-out", async () => {
+    const synced = createMenuDocument({ title: "Synced" });
+    const edited = createMenuDocument({ title: "Edited" });
+    const foreign = createMenuDocument({ title: "Foreign" });
+    const unconfirmed = createMenuDocument({ title: "Unconfirmed" });
+    const docs = new Map([
+      [synced.id, synced],
+      // Edited after the agreement: the local work is unproven.
+      [edited.id, { ...edited, title: "Edited locally" }],
+      [foreign.id, foreign],
+      [unconfirmed.id, unconfirmed],
+    ]);
+    await stampDraftOrigin(synced.id, "user-a", "s1", menuContentHash(synced));
+    await stampDraftOrigin(edited.id, "user-a", "s1", menuContentHash(edited));
+    await stampDraftOrigin(foreign.id, "user-b", "s1", menuContentHash(foreign));
+    await stampDraftOrigin(unconfirmed.id, "user-a", "");
+    // A stamp for a row that no longer exists is unprovable.
+    await stampDraftOrigin("ghost", "user-a", "s1", "deadbeef");
+
+    await expect(
+      collectSignOutDissolveIds("user-a", async (id) => {
+        const doc = docs.get(id);
+        if (!doc) throw new Error(`missing ${id}`);
+        return doc;
+      })
+    ).resolves.toEqual([synced.id]);
   });
 
   it("hashes content identically regardless of key order", () => {

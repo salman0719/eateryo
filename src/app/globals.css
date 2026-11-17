@@ -292,6 +292,18 @@ html[data-sidebar="rail"] .app-sidebar .app-sidebar-mark {
   }
 }
 
+/* Horizontal tab strips (editor categories, diner menu tabs): a short
+   sideways scroll paints no bar — touch, trackpad, wheel and keyboard all
+   keep working. Always pairs with `ScrollArrowStrip`
+   (src/components/ui/scroll-arrow-strip.tsx), whose edge arrows are the
+   affordance that more pills wait off-screen. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Printing table cards: chrome hidden, cards kept whole. */
 @media print {
   [data-print-hide] {

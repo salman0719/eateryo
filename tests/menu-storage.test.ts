@@ -37,6 +37,8 @@ describe("menu storage", () => {
       id: "c1",
       name: "Drinks",
       sortOrder: 0,
+      description: "",
+      cover: null,
       items: [
         {
           id: "i1",
