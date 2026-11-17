@@ -61,14 +61,14 @@ export function CategoryStrip({
               onClick={() => onSelect(tab.id)}
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                 selected
-                  ? "border-accent-700 bg-accent-50 text-accent-900"
+                  ? "border-accent-700 bg-accent-700 text-on-accent shadow-sm"
                   : "border-line-300 bg-surface-base text-ink-600 hover:border-accent-700 hover:text-accent-900"
               }`}
             >
               <span className="max-w-40 truncate">{tab.name || "Untitled category"}</span>
               <span
                 className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-                  selected ? "bg-accent-100 text-accent-900" : "bg-surface-100 text-ink-500"
+                  selected ? "bg-accent-800 text-on-accent" : "bg-surface-100 text-ink-500"
                 }`}
               >
                 {tab.dishCount}
