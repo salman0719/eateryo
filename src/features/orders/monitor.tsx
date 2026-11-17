@@ -9,11 +9,14 @@
  * A new order (status `new`, created after the last seen moment) badges the
  * Orders tab, raises a toast, and — when the staffer opted in with a click —
  * chimes. Opening the Orders tab counts as seeing them: toasts clear and the
- * badge resets, and arrivals while the board is open stay silent.
+ * badge resets. The chime is not tied to what is on screen: a ticket that
+ * lands while the board is open still makes the sound, because the person at
+ * the pass may be looking at the fryer, not the list.
  *
  * Chime needs a prior user gesture (autoplay policy), so sound defaults off
  * with an explicit toggle; system notifications additionally need a granted
  * Notification permission, asked only after the first real order arrives.
+ * The sound itself lives in `./chime` — a rising four-note motif, not a ping.
  */
 
 import {
@@ -35,6 +38,7 @@ import {
   monitorScopeKey,
 } from "./monitor-utils";
 import { orderCode, type Order, type OrderStatus } from "./schema";
+import { playOrderChime } from "./chime";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "./table-links";
 
@@ -67,7 +71,11 @@ interface MonitorValue {
   notificationsAvailable: boolean;
   notificationPermission: NotificationPermission | "unsupported";
   requestNotifications: () => Promise<void>;
-  /** The board is open: arrivals stay silent and the unseen markers advance. */
+  /**
+   * The board is open: unseen markers advance and toasts clear. The chime
+   * still plays on arrival — only the toast and system notification depend
+   * on the list not being in front of the reader.
+   */
   setViewingBoard: (viewing: boolean) => void;
   refresh: () => void;
   /** Board status writes: guard the id through the PATCH, then adopt/revert. */
@@ -99,36 +107,6 @@ function pollErrorMessage(error: unknown): string {
     }
   }
   return "Could not reach the server. Check your connection.";
-}
-
-/** Best-effort two-tone chime; silence on any failure (sound never breaks the board). */
-function playChime() {
-  try {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    const ctx = new Ctor();
-    const start = ctx.currentTime;
-    [880, 1174.66].forEach((frequency, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = frequency;
-      const at = start + index * 0.18;
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.2, at + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(at);
-      osc.stop(at + 0.2);
-    });
-    void ctx.resume?.().catch(() => undefined);
-    window.setTimeout(() => void ctx.close().catch(() => undefined), 900);
-  } catch {
-    // Sound is decoration; a blocked AudioContext stays silent.
-  }
 }
 
 function notificationBody(order: Order): string {
@@ -260,9 +238,13 @@ export function OrderMonitorProvider({
         setOrders((current) => mergeBoardOrders(current, result.orders, guardedRef.current));
         if (arrivals.length > 0) {
           setHasArrived(true);
+          // Sound follows the toggle, not the screen: a board left open on a
+          // counter must still announce a ticket. Toasts and system
+          // notifications stay for the other-screen case, where the ticket is
+          // not already in front of the reader.
+          if (soundOnRef.current) playOrderChime();
           if (!viewingRef.current) {
             for (const order of arrivals) pushToast(order);
-            if (soundOnRef.current) playChime();
             if (permissionRef.current === "granted") {
               try {
                 for (const order of arrivals) {
@@ -375,7 +357,7 @@ export function OrderMonitorProvider({
     } catch {
       // Preference stays in memory for the session.
     }
-    if (on) playChime();
+    if (on) playOrderChime();
   }, []);
 
   const requestNotifications = useCallback(async () => {
