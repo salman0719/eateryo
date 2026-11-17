@@ -1,3 +1,5 @@
+import { createHash, randomBytes } from "node:crypto";
+
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 
 import {
@@ -6,6 +8,7 @@ import {
   orderLine as orderLineTable,
   orderLineOption as orderLineOptionTable,
   orderRateLimit,
+  orderTracking as orderTrackingTable,
   restaurant as restaurantTable,
   restaurantMembership,
 } from "@/lib/db/schema";
@@ -722,4 +725,72 @@ export async function consumeOrderRateLimit(
     .returning({ count: orderRateLimit.count });
   const count = rows[0]?.count ?? 1;
   return { allowed: count <= limit, count };
+}
+
+/**
+ * Diner order tracking (v1): a per-order bearer token, read-only and scoped
+ * to that order. Locked decisions: 7-day hard cap, 24h after terminal
+ * status, sessionStorage resume, same-device + opt-in link.
+ *
+ * The raw token is returned once and never stored — only its SHA-256 hash.
+ * A miss (unknown hash, expired, or terminally old) answers `null` so the
+ * route can return one generic 404 without revealing which case it was.
+ */
+
+export const TRACK_TOKEN_BYTES = 32;
+export const TRACK_HARD_CAP_MS = 7 * 24 * 60 * 60 * 1000;
+export const TRACK_TERMINAL_GRACE_MS = 24 * 60 * 60 * 1000;
+/** The track route's own bucket: polling must never eat the POST 12/min one. */
+export const TRACK_RATE_LIMIT_PER_WINDOW = 60;
+
+export function hashTrackingToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Mint one tracking token for an order; the raw value is returned once. */
+export async function createOrderTrackingToken(
+  db: TenancyDb,
+  orderId: string,
+  now: Date = new Date()
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = randomBytes(TRACK_TOKEN_BYTES).toString("base64url");
+  const expiresAt = new Date(now.getTime() + TRACK_HARD_CAP_MS);
+  await db.insert(orderTrackingTable).values({
+    orderId,
+    tokenHash: hashTrackingToken(token),
+    expiresAt,
+  });
+  return { token, expiresAt };
+}
+
+/**
+ * Resolve a presented token to its order, or `null` when unknown, expired,
+ * or past the terminal grace window. Lazy expiry only — no scheduled sweep.
+ */
+export async function getOrderByTrackingToken(
+  db: TenancyDb,
+  rawToken: string,
+  now: Date = new Date()
+): Promise<Order | null> {
+  const presented = rawToken.trim();
+  if (!presented || presented.length > 256) return null;
+  const tokenHash = hashTrackingToken(presented);
+  const rows = await db
+    .select({ tracking: orderTrackingTable, order: orderTable })
+    .from(orderTrackingTable)
+    .innerJoin(orderTable, eq(orderTable.id, orderTrackingTable.orderId))
+    .where(eq(orderTrackingTable.tokenHash, tokenHash))
+    .limit(1);
+  const found = rows[0];
+  if (!found) return null;
+  if (found.tracking.expiresAt.getTime() <= now.getTime()) return null;
+  const status = found.order.status;
+  if (
+    (status === "served" || status === "cancelled") &&
+    found.order.updatedAt.getTime() + TRACK_TERMINAL_GRACE_MS <= now.getTime()
+  ) {
+    return null;
+  }
+  const { lines, options } = await linesWithOptions(db, [found.order.id]);
+  return toOrder(found.order, lines.get(found.order.id) ?? [], options);
 }

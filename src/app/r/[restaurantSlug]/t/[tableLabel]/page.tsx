@@ -52,12 +52,14 @@ export async function generateMetadata({
 
 export default function TableLandingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ restaurantSlug: string; tableLabel: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   return (
     <Suspense fallback={<LandingLoading />}>
-      <TableLandingContent params={params} />
+      <TableLandingContent params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
@@ -72,10 +74,17 @@ function LandingLoading() {
 
 async function TableLandingContent({
   params,
+  searchParams,
 }: {
   params: Promise<{ restaurantSlug: string; tableLabel: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { restaurantSlug, tableLabel: rawLabel } = await params;
+  const query = await searchParams;
+  // A reload of a confirmation link carries `?track=`; hand it to the
+  // client so its first paint is the loading state, not the menu tabs.
+  const resumeToken =
+    typeof query.track === "string" && query.track.length > 0 ? query.track : null;
   const landing = await loadLanding(restaurantSlug);
   if (!landing) notFound();
 
@@ -132,6 +141,7 @@ async function TableLandingContent({
         doc: menu.doc,
       }))}
       closedMenus={landing.closedMenus}
+      resumeToken={resumeToken}
     />
   );
 }
