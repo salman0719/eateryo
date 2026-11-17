@@ -1129,7 +1129,9 @@ export function MenuEditor({
                 className={`${selection.itemId ? "hidden lg:block " : ""}scroll-mt-4 overflow-hidden rounded-2xl border border-line-200 bg-surface-base`}
               >
                 {/* One category on the canvas: its band holds the name, the
-              count, and the two things that act on the category itself. */}
+              count, and the one thing that acts on the category itself.
+              Ordering lives in the Reorder tab, so this band carries no
+              up/down steppers. */}
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2">
                   <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
                     {selectedCategory.name || "Untitled category"}
@@ -1143,30 +1145,6 @@ export function MenuEditor({
                       </span>
                     )}
                   </p>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      aria-label={`Move ${selectedCategory.name} up`}
-                      disabled={selectedCategoryIndex === 0}
-                      onClick={() =>
-                        onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex - 1))
-                      }
-                      className={tinyButton}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Move ${selectedCategory.name} down`}
-                      disabled={selectedCategoryIndex === doc.categories.length - 1}
-                      onClick={() =>
-                        onChange(moveCategory(doc, selectedCategory.id, selectedCategoryIndex + 1))
-                      }
-                      className={tinyButton}
-                    >
-                      ↓
-                    </button>
-                  </div>
                   <button
                     type="button"
                     onClick={() => handleDeleteCategory(selectedCategory, selectedCategoryIndex)}
