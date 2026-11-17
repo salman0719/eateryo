@@ -148,6 +148,18 @@ export const menuCategorySchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   sortOrder: z.number().int().nonnegative(),
+  /**
+   * Owner-written subheading, shown under the heading on the diner page.
+   * Empty by default; default (not optional) so documents saved before
+   * descriptions existed stay valid and read back identically.
+   */
+  description: z.string().default(""),
+  /**
+   * Owner-supplied cover photo for the category banner (same stored shape
+   * and pipeline as a dish photo — no new uploader). Null by default, so
+   * documents saved before covers existed stay valid.
+   */
+  cover: menuItemImageSchema.nullable().default(null),
   items: z.array(menuItemSchema).default([]),
 });
 
@@ -179,6 +191,14 @@ export const menuDocumentSchema = z.object({
    * published snapshots keep working without resolving anything.
    */
   modifierTemplates: z.array(menuOptionSchema).default([]),
+  /**
+   * Diner-facing meanings for custom dietary codes, written by the owner in
+   * the label picker (e.g. { "SF": "Contains sesame" }). Known labels
+   * resolve from a built-in constant instead — this map is only the overflow
+   * for codes the constant does not know. Empty by default, so older
+   * documents stay valid.
+   */
+  labelMeanings: z.record(z.string(), z.string()).default({}),
   source: menuSourceSchema.optional(),
   updatedAt: z.string().min(1),
 });

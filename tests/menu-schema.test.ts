@@ -60,6 +60,69 @@ describe("menuDocumentSchema", () => {
     expect(item.reviewNotes).toEqual([]);
   });
 
+  it("fills category and label defaults for pre-redesign documents", () => {
+    // Documents saved before descriptions/covers/label-meanings existed
+    // carry none of the keys; they must still parse, with honest empties.
+    const parsed = menuDocumentSchema.parse({
+      schemaVersion: 1,
+      id: "menu-1",
+      title: "Legacy",
+      currency: null,
+      updatedAt: new Date().toISOString(),
+      categories: [{ id: "c1", name: "Mains", sortOrder: 0, items: [] }],
+    });
+    expect(parsed.categories[0].description).toBe("");
+    expect(parsed.categories[0].cover).toBeNull();
+    expect(parsed.labelMeanings).toEqual({});
+  });
+
+  it("round-trips category descriptions, covers, and custom label meanings", () => {
+    const cover = {
+      url: "https://cdn.example/dish.jpg",
+      key: "dish-key",
+      width: 1024,
+      height: 768,
+      thumb: null,
+    };
+    const parsed = menuDocumentSchema.parse({
+      schemaVersion: 1,
+      id: "menu-1",
+      title: "Covered",
+      currency: "€",
+      labelMeanings: { SF: "Contains sesame" },
+      updatedAt: new Date().toISOString(),
+      categories: [
+        { id: "c1", name: "Starters", sortOrder: 0, description: "To open", cover, items: [] },
+      ],
+    });
+    expect(parsed.categories[0].description).toBe("To open");
+    expect(parsed.categories[0].cover).toEqual(cover);
+    expect(parsed.labelMeanings).toEqual({ SF: "Contains sesame" });
+    // A re-save parses identically: the new fields are stable.
+    expect(menuDocumentSchema.parse(parsed)).toEqual(parsed);
+  });
+
+  it("rejects non-https category covers like dish photos", () => {
+    const result = menuDocumentSchema.safeParse({
+      schemaVersion: 1,
+      id: "menu-1",
+      title: "Bad cover",
+      currency: null,
+      updatedAt: new Date().toISOString(),
+      categories: [
+        {
+          id: "c1",
+          name: "Mains",
+          sortOrder: 0,
+          description: "",
+          cover: { url: "http://cdn.example/dish.jpg", key: "k", width: 10, height: 10 },
+          items: [],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects invented-looking wrong types instead of coercing them", () => {
     const result = menuDocumentSchema.safeParse({
       schemaVersion: 1,

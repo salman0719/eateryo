@@ -15,7 +15,7 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "@/components/ui/brand";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { MenuCategory, MenuItem } from "@/features/menu/schema";
+import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
 import {
   priceWithOptions,
@@ -96,6 +96,62 @@ function CustomizableHint({ item }: { item: MenuItem }) {
         ? `Requires ${required.map((group) => group.name).join(", ")}`
         : "Add-ons available"}
     </p>
+  );
+}
+
+/**
+ * Step 13 of the redesign: the category heading on the diner page
+ * (SPEC §5.4, treatment C).
+ *
+ * A set cover renders as one uniform 72px banner with the title overlaid
+ * on a baked-in scrim and the description below it; without a cover the
+ * heading is today's band (plus the description when set). Cover and
+ * description are each optional. A photo that fails to load hides the
+ * banner and falls back to the band — never a broken icon. Plain `<img>`
+ * from the CDN like dish photos (the optimizer must never touch editor
+ * images); the banner reuses the dish display rendition, so no new size.
+ */
+function CategoryHeading({ category }: { category: MenuCategory }) {
+  const [coverFailed, setCoverFailed] = useState(false);
+  const cover: MenuItemImage | null = !coverFailed && category.cover ? category.cover : null;
+  return (
+    <>
+      {cover ? (
+        <div className="relative h-[72px] overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element -- category cover served straight from the CDN at its stored size; the optimizer must never touch it */}
+          <img
+            src={cover.url}
+            alt=""
+            width={cover.width}
+            height={cover.height}
+            loading="lazy"
+            decoding="async"
+            onError={() => setCoverFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          <div aria-hidden="true" className="absolute inset-0 bg-scrim" />
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-linear-to-t from-scrim to-transparent"
+          />
+          {/* White reads on any owner photo; no theme role can name "light
+              text over an arbitrary photo", so the raw utility stays on
+              this bespoke banner with this comment (AGENTS.md). */}
+          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-lg font-bold text-white">
+            {category.name}
+          </h2>
+        </div>
+      ) : (
+        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-lg font-bold tracking-wide text-ink-800 uppercase">
+          {category.name}
+        </h2>
+      )}
+      {category.description ? (
+        <p className="border-b border-line-100 bg-surface-base px-5 py-2 text-xs leading-5 text-ink-600">
+          {category.description}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -199,9 +255,7 @@ export function OrderMenuSection({
       aria-label={category.name}
       className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
     >
-      <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-sm font-bold tracking-wide text-ink-800 uppercase">
-        {category.name}
-      </h2>
+      <CategoryHeading category={category} />
       <ul className="divide-y divide-line-100">
         {category.items.map((item) => {
           const soldOut = item.available === false;
