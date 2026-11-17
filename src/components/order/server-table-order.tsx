@@ -14,10 +14,11 @@
  * plainly instead of pretending it was sent.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
-import { placeOrder } from "@/features/orders/client";
+import { fetchTrackedOrder, placeOrderWithTracking } from "@/features/orders/client";
+import { saveTracker } from "@/features/orders/use-order-tracker";
 import {
   priceWithOptions,
   selectionsKey,
@@ -39,6 +40,7 @@ import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderSheet } from "./order-sheet";
+import { OrderTracker } from "./order-tracker";
 
 interface ServerTableOrderProps {
   /** The café's public slug — the order is resolved inside it. */
@@ -64,6 +66,8 @@ export function ServerTableOrder({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [tracking, setTracking] = useState<{ token: string; expiresAt: string } | null>(null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const viewOrderButton = useRef<HTMLButtonElement | null>(null);
   /** Wide screens keep the order in its own column; phones raise the sheet. */
@@ -115,12 +119,35 @@ export function ServerTableOrder({
     if (next.length === 0) setSheetOpen(false);
   }
 
+  // Resume from a reloadable link (`?track=`): the token is the only handle
+  // this browser has after a reload, so fetch once and show the tracker.
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams(window.location.search);
+    const resumed = params.get("track");
+    if (!resumed) return;
+    void (async () => {
+      try {
+        const result = await fetchTrackedOrder(resumed);
+        if (cancelled) return;
+        setPlaced(result.order);
+        setTracking({ token: resumed, expiresAt: result.serverTime });
+      } catch {
+        if (cancelled) return;
+        setResumeError("That order link is no longer valid. Ask staff to check your order.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function sendOrder() {
     if (lines.length === 0 || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      const order = await placeOrder({
+      const placedOrder = await placeOrderWithTracking({
         restaurantSlug,
         slug,
         tableLabel,
@@ -136,7 +163,19 @@ export function ServerTableOrder({
         })),
         website: honeypot,
       });
-      setPlaced(order);
+      setPlaced(placedOrder.order);
+      setTracking(placedOrder.tracking);
+      if (placedOrder.tracking) {
+        saveTracker({
+          orderId: placedOrder.order.id,
+          token: placedOrder.tracking.token,
+          expiresAt: placedOrder.tracking.expiresAt,
+          placedAt: new Date().toISOString(),
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.set("track", placedOrder.tracking.token);
+        window.history.replaceState(null, "", url.toString());
+      }
       setLines([]);
       setNote("");
       setSheetOpen(false);
@@ -160,8 +199,32 @@ export function ServerTableOrder({
           order={placed}
           restaurantName={restaurantName}
           footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
-          onOrderAgain={() => setPlaced(null)}
-        />
+          onOrderAgain={() => {
+            setPlaced(null);
+            setTracking(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("track");
+            window.history.replaceState(null, "", url.toString());
+          }}
+        >
+          <OrderTracker
+            orderId={placed.id}
+            token={tracking?.token ?? null}
+            initialOrder={placed}
+            restaurantName={restaurantName}
+          />
+        </OrderReceived>
+      </OrderShell>
+    );
+  }
+
+  if (resumeError) {
+    return (
+      <OrderShell tableLabel={tableLabel}>
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
+          <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
+        </div>
       </OrderShell>
     );
   }

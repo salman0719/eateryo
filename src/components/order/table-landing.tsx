@@ -13,13 +13,14 @@
  * stay a server component that only reads the landing.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { formatTableLabel } from "@/features/orders/table-links";
-import type { Order } from "@/features/orders/schema";
+import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
 import { OrderShell } from "./order-menu";
 import { OrderReceived } from "./order-received";
+import { OrderTracker } from "./order-tracker";
 import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "./table-order-tabs";
 
 export interface TableLandingProps {
@@ -48,18 +49,57 @@ export function TableLanding({
   menus,
   closedMenus,
 }: TableLandingProps) {
-  const [placed, setPlaced] = useState<Order | null>(null);
+  const [placed, setPlaced] = useState<PlacedOrder | null>(null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
   const frame = "rounded-2xl border border-line-200 bg-surface-base";
+
+  // A shared table link (`?track=`) resumes the tracker after a reload.
+  useEffect(() => {
+    let cancelled = false;
+    const token = new URLSearchParams(window.location.search).get("track");
+    if (!token) return;
+    void (async () => {
+      try {
+        const result = await fetchTrackedOrder(token);
+        if (cancelled) return;
+        setPlaced({ order: result.order, tracking: { token, expiresAt: result.serverTime } });
+      } catch {
+        if (cancelled) return;
+        setResumeError("That order link is no longer valid. Ask staff to check your order.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   if (placed) {
     return (
-      <OrderShell tableLabel={placed.tableLabel}>
+      <OrderShell tableLabel={placed.order.tableLabel}>
         <OrderReceived
-          order={placed}
+          order={placed.order}
           restaurantName={restaurantName}
           footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
           onOrderAgain={() => setPlaced(null)}
-        />
+        >
+          <OrderTracker
+            orderId={placed.order.id}
+            token={placed.tracking?.token ?? null}
+            initialOrder={placed.order}
+            restaurantName={restaurantName}
+          />
+        </OrderReceived>
+      </OrderShell>
+    );
+  }
+
+  if (resumeError) {
+    return (
+      <OrderShell tableLabel={tableLabel}>
+        <div className={`${frame} p-8 text-center`}>
+          <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
+        </div>
       </OrderShell>
     );
   }
@@ -80,7 +120,14 @@ export function TableLanding({
         tableLabel={tableLabel}
         menus={menus}
         closedMenus={closedMenus}
-        onPlaced={setPlaced}
+        onPlaced={(next) => {
+          setPlaced(next);
+          if (next.tracking) {
+            const url = new URL(window.location.href);
+            url.searchParams.set("track", next.tracking.token);
+            window.history.replaceState(null, "", url.toString());
+          }
+        }}
       />
     </OrderShell>
   );
