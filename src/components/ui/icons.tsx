@@ -61,6 +61,20 @@ export function ChevronUpIcon(props: IconProps) {
   );
 }
 
+/**
+ * A photo: framed image with a sun and a horizon. Used where a photo
+ * placeholder needs to say "picture goes here" rather than a generic box.
+ */
+export function ImageIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <circle cx="9" cy="9.5" r="1.6" />
+      <path d="M4 17l4.5-4.5 3 3L15 12l5 5" />
+    </Glyph>
+  );
+}
+
 /** Capture: a camera body with one lens. */
 export function CameraIcon(props: IconProps) {
   return (

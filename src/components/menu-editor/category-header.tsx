@@ -14,6 +14,8 @@ import { itemImageCopy } from "@/features/item-images/ref";
 import { uploadItemImage } from "@/features/item-images/upload";
 import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
 
+import { ImageIcon } from "@/components/ui/icons";
+
 import { CommitInput } from "./fields";
 
 /**
@@ -95,9 +97,9 @@ export function CategoryHeader({
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-line-300 bg-surface-base text-xl text-ink-400"
+            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-dashed border-line-300 bg-surface-base text-ink-400"
           >
-            ▢
+            <ImageIcon size={22} />
           </span>
         )}
         <div className="grid min-w-0 flex-1 gap-2">
