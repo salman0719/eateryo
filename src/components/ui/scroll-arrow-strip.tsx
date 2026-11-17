@@ -18,8 +18,11 @@ export function ScrollArrowStrip({
   label,
   children,
 }: {
-  /** `nav` keeps the editor's categories landmark; `div` for a row inside one. */
-  as?: "nav" | "div";
+  /**
+   * `nav` keeps the editor's categories landmark, `tablist` keeps the
+   * editor's Menu sections tablist, `div` for a row inside a landmark.
+   */
+  as?: "nav" | "div" | "tablist";
   /** Accessible name for the scroll region. */
   label: string;
   children: ReactNode;
@@ -69,6 +72,10 @@ export function ScrollArrowStrip({
       <nav ref={trackRef} aria-label={label} tabIndex={0} className={trackClass}>
         {children}
       </nav>
+    ) : as === "tablist" ? (
+      <div ref={trackRef} role="tablist" aria-label={label} tabIndex={0} className={trackClass}>
+        {children}
+      </div>
     ) : (
       <div ref={trackRef} role="region" aria-label={label} tabIndex={0} className={trackClass}>
         {children}
