@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ChevronLeftIcon } from "@/components/ui/icons";
 import {
   hasAnyPrice,
   isItemFlagged,
@@ -43,6 +44,11 @@ const smallButton =
   "rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors " +
   "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 " +
   "disabled:cursor-not-allowed disabled:opacity-40";
+
+const iconButton =
+  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line-300 text-ink-600 " +
+  "transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 " +
+  "focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 const primaryButton =
   "rounded-full bg-accent-700 px-3 py-1 text-xs font-semibold text-on-accent transition-colors " +
@@ -151,9 +157,9 @@ export function ItemInspector({
           type="button"
           onClick={onDone}
           aria-label="Close the dish editor"
-          className={smallButton}
+          className={iconButton}
         >
-          ✕
+          <ChevronLeftIcon size={16} />
         </button>
       </div>
 
