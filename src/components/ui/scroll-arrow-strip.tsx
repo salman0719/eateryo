@@ -44,10 +44,19 @@ export function ScrollArrowStrip({
     track.addEventListener("scroll", update, { passive: true });
     const observer = new ResizeObserver(update);
     observer.observe(track);
+    // Adding, renaming or deleting a pill changes the scrollable width
+    // without resizing the track itself, so watch the contents too.
+    const contents = new MutationObserver(update);
+    contents.observe(track, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
     return () => {
       cancelAnimationFrame(frame);
       track.removeEventListener("scroll", update);
       observer.disconnect();
+      contents.disconnect();
     };
   }, []);
 
