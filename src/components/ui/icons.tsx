@@ -52,6 +52,18 @@ export function ChevronLeftIcon(props: IconProps) {
   );
 }
 
+/**
+ * Close: two crossing strokes. The wide screen's way out of the inspector,
+ * where a back chevron on the right read as a second "next".
+ */
+export function CloseIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </Glyph>
+  );
+}
+
 /** Disclosure, closed. */
 export function ChevronDownIcon(props: IconProps) {
   return (

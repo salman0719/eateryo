@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { ChevronLeftIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon, CloseIcon } from "@/components/ui/icons";
 import {
   hasAnyPrice,
   isItemFlagged,
@@ -45,10 +45,15 @@ const smallButton =
   "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 " +
   "disabled:cursor-not-allowed disabled:opacity-40";
 
-const iconButton =
-  "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line-300 text-ink-600 " +
+// The display mode is composed by each control rather than baked in here: a
+// base `inline-flex` would compete with the close button's `hidden`, and the
+// cross appeared below `lg` on whichever utility the stylesheet ordered last.
+const iconButtonBase =
+  "h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line-300 text-ink-600 " +
   "transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 " +
   "focus-visible:outline-offset-2 focus-visible:outline-accent-700";
+
+const iconButton = `inline-flex ${iconButtonBase}`;
 
 const primaryButton =
   "rounded-full bg-accent-700 px-3 py-1 text-xs font-semibold text-on-accent transition-colors " +
@@ -140,11 +145,23 @@ export function ItemInspector({
 
   return (
     <div className="rounded-2xl border border-line-200 bg-surface-base">
-      {/* Sticky so the dish's name and its way back stay in view while a
+      {/* Sticky so the dish's name and its way out stay in view while a
           long form scrolls under them. The card itself cannot clip its
           corners (`overflow-hidden` would trap this), so the header and
           footer round their own edges. */}
       <div className="sticky top-0 z-10 flex items-start gap-2 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
+        {/* On a phone the inspector has replaced the list, so its way out is
+            a back chevron and belongs on the leading edge. Beside the list on
+            a wide screen the same control sat on the right and read as a
+            second "next", so there it becomes an explicit close. */}
+        <button
+          type="button"
+          onClick={onDone}
+          aria-label="Close the dish editor"
+          className={`${iconButton} lg:hidden`}
+        >
+          <ChevronLeftIcon size={16} />
+        </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold tracking-wide text-ink-500 uppercase">
             {categoryName || "Untitled category"} · dish {position} of {count}
@@ -157,9 +174,9 @@ export function ItemInspector({
           type="button"
           onClick={onDone}
           aria-label="Close the dish editor"
-          className={iconButton}
+          className={`hidden ${iconButtonBase} lg:inline-flex`}
         >
-          <ChevronLeftIcon size={16} />
+          <CloseIcon size={16} />
         </button>
       </div>
 
