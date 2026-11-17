@@ -14,6 +14,7 @@
  * Chime needs a prior user gesture (autoplay policy), so sound defaults off
  * with an explicit toggle; system notifications additionally need a granted
  * Notification permission, asked only after the first real order arrives.
+ * The sound itself lives in `./chime` — a rising four-note motif, not a ping.
  */
 
 import {
@@ -35,6 +36,7 @@ import {
   monitorScopeKey,
 } from "./monitor-utils";
 import { orderCode, type Order, type OrderStatus } from "./schema";
+import { playOrderChime } from "./chime";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "./table-links";
 
@@ -99,36 +101,6 @@ function pollErrorMessage(error: unknown): string {
     }
   }
   return "Could not reach the server. Check your connection.";
-}
-
-/** Best-effort two-tone chime; silence on any failure (sound never breaks the board). */
-function playChime() {
-  try {
-    const Ctor =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!Ctor) return;
-    const ctx = new Ctor();
-    const start = ctx.currentTime;
-    [880, 1174.66].forEach((frequency, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = frequency;
-      const at = start + index * 0.18;
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.exponentialRampToValueAtTime(0.2, at + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.16);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(at);
-      osc.stop(at + 0.2);
-    });
-    void ctx.resume?.().catch(() => undefined);
-    window.setTimeout(() => void ctx.close().catch(() => undefined), 900);
-  } catch {
-    // Sound is decoration; a blocked AudioContext stays silent.
-  }
 }
 
 function notificationBody(order: Order): string {
@@ -262,7 +234,7 @@ export function OrderMonitorProvider({
           setHasArrived(true);
           if (!viewingRef.current) {
             for (const order of arrivals) pushToast(order);
-            if (soundOnRef.current) playChime();
+            if (soundOnRef.current) playOrderChime();
             if (permissionRef.current === "granted") {
               try {
                 for (const order of arrivals) {
@@ -375,7 +347,7 @@ export function OrderMonitorProvider({
     } catch {
       // Preference stays in memory for the session.
     }
-    if (on) playChime();
+    if (on) playOrderChime();
   }, []);
 
   const requestNotifications = useCallback(async () => {
