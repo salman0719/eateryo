@@ -9,6 +9,7 @@
  */
 
 import {
+  menuOptionSchema,
   SCHEMA_VERSION,
   type MenuCategory,
   type MenuDocument,
@@ -16,6 +17,7 @@ import {
   type MenuItemImage,
 } from "./schema";
 import type { ItemPatch, NewCategoryInput, NewItemInput } from "./types";
+import { cleanDietaryLabel } from "./dietary-labels";
 
 export function generateId(): string {
   const cryptoObj = globalThis.crypto;
@@ -81,6 +83,8 @@ export function createMenuDocument(input?: {
     title: input?.title?.trim() ? input.title.trim() : "Untitled menu",
     currency: input?.currency ?? null,
     categories: [],
+    modifierTemplates: [],
+    labelMeanings: {},
     updatedAt: nowIso(),
   };
 }
@@ -100,7 +104,10 @@ function buildItem(
     available: input.available ?? null,
     dietaryLabels: input.dietaryLabels ? [...input.dietaryLabels] : [],
     variants: input.variants ? clone(input.variants) : [],
-    options: input.options ? clone(input.options) : [],
+    // Old or partial option shapes (extraction, samples, older docs passing
+    // through an edit) gain the contract defaults here, so every item in a
+    // document carries the full group rules.
+    options: input.options ? input.options.map((option) => menuOptionSchema.parse(option)) : [],
     reviewNotes: input.reviewNotes ? [...input.reviewNotes] : [],
     unpricedAccepted: input.unpricedAccepted ?? false,
   };
@@ -155,6 +162,8 @@ export function addCategory(doc: MenuDocument, input: NewCategoryInput): MenuDoc
     id: generateId(),
     name: requireNonEmpty(input.name, "Category name"),
     sortOrder: next.categories.length,
+    description: input.description ?? "",
+    cover: input.cover ?? null,
     items: [],
   });
   return finalize(next);
@@ -163,6 +172,69 @@ export function addCategory(doc: MenuDocument, input: NewCategoryInput): MenuDoc
 export function renameCategory(doc: MenuDocument, categoryId: string, name: string): MenuDocument {
   const next = clone(doc);
   findCategory(next, categoryId).name = requireNonEmpty(name, "Category name");
+  return finalize(next);
+}
+
+/**
+ * Whether another category already uses this name (case-insensitive,
+ * whitespace-insensitive). The header's name input uses it as its
+ * duplicate guard; the category itself is always excepted.
+ */
+export function isCategoryNameTaken(
+  doc: Pick<MenuDocument, "categories">,
+  name: string,
+  exceptCategoryId?: string
+): boolean {
+  const wanted = name.trim().toLowerCase();
+  if (!wanted) return false;
+  return doc.categories.some(
+    (category) => category.id !== exceptCategoryId && category.name.trim().toLowerCase() === wanted
+  );
+}
+
+/**
+ * Replace a category's description. Descriptions ride the category id, so a
+ * rename migrates them automatically and a delete drops them with it.
+ */
+export function setCategoryDescription(
+  doc: MenuDocument,
+  categoryId: string,
+  description: string
+): MenuDocument {
+  const next = clone(doc);
+  findCategory(next, categoryId).description = description;
+  return finalize(next);
+}
+
+/**
+ * Attach, replace, or (null) remove a category's cover photo. Removal clears
+ * the reference only — the stored file is kept on purpose, exactly like
+ * dish photos, because a published revision may still be serving it.
+ */
+export function setCategoryCover(
+  doc: MenuDocument,
+  categoryId: string,
+  cover: MenuCategory["cover"]
+): MenuDocument {
+  const next = clone(doc);
+  findCategory(next, categoryId).cover = cover;
+  return finalize(next);
+}
+
+/**
+ * Write (or, with a blank meaning, clear) a custom label meaning on the
+ * menu. Built-in codes never need this — they resolve from the dictionary —
+ * but the picker stores custom codes here so tooltips survive reloads.
+ */
+export function setLabelMeaning(doc: MenuDocument, code: string, meaning: string): MenuDocument {
+  const label = cleanDietaryLabel(code);
+  if (!label) throw new Error("Label code must not be empty.");
+  const next = clone(doc);
+  const meanings = { ...next.labelMeanings };
+  const cleaned = cleanDietaryLabel(meaning);
+  if (!cleaned) delete meanings[label];
+  else meanings[label] = cleaned;
+  next.labelMeanings = meanings;
   return finalize(next);
 }
 

@@ -444,6 +444,61 @@ export const orderLine = pgTable(
 );
 
 /**
+ * One picked add-on on an order line (Step 10 + P1 option groups).
+ *
+ * A snapshot like the line itself: group/choice names as the kitchen reads
+ * them, and the server-resolved delta in cents (null when the menu showed
+ * none). Rows cascade with the line, so deleting an order never orphans a
+ * pick — and history never rewrites when the menu is renamed.
+ */
+export const orderLineOption = pgTable(
+  "order_line_option",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    orderLineId: text("order_line_id")
+      .notNull()
+      .references(() => orderLine.id, { onDelete: "cascade" }),
+    groupName: text("group_name").notNull(),
+    choiceName: text("choice_name").notNull(),
+    /** Delta in cents, or null when the menu showed no extra. */
+    priceDeltaCents: integer("price_delta_cents"),
+  },
+  (t) => ({
+    lineIdx: index("order_line_option_line_idx").on(t.orderLineId),
+  })
+);
+
+/**
+ * Read-only tracking tokens for diners (order tracking v1).
+ *
+ * One row per issued token: only the SHA-256 hash is stored, never the raw
+ * token. The token is scoped to a single order, read-only, and expires via
+ * `expiresAt` (7-day hard cap) plus a lazy terminal grace check in the repo
+ * (24h after served/cancelled). Rows cascade with the order.
+ */
+export const orderTracking = pgTable(
+  "order_tracking",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => order.id, { onDelete: "cascade" }),
+    /** SHA-256 hex of the bearer token; the raw token is returned once only. */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenUnique: uniqueIndex("order_tracking_token_unique").on(t.tokenHash),
+    orderIdx: index("order_tracking_order_idx").on(t.orderId),
+  })
+);
+
+/**
  * Fixed-window counters for the anonymous order endpoint (Step 10).
  * `key` is a one-way hash of the caller's address plus the window minute, so
  * no raw IP is stored; rows are tiny and can be swept by age in Step 11.
@@ -576,6 +631,8 @@ export const schema = {
   publishedMenu,
   order,
   orderLine,
+  orderLineOption,
+  orderTracking,
   orderRateLimit,
   orderEmailLog,
   extractionUsage,

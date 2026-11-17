@@ -14,10 +14,18 @@
  * plainly instead of pretending it was sent.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
-import { placeOrder } from "@/features/orders/client";
+import { fetchTrackedOrder, placeOrderWithTracking } from "@/features/orders/client";
+import { saveTracker } from "@/features/orders/use-order-tracker";
+import {
+  priceWithOptions,
+  selectionsKey,
+  validateOptionSelections,
+  withResolvedDeltas,
+  type OptionSelection,
+} from "@/features/menu/option-groups";
 import {
   addLine,
   orderTotal,
@@ -29,9 +37,16 @@ import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
-import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import {
+  OrderMenuSection,
+  OrderShell,
+  OrderSkeleton,
+  StickyCartBar,
+  formatOrderTotal,
+} from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderSheet } from "./order-sheet";
+import { OrderTracker } from "./order-tracker";
 
 interface ServerTableOrderProps {
   /** The café's public slug — the order is resolved inside it. */
@@ -41,6 +56,13 @@ interface ServerTableOrderProps {
   doc: MenuDocument;
   tableLabel: string;
   restaurantName: string;
+  /**
+   * The reloadable order token from `?track=`, read server-side so the
+   * first paint already knows a resume is coming. While it resolves the
+   * page shows a neutral loading state — never the menu, which would
+   * flash and vanish once the confirmation arrives.
+   */
+  resumeToken: string | null;
 }
 
 export function ServerTableOrder({
@@ -49,6 +71,7 @@ export function ServerTableOrder({
   doc,
   tableLabel,
   restaurantName,
+  resumeToken,
 }: ServerTableOrderProps) {
   const [lines, setLines] = useState<OrderLine[]>([]);
   const [note, setNote] = useState("");
@@ -57,6 +80,9 @@ export function ServerTableOrder({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
+  const [tracking, setTracking] = useState<{ token: string; expiresAt: string } | null>(null);
+  const [resolving, setResolving] = useState(resumeToken !== null);
+  const [resumeError, setResumeError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const viewOrderButton = useRef<HTMLButtonElement | null>(null);
   /** Wide screens keep the order in its own column; phones raise the sheet. */
@@ -73,16 +99,30 @@ export function ServerTableOrder({
     return item.variants[0]?.name ?? null;
   }
 
-  function addItem(item: MenuItem) {
+  function addItem(item: MenuItem, selections: OptionSelection[]) {
+    const problem = validateOptionSelections(item, selections);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const variantName = chosenVariantName(item);
     const variant = variantName ? item.variants.find((v) => v.name === variantName) : null;
+    const base = variant ? variant.price : item.price;
+    const key = selectionsKey(selections);
     setLines((current) =>
       addLine(current, {
         menuItemId: item.id,
         name: item.name,
         variantName,
-        unitPrice: variant ? variant.price : item.price,
-      })
+        options: selections,
+        unitPrice: priceWithOptions(base, item, selections),
+      }).map((line) =>
+        line.menuItemId === item.id &&
+        (line.variantName ?? null) === variantName &&
+        selectionsKey(line.options) === key
+          ? { ...line, options: withResolvedDeltas(item, line.options) }
+          : line
+      )
     );
     setError(null);
   }
@@ -94,12 +134,46 @@ export function ServerTableOrder({
     if (next.length === 0) setSheetOpen(false);
   }
 
+  // Resume from a reloadable link (`?track=`): the token is the only handle
+  // this browser has after a reload, so fetch once and show the tracker.
+  // The token arrives as a prop (read server-side), so the first paint is
+  // already the loading state — the menu never flashes underneath.
+  useEffect(() => {
+    if (!resumeToken) return;
+    let cancelled = false;
+    const resumed = resumeToken;
+    void (async () => {
+      try {
+        const result = await fetchTrackedOrder(resumed);
+        if (cancelled) return;
+        setPlaced(result.order);
+        setTracking({ token: resumed, expiresAt: result.serverTime });
+      } catch {
+        if (cancelled) return;
+        setResumeError("That order link is no longer valid. Ask staff to check your order.");
+      } finally {
+        if (!cancelled) setResolving(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeToken]);
+
+  if (resolving) {
+    return (
+      <OrderShell tableLabel={tableLabel}>
+        <OrderSkeleton label="Finding your order…" />
+      </OrderShell>
+    );
+  }
+
   async function sendOrder() {
     if (lines.length === 0 || submitting) return;
     setSubmitting(true);
     setError(null);
     try {
-      const order = await placeOrder({
+      const placedOrder = await placeOrderWithTracking({
         restaurantSlug,
         slug,
         tableLabel,
@@ -107,11 +181,27 @@ export function ServerTableOrder({
         lines: lines.map((line) => ({
           menuItemId: line.menuItemId,
           variantName: line.variantName,
+          options: line.options.map((option) => ({
+            groupName: option.groupName,
+            choiceName: option.choiceName,
+          })),
           quantity: line.quantity,
         })),
         website: honeypot,
       });
-      setPlaced(order);
+      setPlaced(placedOrder.order);
+      setTracking(placedOrder.tracking);
+      if (placedOrder.tracking) {
+        saveTracker({
+          orderId: placedOrder.order.id,
+          token: placedOrder.tracking.token,
+          expiresAt: placedOrder.tracking.expiresAt,
+          placedAt: new Date().toISOString(),
+        });
+        const url = new URL(window.location.href);
+        url.searchParams.set("track", placedOrder.tracking.token);
+        window.history.replaceState(null, "", url.toString());
+      }
       setLines([]);
       setNote("");
       setSheetOpen(false);
@@ -135,8 +225,32 @@ export function ServerTableOrder({
           order={placed}
           restaurantName={restaurantName}
           footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
-          onOrderAgain={() => setPlaced(null)}
-        />
+          onOrderAgain={() => {
+            setPlaced(null);
+            setTracking(null);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("track");
+            window.history.replaceState(null, "", url.toString());
+          }}
+        >
+          <OrderTracker
+            orderId={placed.id}
+            token={tracking?.token ?? null}
+            initialOrder={placed}
+            restaurantName={restaurantName}
+          />
+        </OrderReceived>
+      </OrderShell>
+    );
+  }
+
+  if (resumeError) {
+    return (
+      <OrderShell tableLabel={tableLabel}>
+        <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
+          <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
+        </div>
       </OrderShell>
     );
   }
@@ -204,13 +318,6 @@ export function ServerTableOrder({
                 setVariantChoice((current) => ({ ...current, [itemId]: name }))
               }
               onAdd={addItem}
-              itemCount={(item, variantName) =>
-                lines.find(
-                  (line) =>
-                    line.menuItemId === item.id &&
-                    (line.variantName ?? null) === (variantName ?? null)
-                )?.quantity ?? 0
-              }
             />
           ))}
         </div>

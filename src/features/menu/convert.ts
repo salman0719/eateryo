@@ -8,7 +8,7 @@
 import type { ExtractedMenu } from "@/lib/ai/extraction-schema";
 
 import { generateId, nowIso, resolveFirstMenuTitle } from "./menu-utils";
-import { SCHEMA_VERSION, type MenuDocument } from "./schema";
+import { menuOptionSchema, SCHEMA_VERSION, type MenuDocument } from "./schema";
 
 export interface ExtractionSource {
   provider?: string;
@@ -35,6 +35,9 @@ export function extractedMenuToDocument(
       id: generateId(),
       name: category.name,
       sortOrder: categoryIndex,
+      // Extraction names sections; descriptions and covers are owner-authored later.
+      description: "",
+      cover: null,
       items: category.items.map((item, itemIndex) => ({
         id: generateId(),
         name: item.name,
@@ -45,14 +48,21 @@ export function extractedMenuToDocument(
         available: item.available ?? null,
         dietaryLabels: [...item.dietaryLabels],
         variants: item.variants.map((v) => ({ name: v.name, price: v.price ?? null })),
-        options: item.options.map((o) => ({
-          name: o.name,
-          choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
-        })),
+        options: item.options.map((o) =>
+          menuOptionSchema.parse({
+            name: o.name,
+            choices: o.choices.map((c) => ({ name: c.name, priceDelta: c.priceDelta ?? null })),
+          })
+        ),
         reviewNotes: [...item.reviewNotes],
         unpricedAccepted: false,
       })),
     })),
+    // Extraction produces dishes, never library definitions: the owner
+    // promotes a dish's group to a template from the editor.
+    modifierTemplates: [],
+    // Descriptions, covers, and label meanings are owner-authored later.
+    labelMeanings: {},
     source: {
       ...(source?.originalFileName ? { originalFileName: source.originalFileName } : {}),
       ...(originalTitle ? { originalTitle } : {}),

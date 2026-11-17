@@ -15,6 +15,13 @@ import { useEffect, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import {
+  priceWithOptions,
+  selectionsKey,
+  validateOptionSelections,
+  withResolvedDeltas,
+  type OptionSelection,
+} from "@/features/menu/option-groups";
+import {
   addLine,
   orderTotal,
   setLineQuantity,
@@ -101,17 +108,31 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
     return item.variants[0]?.name ?? null;
   }
 
-  function addItem(item: MenuItem) {
+  function addItem(item: MenuItem, selections: OptionSelection[]) {
     if (!menu) return;
+    const problem = validateOptionSelections(item, selections);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const variantName = chosenVariantName(item);
     const variant = variantName ? item.variants.find((v) => v.name === variantName) : null;
+    const base = variant ? variant.price : item.price;
+    const key = selectionsKey(selections);
     setLines((current) =>
       addLine(current, {
         menuItemId: item.id,
         name: item.name,
         variantName,
-        unitPrice: variant ? variant.price : item.price,
-      })
+        options: selections,
+        unitPrice: priceWithOptions(base, item, selections),
+      }).map((line) =>
+        line.menuItemId === item.id &&
+        (line.variantName ?? null) === variantName &&
+        selectionsKey(line.options) === key
+          ? { ...line, options: withResolvedDeltas(item, line.options) }
+          : line
+      )
     );
     setError(null);
   }
@@ -285,13 +306,6 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
                 setVariantChoice((current) => ({ ...current, [itemId]: name }))
               }
               onAdd={addItem}
-              itemCount={(item, variantName) =>
-                lines.find(
-                  (line) =>
-                    line.menuItemId === item.id &&
-                    (line.variantName ?? null) === (variantName ?? null)
-                )?.quantity ?? 0
-              }
             />
           ))}
         </div>

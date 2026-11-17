@@ -1,54 +1,27 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   accountReadState,
   decideLocalDraftClaim,
   decideLocalDraftClaimSurface,
+  decidePublishJourneyClaim,
   deriveClaimGate,
-  dismissLocalDraftClaim,
-  loadBrowserAccount,
-  loadLocalDraftClaim,
-  localDraftClaimKey,
-  markLocalDraftsClaimed,
-  rememberBrowserAccount,
   resolveAutoClaimTarget,
   resumeBannerReady,
 } from "@/features/menus/claim-local-drafts";
 
 /**
- * R1 claim rules: a brand-new account auto-imports its browser drafts, an
- * established account is offered them, and a remembered answer (done or
- * "not now") stops both. Storage failures must never lose a draft.
+ * R1 claim rules: sign-in auto-imports every unseen browser draft, whether
+ * or not the account already holds menus. There are no remembered answers:
+ * every sign-in evaluates the live rows. Storage failures must never lose
+ * a draft.
  */
-
-function fakeStorage(): Storage {
-  const data = new Map<string, string>();
-  return {
-    get length() {
-      return data.size;
-    },
-    clear: () => data.clear(),
-    getItem: (key: string) => data.get(key) ?? null,
-    key: (index: number) => [...data.keys()][index] ?? null,
-    removeItem: (key: string) => {
-      data.delete(key);
-    },
-    setItem: (key: string, value: string) => {
-      data.set(key, value);
-    },
-  } as Storage;
-}
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 const NEW_ACCOUNT = {
   localCount: 2,
   accountMenuCount: 0,
   restaurantCount: 0,
   ownedRestaurantCount: 0,
-  status: "unseen" as const,
 };
 
 describe("decideLocalDraftClaim", () => {
@@ -60,7 +33,9 @@ describe("decideLocalDraftClaim", () => {
     expect(decideLocalDraftClaim({ ...NEW_ACCOUNT, localCount: 0 })).toBe("none");
   });
 
-  it("offers the import once the account already has menus", () => {
+  it("auto-imports even when the account already has menus", () => {
+    // No offer banner: sign-in claims every unseen draft in one go, and the
+    // import target reuses the owned café rather than minting a new one.
     expect(
       decideLocalDraftClaim({
         ...NEW_ACCOUNT,
@@ -68,7 +43,7 @@ describe("decideLocalDraftClaim", () => {
         restaurantCount: 1,
         ownedRestaurantCount: 1,
       })
-    ).toBe("offer");
+    ).toBe("auto-import");
   });
 
   it("auto-imports when the account holds no menus, even with a restaurant", () => {
@@ -90,15 +65,35 @@ describe("decideLocalDraftClaim", () => {
     ).toBe("none");
   });
 
-  it("honours a remembered dismissal or completion", () => {
-    expect(decideLocalDraftClaim({ ...NEW_ACCOUNT, status: "dismissed" })).toBe("none");
-    expect(decideLocalDraftClaim({ ...NEW_ACCOUNT, status: "done" })).toBe("none");
-  });
-
   it("swallows the browser on a shared device: whoever signs in owns what was there", () => {
     // No fork, no queue — the first sign-in adopts the drafts, marked so
     // they never render signed out again.
     expect(decideLocalDraftClaim(NEW_ACCOUNT)).toBe("auto-import");
+  });
+});
+
+describe("decidePublishJourneyClaim", () => {
+  const JOURNEY = {
+    signedIn: true,
+    mayFile: true,
+    journeyDraftLocal: true,
+    alreadyClaimed: false,
+  };
+
+  it("attaches the journey draft with no prior-menu check", () => {
+    // The emailed link is consent for that menu: prior account menus,
+    // remembered answers, and café count never enter this decision.
+    expect(decidePublishJourneyClaim(JOURNEY)).toBe(true);
+  });
+
+  it("stays out when there is nothing local to attach", () => {
+    expect(decidePublishJourneyClaim({ ...JOURNEY, journeyDraftLocal: false })).toBe(false);
+  });
+
+  it("never files twice, signs out, or files without a writable home", () => {
+    expect(decidePublishJourneyClaim({ ...JOURNEY, alreadyClaimed: true })).toBe(false);
+    expect(decidePublishJourneyClaim({ ...JOURNEY, signedIn: false })).toBe(false);
+    expect(decidePublishJourneyClaim({ ...JOURNEY, mayFile: false })).toBe(false);
   });
 });
 
@@ -135,60 +130,6 @@ describe("resolveAutoClaimTarget", () => {
   });
 });
 
-describe("per-account memory", () => {
-  it("remembers done and dismissed independently per account", () => {
-    const storage = fakeStorage();
-    vi.stubGlobal("window", { localStorage: storage });
-
-    expect(loadLocalDraftClaim("user-a")).toBe("unseen");
-    dismissLocalDraftClaim("user-a");
-    expect(loadLocalDraftClaim("user-a")).toBe("dismissed");
-    expect(loadLocalDraftClaim("user-b")).toBe("unseen");
-
-    markLocalDraftsClaimed("user-b");
-    expect(loadLocalDraftClaim("user-b")).toBe("done");
-    expect(storage.getItem(localDraftClaimKey("user-b"))).toBe("done");
-  });
-
-  it("treats damaged values and unavailable storage as unseen", () => {
-    const storage = fakeStorage();
-    vi.stubGlobal("window", { localStorage: storage });
-    storage.setItem(localDraftClaimKey("user-a"), "maybe");
-    expect(loadLocalDraftClaim("user-a")).toBe("unseen");
-
-    vi.stubGlobal("window", {});
-    expect(loadLocalDraftClaim("user-a")).toBe("unseen");
-    expect(() => markLocalDraftsClaimed("user-a")).not.toThrow();
-    expect(() => dismissLocalDraftClaim("user-a")).not.toThrow();
-  });
-
-  it("remembers which account this browser was last used with", () => {
-    const storage = fakeStorage();
-    vi.stubGlobal("window", { localStorage: storage });
-
-    expect(loadBrowserAccount()).toBeNull();
-    rememberBrowserAccount("user-a");
-    expect(loadBrowserAccount()).toBe("user-a");
-  });
-
-  it("never throws when storage itself rejects the write", () => {
-    vi.stubGlobal("window", {
-      localStorage: {
-        getItem: () => {
-          throw new Error("blocked");
-        },
-        setItem: () => {
-          throw new Error("blocked");
-        },
-      },
-    });
-
-    expect(loadLocalDraftClaim("user-a")).toBe("unseen");
-    expect(() => markLocalDraftsClaimed("user-a")).not.toThrow();
-    expect(() => dismissLocalDraftClaim("user-a")).not.toThrow();
-  });
-});
-
 /**
  * 002: an account read that *failed* must not look like one still in flight.
  * The gate settles either way, but a failure may never be read as "the
@@ -204,7 +145,6 @@ describe("claim gate", () => {
       accountMenuCount: 0,
       restaurantCount: 0,
       ownedRestaurantCount: 0,
-      status: "unseen" as const,
       ...overrides,
     };
   }
@@ -309,7 +249,7 @@ describe("claim gate", () => {
         signedIn: true,
         claim: claimInputs({ accountMenuCount: 3, ownedRestaurantCount: 1 }),
       })
-    ).toBe("offer");
+    ).toBe("auto-import");
     expect(
       decideLocalDraftClaimSurface({ gate, signedIn: true, claim: claimInputs({ localCount: 0 }) })
     ).toBe("none");

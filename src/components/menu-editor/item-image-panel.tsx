@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 
+import { ImageIcon } from "@/components/ui/icons";
 import type { MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { itemImageCopy } from "@/features/item-images/ref";
 import { ItemImageError } from "@/features/item-images/errors";
@@ -90,9 +91,9 @@ export function ItemImagePanel({
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-line-200 bg-surface-50 text-lg text-ink-400"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-line-200 bg-surface-50 text-ink-400"
           >
-            ▢
+            <ImageIcon size={20} />
           </span>
         )}
         <div className="min-w-0 flex-1">

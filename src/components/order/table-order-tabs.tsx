@@ -20,17 +20,20 @@ import type { MenuAvailability } from "@/features/availability/schema";
 import { formatAvailability } from "@/features/availability/format";
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu, type SearchMatch } from "@/features/menu/search";
-import { placeOrder } from "@/features/orders/client";
+import { placeOrderWithTracking, type PlacedOrder } from "@/features/orders/client";
+import { saveTracker } from "@/features/orders/use-order-tracker";
 import {
-  addLine,
-  orderTotal,
-  setLineQuantity,
-  type Order,
-  type OrderLine,
-} from "@/features/orders/schema";
+  priceWithOptions,
+  selectionsKey,
+  validateOptionSelections,
+  withResolvedDeltas,
+  type OptionSelection,
+} from "@/features/menu/option-groups";
+import { addLine, orderTotal, setLineQuantity, type OrderLine } from "@/features/orders/schema";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, StickyCartBar, formatOrderTotal } from "./order-menu";
 import { OrderSheet } from "./order-sheet";
@@ -75,7 +78,7 @@ interface TableOrderTabsProps {
    * component only orders, so the receipt stays one file (`order-received.tsx`)
    * instead of a section of every flow.
    */
-  onPlaced: (order: Order) => void;
+  onPlaced: (placed: PlacedOrder) => void;
 }
 
 function menuLabel(menu: { title: string }): string {
@@ -226,18 +229,33 @@ export function TableOrderTabs({
     return item.variants[0]?.name ?? null;
   }
 
-  function addItem(menu: TableOrderMenu, item: MenuItem) {
+  function addItem(menu: TableOrderMenu, item: MenuItem, selections: OptionSelection[]) {
+    const problem = validateOptionSelections(item, selections);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     const variantName = chosenVariantName(menu, item);
     const variant = variantName ? item.variants.find((v) => v.name === variantName) : null;
+    const base = variant ? variant.price : item.price;
+    const key = selectionsKey(selections);
     setLines((current) =>
       addLine(current, {
         menuItemId: item.id,
         name: item.name,
         variantName,
-        unitPrice: variant ? variant.price : item.price,
+        options: selections,
+        unitPrice: priceWithOptions(base, item, selections),
         menuId: menu.menuId,
         menuTitle: menu.title,
-      })
+      }).map((line) =>
+        line.menuId === menu.menuId &&
+        line.menuItemId === item.id &&
+        (line.variantName ?? null) === variantName &&
+        selectionsKey(line.options) === key
+          ? { ...line, options: withResolvedDeltas(item, line.options) }
+          : line
+      )
     );
     setError(null);
   }
@@ -258,7 +276,7 @@ export function TableOrderTabs({
     setSubmitting(true);
     setError(null);
     try {
-      const order = await placeOrder({
+      const placed = await placeOrderWithTracking({
         restaurantSlug,
         tableLabel,
         note: note.trim() ? note : null,
@@ -269,12 +287,24 @@ export function TableOrderTabs({
             menuSlug,
             menuItemId: line.menuItemId,
             variantName: line.variantName,
+            options: line.options.map((option) => ({
+              groupName: option.groupName,
+              choiceName: option.choiceName,
+            })),
             quantity: line.quantity,
           };
         }),
         website: honeypot,
       });
-      onPlaced(order);
+      if (placed.tracking) {
+        saveTracker({
+          orderId: placed.order.id,
+          token: placed.tracking.token,
+          expiresAt: placed.tracking.expiresAt,
+          placedAt: new Date().toISOString(),
+        });
+      }
+      onPlaced(placed);
       setLines([]);
       setNote("");
       setSheetOpen(false);
@@ -336,7 +366,7 @@ export function TableOrderTabs({
         <div className="flex min-w-0 flex-col gap-4">
           <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
             {!singleMenu && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <ScrollArrowStrip label="Menus">
                 {menus.length > 0 && (
                   <TabButton
                     active={activeTab === ALL_TAB}
@@ -367,7 +397,7 @@ export function TableOrderTabs({
                     onHide={hideClosedInfo}
                   />
                 ))}
-              </div>
+              </ScrollArrowStrip>
             )}
             {onlyClosedMenu ? (
               <div>
@@ -448,15 +478,7 @@ export function TableOrderTabs({
                           [choiceKey(menu.menuId, itemId)]: name,
                         }))
                       }
-                      onAdd={(item) => addItem(menu, item)}
-                      itemCount={(item, variantName) =>
-                        lines.find(
-                          (line) =>
-                            line.menuId === menu.menuId &&
-                            line.menuItemId === item.id &&
-                            (line.variantName ?? null) === (variantName ?? null)
-                        )?.quantity ?? 0
-                      }
+                      onAdd={(item, picks) => addItem(menu, item, picks)}
                     />
                   ))}
                 </div>

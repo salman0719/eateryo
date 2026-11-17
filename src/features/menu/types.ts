@@ -17,4 +17,5 @@ export type NewItemInput = Pick<MenuItem, "name"> &
 export type ItemPatch = Partial<Omit<MenuItem, "id" | "sortOrder">>;
 
 /** Fields allowed when creating a category; `id`/`sortOrder` are assigned. */
-export type NewCategoryInput = Pick<MenuCategory, "name">;
+export type NewCategoryInput = Pick<MenuCategory, "name"> &
+  Partial<Pick<MenuCategory, "description" | "cover">>;

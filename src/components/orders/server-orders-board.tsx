@@ -34,6 +34,7 @@ import { useOrderMonitor } from "@/features/orders/monitor";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { OrderLineOptions } from "@/components/order/option-groups";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
@@ -170,14 +171,30 @@ export function ServerOrdersBoard() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* A switch, not a button: the label names what it controls and the
+              knob carries the state, so "Sound on" can never read as an
+              instruction to turn sound on. */}
           <button
             type="button"
+            role="switch"
+            aria-checked={soundOn}
             onClick={() => setSoundOn(!soundOn)}
-            aria-pressed={soundOn}
             title={soundOn ? "New orders play a chime" : "Turn on a chime for new orders"}
-            className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
+            className="inline-flex items-center gap-2 rounded-full px-2 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
-            {soundOn ? "🔔 Sound on" : "🔕 Sound off"}
+            <span>Chime</span>
+            <span
+              aria-hidden="true"
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                soundOn ? "bg-accent-700" : "bg-line-300"
+              }`}
+            >
+              <span
+                className={`absolute left-0.5 h-4 w-4 rounded-full bg-surface-base shadow-sm transition-transform ${
+                  soundOn ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </span>
           </button>
           <button
             type="button"
@@ -265,12 +282,13 @@ export function ServerOrdersBoard() {
                       key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
                       className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
                     >
-                      <span>
+                      <span className="min-w-0">
                         <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
                         {line.name}
                         {line.variantName && (
                           <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
                         )}
+                        <OrderLineOptions options={line.options} currency={order.currency} />
                       </span>
                       <span className="shrink-0 text-xs tabular-nums text-ink-500">
                         {line.unitPrice === null

@@ -1,13 +1,22 @@
+import { createHash, randomBytes } from "node:crypto";
+
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 
 import {
   menu as menuTable,
   order as orderTable,
   orderLine as orderLineTable,
+  orderLineOption as orderLineOptionTable,
   orderRateLimit,
+  orderTracking as orderTrackingTable,
   restaurant as restaurantTable,
   restaurantMembership,
 } from "@/lib/db/schema";
+import {
+  normalizeSelections,
+  priceWithOptions,
+  validateOptionSelections,
+} from "@/features/menu/option-groups";
 import { menuAvailabilitySchema } from "@/features/availability/schema";
 import { isMenuOpenAt } from "@/features/availability/open-at";
 import type { TenancyDb } from "@/features/tenancy/repo";
@@ -73,8 +82,12 @@ export const ORDER_RATE_LIMIT_PER_WINDOW = 12;
 export interface OrderLineRequest {
   menuItemId: string;
   variantName?: string | null;
+  /** Picked add-ons (group + choice names only — deltas resolve server-side). */
+  options?: ReadonlyArray<{ groupName: string; choiceName: string }>;
   quantity: number;
 }
+/** Generous per-line pick cap: a payload guard, not a menu rule. */
+export const MAX_LINE_OPTIONS = 20;
 
 export interface PlaceOrderInput {
   /** Public menu slug the diner ordered from. */
@@ -121,13 +134,18 @@ export interface StaffOrderQuery {
 
 type OrderRow = typeof orderTable.$inferSelect;
 type OrderLineRow = typeof orderLineTable.$inferSelect;
+type OrderLineOptionRow = typeof orderLineOptionTable.$inferSelect;
 
 function iso(value: Date): string {
   return value.toISOString();
 }
 
 /** Rows → the canonical `Order` wire shape (dollars, ISO timestamps). */
-function toOrder(row: OrderRow, lines: OrderLineRow[]): Order {
+function toOrder(
+  row: OrderRow,
+  lines: OrderLineRow[],
+  optionsByLine: Map<string, OrderLineOptionRow[]> = new Map()
+): Order {
   const parsed = orderSchema.safeParse({
     id: row.id,
     menuId: row.menuId,
@@ -139,6 +157,11 @@ function toOrder(row: OrderRow, lines: OrderLineRow[]): Order {
       menuItemId: line.menuItemId,
       name: line.name,
       variantName: line.variantName,
+      options: (optionsByLine.get(line.id) ?? []).map((option) => ({
+        groupName: option.groupName,
+        choiceName: option.choiceName,
+        priceDelta: option.priceDeltaCents === null ? null : option.priceDeltaCents / 100,
+      })),
       unitPrice: line.unitPriceCents === null ? null : line.unitPriceCents / 100,
       quantity: line.quantity,
       menuId: line.menuId,
@@ -174,6 +197,35 @@ async function linesByOrderId(
     grouped.set(row.orderId, list);
   }
   return grouped;
+}
+
+/** Load picked add-ons for a set of lines, grouped by line id. */
+async function optionsByLineId(
+  db: TenancyDb,
+  lineIds: string[]
+): Promise<Map<string, OrderLineOptionRow[]>> {
+  const grouped = new Map<string, OrderLineOptionRow[]>();
+  if (lineIds.length === 0) return grouped;
+  const rows = await db
+    .select()
+    .from(orderLineOptionTable)
+    .where(inArray(orderLineOptionTable.orderLineId, lineIds));
+  for (const row of rows) {
+    const list = grouped.get(row.orderLineId) ?? [];
+    list.push(row);
+    grouped.set(row.orderLineId, list);
+  }
+  return grouped;
+}
+
+/** Lines plus their picks for a set of orders (one extra query, no N+1). */
+async function linesWithOptions(
+  db: TenancyDb,
+  orderIds: string[]
+): Promise<{ lines: Map<string, OrderLineRow[]>; options: Map<string, OrderLineOptionRow[]> }> {
+  const lines = await linesByOrderId(db, orderIds);
+  const lineIds = [...lines.values()].flat().map((line) => line.id);
+  return { lines, options: await optionsByLineId(db, lineIds) };
 }
 
 function collectItems(doc: MenuDocument): Map<string, MenuItem> {
@@ -214,6 +266,7 @@ interface ResolvedLine {
   menuItemId: string;
   name: string;
   variantName: string | null;
+  options: { groupName: string; choiceName: string; priceDeltaCents: number | null }[];
   unitPriceCents: number | null;
   quantity: number;
 }
@@ -247,11 +300,32 @@ function resolveOrderLine(items: Map<string, MenuItem>, request: OrderLineReques
     : null;
   const price = variant ? variant.price : item.price;
 
+  const picks = normalizeSelections(request.options ?? []);
+  if (picks.length > MAX_LINE_OPTIONS) {
+    throw new OrderRepoError("invalid", `A single line takes at most ${MAX_LINE_OPTIONS} options.`);
+  }
+  const problem = validateOptionSelections(item, picks);
+  if (problem) {
+    throw new OrderRepoError("invalid", problem);
+  }
+  const priced = priceWithOptions(price, item, picks);
+  const options = picks.map((pick) => {
+    const group = item.options.find((candidate) => candidate.name === pick.groupName);
+    const choice = group?.choices.find((candidate) => candidate.name === pick.choiceName);
+    const delta = choice?.priceDelta ?? null;
+    return {
+      groupName: pick.groupName,
+      choiceName: pick.choiceName,
+      priceDeltaCents: delta === null ? null : Math.round(delta * 100),
+    };
+  });
+
   return {
     menuItemId: item.id,
     name: item.name,
     variantName,
-    unitPriceCents: price === null ? null : Math.round(price * 100),
+    options,
+    unitPriceCents: priced === null ? null : Math.round(priced * 100),
     quantity: request.quantity,
   };
 }
@@ -278,12 +352,60 @@ async function assertMenuOpen(db: TenancyDb, menuId: string, now: Date): Promise
 }
 
 /**
+ * Persist resolved lines and their picks. Lines go first (returning ids),
+ * then one option row per pick; options carry no identity of their own, so
+ * there is nothing to upsert — a retry would double-insert, which is why the
+ * caller deletes the order row when any part of the write fails.
+ */
+async function insertLinesWithOptions(
+  db: TenancyDb,
+  orderId: string,
+  lines: (ResolvedLine & { menuId: string | null; menuTitle: string | null })[]
+): Promise<{ lines: OrderLineRow[]; options: Map<string, OrderLineOptionRow[]> }> {
+  const insertedLines = await db
+    .insert(orderLineTable)
+    // Columns are picked explicitly: the line's `options` ride in the
+    // option table below, never in this row.
+    .values(
+      lines.map((line) => ({
+        orderId,
+        menuId: line.menuId,
+        menuTitle: line.menuTitle,
+        menuItemId: line.menuItemId,
+        name: line.name,
+        variantName: line.variantName,
+        unitPriceCents: line.unitPriceCents,
+        quantity: line.quantity,
+      }))
+    )
+    .returning();
+  const optionRows = insertedLines.flatMap((inserted, index) =>
+    (lines[index]?.options ?? []).map((pick) => ({
+      orderLineId: inserted.id,
+      groupName: pick.groupName,
+      choiceName: pick.choiceName,
+      priceDeltaCents: pick.priceDeltaCents,
+    }))
+  );
+  const options = new Map<string, OrderLineOptionRow[]>();
+  if (optionRows.length > 0) {
+    const insertedOptions = await db.insert(orderLineOptionTable).values(optionRows).returning();
+    for (const row of insertedOptions) {
+      const list = options.get(row.orderLineId) ?? [];
+      list.push(row);
+      options.set(row.orderLineId, list);
+    }
+  }
+  return { lines: insertedLines, options };
+}
+
+/**
  * Place an order from a public table link. Anonymous by design — the diner
  * never signs in, and nothing about them is stored.
  *
  * Server-side recomputation: every line is resolved against the *published
  * snapshot* (the menu the diner saw), so a client cannot invent a name, a
- * price, or a total. Unpriced lines make the total `null`.
+ * price, a total, or an add-on. Unpriced lines make the total `null`.
  */
 export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput): Promise<Order> {
   const page = await getPublishedMenuByPath(db, input.restaurantSlug, input.slug);
@@ -332,11 +454,8 @@ export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput):
   if (!row) throw new Error("order creation did not produce a row");
 
   try {
-    const insertedLines = await db
-      .insert(orderLineTable)
-      .values(lines.map((line) => ({ ...line, orderId: row.id })))
-      .returning();
-    return toOrder(row, insertedLines);
+    const inserted = await insertLinesWithOptions(db, row.id, lines);
+    return toOrder(row, inserted.lines, inserted.options);
   } catch (error) {
     // The Neon HTTP driver has no interactive transactions: compensate so a
     // half-written order can never appear on the board.
@@ -436,11 +555,8 @@ export async function placeTableOrder(db: TenancyDb, input: PlaceTableOrderInput
   if (!row) throw new Error("order creation did not produce a row");
 
   try {
-    const insertedLines = await db
-      .insert(orderLineTable)
-      .values(lines.map((line) => ({ ...line, orderId: row.id })))
-      .returning();
-    return toOrder(row, insertedLines);
+    const inserted = await insertLinesWithOptions(db, row.id, lines);
+    return toOrder(row, inserted.lines, inserted.options);
   } catch (error) {
     await db
       .delete(orderTable)
@@ -504,12 +620,12 @@ export async function listOrdersForStaff(
     .limit(limit);
 
   const orderRows = rows.map((entry) => entry.order);
-  const lines = await linesByOrderId(
+  const { lines, options } = await linesWithOptions(
     db,
     orderRows.map((row) => row.id)
   );
   return {
-    orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [])),
+    orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [], options)),
     serverTime: iso(serverTime),
   };
 }
@@ -527,8 +643,8 @@ export async function getOrderForStaff(
     .where(and(eq(orderTable.id, orderId), eq(restaurantMembership.userId, userId)));
   const row = rows[0]?.order;
   if (!row) return null;
-  const lines = await linesByOrderId(db, [row.id]);
-  return toOrder(row, lines.get(row.id) ?? []);
+  const { lines, options } = await linesWithOptions(db, [row.id]);
+  return toOrder(row, lines.get(row.id) ?? [], options);
 }
 
 /**
@@ -583,8 +699,8 @@ export async function updateOrderStatusForStaff(
     );
   }
 
-  const lines = await linesByOrderId(db, [orderId]);
-  return toOrder(updated[0], lines.get(orderId) ?? []);
+  const { lines, options } = await linesWithOptions(db, [orderId]);
+  return toOrder(updated[0], lines.get(orderId) ?? [], options);
 }
 
 /**
@@ -609,4 +725,72 @@ export async function consumeOrderRateLimit(
     .returning({ count: orderRateLimit.count });
   const count = rows[0]?.count ?? 1;
   return { allowed: count <= limit, count };
+}
+
+/**
+ * Diner order tracking (v1): a per-order bearer token, read-only and scoped
+ * to that order. Locked decisions: 7-day hard cap, 24h after terminal
+ * status, sessionStorage resume, same-device + opt-in link.
+ *
+ * The raw token is returned once and never stored — only its SHA-256 hash.
+ * A miss (unknown hash, expired, or terminally old) answers `null` so the
+ * route can return one generic 404 without revealing which case it was.
+ */
+
+export const TRACK_TOKEN_BYTES = 32;
+export const TRACK_HARD_CAP_MS = 7 * 24 * 60 * 60 * 1000;
+export const TRACK_TERMINAL_GRACE_MS = 24 * 60 * 60 * 1000;
+/** The track route's own bucket: polling must never eat the POST 12/min one. */
+export const TRACK_RATE_LIMIT_PER_WINDOW = 60;
+
+export function hashTrackingToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/** Mint one tracking token for an order; the raw value is returned once. */
+export async function createOrderTrackingToken(
+  db: TenancyDb,
+  orderId: string,
+  now: Date = new Date()
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = randomBytes(TRACK_TOKEN_BYTES).toString("base64url");
+  const expiresAt = new Date(now.getTime() + TRACK_HARD_CAP_MS);
+  await db.insert(orderTrackingTable).values({
+    orderId,
+    tokenHash: hashTrackingToken(token),
+    expiresAt,
+  });
+  return { token, expiresAt };
+}
+
+/**
+ * Resolve a presented token to its order, or `null` when unknown, expired,
+ * or past the terminal grace window. Lazy expiry only — no scheduled sweep.
+ */
+export async function getOrderByTrackingToken(
+  db: TenancyDb,
+  rawToken: string,
+  now: Date = new Date()
+): Promise<Order | null> {
+  const presented = rawToken.trim();
+  if (!presented || presented.length > 256) return null;
+  const tokenHash = hashTrackingToken(presented);
+  const rows = await db
+    .select({ tracking: orderTrackingTable, order: orderTable })
+    .from(orderTrackingTable)
+    .innerJoin(orderTable, eq(orderTable.id, orderTrackingTable.orderId))
+    .where(eq(orderTrackingTable.tokenHash, tokenHash))
+    .limit(1);
+  const found = rows[0];
+  if (!found) return null;
+  if (found.tracking.expiresAt.getTime() <= now.getTime()) return null;
+  const status = found.order.status;
+  if (
+    (status === "served" || status === "cancelled") &&
+    found.order.updatedAt.getTime() + TRACK_TERMINAL_GRACE_MS <= now.getTime()
+  ) {
+    return null;
+  }
+  const { lines, options } = await linesWithOptions(db, [found.order.id]);
+  return toOrder(found.order, lines.get(found.order.id) ?? [], options);
 }

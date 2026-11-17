@@ -283,6 +283,8 @@ interface CommitNumberProps {
   onCommit: (value: number | null) => void;
   placeholder?: string;
   inputClassName?: string;
+  /** Whole numbers only: integer keyboard and a matching error message. */
+  integer?: boolean;
 }
 
 export function CommitNumber({
@@ -291,6 +293,7 @@ export function CommitNumber({
   onCommit,
   placeholder,
   inputClassName,
+  integer = false,
 }: CommitNumberProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -307,8 +310,12 @@ export function CommitNumber({
         return;
       }
       const parsed = Number(trimmed);
-      if (!Number.isFinite(parsed) || parsed < 0) {
-        setError("Enter a price of 0 or more, or leave blank.");
+      if (!Number.isFinite(parsed) || parsed < 0 || (integer && !Number.isInteger(parsed))) {
+        setError(
+          integer
+            ? "Enter a whole number of 0 or more, or leave blank."
+            : "Enter a price of 0 or more, or leave blank."
+        );
         setDraft(null);
         return;
       }
@@ -325,8 +332,8 @@ export function CommitNumber({
       <input
         type="number"
         min="0"
-        step="0.01"
-        inputMode="decimal"
+        step={integer ? "1" : "0.01"}
+        inputMode={integer ? "numeric" : "decimal"}
         aria-label={label}
         placeholder={placeholder}
         value={draft ?? (value === null ? "" : String(value))}

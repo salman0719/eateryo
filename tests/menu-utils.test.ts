@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { menuDocumentSchema } from "../src/features/menu/schema";
 import {
   acceptItemUnpriced,
   addCategory,
@@ -11,6 +12,7 @@ import {
   deleteItems,
   duplicateItem,
   hasAnyPrice,
+  isCategoryNameTaken,
   isItemFlagged,
   moveCategory,
   moveItem,
@@ -21,7 +23,10 @@ import {
   renameCategory,
   resolveFirstMenuTitle,
   serviceMenuName,
+  setCategoryCover,
+  setCategoryDescription,
   setItemAvailability,
+  setLabelMeaning,
   suggestRestaurantName,
   suggestSecondMenuNames,
   updateItem,
@@ -326,5 +331,78 @@ describe("menu naming (Q2)", () => {
     expect(isPlaceholderMenuTitle("  MENU  ")).toBe(true);
     expect(isPlaceholderMenuTitle("Main menu")).toBe(false);
     expect(isPlaceholderMenuTitle("Lunch")).toBe(false);
+  });
+});
+
+const sampleCover = {
+  url: "https://cdn.example/dish-abc-display.webp",
+  key: "dish-abc-display.webp",
+  width: 1024,
+  height: 640,
+  thumb: null,
+};
+
+describe("category descriptions and covers", () => {
+  it("sets a description and a cover on a category", () => {
+    const { doc, drinksId } = setupTwoCategoryMenu();
+    const described = setCategoryDescription(doc, drinksId, "Hot drinks, all day.");
+    expect(described.categories.find((c) => c.id === drinksId)!.description).toBe(
+      "Hot drinks, all day."
+    );
+    const covered = setCategoryCover(described, drinksId, sampleCover);
+    expect(covered.categories.find((c) => c.id === drinksId)!.cover).toEqual(sampleCover);
+    expect(() => setCategoryDescription(doc, "nope", "x")).toThrow();
+    expect(() => setCategoryCover(doc, "nope", null)).toThrow();
+  });
+
+  it("carries the description and cover across a rename", () => {
+    const { doc, drinksId } = setupTwoCategoryMenu();
+    const seeded = setCategoryCover(
+      setCategoryDescription(doc, drinksId, "Hot drinks, all day."),
+      drinksId,
+      sampleCover
+    );
+    const renamed = renameCategory(seeded, drinksId, "Hot Drinks");
+    const category = renamed.categories.find((c) => c.id === drinksId)!;
+    expect(category.name).toBe("Hot Drinks");
+    expect(category.description).toBe("Hot drinks, all day.");
+    expect(category.cover).toEqual(sampleCover);
+  });
+
+  it("drops them with a deleted category", () => {
+    const { doc, drinksId } = setupTwoCategoryMenu();
+    const seeded = setCategoryCover(
+      setCategoryDescription(doc, drinksId, "Hot drinks, all day."),
+      drinksId,
+      sampleCover
+    );
+    const after = deleteCategory(seeded, drinksId);
+    expect(after.categories.some((c) => c.id === drinksId)).toBe(false);
+    expect(after.categories).toHaveLength(1);
+  });
+
+  it("writes, trims, and clears custom label meanings", () => {
+    const { doc } = setupTwoCategoryMenu();
+    const written = setLabelMeaning(doc, "  low-alcohol ", " Under 1.2% ABV. ");
+    expect(written.labelMeanings).toEqual({ "low-alcohol": "Under 1.2% ABV." });
+    expect(setLabelMeaning(written, "low-alcohol", "   ").labelMeanings).toEqual({});
+    expect(() => setLabelMeaning(doc, "   ", "x")).toThrow();
+  });
+
+  it("carries custom label meanings through a schema round trip", () => {
+    const { doc } = setupTwoCategoryMenu();
+    const seeded = setLabelMeaning(doc, "low-alcohol", "Under 1.2% ABV.");
+    const revived = menuDocumentSchema.parse(JSON.parse(JSON.stringify(seeded)));
+    expect(revived.labelMeanings).toEqual({ "low-alcohol": "Under 1.2% ABV." });
+  });
+
+  it("guards duplicate category names except the category itself", () => {
+    const { doc, drinksId, foodId } = setupTwoCategoryMenu();
+    expect(isCategoryNameTaken(doc, "food", drinksId)).toBe(true);
+    expect(isCategoryNameTaken(doc, "  FOOD  ", drinksId)).toBe(true);
+    expect(isCategoryNameTaken(doc, "Drinks", drinksId)).toBe(false);
+    expect(isCategoryNameTaken(doc, "Drinks", foodId)).toBe(true);
+    expect(isCategoryNameTaken(doc, "   ", drinksId)).toBe(false);
+    expect(isCategoryNameTaken(doc, "Brunch", drinksId)).toBe(false);
   });
 });

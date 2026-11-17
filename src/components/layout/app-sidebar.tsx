@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
 import { BrandLockup } from "@/components/ui/brand";
@@ -26,13 +26,6 @@ import {
   type SidebarMode,
 } from "./sidebar-preference";
 
-/** One row of the editor's contextual outline: a section of the open menu. */
-export interface SidebarOutlineItem {
-  id: string;
-  name: string;
-  itemCount: number;
-}
-
 interface AppSidebarProps {
   /**
    * Top-level destinations, from `availableSections` (the capability table).
@@ -53,18 +46,14 @@ interface AppSidebarProps {
   email: string | null;
   onNavigate: (section: AppSectionId) => void;
   onSignOut: () => void;
+  /**
+   * Signed-out sign-in path. When the shell hands this over, the button asks
+   * about the browser draft first instead of navigating straight away.
+   */
+  onSignIn?: () => void;
   /** The lockup is the way home: it lands on Capture the way the brand does
    *  everywhere else, without reloading the shell. */
   onHome: () => void;
-  /**
-   * The open menu's sections while the edit workspace is showing. This is the
-   * contextual half of the column: the space earns itself by jumping around a
-   * long menu, not by repeating the nav.
-   */
-  outline?: SidebarOutlineItem[] | null;
-  /** Stable list identity; the section observer re-attaches only when it changes. */
-  outlineKey?: string;
-  onOutlineSelect?: (categoryId: string) => void;
   /**
    * Launch-checklist progress while it is still unfinished. Null hides the
    * row: signed out, not read yet, unreadable, or already complete — the
@@ -116,8 +105,8 @@ const itemBase =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
 /**
- * The app's left column: brand, destinations, the open menu's sections, and
- * the account. A tablet-width window gets a 72px icon rail; an xl window gets
+ * The app's left column: brand, destinations, and the account. A
+ * tablet-width window gets a 72px icon rail; an xl window gets
  * the 260px column; either can be toggled and the choice is remembered
  * (see `sidebar-preference.ts`), so nobody is stuck with a column they are
  * not using.
@@ -135,10 +124,8 @@ export function AppSidebar({
   email,
   onNavigate,
   onSignOut,
+  onSignIn,
   onHome,
-  outline,
-  outlineKey = "",
-  onOutlineSelect,
   launch,
   menusPending = false,
 }: AppSidebarProps) {
@@ -150,32 +137,6 @@ export function AppSidebar({
     () => currentSidebarMode(window.innerWidth),
     () => "expanded" as const
   );
-  const [activeOutlineId, setActiveOutlineId] = useState<string | null>(null);
-
-  // Highlight the section nearest the top of the viewport as the editor
-  // scrolls. Only the edit workspace tags its sections (`data-menu-section`),
-  // so reorder/preview simply find nothing and leave the outline quiet.
-  useEffect(() => {
-    if (!outlineKey) return;
-    const nodes = Array.from(document.querySelectorAll<HTMLElement>("[data-menu-section]"));
-    if (nodes.length === 0) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const first = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (first) {
-          setActiveOutlineId(first.target.getAttribute("data-menu-section"));
-        }
-      },
-      // A section counts as current once its top band clears the viewport's
-      // top edge and before it has scrolled into the lower half.
-      { rootMargin: "-64px 0px -55% 0px" }
-    );
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
-  }, [outlineKey]);
-
   function toggle() {
     const next: SidebarMode = mode === "expanded" ? "rail" : "expanded";
     applySidebarMode(next);
@@ -302,38 +263,6 @@ export function AppSidebar({
             </span>
           </a>
         ) : null}
-
-        {outline && outline.length > 0 ? (
-          <div className="app-sidebar-label mt-3 border-t border-line-200 pt-3">
-            <p className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-500 uppercase">
-              In this menu
-            </p>
-            <ul className="flex flex-col gap-0.5">
-              {outline.map((item) => {
-                const current = item.id === activeOutlineId;
-                return (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOutlineSelect?.(item.id)}
-                      aria-current={current ? "true" : undefined}
-                      className={`flex min-h-[32px] w-full items-center gap-2 rounded-lg px-2.5 py-1 text-left text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
-                        current
-                          ? "bg-surface-100 font-semibold text-ink-900"
-                          : "text-ink-600 hover:bg-surface-100 hover:text-ink-900"
-                      }`}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                      <span className="shrink-0 text-[11px] font-normal text-ink-500">
-                        {item.itemCount}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ) : null}
       </nav>
 
       <div className="app-sidebar-label border-t border-line-200 px-3 py-3 text-xs">
@@ -356,6 +285,14 @@ export function AppSidebar({
               Sign out
             </button>
           </>
+        ) : onSignIn ? (
+          <button
+            type="button"
+            onClick={onSignIn}
+            className="inline-flex rounded-lg border border-line-300 px-2.5 py-1 font-medium text-ink-600 transition-colors hover:bg-surface-100 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            Sign in
+          </button>
         ) : (
           <a
             href="/sign-in"
