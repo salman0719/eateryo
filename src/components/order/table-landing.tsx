@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
-import { OrderShell } from "./order-menu";
+import { OrderShell, OrderSkeleton } from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderTracker } from "./order-tracker";
 import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "./table-order-tabs";
@@ -29,6 +29,13 @@ export interface TableLandingProps {
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
+  /**
+   * The reloadable order token from `?track=`, read server-side so the
+   * first paint already knows a resume is coming. While it resolves the
+   * page shows a neutral loading state — never the ordering UI, which
+   * would flash and vanish once the confirmation arrives.
+   */
+  resumeToken: string | null;
 }
 
 /** What the heading says about this visit, in the diner's terms. */
@@ -48,16 +55,20 @@ export function TableLanding({
   tableLabel,
   menus,
   closedMenus,
+  resumeToken,
 }: TableLandingProps) {
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
+  const [resolving, setResolving] = useState(resumeToken !== null);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   // A shared table link (`?track=`) resumes the tracker after a reload.
+  // The token arrives as a prop (read server-side), so the first paint is
+  // already the loading state — the ordering UI never flashes underneath.
   useEffect(() => {
+    if (!resumeToken) return;
     let cancelled = false;
-    const token = new URLSearchParams(window.location.search).get("track");
-    if (!token) return;
+    const token = resumeToken;
     void (async () => {
       try {
         const result = await fetchTrackedOrder(token);
@@ -66,12 +77,22 @@ export function TableLanding({
       } catch {
         if (cancelled) return;
         setResumeError("That order link is no longer valid. Ask staff to check your order.");
+      } finally {
+        if (!cancelled) setResolving(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resumeToken]);
+
+  if (resolving) {
+    return (
+      <OrderShell tableLabel={tableLabel}>
+        <OrderSkeleton label="Finding your order…" />
+      </OrderShell>
+    );
+  }
 
   if (placed) {
     return (

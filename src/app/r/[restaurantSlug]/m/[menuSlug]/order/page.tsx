@@ -77,6 +77,10 @@ async function TableOrderLink({
 
   const tableParam = typeof query.table === "string" ? query.table : null;
   const tableLabel = normalizeTableLabel(tableParam);
+  // A reload of a confirmation link carries `?track=`; hand it to the
+  // client so its first paint is the loading state, not the menu.
+  const resumeToken =
+    typeof query.track === "string" && query.track.length > 0 ? query.track : null;
 
   if (!tableLabel) {
     return (
@@ -102,6 +106,7 @@ async function TableOrderLink({
       doc={page.doc}
       tableLabel={tableLabel}
       restaurantName={page.restaurantName}
+      resumeToken={resumeToken}
     />
   );
 }

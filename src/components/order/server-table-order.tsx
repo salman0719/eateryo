@@ -37,7 +37,13 @@ import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
-import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import {
+  OrderMenuSection,
+  OrderShell,
+  OrderSkeleton,
+  StickyCartBar,
+  formatOrderTotal,
+} from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderSheet } from "./order-sheet";
 import { OrderTracker } from "./order-tracker";
@@ -50,6 +56,13 @@ interface ServerTableOrderProps {
   doc: MenuDocument;
   tableLabel: string;
   restaurantName: string;
+  /**
+   * The reloadable order token from `?track=`, read server-side so the
+   * first paint already knows a resume is coming. While it resolves the
+   * page shows a neutral loading state — never the menu, which would
+   * flash and vanish once the confirmation arrives.
+   */
+  resumeToken: string | null;
 }
 
 export function ServerTableOrder({
@@ -58,6 +71,7 @@ export function ServerTableOrder({
   doc,
   tableLabel,
   restaurantName,
+  resumeToken,
 }: ServerTableOrderProps) {
   const [lines, setLines] = useState<OrderLine[]>([]);
   const [note, setNote] = useState("");
@@ -67,6 +81,7 @@ export function ServerTableOrder({
   const [submitting, setSubmitting] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
   const [tracking, setTracking] = useState<{ token: string; expiresAt: string } | null>(null);
+  const [resolving, setResolving] = useState(resumeToken !== null);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const viewOrderButton = useRef<HTMLButtonElement | null>(null);
@@ -121,11 +136,12 @@ export function ServerTableOrder({
 
   // Resume from a reloadable link (`?track=`): the token is the only handle
   // this browser has after a reload, so fetch once and show the tracker.
+  // The token arrives as a prop (read server-side), so the first paint is
+  // already the loading state — the menu never flashes underneath.
   useEffect(() => {
+    if (!resumeToken) return;
     let cancelled = false;
-    const params = new URLSearchParams(window.location.search);
-    const resumed = params.get("track");
-    if (!resumed) return;
+    const resumed = resumeToken;
     void (async () => {
       try {
         const result = await fetchTrackedOrder(resumed);
@@ -135,12 +151,22 @@ export function ServerTableOrder({
       } catch {
         if (cancelled) return;
         setResumeError("That order link is no longer valid. Ask staff to check your order.");
+      } finally {
+        if (!cancelled) setResolving(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [resumeToken]);
+
+  if (resolving) {
+    return (
+      <OrderShell tableLabel={tableLabel}>
+        <OrderSkeleton label="Finding your order…" />
+      </OrderShell>
+    );
+  }
 
   async function sendOrder() {
     if (lines.length === 0 || submitting) return;
