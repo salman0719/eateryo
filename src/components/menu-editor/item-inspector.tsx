@@ -133,8 +133,12 @@ export function ItemInspector({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
-      <div className="flex items-start gap-2 border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
+    <div className="rounded-2xl border border-line-200 bg-surface-base">
+      {/* Sticky so the dish's name and its way back stay in view while a
+          long form scrolls under them. The card itself cannot clip its
+          corners (`overflow-hidden` would trap this), so the header and
+          footer round their own edges. */}
+      <div className="sticky top-0 z-10 flex items-start gap-2 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-semibold tracking-wide text-ink-500 uppercase">
             {categoryName || "Untitled category"} · dish {position} of {count}
@@ -505,7 +509,7 @@ export function ItemInspector({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-line-200 bg-surface-50 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 rounded-b-2xl border-t border-line-200 bg-surface-50 px-3 py-2">
         <button type="button" onClick={onDuplicate} className={smallButton}>
           Duplicate
         </button>
