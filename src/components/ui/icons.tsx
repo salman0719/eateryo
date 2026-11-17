@@ -53,8 +53,8 @@ export function ChevronLeftIcon(props: IconProps) {
 }
 
 /**
- * Close: two crossing strokes. The wide screen's way out of the inspector,
- * where a back chevron on the right read as a second "next".
+ * Close: two crossing strokes. A generic dismiss glyph — the inspector
+ * deliberately does not use it, so a cross never sits near Delete.
  */
 export function CloseIcon(props: IconProps) {
   return (
