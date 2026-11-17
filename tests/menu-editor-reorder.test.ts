@@ -37,7 +37,6 @@ function renderReorder(doc: MenuDocument): string {
       onImportFile: noop,
       importError: null,
       onDeleteMenu: noop,
-      onBack: noop,
     })
   );
 }

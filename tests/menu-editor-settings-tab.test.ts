@@ -20,7 +20,6 @@ const baseProps = {
   onImportFile: noop,
   importError: null,
   onDeleteMenu: noop,
-  onBack: noop,
 };
 
 function docWithDupes() {

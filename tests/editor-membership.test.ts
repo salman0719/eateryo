@@ -59,7 +59,6 @@ function renderEditor(
       onImportFile: () => {},
       importError: null,
       onDeleteMenu: () => {},
-      onBack: () => {},
       onServer,
       accountCheckFailed,
       onRetryAccountCheck: () => {},

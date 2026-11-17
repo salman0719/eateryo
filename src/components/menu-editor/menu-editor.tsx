@@ -116,7 +116,6 @@ interface MenuEditorProps {
   onImportFile: (file: File) => void;
   importError: string | null;
   onDeleteMenu: () => void;
-  onBack: () => void;
   /**
    * False when the caller has staff access: owner-only controls (editing
    * modes, publishing) are hidden entirely, not just disabled.
@@ -156,10 +155,6 @@ const smallButton =
   "rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors " +
   "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
-const primaryButton =
-  "rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors " +
-  "hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
-
 const tinyButton =
   "rounded-full border border-line-300 px-2 py-1 text-xs font-medium text-ink-600 transition-colors " +
   "hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 " +
@@ -185,7 +180,6 @@ export function MenuEditor({
   onImportFile,
   importError,
   onDeleteMenu,
-  onBack,
   publishing,
   onPreviewOpen,
 }: MenuEditorProps) {
@@ -643,58 +637,13 @@ export function MenuEditor({
     }
   }
 
-  // The way out of edit mode is the library; the way out of preview and
-  // reorder is edit — so the leading button is "Back to edit" there, in the
-  // same spot, rather than an "All menus" that skips the workspace.
-  const headerRow = (
-    <div data-print-hide className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      {mode === "edit" ? (
-        <button type="button" onClick={onBack} className={smallButton}>
-          ← All menus
-        </button>
-      ) : (
-        <button type="button" onClick={() => changeMode("edit")} className={primaryButton}>
-          ← Back to edit
-        </button>
-      )}
-      {undoLabel && (
-        <button
-          type="button"
-          onClick={handleUndo}
-          className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1.5 text-xs font-medium text-accent-900 transition-colors hover:border-accent-700 hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-        >
-          ↩ Undo {undoLabel}
-        </button>
-      )}
-      <div
-        role="status"
-        title={saveState.detail}
-        className={`min-w-0 text-xs font-medium ${saveState.kind === "error" ? "text-danger-700" : "text-ink-500"}`}
-      >
-        {saveState.kind === "saving" ? (
-          <span>
-            <span
-              aria-hidden="true"
-              className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-line-400 border-t-transparent align-[-2px]"
-            />
-            Saving…
-          </span>
-        ) : saveState.kind === "checking" ? (
-          <span>
-            <span className="sr-only">{saveState.message}</span>
-            <Skeleton className="inline-block h-3 w-36 align-[-1px]" />
-          </span>
-        ) : (
-          saveState.message
-        )}
-        {saveState.detail && <span className="sr-only"> — {saveState.detail}</span>}
-      </div>
-      <span className="flex-1" />
-    </div>
-  );
-
-  // One tab strip for every mode, under the publish strip. Staff never saw
-  // the Reorder/Add-on-sets buttons, so those tabs stay owner-only too.
+  // One tab strip for every mode, and the first row of the editor: the tabs
+  // are the way in and out of preview and reorder, so no separate "Back to
+  // edit" is needed above them, and the way out to the library is the shell's
+  // own (the sidebar, the phone tab bar), not a line of chrome here. The save
+  // status and the delete undo ride at the strip's trailing edge, one glance
+  // wide instead of a row above the work. Staff never saw the
+  // Reorder/Add-on-sets buttons, so those tabs stay owner-only too.
   const tabCounts = editorTabCounts(doc);
   const countPill = (count: number) => (
     <span className="rounded-full bg-surface-100 px-1.5 text-[11px] font-semibold text-ink-600">
@@ -703,58 +652,69 @@ export function MenuEditor({
   );
   const tabStrip = (
     <div
-      role="tablist"
-      aria-label="Menu sections"
       data-print-hide
-      className="flex flex-wrap gap-x-1 border-b border-line-200"
+      className="flex flex-wrap items-end justify-between gap-x-3 border-b border-line-200"
     >
-      <EditorTab
-        label="Settings & hours"
-        selected={mode === "edit" && subTab === "settings"}
-        onSelect={() => goSubTab("settings")}
-      />
-      <EditorTab
-        label="Categories"
-        selected={mode === "edit" && subTab === "categories"}
-        onSelect={() => goSubTab("categories")}
-        badge={
-          <>
-            {countPill(tabCounts.dishes)}
-            {tabCounts.toCheck > 0 && (
-              <span className="rounded-full border border-warning-300 bg-warning-50 px-1.5 text-[11px] font-bold text-warning-900">
-                {tabCounts.toCheck} to check
-              </span>
-            )}
-          </>
-        }
-      />
-      {canManage && (
+      <div role="tablist" aria-label="Menu sections" className="flex flex-wrap gap-x-1">
         <EditorTab
-          label="↕ Reorder"
-          selected={mode === "reorder"}
-          onSelect={() => changeMode("reorder")}
+          label="Settings & hours"
+          selected={mode === "edit" && subTab === "settings"}
+          onSelect={() => goSubTab("settings")}
         />
-      )}
-      <EditorTab
-        label="Preview order page"
-        selected={mode === "preview"}
-        onSelect={() => changeMode("preview")}
-      />
-      {canManage && (
         <EditorTab
-          label="Add-on sets"
-          selected={mode === "edit" && subTab === "addons"}
-          onSelect={() => goSubTab("addons")}
-          badge={tabCounts.sets > 0 ? countPill(tabCounts.sets) : undefined}
+          label="Categories"
+          selected={mode === "edit" && subTab === "categories"}
+          onSelect={() => goSubTab("categories")}
+          badge={
+            <>
+              {countPill(tabCounts.dishes)}
+              {tabCounts.toCheck > 0 && (
+                <span className="rounded-full border border-warning-300 bg-warning-50 px-1.5 text-[11px] font-bold text-warning-900">
+                  {tabCounts.toCheck} to check
+                </span>
+              )}
+            </>
+          }
         />
-      )}
+        {canManage && (
+          <EditorTab
+            label="↕ Reorder"
+            selected={mode === "reorder"}
+            onSelect={() => changeMode("reorder")}
+          />
+        )}
+        <EditorTab
+          label="Preview order page"
+          selected={mode === "preview"}
+          onSelect={() => changeMode("preview")}
+        />
+        {canManage && (
+          <EditorTab
+            label="Add-on sets"
+            selected={mode === "edit" && subTab === "addons"}
+            onSelect={() => goSubTab("addons")}
+            badge={tabCounts.sets > 0 ? countPill(tabCounts.sets) : undefined}
+          />
+        )}
+      </div>
+      <div className="flex min-w-0 items-center gap-2 pb-1.5">
+        {undoLabel && (
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-medium text-accent-900 transition-colors hover:border-accent-700 hover:bg-accent-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            ↩ Undo {undoLabel}
+          </button>
+        )}
+        <SaveStatus state={saveState} className="hidden sm:flex" />
+      </div>
     </div>
   );
 
   if (mode === "preview") {
     return (
       <div className="flex flex-col gap-4">
-        {headerRow}
         {tabStrip}
         {publishing && canManage && (
           <PublishPanel
@@ -782,7 +742,6 @@ export function MenuEditor({
   if (mode === "reorder") {
     return (
       <div className="flex flex-col gap-4">
-        {headerRow}
         {tabStrip}
         <div className="rounded-2xl border border-line-200 bg-surface-base p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -971,7 +930,6 @@ export function MenuEditor({
 
   return (
     <div className="flex flex-col gap-4">
-      {headerRow}
       {tabStrip}
       {subTab === "categories" ? (
         <>
@@ -1474,5 +1432,50 @@ function EditorTab({
         {badge}
       </span>
     </button>
+  );
+}
+
+/** The save state at a glance: a quiet dot when saved, a spinner while
+ * saving, the failure sentence when it failed. Where the save went stays in
+ * the tooltip and with screen readers, so the visible status is one word
+ * rather than a paragraph nobody asked to read.
+ *
+ * It has two homes, never both on screen: the tab row from `sm` up, and the
+ * phone's top row below it — the shell hands this same component to
+ * `BrandBar`, whose right-hand side was empty. The display mode comes from
+ * the caller's `className`, because `hidden` and `flex` cannot both live in
+ * the base class and win reliably (see the inspector's controls). */
+export function SaveStatus({ state, className = "" }: { state: SaveState; className?: string }) {
+  return (
+    <span
+      role="status"
+      title={state.detail}
+      className={`min-w-0 items-center gap-1.5 text-xs font-medium ${
+        state.kind === "error" ? "text-danger-700" : "text-ink-500"
+      } ${className}`}
+    >
+      {state.kind === "saving" ? (
+        <>
+          <span
+            aria-hidden="true"
+            className="inline-block h-3 w-3 shrink-0 animate-spin rounded-full border border-line-400 border-t-transparent"
+          />
+          Saving…
+        </>
+      ) : state.kind === "checking" ? (
+        <>
+          <span className="sr-only">{state.message}</span>
+          <Skeleton className="h-3 w-16" />
+        </>
+      ) : state.kind === "saved" ? (
+        <>
+          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-success-700" />
+          {state.message}
+        </>
+      ) : (
+        <span className="truncate">{state.message}</span>
+      )}
+      {state.detail && <span className="sr-only"> — {state.detail}</span>}
+    </span>
   );
 }
