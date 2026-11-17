@@ -38,6 +38,7 @@ import {
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import { OrderMenuSection, StickyCartBar, formatOrderTotal } from "./order-menu";
 import { OrderSheet } from "./order-sheet";
@@ -362,7 +363,7 @@ export function TableOrderTabs({
         <div className="flex min-w-0 flex-col gap-4">
           <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
             {!singleMenu && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <ScrollArrowStrip label="Menus">
                 {menus.length > 0 && (
                   <TabButton
                     active={activeTab === ALL_TAB}
@@ -393,7 +394,7 @@ export function TableOrderTabs({
                     onHide={hideClosedInfo}
                   />
                 ))}
-              </div>
+              </ScrollArrowStrip>
             )}
             {onlyClosedMenu ? (
               <div>
