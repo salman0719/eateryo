@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   consumeOrderRateLimit,
+  createOrderTrackingToken,
   listOrdersForStaff,
   OrderRepoError,
   placeOrderFromSlug,
@@ -218,7 +219,11 @@ export async function POST(request: Request) {
     } catch {
       // The hook itself never throws; this guards the lookup above it.
     }
-    const response = NextResponse.json({ order }, { status: 201 });
+    const tracking = await createOrderTrackingToken(getDb(), order.id);
+    const response = NextResponse.json(
+      { order, tracking: { token: tracking.token, expiresAt: tracking.expiresAt.toISOString() } },
+      { status: 201 }
+    );
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {

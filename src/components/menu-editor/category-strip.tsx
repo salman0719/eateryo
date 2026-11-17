@@ -2,6 +2,8 @@
 
 import type { RefObject } from "react";
 
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
+
 /**
  * Step 14 of the redesign: the Categories tab's one-line strip.
  *
@@ -47,10 +49,7 @@ export function CategoryStrip({
   const filtering = query.trim().length > 0;
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <nav
-        aria-label="Categories"
-        className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto py-0.5"
-      >
+      <ScrollArrowStrip as="nav" label="Categories">
         {tabs.map((tab) => {
           const selected = tab.id === selectedId;
           return (
@@ -76,7 +75,7 @@ export function CategoryStrip({
             </button>
           );
         })}
-      </nav>
+      </ScrollArrowStrip>
       <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
         <label htmlFor="menu-search" className="sr-only">
           Search the menu
