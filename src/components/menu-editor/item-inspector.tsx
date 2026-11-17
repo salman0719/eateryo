@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { ChevronLeftIcon, CloseIcon } from "@/components/ui/icons";
+import { ChevronLeftIcon } from "@/components/ui/icons";
 import {
   hasAnyPrice,
   isItemFlagged,
@@ -151,9 +151,12 @@ export function ItemInspector({
           footer round their own edges. */}
       <div className="sticky top-0 z-10 flex items-start gap-2 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
         {/* On a phone the inspector has replaced the list, so its way out is
-            a back chevron and belongs on the leading edge. Beside the list on
-            a wide screen the same control sat on the right and read as a
-            second "next", so there it becomes an explicit close. */}
+            a back chevron and belongs on the leading edge — with a second
+            Done beside Next in the footer, where the thumb is. Beside the
+            list on a wide screen a back chevron on the right read as a
+            second "next" and a cross read as a second delete, so there the
+            way out is the word Done on the trailing edge and the footer
+            keeps only Duplicate, Delete and Next. */}
         <button
           type="button"
           onClick={onDone}
@@ -173,10 +176,9 @@ export function ItemInspector({
         <button
           type="button"
           onClick={onDone}
-          aria-label="Close the dish editor"
-          className={`hidden ${iconButtonBase} lg:inline-flex`}
+          className={`${primaryButton} hidden items-center lg:inline-flex`}
         >
-          <CloseIcon size={16} />
+          Done
         </button>
       </div>
 
@@ -547,7 +549,7 @@ export function ItemInspector({
         <button type="button" onClick={onNext} className={smallButton}>
           Next dish ›
         </button>
-        <button type="button" onClick={onDone} className={primaryButton}>
+        <button type="button" onClick={onDone} className={`${primaryButton} lg:hidden`}>
           Done
         </button>
       </div>

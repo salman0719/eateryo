@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   addCategory,
@@ -653,9 +654,9 @@ export function MenuEditor({
   const tabStrip = (
     <div
       data-print-hide
-      className="flex flex-wrap items-end justify-between gap-x-3 border-b border-line-200"
+      className="flex items-end justify-between gap-x-3 border-b border-line-200"
     >
-      <div role="tablist" aria-label="Menu sections" className="flex flex-wrap gap-x-1">
+      <ScrollArrowStrip as="tablist" label="Menu sections">
         <EditorTab
           label="Settings & hours"
           selected={mode === "edit" && subTab === "settings"}
@@ -696,8 +697,8 @@ export function MenuEditor({
             badge={tabCounts.sets > 0 ? countPill(tabCounts.sets) : undefined}
           />
         )}
-      </div>
-      <div className="flex min-w-0 items-center gap-2 pb-1.5">
+      </ScrollArrowStrip>
+      <div className="flex min-w-0 shrink-0 items-center gap-2 pb-1.5">
         {undoLabel && (
           <button
             type="button"
@@ -1010,55 +1011,6 @@ export function MenuEditor({
               totalItems={search.totalItems}
             />
           )}
-          {selected.length > 0 && (
-            <div
-              role="region"
-              aria-label="Bulk actions"
-              className="sticky top-0 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3 shadow-sm"
-            >
-              <p className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-semibold text-accent-800">
-                {selected.length} {selected.length === 1 ? "item" : "items"} selected
-              </p>
-              <label className="flex items-center gap-1.5 text-xs text-ink-600">
-                Move to
-                <select
-                  aria-label="Category to move selected items to"
-                  value={bulkTarget}
-                  onChange={(event) => setBulkTarget(event.target.value)}
-                  className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                >
-                  <option value="">Category…</option>
-                  {doc.categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                disabled={!bulkTarget}
-                onClick={handleBulkMove}
-                className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
-              >
-                Move selected
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleBulkDelete()}
-                className={`${smallButton} hover:border-danger-700 hover:text-danger-800`}
-              >
-                Delete selected
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedIds(new Set())}
-                className={smallButton}
-              >
-                Clear
-              </button>
-            </div>
-          )}
           {doc.categories.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
               <p className="font-medium text-ink-900">No categories yet</p>
@@ -1080,13 +1032,23 @@ export function MenuEditor({
             </div>
           ) : selectedCategory ? (
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-              <section
-                data-menu-section={selectedCategory.id}
-                id={`menu-section-${selectedCategory.id}`}
-                aria-label={`Category ${selectedCategory.name}`}
-                className={`${selection.itemId ? "hidden lg:block " : ""}scroll-mt-4 rounded-2xl border border-line-200 bg-surface-base`}
+              {/* The left column holds the category canvas and, once dishes are
+              ticked, the bulk bar. The bar has to be the column's *last* child:
+              `sticky bottom-*` only clamps an element whose normal position is
+              below the scrollport, so a bar parked above the list scrolls away
+              instead of docking. Hiding the column on a phone while the
+              inspector is open (the same rule the card itself follows) keeps
+              the bar off the inspector's footer. */}
+              <div
+                className={`${selection.itemId ? "hidden lg:flex" : "flex"} min-w-0 flex-col gap-3`}
               >
-                {/* One category on the canvas: its band holds the name, the
+                <section
+                  data-menu-section={selectedCategory.id}
+                  id={`menu-section-${selectedCategory.id}`}
+                  aria-label={`Category ${selectedCategory.name}`}
+                  className={`${selection.itemId ? "hidden lg:block " : ""}scroll-mt-4 rounded-2xl border border-line-200 bg-surface-base`}
+                >
+                  {/* One category on the canvas: its band holds the name, the
               count, and the one thing that acts on the category itself.
               Ordering lives in the Reorder tab, so this band carries no
               up/down steppers.
@@ -1097,62 +1059,117 @@ export function MenuEditor({
               clip its corners (`overflow-hidden` would make it the sticky
               containing block and the band would never leave the card), so
               the band rounds its own top edge instead. */}
-                <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2">
-                  <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
-                    {selectedCategory.name || "Untitled category"}
-                  </h2>
-                  <p className="shrink-0 text-xs text-ink-500">
-                    {selectedCategory.items.length}{" "}
-                    {selectedCategory.items.length === 1 ? "item" : "items"}
-                    {selectedToCheck > 0 && (
-                      <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
-                        {selectedToCheck} to check
-                      </span>
-                    )}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteCategory(selectedCategory, selectedCategoryIndex)}
-                    className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
-                  >
-                    Delete
-                  </button>
-                </div>
-                <div className="p-4">
-                  <CategoryHeader
-                    doc={doc}
-                    category={selectedCategory}
-                    canUpload={canUploadItemImages}
-                    onChange={onChange}
-                  />
-                  {selectedCategory.items.length === 0 ? (
-                    <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
-                      No items — add the first one below.
+                  <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2">
+                    <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
+                      {selectedCategory.name || "Untitled category"}
+                    </h2>
+                    <p className="shrink-0 text-xs text-ink-500">
+                      {selectedCategory.items.length}{" "}
+                      {selectedCategory.items.length === 1 ? "item" : "items"}
+                      {selectedToCheck > 0 && (
+                        <span className="ml-2 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
+                          {selectedToCheck} to check
+                        </span>
+                      )}
                     </p>
-                  ) : (
-                    <ul className="mt-3 space-y-2">
-                      {selectedCategory.items.map((item) => (
-                        <DishRow
-                          key={item.id}
-                          item={item}
-                          currency={doc.currency}
-                          selected={item.id === selection.itemId}
-                          bulkSelected={selectedIds.has(item.id)}
-                          duplicate={duplicateIds.has(item.id)}
-                          actions={rowActions}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleAddItem(selectedCategory.id)}
-                    className={`${smallButton} mt-3`}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteCategory(selectedCategory, selectedCategoryIndex)}
+                      className={`${tinyButton} hover:border-danger-700 hover:text-danger-800`}
+                    >
+                      Delete category
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    <CategoryHeader
+                      doc={doc}
+                      category={selectedCategory}
+                      canUpload={canUploadItemImages}
+                      onChange={onChange}
+                    />
+                    {selectedCategory.items.length === 0 ? (
+                      <p className="mt-3 rounded-xl border border-dashed border-line-200 bg-surface-base px-4 py-3 text-center text-sm text-ink-500">
+                        No items — add the first one below.
+                      </p>
+                    ) : (
+                      <ul className="mt-3 space-y-2">
+                        {selectedCategory.items.map((item) => (
+                          <DishRow
+                            key={item.id}
+                            item={item}
+                            currency={doc.currency}
+                            selected={item.id === selection.itemId}
+                            bulkSelected={selectedIds.has(item.id)}
+                            duplicate={duplicateIds.has(item.id)}
+                            actions={rowActions}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleAddItem(selectedCategory.id)}
+                      className={`${smallButton} mt-3`}
+                    >
+                      + Add item
+                    </button>
+                  </div>
+                </section>
+                {selected.length > 0 && (
+                  // Docked to the viewport bottom so it never piles up against
+                  // the sticky category band at the top — the two Delete
+                  // buttons stay far apart. On a phone it floats above the tab
+                  // bar (56px buttons plus the safe area); wider screens have
+                  // no tab bar.
+                  <div
+                    role="region"
+                    aria-label="Bulk actions"
+                    className="sticky bottom-20 z-30 flex flex-wrap items-center gap-3 rounded-2xl border border-line-200 bg-surface-base p-3 shadow-sm sm:bottom-3"
                   >
-                    + Add item
-                  </button>
-                </div>
-              </section>
+                    <p className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-semibold text-accent-800">
+                      {selected.length} {selected.length === 1 ? "item" : "items"} selected
+                    </p>
+                    <label className="flex items-center gap-1.5 text-xs text-ink-600">
+                      Move to
+                      <select
+                        aria-label="Category to move selected items to"
+                        value={bulkTarget}
+                        onChange={(event) => setBulkTarget(event.target.value)}
+                        className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                      >
+                        <option value="">Category…</option>
+                        {doc.categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={!bulkTarget}
+                      onClick={handleBulkMove}
+                      className={`${smallButton} disabled:cursor-not-allowed disabled:opacity-40`}
+                    >
+                      Move selected
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleBulkDelete()}
+                      className={`${smallButton} hover:border-danger-700 hover:text-danger-800`}
+                    >
+                      Delete {selected.length} {selected.length === 1 ? "item" : "items"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIds(new Set())}
+                      className={smallButton}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
               {selectedItem && selectedCategory ? (
                 <div className="lg:sticky lg:top-4">
                   <ItemInspector
@@ -1421,7 +1438,7 @@ function EditorTab({
       role="tab"
       aria-selected={selected}
       onClick={onSelect}
-      className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+      className={`shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
         selected
           ? "border-accent-700 font-bold text-accent-800"
           : "border-transparent font-medium text-ink-500 hover:border-line-300 hover:text-ink-900"
