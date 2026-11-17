@@ -94,6 +94,16 @@ describe("ShellFrame", () => {
     expect(html).not.toContain('aria-label="Sections"');
   });
 
+  it("puts a handed-over save status in the phone brand row", () => {
+    const html = render({
+      saveStatus: createElement("span", { "data-testid": "save" }, "Saved"),
+    });
+    // The brand row is the empty right-hand side of a phone's top line, so the
+    // status lands above the page — not inside it.
+    expect(html.split("<main")[0]).toContain("Saved");
+    expect(html.split("<main")[1] ?? "").not.toContain("Saved");
+  });
+
   it("draws the phone bar and the More sheet trigger once the nav is ready", () => {
     const html = render();
     expect(html).toContain('aria-label="Sections"');

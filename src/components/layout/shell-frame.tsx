@@ -74,6 +74,12 @@ export interface ShellFrameProps {
   /** The editor's working measure, wider than the content screens'. */
   wideMeasure: boolean;
   /**
+   * The open editor's save state, shown in the phone brand row. Below `sm`
+   * there is no room for it on the editor's tab strip, and the top row's
+   * right-hand side is empty. The frame never reads it, so it stays chrome.
+   */
+  saveStatus?: ReactNode;
+  /**
    * The screen column: the shell's banners, then the screen itself. The frame
    * never inspects it, so a page can grow notices without touching this.
    */
@@ -129,6 +135,7 @@ export function ShellFrame({
   dialog,
   screen,
   wideMeasure,
+  saveStatus,
   children,
   signedIn,
   sessionPending,
@@ -182,6 +189,10 @@ export function ShellFrame({
               signedIn={signedIn}
               sessionPending={sessionPending}
               className={showColumn ? "sm:hidden" : undefined}
+              // The editor's save state takes the row's empty right-hand side
+              // on a phone; `sm:hidden` keeps it from ever doubling the copy
+              // the tab strip shows from `sm` up.
+              trailing={saveStatus ? <div className="sm:hidden">{saveStatus}</div> : undefined}
               onHome={onHome}
               // Every in-shell sign-in goes through the choice first: attach
               // the browser draft on login or wipe it on login.

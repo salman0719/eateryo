@@ -14,7 +14,7 @@ import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConflictBanner } from "@/components/menu-editor/conflict-banner";
 import { MissingDraftCard } from "@/components/menu-editor/missing-draft-card";
-import { MenuEditor } from "@/components/menu-editor/menu-editor";
+import { MenuEditor, SaveStatus } from "@/components/menu-editor/menu-editor";
 import { PublishWizard } from "@/components/menu-editor/publish-wizard";
 import type { MenuDocument } from "@/features/menu/schema";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
@@ -1203,6 +1203,17 @@ export function AppShell() {
       // The editor is the dense working surface; the publish step is
       // onboarding and keeps the content measure.
       wideMeasure={screen === "editor" && editorMode !== "publish"}
+      // On a phone the editor's tab row has no space for the save state, so
+      // the empty right-hand side of the top row carries it; from `sm` up the
+      // strip does (the two copies are never both displayed).
+      saveStatus={
+        screen === "editor" && editorMode !== "publish" && routedDoc ? (
+          // `flex`, not the default inline: the dot in SaveStatus is a sized
+          // span, and width/height (plus the gap beside it) only apply in a
+          // flex container. Without it the phone copy showed "Saved" alone.
+          <SaveStatus state={saveState} className="flex" />
+        ) : null
+      }
       signedIn={signedIn}
       sessionPending={sessionPending}
       email={email}
@@ -1436,7 +1447,6 @@ export function AppShell() {
                   onImportFile={(f) => void importFile(f)}
                   importError={importError}
                   onDeleteMenu={() => void handleDeleteMenu(routedDoc.id)}
-                  onBack={() => void handleBackToLibrary()}
                   publishing={{
                     status: activePublication,
                     loaded: activePublicationLoaded,

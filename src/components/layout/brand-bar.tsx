@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { BrandLockup } from "@/components/ui/brand";
 
 /**
@@ -8,6 +10,10 @@ import { BrandLockup } from "@/components/ui/brand";
  * shows without an account and the More sheet is signed-in only, so a visitor
  * would otherwise have no sign-in path at all. It carries nothing else: a
  * signed-out visitor has no destinations to browse.
+ *
+ * The right-hand side is otherwise empty, so `trailing` is where a screen can
+ * put a small piece of state that has no room in the page itself — the editor's
+ * save status, on a phone.
  *
  * The row takes no device decision of its own. The caller owns the width, so
  * the signed-out home can later mount the same lockup in a roomier desktop
@@ -21,11 +27,14 @@ export function BrandBar({
   signedIn,
   sessionPending,
   className = "",
+  trailing,
   onHome,
   onSignIn,
 }: {
   signedIn: boolean;
   sessionPending: boolean;
+  /** The empty right-hand side of the row: the editor's save status, on a phone. */
+  trailing?: ReactNode;
   /** The caller's width rule — `sm:hidden` while the sidebar carries the brand. */
   className?: string;
   /** The lockup's destination; inside the shell it is client-side Capture. */
@@ -62,6 +71,7 @@ export function BrandBar({
             )}
           </div>
         ) : null}
+        {trailing}
       </div>
     </div>
   );
