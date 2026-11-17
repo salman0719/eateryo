@@ -73,12 +73,16 @@ export function ScrollArrowStrip({
   const arrow =
     "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-line-300 bg-surface-base p-1.5 text-ink-700 shadow-sm transition-opacity hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
-  // The tablist sits on the header rule with no vertical padding of its own:
-  // the active tab's -mb-px border then overlaps that rule instead of
-  // floating a couple of pixels above it. Other rows keep the breathing room.
+  // The tablist sits on the header rule: no vertical padding of its own, and
+  // the track itself carries the -mb-px pull so the active tab's border
+  // overlaps the rule. The pull lives on the track — a child of the plain
+  // block wrapper — and never on the tabs, because a tab hanging past a
+  // scroll container's edge paints unreliably on some mobile browsers, while
+  // a negative margin in ordinary block layout always paints. Other rows keep
+  // the breathing room and no pull.
   const trackClass =
     "no-scrollbar flex items-center gap-1 overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700" +
-    (as === "tablist" ? "" : " py-0.5");
+    (as === "tablist" ? " -mb-px" : " py-0.5");
 
   const track =
     as === "nav" ? (

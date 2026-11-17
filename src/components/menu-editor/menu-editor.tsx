@@ -1438,7 +1438,7 @@ function EditorTab({
       role="tab"
       aria-selected={selected}
       onClick={onSelect}
-      className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+      className={`shrink-0 border-b-2 px-3 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
         selected
           ? "border-accent-700 font-bold text-accent-800"
           : "border-transparent font-medium text-ink-500 hover:border-line-300 hover:text-ink-900"
