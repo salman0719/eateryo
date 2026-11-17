@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DIETARY_LABEL_MEANINGS,
   STARTER_DIETARY_LABELS,
   dedupeDietaryLabels,
+  dietaryLabelMeaning,
+  dietaryLabelUsage,
   dietaryLabelVocabulary,
   sameDietaryLabels,
   suggestDietaryLabels,
@@ -93,5 +96,45 @@ describe("suggestDietaryLabels", () => {
   it("caps the row", () => {
     expect(suggestDietaryLabels(vocabulary, { query: "free", limit: 1 })).toEqual(["gluten-free"]);
     expect(suggestDietaryLabels(vocabulary, { limit: 2 })).toEqual(["vegan", "vegetarian"]);
+  });
+});
+
+describe("dietaryLabelUsage", () => {
+  it("counts usage, ranks most-used first, and keeps unused starters at zero", () => {
+    const usage = dietaryLabelUsage([
+      source(["vegan"], ["vegan", "gluten-free"]),
+      source(["low-alcohol"]),
+    ]);
+    expect(usage[0]).toEqual({ label: "vegan", count: 2 });
+    expect(usage.find((entry) => entry.label === "gluten-free")).toEqual({
+      label: "gluten-free",
+      count: 1,
+    });
+    expect(usage.find((entry) => entry.label === "low-alcohol")).toEqual({
+      label: "low-alcohol",
+      count: 1,
+    });
+    expect(usage.find((entry) => entry.label === "halal")).toEqual({ label: "halal", count: 0 });
+    // The vocabulary is the same list, labels only.
+    const docs = [source(["vegan"], ["vegan", "gluten-free"]), source(["low-alcohol"])];
+    expect(dietaryLabelVocabulary(docs)).toEqual(dietaryLabelUsage(docs).map((e) => e.label));
+  });
+});
+
+describe("dietaryLabelMeaning", () => {
+  it("explains every starter code from the built-in dictionary", () => {
+    for (const code of STARTER_DIETARY_LABELS) {
+      expect(DIETARY_LABEL_MEANINGS[code]).toMatch(/\S/);
+      expect(dietaryLabelMeaning({}, code)).toBe(DIETARY_LABEL_MEANINGS[code]);
+    }
+    expect(dietaryLabelMeaning({}, "nut-free")).toBe("No peanuts or tree nuts — ask about prep.");
+  });
+
+  it("prefers the menu's own meaning and never invents one", () => {
+    const sourceDoc = { labelMeanings: { "low-alcohol": "Under 1.2% ABV." } };
+    expect(dietaryLabelMeaning(sourceDoc, "low-alcohol")).toBe("Under 1.2% ABV.");
+    expect(dietaryLabelMeaning(sourceDoc, "LOW-alcohol")).toBe("Under 1.2% ABV.");
+    expect(dietaryLabelMeaning(sourceDoc, "mystery-meat")).toBeNull();
+    expect(dietaryLabelMeaning(sourceDoc, "   ")).toBeNull();
   });
 });

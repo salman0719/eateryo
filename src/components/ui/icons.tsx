@@ -43,6 +43,27 @@ function Glyph({
   );
 }
 
+/** Back: a left-pointing chevron, as in a browser's back affordance. */
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M14.5 6.5 9 12l5.5 5.5" />
+    </Glyph>
+  );
+}
+
+/**
+ * Close: two crossing strokes. A generic dismiss glyph — the inspector
+ * deliberately does not use it, so a cross never sits near Delete.
+ */
+export function CloseIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </Glyph>
+  );
+}
+
 /** Disclosure, closed. */
 export function ChevronDownIcon(props: IconProps) {
   return (
@@ -57,6 +78,20 @@ export function ChevronUpIcon(props: IconProps) {
   return (
     <Glyph {...props}>
       <path d="M6.5 14.5 12 9 17.5 14.5" />
+    </Glyph>
+  );
+}
+
+/**
+ * A photo: framed image with a sun and a horizon. Used where a photo
+ * placeholder needs to say "picture goes here" rather than a generic box.
+ */
+export function ImageIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <circle cx="9" cy="9.5" r="1.6" />
+      <path d="M4 17l4.5-4.5 3 3L15 12l5 5" />
     </Glyph>
   );
 }

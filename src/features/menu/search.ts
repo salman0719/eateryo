@@ -30,6 +30,17 @@ export interface MenuSearchResult {
   totalItems: number;
 }
 
+/**
+ * One flat results-mode row: the dish plus the category it lives in.
+ * Results mode lists these instead of grouped sections, so every row
+ * carries its category pill and a pick can jump straight to the dish.
+ */
+export interface SearchResultRow {
+  categoryId: string;
+  categoryName: string;
+  item: MenuItem;
+}
+
 function contains(query: string, value: string | null | undefined): boolean {
   return (value ?? "").toLowerCase().includes(query);
 }
@@ -63,4 +74,21 @@ export function searchMenu(doc: MenuDocument, rawQuery: string): MenuSearchResul
     matchCount: categories.reduce((sum, match) => sum + match.items.length, 0),
     totalItems,
   };
+}
+
+/**
+ * The same matches as `searchMenu`, flattened into rows in document order
+ * (category order, then item order). A category-name match contributes all
+ * of its items, exactly like the grouped result — flattening changes the
+ * shape, never the set.
+ */
+export function flatSearchRows(doc: MenuDocument, rawQuery: string): SearchResultRow[] {
+  const result = searchMenu(doc, rawQuery);
+  return result.categories.flatMap((match) =>
+    match.items.map((item) => ({
+      categoryId: match.category.id,
+      categoryName: match.category.name,
+      item,
+    }))
+  );
 }

@@ -20,11 +20,23 @@ export interface OptionSelection {
   choiceName: string;
 }
 
-interface OptionGroupLike {
+export interface OptionGroupLike {
   name: string;
   min: number;
   max: number | null;
   choices: ReadonlyArray<{ name: string; priceDelta: number | null }>;
+}
+
+/**
+ * The card header's derived shape: "Optional · 0–2 · 3 choices". Required
+ * comes from min, the range from min/max (open-ended when max is null),
+ * then the choice count — derived, never set, so the header cannot lie
+ * about the group below it.
+ */
+export function optionGroupShape(group: OptionGroupLike): string {
+  const range = group.max === null ? `${group.min}+` : `${group.min}–${group.max}`;
+  const count = group.choices.length;
+  return `${group.min > 0 ? "Required" : "Optional"} · ${range} · ${count} ${count === 1 ? "choice" : "choices"}`;
 }
 
 interface ItemWithOptions {

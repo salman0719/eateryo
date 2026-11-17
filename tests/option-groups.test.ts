@@ -11,6 +11,7 @@ import {
   formatSelectionsSummary,
   normalizeSelections,
   optionGroupConfigProblems,
+  optionGroupShape,
   optionsPriceDelta,
   priceWithOptions,
   selectionsKey,
@@ -204,6 +205,29 @@ describe("configuration problems", () => {
     expect(optionGroupConfigProblems({ ...ok, min: 4, max: null })).toEqual([
       expect.stringContaining("more choices"),
     ]);
+  });
+});
+
+describe("optionGroupShape", () => {
+  const base = group({
+    name: "Sauce",
+    min: 0,
+    max: 2,
+    choices: [
+      { name: "Mayo", priceDelta: 0 },
+      { name: "BBQ", priceDelta: 0 },
+      { name: "Ranch", priceDelta: 1 },
+    ],
+  });
+
+  it("names requiredness, range, and choice count", () => {
+    expect(optionGroupShape(base)).toBe("Optional · 0–2 · 3 choices");
+    expect(optionGroupShape({ ...base, min: 1 })).toBe("Required · 1–2 · 3 choices");
+    expect(optionGroupShape({ ...base, max: null })).toBe("Optional · 0+ · 3 choices");
+    expect(optionGroupShape({ ...base, choices: [base.choices[0]] })).toBe(
+      "Optional · 0–2 · 1 choice"
+    );
+    expect(optionGroupShape({ ...base, choices: [] })).toBe("Optional · 0–2 · 0 choices");
   });
 });
 

@@ -35,6 +35,9 @@ export function extractedMenuToDocument(
       id: generateId(),
       name: category.name,
       sortOrder: categoryIndex,
+      // Extraction names sections; descriptions and covers are owner-authored later.
+      description: "",
+      cover: null,
       items: category.items.map((item, itemIndex) => ({
         id: generateId(),
         name: item.name,
@@ -58,6 +61,8 @@ export function extractedMenuToDocument(
     // Extraction produces dishes, never library definitions: the owner
     // promotes a dish's group to a template from the editor.
     modifierTemplates: [],
+    // Descriptions, covers, and label meanings are owner-authored later.
+    labelMeanings: {},
     source: {
       ...(source?.originalFileName ? { originalFileName: source.originalFileName } : {}),
       ...(originalTitle ? { originalTitle } : {}),

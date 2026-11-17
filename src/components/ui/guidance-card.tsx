@@ -22,7 +22,7 @@ interface GuidanceCardProps {
  * no page-component swap (a Next `<Link>` push can remount the app shell
  * and drop its state — or, when the target route is the page component
  * already mounted, leave the visible screen untouched while only the URL
- * changes). `HomeScreen` follows the new path via `usePathname`.
+ * changes). `NavigationProvider` follows the new path via `usePathname`.
  */
 function navigateInApp(event: MouseEvent<HTMLAnchorElement>, href: string) {
   // Modified clicks keep the browser's default (new tab, new window…).

@@ -2,7 +2,7 @@
 
 /**
  * R0 app-wide order monitor (report 5, tiers 0+1): one signed-in polling
- * context mounted in HomeScreen, so staff on any tab hear about new orders.
+ * context mounted in AppShell, so staff on any tab hear about new orders.
  *
  * One poller per session: the board consumes this context instead of polling
  * itself, so the badge and the board share a cursor and can never disagree.
