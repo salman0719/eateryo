@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SIDEBAR_BOOT_SCRIPT } from "@/components/layout/sidebar-preference";
+import { SESSION_BOOT_SCRIPT } from "@/features/session/session-hint";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,7 +25,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {/* Before the shell paints: a saved sidebar choice must not flash the
-            other width. Inline on purpose — an effect runs after first paint. */}
+            other width, and a returning account must not watch the signed-in
+            shell assemble itself. Inline on purpose — an effect runs after
+            first paint, and a render only learns the hint after hydration. */}
+        <script dangerouslySetInnerHTML={{ __html: SESSION_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: SIDEBAR_BOOT_SCRIPT }} />
         {children}
       </body>

@@ -12,7 +12,7 @@ import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
 /** Magic links are single-use and expire fast (PHASE-2.md §3.6). */
 const MAGIC_LINK_EXPIRES_IN_SECONDS = 5 * 60;
 /** Café owner laptops / staff-board devices should stay signed in (§3.6). */
-const SESSION_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
+export const SESSION_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
 /** Rolling refresh: the 30-day window slides forward on daily use. */
 const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
 
