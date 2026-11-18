@@ -583,7 +583,9 @@ export async function listOrdersForStaff(
   userId: string,
   query: StaffOrderQuery = {}
 ): Promise<{ orders: Order[]; serverTime: string }> {
-  const limit = Math.min(Math.max(query.limit ?? 100, 1), 200);
+  // Capped at 2000 so a deep-history board (All time) loads in one read;
+  // the incremental `since` polls after it stay small regardless.
+  const limit = Math.min(Math.max(query.limit ?? 100, 1), 2000);
   const since = query.since ? new Date(query.since) : null;
   if (query.since && Number.isNaN(since?.getTime())) {
     throw new OrderRepoError("invalid", "since must be an ISO 8601 timestamp.");

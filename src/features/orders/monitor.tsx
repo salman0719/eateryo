@@ -222,10 +222,12 @@ export function OrderMonitorProvider({
     async (initial: boolean, cafeId: string) => {
       // Always one café: the server would otherwise answer with every
       // membership's tickets, which is a union the shell never acts in.
+      // 2000: the board must load deep history in one initial read (the
+      // `since` polls after it stay small regardless of this cap).
       const result = await fetchStaffOrders({
         restaurantId: cafeId,
         since: initial ? null : sinceRef.current,
-        limit: 100,
+        limit: 2000,
       });
       sinceRef.current = result.serverTime;
       if (initial) {
