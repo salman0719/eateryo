@@ -46,6 +46,19 @@ export function usePublication(options: PublicationOptions) {
     accountKeyRef.current = accountKey;
   }, [signedIn, accountKey]);
 
+  /**
+   * Whether the document the editor holds right now is still `menuId`.
+   *
+   * One predicate, because the inline form is a trap: `a?.id ?? null === b`
+   * parses as `a?.id ?? (null === b)`, which is truthy for any open document.
+   * That read as "the doc changed" on every call, so each answer from the
+   * server was dropped while `publicationLoaded` still flipped to true — and
+   * the panel then said a published, live menu had never been published.
+   */
+  function openDocIs(menuId: string): boolean {
+    return (options.getOpenDoc()?.id ?? null) === menuId;
+  }
+
   const activeRestaurantId = active?.restaurantId ?? null;
 
   // Publishing (Step 9): the open menu's public-link state, loaded on open
@@ -86,11 +99,11 @@ export function usePublication(options: PublicationOptions) {
     setLiveDocState("loading");
     try {
       const doc = await fetchLiveMenuDoc(menuId);
-      if (options.getOpenDoc()?.id ?? null !== menuId) return;
+      if (!openDocIs(menuId)) return;
       setLiveDoc(doc);
       setLiveDocState("ready");
     } catch (error) {
-      if (options.getOpenDoc()?.id ?? null !== menuId) return;
+      if (!openDocIs(menuId)) return;
       if (error instanceof SyncError && error.code === "not_found") {
         setLiveDoc(null);
         setLiveDocState("ready");
@@ -113,12 +126,12 @@ export function usePublication(options: PublicationOptions) {
     setPublicationMenuId(menuId);
     try {
       const status = await fetchPublication(menuId);
-      if (options.getOpenDoc()?.id ?? null !== menuId) return;
+      if (!openDocIs(menuId)) return;
       setPublication(status);
       setPublishError(null);
       void refreshLiveDoc(menuId, status);
     } catch (error) {
-      if (options.getOpenDoc()?.id ?? null !== menuId) return;
+      if (!openDocIs(menuId)) return;
       if (error instanceof SyncError && error.code === "not_found") {
         setPublication(null);
       } else {
@@ -126,7 +139,7 @@ export function usePublication(options: PublicationOptions) {
       }
       resetLiveDoc();
     } finally {
-      if (options.getOpenDoc()?.id ?? null === menuId) setPublicationLoaded(true);
+      if (openDocIs(menuId)) setPublicationLoaded(true);
     }
   }
 
@@ -225,7 +238,7 @@ export function usePublication(options: PublicationOptions) {
     void (async () => {
       try {
         const server = await fetchServerMenu(menuId);
-        if (options.getOpenDoc()?.id ?? null === menuId) {
+        if (openDocIs(menuId)) {
           options.onServerRevision(menuId, server.updatedAt);
         }
         // The wizard is how onboarding menus reach the account. Stamp the
