@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
 
 import {
   menu as menuTable,
@@ -130,6 +130,33 @@ export interface StaffOrderQuery {
   /** Restrict to one restaurant (must be one the caller belongs to). */
   restaurantId?: string | null;
   limit?: number;
+  /**
+   * Board window: only orders created at/after this ISO timestamp. Pushed
+   * into SQL so a 24h board never serializes history it hides.
+   */
+  from?: string | null;
+  /** Board window end: only orders created at/before this ISO timestamp. */
+  to?: string | null;
+  /**
+   * Keyset cursor for history pages: `<createdAt>|<id>` of the previous
+   * page's last order (from `nextCursor`). Newest-first, id breaks ties.
+   */
+  cursor?: string | null;
+}
+
+/** Opaque page cursor: the previous page's last row, newest-first. */
+function parseBoardCursor(cursor: string): { createdAt: Date; id: string } {
+  const separator = cursor.lastIndexOf("|");
+  const createdAt = separator < 0 ? null : new Date(cursor.slice(0, separator));
+  const id = separator < 0 ? "" : cursor.slice(separator + 1);
+  if (!createdAt || Number.isNaN(createdAt.getTime()) || !id) {
+    throw new OrderRepoError("invalid", "cursor must be a nextCursor from this board.");
+  }
+  return { createdAt, id };
+}
+
+function boardCursorFor(row: { createdAt: Date; id: string }): string {
+  return `${row.createdAt.toISOString()}|${row.id}`;
 }
 
 type OrderRow = typeof orderTable.$inferSelect;
@@ -574,19 +601,35 @@ function orderCurrency(docs: MenuDocument[]): string | null {
 }
 
 /**
- * Board query (owner or staff). Without `since` it returns the newest orders;
- * with it, everything changed after that timestamp (ascending) so status
- * edits reach other devices too, not just new orders.
+ * Board query (owner or staff). Without `since` it returns one newest-first
+ * history page: the `from`/`to` window filters in SQL (so a 24h board never
+ * serializes older tickets), and `cursor` pages by keyset
+ * (`createdAt`, `id`) with `nextCursor` for the next page — null when the
+ * page is the last one. With `since`, everything changed after that
+ * timestamp (ascending) so status edits reach other devices too, not just
+ * new orders; windowing and paging do not apply to that live path.
  */
 export async function listOrdersForStaff(
   db: TenancyDb,
   userId: string,
   query: StaffOrderQuery = {}
-): Promise<{ orders: Order[]; serverTime: string }> {
+): Promise<{ orders: Order[]; serverTime: string; nextCursor: string | null }> {
   const limit = Math.min(Math.max(query.limit ?? 100, 1), 200);
   const since = query.since ? new Date(query.since) : null;
   if (query.since && Number.isNaN(since?.getTime())) {
     throw new OrderRepoError("invalid", "since must be an ISO 8601 timestamp.");
+  }
+  const from = query.from ? new Date(query.from) : null;
+  if (query.from && Number.isNaN(from?.getTime())) {
+    throw new OrderRepoError("invalid", "from must be an ISO 8601 timestamp.");
+  }
+  const to = query.to ? new Date(query.to) : null;
+  if (query.to && Number.isNaN(to?.getTime())) {
+    throw new OrderRepoError("invalid", "to must be an ISO 8601 timestamp.");
+  }
+  const cursor = query.cursor ? parseBoardCursor(query.cursor) : null;
+  if (query.cursor && since) {
+    throw new OrderRepoError("invalid", "cursor and since cannot be combined.");
   }
   if (query.restaurantId) {
     const membership = await db
@@ -609,23 +652,105 @@ export async function listOrdersForStaff(
 
   const conditions = [eq(restaurantMembership.userId, userId)];
   if (query.restaurantId) conditions.push(eq(orderTable.restaurantId, query.restaurantId));
-  if (since) conditions.push(gt(orderTable.updatedAt, since));
+  if (since) {
+    conditions.push(gt(orderTable.updatedAt, since));
+  } else {
+    if (from) conditions.push(gte(orderTable.createdAt, from));
+    if (to) conditions.push(lte(orderTable.createdAt, to));
+    if (cursor) {
+      // Newest-first keyset: strictly older than the previous page's last row.
+      const older = or(
+        lt(orderTable.createdAt, cursor.createdAt),
+        and(eq(orderTable.createdAt, cursor.createdAt), lt(orderTable.id, cursor.id))
+      );
+      if (older) conditions.push(older);
+    }
+  }
 
   const rows = await db
     .select({ order: orderTable })
     .from(orderTable)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, orderTable.restaurantId))
     .where(and(...conditions))
-    .orderBy(since ? asc(orderTable.updatedAt) : desc(orderTable.createdAt))
-    .limit(limit);
+    .orderBy(
+      ...(since ? [asc(orderTable.updatedAt)] : [desc(orderTable.createdAt), desc(orderTable.id)])
+    )
+    // One extra row decides `nextCursor` without a second round trip.
+    .limit(since ? limit : limit + 1);
 
-  const orderRows = rows.map((entry) => entry.order);
+  const page = since ? rows : rows.slice(0, limit);
+  const orderRows = page.map((entry) => entry.order);
   const { lines, options } = await linesWithOptions(
     db,
     orderRows.map((row) => row.id)
   );
+  const last = orderRows[orderRows.length - 1];
   return {
     orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [], options)),
+    serverTime: iso(serverTime),
+    nextCursor: !since && rows.length > limit && last ? boardCursorFor(last) : null,
+  };
+}
+
+export type OrderStatusCounts = Record<OrderStatus, number>;
+
+const EMPTY_STATUS_COUNTS: OrderStatusCounts = {
+  new: 0,
+  preparing: 0,
+  served: 0,
+  cancelled: 0,
+};
+
+/**
+ * Board counts (owner or staff): one `COUNT(*) GROUP BY status` over the
+ * same scope and window as the history pages, so the header can show "1,503
+ * total" without materializing a single ticket. Lines are never read here.
+ */
+export async function countOrdersForStaff(
+  db: TenancyDb,
+  userId: string,
+  query: { restaurantId?: string | null; from?: string | null; to?: string | null } = {}
+): Promise<{ counts: OrderStatusCounts; total: number; serverTime: string }> {
+  if (!query.restaurantId) {
+    throw new OrderRepoError("invalid", "restaurantId is required for counts.");
+  }
+  const from = query.from ? new Date(query.from) : null;
+  if (query.from && Number.isNaN(from?.getTime())) {
+    throw new OrderRepoError("invalid", "from must be an ISO 8601 timestamp.");
+  }
+  const to = query.to ? new Date(query.to) : null;
+  if (query.to && Number.isNaN(to?.getTime())) {
+    throw new OrderRepoError("invalid", "to must be an ISO 8601 timestamp.");
+  }
+  const membership = await db
+    .select({ id: restaurantMembership.id })
+    .from(restaurantMembership)
+    .where(
+      and(
+        eq(restaurantMembership.userId, userId),
+        eq(restaurantMembership.restaurantId, query.restaurantId)
+      )
+    );
+  if (membership.length === 0) {
+    throw new OrderRepoError("not_found", "That restaurant does not exist.");
+  }
+
+  const serverTime = new Date();
+  const conditions = [
+    eq(orderTable.restaurantId, query.restaurantId),
+    ...(from ? [gte(orderTable.createdAt, from)] : []),
+    ...(to ? [lte(orderTable.createdAt, to)] : []),
+  ];
+  const rows = await db
+    .select({ status: orderTable.status, count: sql<number>`count(*)::int` })
+    .from(orderTable)
+    .where(and(...conditions))
+    .groupBy(orderTable.status);
+  const counts: OrderStatusCounts = { ...EMPTY_STATUS_COUNTS };
+  for (const row of rows) counts[row.status] = row.count;
+  return {
+    counts,
+    total: counts.new + counts.preparing + counts.served + counts.cancelled,
     serverTime: iso(serverTime),
   };
 }

@@ -20,6 +20,11 @@ export interface BoardFilter {
   window: BoardWindow;
   query: string;
   hideDone: boolean;
+  /**
+   * Table labels hidden via the Tables dropdown. The text search never
+   * matches tables (dish + #code only) — this list is the only table filter.
+   */
+  excludedTables?: string[];
 }
 
 export function isInBoardWindow(order: Order, window: BoardWindow, now: number): boolean {
@@ -32,10 +37,19 @@ export function isInBoardWindow(order: Order, window: BoardWindow, now: number):
 export function matchesBoardSearch(order: Order, query: string): boolean {
   const needle = query.trim().toLowerCase();
   if (!needle) return true;
-  const haystack = [order.tableLabel, orderCode(order.id), ...order.lines.map((line) => line.name)]
+  // Dish names + short code only — tables are filtered via the Tables
+  // dropdown (excludedTables), never via text search.
+  const haystack = [orderCode(order.id), ...order.lines.map((line) => line.name)]
     .join(" ")
     .toLowerCase();
   return haystack.includes(needle);
+}
+
+/** Sorted unique table labels across the loaded orders, for the dropdown. */
+export function distinctBoardTables(orders: readonly Order[]): string[] {
+  const seen = new Set<string>();
+  for (const order of orders) seen.add(order.tableLabel);
+  return [...seen].sort((a, b) => a.localeCompare(b));
 }
 
 export function filterBoardOrders(
@@ -43,9 +57,11 @@ export function filterBoardOrders(
   filter: BoardFilter,
   now: number = Date.now()
 ): Order[] {
+  const excluded = filter.excludedTables?.length ? new Set(filter.excludedTables) : null;
   return orders.filter(
     (order) =>
       isInBoardWindow(order, filter.window, now) &&
+      (excluded === null || !excluded.has(order.tableLabel)) &&
       matchesBoardSearch(order, filter.query) &&
       !(filter.hideDone && (order.status === "served" || order.status === "cancelled"))
   );

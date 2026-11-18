@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  distinctBoardTables,
   filterBoardOrders,
   formatElapsed,
   groupBoardOrders,
@@ -53,13 +54,24 @@ describe("board window", () => {
 });
 
 describe("board search", () => {
-  it("matches table, dish, and short code", () => {
+  it("matches dish and short code, never the table", () => {
     const sample = order({ tableLabel: "Patio 2" });
     expect(matchesBoardSearch(sample, "")).toBe(true);
-    expect(matchesBoardSearch(sample, "patio")).toBe(true);
+    expect(matchesBoardSearch(sample, "patio")).toBe(false);
     expect(matchesBoardSearch(sample, "margherita")).toBe(true);
     expect(matchesBoardSearch(sample, "9f2a1c")).toBe(true);
     expect(matchesBoardSearch(sample, "ramen")).toBe(false);
+  });
+
+  it("hides excluded tables and lists distinct tables", () => {
+    const orders = [order({ id: "a", tableLabel: "Patio 2" }), order({ id: "b", tableLabel: "3" })];
+    expect(distinctBoardTables(orders)).toEqual(["3", "Patio 2"]);
+    const visible = filterBoardOrders(
+      orders,
+      { window: "24h", query: "", hideDone: false, excludedTables: ["Patio 2"] },
+      NOON
+    );
+    expect(visible.map((entry) => entry.id)).toEqual(["b"]);
   });
 });
 

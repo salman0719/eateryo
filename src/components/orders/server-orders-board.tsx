@@ -98,6 +98,12 @@ export function ServerOrdersBoard() {
     notificationsAvailable,
     notificationPermission,
     requestNotifications,
+    historyWindow,
+    setHistoryWindow,
+    counts,
+    hasMore,
+    loadingMore,
+    loadMore,
     refresh,
     applyOptimistic,
     resolveOptimistic,
@@ -148,9 +154,9 @@ export function ServerOrdersBoard() {
         <div>
           <h2 className="text-xl font-bold text-ink-900">Orders</h2>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-600">
-            {orders.length === 0
+            {orders.length === 0 && !counts
               ? "Orders placed from public table links appear here."
-              : `${activeCount} active · ${openCount} new`}
+              : `${counts ? `${counts.total.toLocaleString()} in ${historyWindow === "24h" ? "the last 24h" : "all time"} · ` : ""}${activeCount} active · ${openCount} new`}
             <ConnectionPill connection={connection} lastSyncedAt={lastSyncedAt} />
           </p>
         </div>
@@ -229,12 +235,31 @@ export function ServerOrdersBoard() {
           action={{ href: "/tables", label: "Go to Tables" }}
         />
       ) : (
-        <KanbanBoard
-          orders={orders}
-          busyId={busyId}
-          onAdvance={(order, target) => void move(order, target)}
-          onCancel={(order) => void cancel(order)}
-        />
+        <>
+          <KanbanBoard
+            orders={orders}
+            busyId={busyId}
+            onAdvance={(order, target) => void move(order, target)}
+            onCancel={(order) => void cancel(order)}
+            window={historyWindow}
+            onWindowChange={setHistoryWindow}
+          />
+          {hasMore ? (
+            <button
+              type="button"
+              onClick={() => loadMore()}
+              disabled={loadingMore}
+              className="mx-auto rounded-full border border-line-300 px-5 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading older orders…" : "Show older orders"}
+            </button>
+          ) : null}
+          {!hasMore && counts !== null && counts.total > orders.length ? (
+            <p className="text-center text-xs text-ink-500">
+              New orders arrived while paging — press Refresh to reconcile.
+            </p>
+          ) : null}
+        </>
       )}
       {dialog}
     </div>
