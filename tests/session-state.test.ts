@@ -6,6 +6,7 @@ import {
   isSessionGateMessage,
   menuOpenBlockedMessage,
   sessionAnswerPending,
+  sessionLoaderCovers,
   type SessionRead,
 } from "@/features/session/state";
 
@@ -66,6 +67,51 @@ describe("session hint", () => {
   it("never holds once the read has answered", () => {
     expect(sessionAnswerPending({ state: "signed-in", hint: "hinted" })).toBe(false);
     expect(sessionAnswerPending({ state: "signed-out", hint: "hinted" })).toBe(false);
+  });
+});
+
+describe("session loader", () => {
+  /** A settled visitor: nothing is out, so nothing is covered. */
+  const settled = {
+    sessionPending: false,
+    sessionCheckGaveUp: false,
+    signedIn: false,
+    workspacePending: false,
+    workspaceFailed: false,
+    libraryLoading: false,
+  };
+
+  it("covers the shell while the session read is still out", () => {
+    expect(sessionLoaderCovers({ ...settled, sessionPending: true })).toBe(true);
+  });
+
+  it("keeps covering until the café and the library have answered too", () => {
+    expect(sessionLoaderCovers({ ...settled, signedIn: true, workspacePending: true })).toBe(true);
+    expect(sessionLoaderCovers({ ...settled, signedIn: true, libraryLoading: true })).toBe(true);
+  });
+
+  it("never covers a visitor, and lifts once the account is settled", () => {
+    expect(sessionLoaderCovers(settled)).toBe(false);
+    expect(sessionLoaderCovers({ ...settled, signedIn: true })).toBe(false);
+  });
+
+  it("hands a failed café read to the shell, which offers a retry", () => {
+    // The café list stays `null` after a failure, so `pending` never goes
+    // false on its own: waiting on it would spin forever.
+    expect(
+      sessionLoaderCovers({
+        ...settled,
+        signedIn: true,
+        workspacePending: true,
+        workspaceFailed: true,
+      })
+    ).toBe(false);
+  });
+
+  it("hands a session read that gave up to the shell's own card", () => {
+    expect(
+      sessionLoaderCovers({ ...settled, sessionPending: true, sessionCheckGaveUp: true })
+    ).toBe(false);
   });
 });
 

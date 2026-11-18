@@ -66,6 +66,46 @@ export function sessionAnswerPending(input: { state: SessionState; hint: Session
   return input.hint !== "none";
 }
 
+/**
+ * Whether the full-screen session loader covers the shell.
+ *
+ * A returning account should never watch the shell assemble itself: the
+ * session answers, then the café, then the library, and each answer used to
+ * move the logo sideways and make a column appear. Covering the frame until
+ * all three have answered means the signed-in shape is revealed once, already
+ * complete — so nothing has to be reserved or matched to anything.
+ *
+ * Display only, like `sessionAnswerPending`. Two hand-overs matter, because a
+ * loader that outlives a failed read is a spinner nobody can leave:
+ * - a session read that gave up (`sessionCheckGaveUp`) belongs to the shell's
+ *   own "Checking your session…" card, which offers Try again;
+ * - a café read that settled by *failing* keeps `pending` true by design (the
+ *   list is still `null`), so waiting on it would never end — the shell shows
+ *   the failure instead.
+ *
+ * A visitor is never covered: `sessionPending` is already false for an absent
+ * hint. An unread hint (the prerendered frame) leaves the CSS rule, not this
+ * function, deciding whether the element is even visible.
+ */
+export function sessionLoaderCovers(input: {
+  /** The session read is still out (see `sessionAnswerPending`). */
+  sessionPending: boolean;
+  /** The session read used up its retries; the shell owns the recovery. */
+  sessionCheckGaveUp: boolean;
+  signedIn: boolean;
+  /** The café the shell acts in has not been resolved yet. */
+  workspacePending: boolean;
+  /** That read settled by failing: a wait that would never end. */
+  workspaceFailed: boolean;
+  /** The browser's first library read has not settled. */
+  libraryLoading: boolean;
+}): boolean {
+  if (input.sessionCheckGaveUp) return false;
+  if (input.sessionPending) return true;
+  if (!input.signedIn) return false;
+  return (input.workspacePending && !input.workspaceFailed) || input.libraryLoading;
+}
+
 /** Why a menu URL did not open. */
 export type MenuBlockReason = "signed-out" | "other-account";
 
