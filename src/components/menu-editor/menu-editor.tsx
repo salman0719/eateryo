@@ -714,28 +714,68 @@ export function MenuEditor({
   );
 
   if (mode === "preview") {
+    // The publish rail is for an owner who has something to publish. A staff
+    // preview keeps the page alone, banner included, because there is no
+    // action to put beside it.
+    const showPublishRail = Boolean(publishing && canManage);
     return (
       <div className="flex flex-col gap-4">
         {tabStrip}
-        {publishing && canManage && (
-          <PublishPanel
-            signedIn={syncMode === "account"}
-            controls={publishing}
-            draftDoc={doc}
-            onStartWizard={onStartPublish}
-          />
-        )}
-        <PhoneFrame
-          label="What a table card opens"
-          heightClass="h-[min(78vh,860px)]"
-          widthClass="max-w-[420px]"
+        {/*
+        From `lg` the preview stops being a phone island centred in a wide
+        column: the page keeps a phone's width and its publish state becomes a
+        sticky rail beside it. Below `lg` the same two blocks stack — panel
+        first, page under it — which is the layout this tab always had. The
+        panel is rendered once and ordered by CSS, so the rail and the stacked
+        card can never disagree about the menu's state.
+
+        The pair is centred as one cluster and the phone track is capped at a
+        phone's width: pinning a 1fr page column against a fixed rail left the
+        two hugging the outer edges with a hole between them, and let the frame
+        grow into a tablet on a wide window.
+      */}
+        <div
+          className={`flex flex-col gap-4 ${
+            showPublishRail
+              ? "lg:grid lg:grid-cols-[minmax(0,420px)_320px] lg:items-start lg:justify-center lg:gap-6 xl:grid-cols-[minmax(0,420px)_340px]"
+              : ""
+          }`}
         >
-          <OrderPagePreview
-            doc={doc}
-            restaurantName={restaurantName}
-            draftAheadOfLive={needsPublish}
-          />
-        </PhoneFrame>
+          <div className="order-2 min-w-0 lg:order-none">
+            <PhoneFrame
+              label="What a table card opens"
+              heightClass={
+                showPublishRail
+                  ? "h-[min(78vh,860px)] lg:h-[min(84vh,900px)]"
+                  : "h-[min(78vh,860px)]"
+              }
+              // A frame is a phone at every width — never a tablet. The grid
+              // track shrinks it on a narrow `lg`, and it never exceeds 420.
+              widthClass="max-w-[420px]"
+            >
+              <OrderPagePreview
+                doc={doc}
+                restaurantName={restaurantName}
+                draftAheadOfLive={needsPublish}
+              />
+            </PhoneFrame>
+          </div>
+          {publishing && canManage && (
+            <div className="order-1 flex flex-col gap-3 lg:order-none lg:sticky lg:top-4">
+              {/*
+              One card at every width — the same states, the same copy. On a
+              phone it stacks above the page; from `lg` it is the rail. Only
+              the placement changes, never what it says.
+            */}
+              <PublishPanel
+                signedIn={syncMode === "account"}
+                controls={publishing}
+                draftDoc={doc}
+                onStartWizard={onStartPublish}
+              />
+            </div>
+          )}
+        </div>
       </div>
     );
   }

@@ -292,6 +292,52 @@ html[data-sidebar="rail"] .app-sidebar .app-sidebar-mark {
   }
 }
 
+/* Session loader (src/components/layout/session-loader.tsx).
+
+   A returning account sees this instead of a half-shaped shell while the
+   session, the café and the library answer, so the signed-in frame is
+   revealed once, already complete. Nothing here reserves geometry or matches
+   the resolved screen — that is what made the old placeholder jump.
+
+   Visibility comes from `data-session` on <html>, set before paint by the
+   boot script in layout.tsx (see SESSION_BOOT_SCRIPT). A render cannot do
+   this: the prerendered markup has no hint, and by the time hydration reads
+   the cookie the session read has usually answered. Unset means "no
+   loader", so a blocked script or a refused write shows the visitor's frame
+   rather than a spinner nobody can leave. React unmounts the element when
+   the reads settle or hand over to the shell's own retry. */
+.session-loader {
+  display: none;
+}
+
+html[data-session="hinted"] .session-loader {
+  display: flex;
+}
+
+@keyframes eateryo-session-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.session-loader-dot {
+  animation: eateryo-session-dot 1.05s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-loader-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 /* Horizontal tab strips (editor categories, diner menu tabs): a short
    sideways scroll paints no bar — touch, trackpad, wheel and keyboard all
    keep working. Always pairs with `ScrollArrowStrip`
