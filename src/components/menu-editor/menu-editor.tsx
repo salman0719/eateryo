@@ -737,7 +737,7 @@ export function MenuEditor({
         <div
           className={`flex flex-col gap-4 ${
             showPublishRail
-              ? "lg:grid lg:grid-cols-[minmax(0,420px)_340px] lg:items-start lg:justify-center lg:gap-6"
+              ? "lg:grid lg:grid-cols-[minmax(0,420px)_320px] lg:items-start lg:justify-center lg:gap-6 xl:grid-cols-[minmax(0,420px)_340px]"
               : ""
           }`}
         >
