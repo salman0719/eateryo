@@ -83,7 +83,10 @@ describe("preview tab layout", () => {
 
     // The two-column grid only exists at `lg`; below it the flex column stacks.
     // The pair is centred as one cluster, so neither edge claims a gutter.
-    expect(html).toContain("lg:grid-cols-[minmax(0,420px)_340px]");
+    // The page keeps the wider track at lg: a 340px card beside a 335px
+    // phone made the card the larger of the two. The rail widens at xl.
+    expect(html).toContain("lg:grid-cols-[minmax(0,420px)_320px]");
+    expect(html).toContain("xl:grid-cols-[minmax(0,420px)_340px]");
     expect(html).toContain("lg:justify-center");
     expect(html).toContain("lg:items-start");
     // Stacked order: the publish card first, the page under it.
@@ -153,6 +156,7 @@ describe("preview tab layout", () => {
 
     expect(html).toContain("This is the page a table card opens");
     expect(html).not.toContain("Table ordering");
-    expect(html).not.toContain("lg:grid-cols-[minmax(0,420px)_340px]");
+    expect(html).not.toContain("lg:grid-cols-[minmax(0,420px)_320px]");
+    expect(html).not.toContain("xl:grid-cols");
   });
 });
