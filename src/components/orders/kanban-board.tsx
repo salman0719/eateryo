@@ -9,9 +9,10 @@
  * toggle. New owns the first column and never scrolls away inside history.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  distinctBoardTables,
   filterBoardOrders,
   formatElapsed,
   groupBoardOrders,
@@ -47,11 +48,45 @@ function formatTime(iso: string): string {
 
 export function BoardFilterBar({
   filter,
+  tables,
   onChange,
 }: {
   filter: BoardFilter;
+  tables: string[];
   onChange: (next: BoardFilter) => void;
 }) {
+  const hiddenCount = filter.excludedTables?.length ?? 0;
+  const [tablesOpen, setTablesOpen] = useState(false);
+  const tablesRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!tablesOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (tablesRef.current && !tablesRef.current.contains(event.target as Node)) {
+        setTablesOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTablesOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [tablesOpen]);
+  const toggleTable = (table: string) => {
+    const current = filter.excludedTables ?? [];
+    onChange({
+      ...filter,
+      excludedTables: current.includes(table)
+        ? current.filter((entry) => entry !== table)
+        : [...current, table],
+    });
+  };
+  const showOnlyTable = (table: string) => {
+    onChange({ ...filter, excludedTables: tables.filter((entry) => entry !== table) });
+  };
   return (
     <div className="flex flex-wrap items-center gap-2 py-1">
       <label className="sr-only" htmlFor="board-window">
@@ -76,9 +111,70 @@ export function BoardFilterBar({
         type="search"
         value={filter.query}
         onChange={(event) => onChange({ ...filter, query: event.target.value })}
-        placeholder="Filter: table, dish, #code…"
+        placeholder="Filter: dish, #code…"
         className="min-w-44 flex-1 rounded-full border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 sm:max-w-64 sm:flex-none"
       />
+      <div ref={tablesRef} className="relative">
+        <button
+          type="button"
+          aria-haspopup="true"
+          aria-expanded={tablesOpen}
+          onClick={() => setTablesOpen((open) => !open)}
+          className="cursor-pointer rounded-full border border-line-300 bg-surface-base px-3 py-1.5 text-sm text-ink-700"
+        >
+          Tables{hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ""}
+        </button>
+        {tablesOpen && (
+          <div className="absolute z-20 mt-1 max-h-64 w-52 overflow-auto rounded-xl border border-line-200 bg-surface-base p-1.5 shadow-lg">
+            {tables.length === 0 ? (
+              <p className="px-2 py-1.5 text-sm text-ink-500">No tables yet.</p>
+            ) : (
+              tables.map((table) => {
+                const hidden = filter.excludedTables?.includes(table) ?? false;
+                return (
+                  <div
+                    key={table}
+                    className="flex items-center gap-1 rounded-lg px-2 py-1.5 hover:bg-surface-100"
+                  >
+                    <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm text-ink-900">
+                      <input
+                        type="checkbox"
+                        checked={!hidden}
+                        onChange={() => toggleTable(table)}
+                        className="size-4 accent-[var(--color-accent-700)]"
+                      />
+                      {formatTableLabel(table)}
+                    </label>
+                    <button
+                      type="button"
+                      title={`Show only ${formatTableLabel(table)}`}
+                      onClick={() => {
+                        showOnlyTable(table);
+                        setTablesOpen(false);
+                      }}
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium text-ink-500 hover:bg-surface-200 hover:text-ink-900"
+                    >
+                      Only
+                    </button>
+                  </div>
+                );
+              })
+            )}
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange({ ...filter, excludedTables: [] });
+                  setTablesOpen(false);
+                }}
+                className="mt-1 w-full rounded-lg px-2 py-1.5 text-center text-sm font-medium text-ink-700 hover:bg-surface-100"
+              >
+                Show all tables
+              </button>
+            )}
+          </div>
+        )}
+      </div>
       <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-ink-700">
         <input
           type="checkbox"
@@ -95,12 +191,14 @@ export function BoardFilterBar({
 function OrderTicket({
   order,
   busy,
+  highlighted,
   onAdvance,
   onCancel,
   onDelete,
 }: {
   order: Order;
   busy: boolean;
+  highlighted?: boolean;
   onAdvance: (order: Order, target: OrderStatus) => void;
   onCancel: (order: Order) => void;
   onDelete?: (order: Order) => void;
@@ -115,7 +213,11 @@ function OrderTicket({
     <article
       aria-busy={busy}
       className={`rounded-xl border bg-surface-base p-3 ${
-        order.status === "new" ? "border-warning-300" : "border-line-200"
+        highlighted
+          ? `order-just-moved ${order.status === "new" ? "border-warning-300" : "border-line-200"}`
+          : order.status === "new"
+            ? "border-warning-300"
+            : "border-line-200"
       }`}
     >
       <div className="flex flex-wrap items-center gap-1.5">
@@ -123,6 +225,11 @@ function OrderTicket({
         <StatusChip tone={STATUS_TONES[order.status]} size="sm">
           {orderStatusLabel(order.status)}
         </StatusChip>
+        {highlighted && (
+          <span className="rounded-full bg-accent-700 px-2 py-0.5 text-[11px] font-bold text-on-accent">
+            Just moved
+          </span>
+        )}
         <span className="text-[11px] font-medium text-ink-500">
           #{orderCode(order.id)} · {formatTime(order.createdAt)}
         </span>
@@ -205,16 +312,66 @@ export function KanbanBoard({
   onAdvance,
   onCancel,
   onDelete,
+  window,
+  onWindowChange,
 }: {
   orders: Order[];
   busyId: string | null;
   onAdvance: (order: Order, target: OrderStatus) => void;
   onCancel: (order: Order) => void;
   onDelete?: (order: Order) => void;
+  /**
+   * Controlled history window (the server board owns it so a change
+   * refetches from SQL). Omitted, the board owns its own window state —
+   * the local queue's mode.
+   */
+  window?: BoardFilter["window"];
+  onWindowChange?: (window: BoardFilter["window"]) => void;
 }) {
-  const [filter, setFilter] = useState<BoardFilter>({ window: "24h", query: "", hideDone: false });
+  const [localFilter, setLocalFilter] = useState<BoardFilter>({
+    window: "24h",
+    query: "",
+    hideDone: false,
+    excludedTables: [],
+  });
+  // Controlled window, local search: the server board owns `window` so a
+  // change refetches from SQL; the local queue owns everything.
+  const filter = useMemo<BoardFilter>(
+    () => (window === undefined ? localFilter : { ...localFilter, window }),
+    [window, localFilter]
+  );
+  const setFilter = (next: BoardFilter) => {
+    if (window !== undefined && next.window !== window) onWindowChange?.(next.window);
+    setLocalFilter(next);
+  };
+  const tables = useMemo(() => distinctBoardTables(orders), [orders]);
   const filtered = useMemo(() => filterBoardOrders(orders, filter), [orders, filter]);
   const grouped = useMemo(() => groupBoardOrders(filtered), [filtered]);
+  // Experiment: keep the ticket the user just moved visible. The status
+  // flip jumps columns, so we glow its border for 10s. The glow runs once
+  // and dissolves back to transparent, so removing the class at timeout
+  // is invisible.
+  const [justMovedId, setJustMovedId] = useState<string | null>(null);
+  const justMovedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flagJustMoved = (orderId: string) => {
+    setJustMovedId(orderId);
+    if (justMovedTimer.current) clearTimeout(justMovedTimer.current);
+    justMovedTimer.current = setTimeout(() => setJustMovedId(null), 10_000);
+  };
+  useEffect(
+    () => () => {
+      if (justMovedTimer.current) clearTimeout(justMovedTimer.current);
+    },
+    []
+  );
+  const handleAdvance = (order: Order, target: OrderStatus) => {
+    onAdvance(order, target);
+    flagJustMoved(order.id);
+  };
+  const handleCancel = (order: Order) => {
+    onCancel(order);
+    flagJustMoved(order.id);
+  };
 
   const columns = [
     { key: "new", title: "🔥 New", orders: grouped.fresh, highlight: true },
@@ -224,7 +381,21 @@ export function KanbanBoard({
 
   return (
     <div>
-      <BoardFilterBar filter={filter} onChange={setFilter} />
+      <style>{`@keyframes order-just-moved-glow {
+        0% { box-shadow: 0 0 0 0 transparent; }
+        6% { box-shadow: 0 0 0 2px var(--color-accent-500), 0 0 14px color-mix(in srgb, var(--color-accent-500) 55%, transparent); }
+        18% { box-shadow: 0 0 0 4px var(--color-accent-500), 0 0 22px color-mix(in srgb, var(--color-accent-500) 80%, transparent); }
+        30% { box-shadow: 0 0 0 2px var(--color-accent-500), 0 0 14px color-mix(in srgb, var(--color-accent-500) 55%, transparent); }
+        42% { box-shadow: 0 0 0 4px var(--color-accent-500), 0 0 22px color-mix(in srgb, var(--color-accent-500) 80%, transparent); }
+        54% { box-shadow: 0 0 0 2px var(--color-accent-500), 0 0 14px color-mix(in srgb, var(--color-accent-500) 55%, transparent); }
+        66% { box-shadow: 0 0 0 4px var(--color-accent-500), 0 0 22px color-mix(in srgb, var(--color-accent-500) 80%, transparent); }
+        78% { box-shadow: 0 0 0 2px var(--color-accent-500), 0 0 14px color-mix(in srgb, var(--color-accent-500) 55%, transparent); }
+        90% { box-shadow: 0 0 0 4px var(--color-accent-500), 0 0 22px color-mix(in srgb, var(--color-accent-500) 80%, transparent); }
+        100% { box-shadow: 0 0 0 0 transparent; }
+      }
+      .order-just-moved { animation: order-just-moved-glow 10s ease-in-out 1 forwards; }
+      @media (prefers-reduced-motion: reduce) { .order-just-moved { animation: none; } }`}</style>
+      <BoardFilterBar filter={filter} tables={tables} onChange={setFilter} />
       <div className="mt-3 grid items-start gap-3 md:grid-cols-3">
         {columns.map((column) => (
           <section
@@ -236,7 +407,11 @@ export function KanbanBoard({
                 : "border border-line-200 bg-surface-100"
             }`}
           >
-            <h3 className="flex items-center gap-2 px-1 pt-1 text-xs font-bold tracking-wide text-ink-900 uppercase">
+            <h3
+              className={`sticky top-0 z-10 -mx-2.5 -mt-2.5 flex items-center gap-2 rounded-t-2xl px-3.5 pt-3 pb-2 text-xs font-bold tracking-wide text-ink-900 uppercase ${
+                column.highlight ? "bg-warning-50" : "bg-surface-100"
+              }`}
+            >
               {column.title}
               <span className="rounded-full bg-ink-900 px-2 py-0.5 text-[11px] font-bold text-surface-base">
                 {column.orders.length}
@@ -252,8 +427,9 @@ export function KanbanBoard({
                   key={order.id}
                   order={order}
                   busy={busyId === order.id}
-                  onAdvance={onAdvance}
-                  onCancel={onCancel}
+                  highlighted={justMovedId === order.id}
+                  onAdvance={handleAdvance}
+                  onCancel={handleCancel}
                   onDelete={onDelete}
                 />
               ))
