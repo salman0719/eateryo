@@ -48,16 +48,12 @@ function formatTime(iso: string): string {
 export function BoardFilterBar({
   filter,
   onChange,
-  visible,
-  total,
 }: {
   filter: BoardFilter;
   onChange: (next: BoardFilter) => void;
-  visible: number;
-  total: number;
 }) {
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-line-200 bg-surface-base py-2">
+    <div className="flex flex-wrap items-center gap-2 py-1">
       <label className="sr-only" htmlFor="board-window">
         Time window
       </label>
@@ -92,9 +88,6 @@ export function BoardFilterBar({
         />
         Hide done
       </label>
-      <span className="ml-auto text-xs text-ink-500">
-        {visible} of {total} · default is 24h, not all-time
-      </span>
     </div>
   );
 }
@@ -231,12 +224,7 @@ export function KanbanBoard({
 
   return (
     <div>
-      <BoardFilterBar
-        filter={filter}
-        onChange={setFilter}
-        visible={filtered.length}
-        total={orders.length}
-      />
+      <BoardFilterBar filter={filter} onChange={setFilter} />
       <div className="mt-3 grid items-start gap-3 md:grid-cols-3">
         {columns.map((column) => (
           <section
