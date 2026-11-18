@@ -107,7 +107,11 @@ function ChangeList({
   summary: MenuChangeSummary | null;
   state: PublishingControls["liveDocState"];
 }) {
-  if (state === "loading") {
+  // A skeleton is for a comparison that has never arrived. Re-reading the live
+  // snapshot for the same menu (entering the preview refreshes it) keeps the
+  // last answer on screen: swapping a rendered "1 repriced" for placeholders
+  // and back reads as if the answer had been withdrawn.
+  if (state === "loading" && !summary) {
     return (
       <div role="status" aria-busy="true" className="mt-2 flex flex-col gap-2">
         <span className="sr-only">Comparing your draft with what diners see…</span>
@@ -125,7 +129,7 @@ function ChangeList({
     );
   }
 
-  if (state !== "ready" || !summary) return null;
+  if (!summary) return null;
 
   if (summary.rows.length === 0) {
     // Only what the comparison can prove: it covers names, prices, photos,
@@ -329,7 +333,9 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
         </div>
       )}
 
-      {loaded && !status && (
+      {/* A read that failed is not "never published": the error below is the
+          only claim this panel may make until the status actually answers. */}
+      {loaded && !status && !error && (
         <p className="mt-2 text-xs leading-5 text-ink-600">
           This menu has never been published. Publishing makes it orderable at your tables — print a
           table card from the Tables tab and diners can order from it.
