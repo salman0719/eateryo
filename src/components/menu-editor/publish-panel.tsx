@@ -11,6 +11,7 @@ import {
   MENU_CHANGE_LABEL,
   MENU_CHANGE_ORDER,
   summarizeMenuChanges,
+  type MenuChangeKind,
   type MenuChangeSummary,
 } from "@/features/publishing/changes";
 import type { PublicationStatus } from "@/features/publishing/schema";
@@ -69,6 +70,39 @@ interface PublishPanelProps {
   draftDoc: MenuDocument;
   /** Opens the R1 publish wizard for a menu that is not in the account yet. */
   onStartWizard?: () => void;
+}
+
+/**
+ * A change line's counts. Kinds whose label is a noun take a singular when
+ * the count is one — "1 option", not "1 options"; the adjective kinds
+ * ("2 repriced") read as the fragment they always have.
+ */
+const CHANGE_NOUNS: Partial<Record<MenuChangeKind, [string, string]>> = {
+  photo: ["photo", "photos"],
+  labels: ["label", "labels"],
+  options: ["option", "options"],
+  category: ["section", "sections"],
+  title: ["title", "titles"],
+  currency: ["currency", "currencies"],
+  description: ["description", "descriptions"],
+  availability: ["status", "statuses"],
+};
+
+function formatChangeCount(count: number, kind: MenuChangeKind): string {
+  const nouns = CHANGE_NOUNS[kind];
+  if (nouns) return `${count} ${count === 1 ? nouns[0] : nouns[1]}`;
+  return `${count} ${MENU_CHANGE_LABEL[kind]}`;
+}
+
+/** Draft edits exist that diners do not see yet. */
+function needsPublishOf(status: PublicationStatus | null): boolean {
+  return status?.isLive === true && status.hasUnpublishedChanges;
+}
+
+/** What the one button on this surface does, in the owner's words. */
+function publishLabelOf(status: PublicationStatus | null): string {
+  if (!status?.isLive) return "Publish for ordering";
+  return needsPublishOf(status) ? "Publish changes" : "Republish";
 }
 
 function StatusPill({ status }: { status: PublicationStatus | null }) {
@@ -143,8 +177,8 @@ function ChangeList({
     );
   }
 
-  const counts = MENU_CHANGE_ORDER.filter((kind) => summary.counts[kind] > 0).map(
-    (kind) => `${summary.counts[kind]} ${MENU_CHANGE_LABEL[kind]}`
+  const counts = MENU_CHANGE_ORDER.filter((kind) => summary.counts[kind] > 0).map((kind) =>
+    formatChangeCount(summary.counts[kind], kind)
   );
 
   return (
@@ -191,16 +225,12 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
     onPublish,
     onUnpublish,
   } = controls;
-  const needsPublish = status?.isLive === true && status.hasUnpublishedChanges;
+  const needsPublish = needsPublishOf(status);
   const summary = useMemo(
     () => (liveDoc ? summarizeMenuChanges(liveDoc, draftDoc) : null),
     [liveDoc, draftDoc]
   );
-  const publishLabel = !status?.isLive
-    ? "Publish for ordering"
-    : needsPublish
-      ? "Publish changes"
-      : "Republish";
+  const publishLabel = publishLabelOf(status);
 
   if (!signedIn) {
     return (
@@ -312,17 +342,6 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="text-sm font-semibold text-ink-900">Table ordering</h3>
         <StatusPill status={status} />
-        <span className="flex-1" />
-        {loaded && (
-          <button
-            type="button"
-            onClick={onPublish}
-            disabled={busy}
-            className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-          >
-            {busy ? "Publishing…" : publishLabel}
-          </button>
-        )}
       </div>
 
       {!loaded && (
@@ -367,8 +386,21 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
               <ChangeList summary={summary} state={liveDocState} />
             </>
           )}
+        </div>
+      )}
 
-          {status.isLive && (
+      {/*
+        One row, one edge each: the primary action on the right, the
+        reversible Unpublish opposite it. Stacked, they cost a phone a whole
+        row above the page it came to look at.
+
+        Neither button shrinks or wraps: at 320px the pair is ~190px inside a
+        288px card, so `shrink-0` and `whitespace-nowrap` keep two buttons on
+        one line instead of one button squeezed into two words per line.
+      */}
+      {loaded && (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          {status?.isLive && (
             <button
               type="button"
               onClick={async () => {
@@ -381,11 +413,19 @@ export function PublishPanel({ signedIn, controls, draftDoc, onStartWizard }: Pu
                 if (ok) onUnpublish();
               }}
               disabled={busy}
-              className="self-start rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              className="shrink-0 rounded-full border border-line-300 px-2.5 py-1.5 text-xs font-medium whitespace-nowrap text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:px-3"
             >
               {busy ? "Working…" : "Unpublish"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={onPublish}
+            disabled={busy}
+            className="ml-auto shrink-0 rounded-full bg-accent-700 px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:px-3"
+          >
+            {busy ? "Publishing…" : publishLabel}
+          </button>
         </div>
       )}
 
