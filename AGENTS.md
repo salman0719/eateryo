@@ -360,7 +360,9 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   migrations (do not hand-edit `drizzle/`)
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
-  session guard, sign-in page
+  session guard, sign-in page. The auth route also mirrors every session
+  cookie change into the readable `eateryo.session-hint` flag
+  (`src/lib/auth/session-hint.ts`), which is that flag's only writer.
 - `src/lib/auth/dev-sign-in.ts`, `src/app/api/dev/magic-link/` — the
   `DEV_SIGN_IN_BYPASS=1` local shortcut: the auth instance parks the freshly
   minted link instead of emailing it and the sign-in page offers it as an
@@ -379,7 +381,17 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
 - `src/features/session/state.ts` — the pure tri-state session read
   (`signed-in` / `signed-out` / `unknown`) and the device-stamp menu access
   matrix; a page load whose session has not answered is **never** treated as
-  signed out, so a reload of `/menus/<id>` cannot accuse its owner
+  signed out, so a reload of `/menus/<id>` cannot accuse its owner.
+  `sessionAnswerPending` is the display-only exception: with the hint absent
+  the shell need not hold its placeholder, while `sessionState` stays the
+  server's answer for every guard.
+- `src/features/session/session-hint.ts`, `use-session-hint.ts`,
+  `src/lib/auth/session-hint.ts` — the readable one-bit session hint: absent
+  means no session cookie is in this browser (so a visitor's screen needs no
+  wait), present means "maybe, ask". The auth-route mirror is its only
+  writer, its lifetime mirrors the session cookie's, and it may only choose
+  what a screen shows — guards, ownership and data reads keep using the
+  server. Tests: `tests/session-hint.test.ts`, `tests/session-state.test.ts`.
 - `src/features/tenancy/repo.ts`, `src/app/api/restaurants/` —
   ownership-scoped restaurant repository + API (session id only);
   `src/features/tenancy/client.ts` — typed browser client for it
