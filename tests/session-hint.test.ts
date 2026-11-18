@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  SESSION_BOOT_SCRIPT,
+  SESSION_HINT_ATTR,
   SESSION_HINT_COOKIE,
   SESSION_HINT_VALUE,
   hasSessionCookie,
@@ -184,6 +186,53 @@ describe("session hint mirror", () => {
   });
 });
 
+describe("session hint boot script", () => {
+  /** Run the inline script against a stand-in document, as the browser does. */
+  function applied(cookie: string): string | null {
+    let value: string | null = null;
+    const fake = {
+      cookie,
+      documentElement: {
+        setAttribute(name: string, next: string) {
+          if (name === SESSION_HINT_ATTR) value = next;
+        },
+      },
+    };
+    new Function("document", SESSION_BOOT_SCRIPT)(fake);
+    return value;
+  }
+
+  it("marks a browser that may hold a session, before the first paint", () => {
+    expect(applied(`a=1; ${SESSION_HINT_COOKIE}=1`)).toBe("hinted");
+  });
+
+  it("marks a browser with no hint as the visitor's", () => {
+    expect(applied("a=1")).toBe("none");
+    expect(applied("")).toBe("none");
+  });
+
+  it("reads an empty hint as absent, like hasSessionHint does", () => {
+    expect(applied(`${SESSION_HINT_COOKIE}=`)).toBe("none");
+    expect(applied(`${SESSION_HINT_COOKIE}=`)).toBe(
+      hasSessionHint(`${SESSION_HINT_COOKIE}=`) ? "hinted" : "none"
+    );
+  });
+
+  it("does not mistake a longer cookie name for the hint", () => {
+    expect(applied(`x${SESSION_HINT_COOKIE}=1`)).toBe("none");
+  });
+
+  it("survives a document that refuses the write", () => {
+    const hostile = {
+      cookie: `${SESSION_HINT_COOKIE}=1`,
+      get documentElement(): never {
+        throw new Error("refused");
+      },
+    };
+    expect(() => new Function("document", SESSION_BOOT_SCRIPT)(hostile)).not.toThrow();
+  });
+});
+
 describe("session hint reads", () => {
   it("reads the flag from a Cookie header, and an empty value as absent", () => {
     expect(hasSessionHint(`a=1; ${SESSION_HINT_COOKIE}=1`)).toBe(true);
@@ -197,6 +246,14 @@ describe("session hint reads", () => {
     expect(hasSessionCookie(`__Host-${SESSION_COOKIE}=tok`)).toBe(true);
     expect(hasSessionCookie(`${SESSION_COOKIE}=`)).toBe(false);
     expect(hasSessionCookie("eateryo.ff=assistant")).toBe(false);
+  });
+
+  it("leaves the boot script's attribute readable to CSS before paint", () => {
+    // The script is a string, so the contract that matters is the one CSS
+    // holds: this attribute name, with these two values.
+    expect(SESSION_HINT_ATTR).toBe("data-session");
+    expect(SESSION_BOOT_SCRIPT).toContain(JSON.stringify(SESSION_HINT_COOKIE));
+    expect(SESSION_BOOT_SCRIPT).toContain(JSON.stringify(SESSION_HINT_ATTR));
   });
 
   it("answers unknown, never none, where there is no document", () => {

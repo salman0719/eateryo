@@ -31,6 +31,38 @@ export const SESSION_HINT_COOKIE = "eateryo.session-hint";
 export const SESSION_HINT_VALUE = "1";
 
 /**
+ * What the boot script leaves on `<html>`: `hinted` or `none`.
+ *
+ * CSS reads it (`globals.css`), so a screen can be chosen before the first
+ * paint rather than in a React render. Never read it in a guard: it is the
+ * same display-only flag as the hint, one layer earlier.
+ */
+export const SESSION_HINT_ATTR = "data-session";
+
+/**
+ * Runs in `<body>` before the shell is painted (see `layout.tsx`).
+ *
+ * The hint cannot be applied by a render. `useSessionHint()` has no snapshot
+ * before hydration — the prerendered markup cannot know the request's cookies
+ * — and by the time React re-renders with `document.cookie`, the session read
+ * has usually answered too, so a hint-gated frame never gets a commit of its
+ * own. That is what made the reserved signed-in frame invisible: you saw the
+ * neutral frame, then the resolved screen, and never the middle.
+ *
+ * Reading the cookie here makes the decision before layout instead, so the
+ * returning account's loader and the visitor's screen are both right at the
+ * first paint. Inline and synchronous on purpose: an effect runs after paint.
+ * An empty value reads as absent, exactly like `hasSessionHint`, and a
+ * refused write leaves the attribute unset — which the CSS reads as "no
+ * loader", never as a stuck one.
+ */
+export const SESSION_BOOT_SCRIPT =
+  `try{var n=${JSON.stringify(SESSION_HINT_COOKIE)},v="none";` +
+  `document.cookie.split(";").forEach(function(c){c=c.trim();` +
+  `if(c.slice(0,n.length+1)===n+"="&&c.length>n.length+1){v="hinted"}});` +
+  `document.documentElement.setAttribute(${JSON.stringify(SESSION_HINT_ATTR)},v)}catch(e){}`;
+
+/**
  * Better Auth's session cookie, and the prefixes it may carry. The secure
  * prefix is `__Secure-` (https), and a host-only deployment uses `__Host-`.
  */
