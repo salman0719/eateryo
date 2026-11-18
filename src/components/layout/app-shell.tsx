@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
+import { SessionLoader } from "./session-loader";
 import { ShellFrame } from "./shell-frame";
 import { AssistantPage } from "@/components/pages/assistant-page";
 import { CapturePage } from "@/components/pages/capture-page";
@@ -80,6 +81,7 @@ import {
   decideMenuOpen,
   isSessionGateMessage,
   menuOpenBlockedMessage,
+  sessionLoaderCovers,
   type SessionState,
 } from "@/features/session/state";
 import {
@@ -813,6 +815,24 @@ export function AppShell() {
    */
   const showShellColumn =
     !sessionPending && !libraryLoading && shellColumnVisible({ sessionState });
+  /**
+   * The returning account's wait, over the frame rather than instead of it.
+   *
+   * Nothing is reserved or matched here (that is what the old placeholder got
+   * wrong): the loader hides the shell until the session, the café and the
+   * library have answered, so the signed-in shape is painted once, complete.
+   * The boot script decides whether the element is visible at all — a visitor
+   * never sees it — and this decides when it is gone, handing a failed read
+   * back to the shell's own card (`sessionCheckGaveUp`) and its café retry.
+   */
+  const sessionLoaderVisible = sessionLoaderCovers({
+    sessionPending,
+    sessionCheckGaveUp,
+    signedIn,
+    workspacePending: workspace.pending,
+    workspaceFailed: workspace.failedFor !== null,
+    libraryLoading,
+  });
   /** Nav waits for the membership read: no provisional tabs, no empty bar. */
   const navReady = !sessionPending && !accountAccessPending;
   /**
@@ -1199,6 +1219,7 @@ export function AppShell() {
   return (
     <ShellFrame
       dialog={dialog}
+      sessionLoader={sessionLoaderVisible ? <SessionLoader /> : null}
       screen={screen}
       // The editor is the dense working surface; the publish step is
       // onboarding and keeps the content measure.
