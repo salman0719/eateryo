@@ -71,11 +71,7 @@ describe("board filter + grouping", () => {
       order({ id: "c", status: "served" }),
       order({ id: "d", status: "cancelled" }),
     ];
-    const visible = filterBoardOrders(
-      orders,
-      { window: "24h", query: "", hideDone: true },
-      NOON
-    );
+    const visible = filterBoardOrders(orders, { window: "24h", query: "", hideDone: true }, NOON);
     expect(visible.map((entry) => entry.id)).toEqual(["a", "b"]);
     const grouped = groupBoardOrders(
       filterBoardOrders(orders, { window: "24h", query: "", hideDone: false }, NOON)
@@ -90,12 +86,12 @@ describe("elapsed + hot", () => {
   it("formats short elapsed labels and flags stale new tickets", () => {
     expect(formatElapsed(new Date(NOON - 4 * 60_000).toISOString(), NOON)).toBe("4m");
     expect(formatElapsed(new Date(NOON - 125 * 60_000).toISOString(), NOON)).toBe("2h 5m");
-    expect(
-      isNewHot(order({ createdAt: new Date(NOON - 25 * 60_000).toISOString() }), NOON)
-    ).toBe(true);
-    expect(
-      isNewHot(order({ createdAt: new Date(NOON - 5 * 60_000).toISOString() }), NOON)
-    ).toBe(false);
+    expect(isNewHot(order({ createdAt: new Date(NOON - 25 * 60_000).toISOString() }), NOON)).toBe(
+      true
+    );
+    expect(isNewHot(order({ createdAt: new Date(NOON - 5 * 60_000).toISOString() }), NOON)).toBe(
+      false
+    );
     expect(
       isNewHot(
         order({ status: "preparing", createdAt: new Date(NOON - 60 * 60_000).toISOString() }),
