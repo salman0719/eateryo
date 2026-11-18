@@ -12,6 +12,8 @@
  * Pure, so the matrix is unit-tested without a browser or the auth client.
  */
 
+import type { SessionHint } from "./session-hint";
+
 /** What a session read has established right now. */
 export type SessionState = "signed-in" | "signed-out" | "unknown";
 
@@ -43,6 +45,65 @@ export function decideSessionState(read: SessionRead): SessionState {
   if (sessionErrorStatus(read.error) === 401) return "signed-out";
   if (read.error) return "unknown";
   return "signed-out";
+}
+
+/**
+ * Whether the shell should hold its neutral placeholder while the read is
+ * still out.
+ *
+ * The hint cannot answer for the server, but its *absence* answers one
+ * question on its own: no session token is in this browser's jar, so there is
+ * nothing to wait for and the visitor's screen is already true. A present hint
+ * — and an unread one, which is what the prerendered frame sees — waits
+exactly as before.
+ *
+ * This is display only. `sessionState` stays the server's answer and every
+ * guard, ownership check and data read keeps using it, so a missing hint can
+ * shorten a skeleton but can never bounce a URL or open a surface.
+ */
+export function sessionAnswerPending(input: { state: SessionState; hint: SessionHint }): boolean {
+  if (input.state !== "unknown") return false;
+  return input.hint !== "none";
+}
+
+/**
+ * Whether the full-screen session loader covers the shell.
+ *
+ * A returning account should never watch the shell assemble itself: the
+ * session answers, then the café, then the library, and each answer used to
+ * move the logo sideways and make a column appear. Covering the frame until
+ * all three have answered means the signed-in shape is revealed once, already
+ * complete — so nothing has to be reserved or matched to anything.
+ *
+ * Display only, like `sessionAnswerPending`. Two hand-overs matter, because a
+ * loader that outlives a failed read is a spinner nobody can leave:
+ * - a session read that gave up (`sessionCheckGaveUp`) belongs to the shell's
+ *   own "Checking your session…" card, which offers Try again;
+ * - a café read that settled by *failing* keeps `pending` true by design (the
+ *   list is still `null`), so waiting on it would never end — the shell shows
+ *   the failure instead.
+ *
+ * A visitor is never covered: `sessionPending` is already false for an absent
+ * hint. An unread hint (the prerendered frame) leaves the CSS rule, not this
+ * function, deciding whether the element is even visible.
+ */
+export function sessionLoaderCovers(input: {
+  /** The session read is still out (see `sessionAnswerPending`). */
+  sessionPending: boolean;
+  /** The session read used up its retries; the shell owns the recovery. */
+  sessionCheckGaveUp: boolean;
+  signedIn: boolean;
+  /** The café the shell acts in has not been resolved yet. */
+  workspacePending: boolean;
+  /** That read settled by failing: a wait that would never end. */
+  workspaceFailed: boolean;
+  /** The browser's first library read has not settled. */
+  libraryLoading: boolean;
+}): boolean {
+  if (input.sessionCheckGaveUp) return false;
+  if (input.sessionPending) return true;
+  if (!input.signedIn) return false;
+  return (input.workspacePending && !input.workspaceFailed) || input.libraryLoading;
 }
 
 /** Why a menu URL did not open. */

@@ -11,7 +11,12 @@ import {
   type ReactNode,
 } from "react";
 
-import { decideSessionState, type SessionState } from "@/features/session/state";
+import {
+  decideSessionState,
+  sessionAnswerPending,
+  type SessionState,
+} from "@/features/session/state";
+import { useSessionHint } from "@/features/session/use-session-hint";
 import { authClient } from "@/lib/auth-client";
 
 import { fetchRestaurants, fetchRestaurantsForAccount, type RestaurantOption } from "./client";
@@ -105,8 +110,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     pending: sessionLoading,
     error: sessionError ?? null,
   });
-  const sessionPending = sessionState === "unknown";
-  const sessionCheckFailed = sessionPending && sessionError != null;
+  /**
+   * The hint answers one question the read cannot: whether there is anything
+   * to wait for. No hint means no session cookie is in this jar, so the
+   * visitor's screen is already true and the shell can paint it now; a hint —
+   * or a not-yet-read one, the prerendered frame's answer — waits as before.
+   *
+   * It changes `sessionPending` only. `sessionState` below stays the server's
+   * answer, and the guards read that, so the hint can shorten a skeleton but
+   * never bounce a URL or open a surface.
+   */
+  const sessionHint = useSessionHint();
+  const sessionPending = sessionAnswerPending({ state: sessionState, hint: sessionHint });
+  /** A failed read is still a failed read, hint or no hint: keep retrying it. */
+  const sessionCheckFailed = sessionState === "unknown" && sessionError != null;
   const signedIn = session?.user != null;
   const accountKey = session?.user?.id ?? null;
 
