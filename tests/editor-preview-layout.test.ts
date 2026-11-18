@@ -108,9 +108,13 @@ describe("preview tab layout", () => {
       publishing: { ...liveWithChanges, liveDoc: live, liveDocState: "ready" },
     });
 
-    // No compact summary above the card: the card is the surface.
-    expect(html).not.toContain("Details");
-    expect(html).not.toContain("Hide details");
+    // No compact summary above the card: the card is the surface, and its
+    // change list is the only disclosure — one of it.
+    expect(html.match(/>Show details</g)).toHaveLength(1);
+    // Shut it offers the list, open it offers the way back; the <details>
+    // element's own state swaps them, so no state can drift from the markup.
+    expect(html).toContain('group-open:hidden">Show details');
+    expect(html).toContain('hidden group-open:inline">Hide details');
     expect(html).toContain("Since you last published: 1 repriced · 1 option");
     // A count of one gets a singular noun.
     expect(html).not.toContain("1 options");

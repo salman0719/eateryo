@@ -186,9 +186,14 @@ function ChangeList({
       <p className="text-xs font-semibold text-ink-700">
         Since you last published: {counts.join(" · ")}
       </p>
-      <details className="mt-1">
+      <details className="group mt-1">
         <summary className="cursor-pointer text-xs font-medium text-accent-800 underline hover:text-accent-900">
-          Show details
+          {/* The label names the next move, not the current state: shut it
+              offers the list, open it offers the way back. Both are in the
+              DOM and the <details> element's own state picks one, so the
+              summary stays a real disclosure with nothing to keep in sync. */}
+          <span className="group-open:hidden">Show details</span>
+          <span className="hidden group-open:inline">Hide details</span>
         </summary>
         <ul className="mt-2 max-h-56 divide-y divide-line-100 overflow-y-auto rounded-xl border border-line-200">
           {summary.rows.map((row, index) => (
