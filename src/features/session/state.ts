@@ -12,6 +12,8 @@
  * Pure, so the matrix is unit-tested without a browser or the auth client.
  */
 
+import type { SessionHint } from "./session-hint";
+
 /** What a session read has established right now. */
 export type SessionState = "signed-in" | "signed-out" | "unknown";
 
@@ -43,6 +45,25 @@ export function decideSessionState(read: SessionRead): SessionState {
   if (sessionErrorStatus(read.error) === 401) return "signed-out";
   if (read.error) return "unknown";
   return "signed-out";
+}
+
+/**
+ * Whether the shell should hold its neutral placeholder while the read is
+ * still out.
+ *
+ * The hint cannot answer for the server, but its *absence* answers one
+ * question on its own: no session token is in this browser's jar, so there is
+ * nothing to wait for and the visitor's screen is already true. A present hint
+ * — and an unread one, which is what the prerendered frame sees — waits
+exactly as before.
+ *
+ * This is display only. `sessionState` stays the server's answer and every
+ * guard, ownership check and data read keeps using it, so a missing hint can
+ * shorten a skeleton but can never bounce a URL or open a surface.
+ */
+export function sessionAnswerPending(input: { state: SessionState; hint: SessionHint }): boolean {
+  if (input.state !== "unknown") return false;
+  return input.hint !== "none";
 }
 
 /** Why a menu URL did not open. */

@@ -5,6 +5,7 @@ import {
   decideSessionState,
   isSessionGateMessage,
   menuOpenBlockedMessage,
+  sessionAnswerPending,
   type SessionRead,
 } from "@/features/session/state";
 
@@ -46,6 +47,25 @@ describe("session state", () => {
     expect(decideSessionState({ hasUser: true, pending: true, error: { status: 500 } })).toBe(
       "signed-in"
     );
+  });
+});
+
+describe("session hint", () => {
+  it("stops waiting for a browser that holds no session hint", () => {
+    expect(sessionAnswerPending({ state: "unknown", hint: "none" })).toBe(false);
+  });
+
+  it("waits while a hint says a session may exist", () => {
+    expect(sessionAnswerPending({ state: "unknown", hint: "hinted" })).toBe(true);
+  });
+
+  it("waits when the hint has not been read yet — the prerendered frame", () => {
+    expect(sessionAnswerPending({ state: "unknown", hint: "unknown" })).toBe(true);
+  });
+
+  it("never holds once the read has answered", () => {
+    expect(sessionAnswerPending({ state: "signed-in", hint: "hinted" })).toBe(false);
+    expect(sessionAnswerPending({ state: "signed-out", hint: "hinted" })).toBe(false);
   });
 });
 
