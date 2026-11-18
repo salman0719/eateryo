@@ -231,7 +231,12 @@ export function KanbanBoard({
 
   return (
     <div>
-      <BoardFilterBar filter={filter} onChange={setFilter} visible={filtered.length} total={orders.length} />
+      <BoardFilterBar
+        filter={filter}
+        onChange={setFilter}
+        visible={filtered.length}
+        total={orders.length}
+      />
       <div className="mt-3 grid items-start gap-3 md:grid-cols-3">
         {columns.map((column) => (
           <section
@@ -276,4 +281,3 @@ export function KanbanBoard({
     </div>
   );
 }
-
