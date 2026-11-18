@@ -9,7 +9,7 @@
  * toggle. New owns the first column and never scrolls away inside history.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import {
   distinctBoardTables,
@@ -32,6 +32,10 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { OrderLineOptions } from "@/components/order/option-groups";
 import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
+
+// Ghost lifecycle: fully laid out, then a height dissolve so removal doesn't pop.
+const GHOST_VISIBLE_MS = 8500;
+const GHOST_COLLAPSE_MS = 600;
 
 const STATUS_TONES: Record<OrderStatus, StatusTone> = {
   new: "warning",
@@ -351,26 +355,58 @@ export function KanbanBoard({
   // flip jumps columns, so we glow its border for 10s. The glow runs once
   // and dissolves back to transparent, so removing the class at timeout
   // is invisible.
-  const [justMovedId, setJustMovedId] = useState<string | null>(null);
-  const justMovedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flagJustMoved = (orderId: string) => {
-    setJustMovedId(orderId);
-    if (justMovedTimer.current) clearTimeout(justMovedTimer.current);
-    justMovedTimer.current = setTimeout(() => setJustMovedId(null), 10_000);
+  // Ghost: leave a placeholder in the source column so the eye sees
+  // where the ticket went.
+  const [justMoved, setJustMoved] = useState<{
+    id: string;
+    from: "new" | "preparing" | "done";
+    index: number;
+  } | null>(null);
+  // Two-phase ghost exit: fully laid out for GHOST_VISIBLE_MS, then a
+  // height dissolve for GHOST_COLLAPSE_MS so removal doesn't pop.
+  const [ghostLeaving, setGhostLeaving] = useState(false);
+  const justMovedTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const flagJustMoved = (orderId: string, fromStatus: OrderStatus, fromIndex: number) => {
+    const from = fromStatus === "new" ? "new" : fromStatus === "preparing" ? "preparing" : "done";
+    justMovedTimers.current.forEach(clearTimeout);
+    justMovedTimers.current = [];
+    setGhostLeaving(false);
+    setJustMoved({ id: orderId, from, index: fromIndex < 0 ? 0 : fromIndex });
+    justMovedTimers.current.push(
+      setTimeout(() => setGhostLeaving(true), GHOST_VISIBLE_MS),
+      setTimeout(
+        () => {
+          setJustMoved(null);
+          setGhostLeaving(false);
+        },
+        GHOST_VISIBLE_MS + GHOST_COLLAPSE_MS + 50
+      )
+    );
   };
   useEffect(
     () => () => {
-      if (justMovedTimer.current) clearTimeout(justMovedTimer.current);
+      justMovedTimers.current.forEach(clearTimeout);
     },
     []
   );
+  const sourceIndexFor = (order: Order) => {
+    const source =
+      order.status === "new"
+        ? grouped.fresh
+        : order.status === "preparing"
+          ? grouped.preparing
+          : grouped.done;
+    return source.findIndex((entry) => entry.id === order.id);
+  };
   const handleAdvance = (order: Order, target: OrderStatus) => {
+    const fromIndex = sourceIndexFor(order);
     onAdvance(order, target);
-    flagJustMoved(order.id);
+    flagJustMoved(order.id, order.status, fromIndex);
   };
   const handleCancel = (order: Order) => {
+    const fromIndex = sourceIndexFor(order);
     onCancel(order);
-    flagJustMoved(order.id);
+    flagJustMoved(order.id, order.status, fromIndex);
   };
 
   const columns = [
@@ -417,23 +453,82 @@ export function KanbanBoard({
                 {column.orders.length}
               </span>
             </h3>
-            {column.orders.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-line-300 bg-surface-base px-3 py-4 text-center text-xs text-ink-500">
-                {column.key === "new" ? "All caught up 🎉" : "Nothing here."}
-              </p>
-            ) : (
-              column.orders.map((order) => (
-                <OrderTicket
-                  key={order.id}
-                  order={order}
-                  busy={busyId === order.id}
-                  highlighted={justMovedId === order.id}
-                  onAdvance={handleAdvance}
-                  onCancel={handleCancel}
-                  onDelete={onDelete}
-                />
-              ))
-            )}
+            {(() => {
+              const ghostOrder =
+                justMoved && justMoved.from === column.key
+                  ? (orders.find((entry) => entry.id === justMoved.id) ?? null)
+                  : null;
+              const showGhost =
+                !!ghostOrder && !column.orders.some((entry) => entry.id === ghostOrder.id);
+              // Sustain the ticket's index: insert where it was, clamped to
+              // the shrunken list, instead of appending at the bottom.
+              const insertAt = showGhost
+                ? Math.min(Math.max(justMoved?.index ?? 0, 0), column.orders.length)
+                : -1;
+              if (column.orders.length === 0 && !showGhost) {
+                return (
+                  <p className="rounded-xl border border-dashed border-line-300 bg-surface-base px-3 py-4 text-center text-xs text-ink-500">
+                    {column.key === "new" ? "All caught up 🎉" : "Nothing here."}
+                  </p>
+                );
+              }
+              const ghostNode: ReactElement | null =
+                showGhost && ghostOrder ? (
+                  <div
+                    key={`ghost-${ghostOrder.id}`}
+                    aria-hidden="true"
+                    // Height dissolve: 1fr -> 0fr collapses the exact ticket
+                    // height; negative margin cancels the column gap so the
+                    // final removal doesn't jump. Opacity fades alongside.
+                    className="grid transition-all ease-in-out motion-reduce:transition-none"
+                    style={{
+                      gridTemplateRows: ghostLeaving ? "0fr" : "1fr",
+                      opacity: ghostLeaving ? 0 : 1,
+                      marginTop: ghostLeaving ? -8 : 0,
+                      transitionDuration: `${GHOST_COLLAPSE_MS}ms`,
+                    }}
+                  >
+                    <div className="min-h-0 overflow-hidden">
+                      {/* Exact ticket layout, ghosted: same article, buttons
+                        kept disabled so the height matches pixel-for-pixel.
+                        Visual-only filters + dashed border; overlay pill is
+                        absolute so it never changes the layout. */}
+                      <div className="pointer-events-none relative select-none opacity-60 saturate-50 grayscale [&_article]:border-dashed [&_article]:bg-surface-base/60 [&_article]:shadow-none">
+                        <div inert={true}>
+                          <OrderTicket
+                            order={ghostOrder}
+                            busy={true}
+                            onAdvance={() => {}}
+                            onCancel={() => {}}
+                          />
+                        </div>
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <span className="rounded-full bg-ink-900/75 px-3 py-1 text-[11px] font-bold text-surface-base shadow">
+                            → Moved to {orderStatusLabel(ghostOrder.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              const nodes: ReactElement[] = [];
+              column.orders.forEach((order, orderIndex) => {
+                if (showGhost && orderIndex === insertAt && ghostNode) nodes.push(ghostNode);
+                nodes.push(
+                  <OrderTicket
+                    key={order.id}
+                    order={order}
+                    busy={busyId === order.id}
+                    highlighted={justMoved?.id === order.id}
+                    onAdvance={handleAdvance}
+                    onCancel={handleCancel}
+                    onDelete={onDelete}
+                  />
+                );
+              });
+              if (showGhost && insertAt >= column.orders.length && ghostNode) nodes.push(ghostNode);
+              return nodes;
+            })()}
           </section>
         ))}
       </div>
