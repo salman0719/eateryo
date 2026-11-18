@@ -10,28 +10,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import {
-  nextOrderStatus,
-  orderCode,
-  orderStatusLabel,
-  orderTotal,
-  type Order,
-  type OrderStatus,
-} from "@/features/orders/schema";
+import { orderCode, type Order, type OrderStatus } from "@/features/orders/schema";
 import {
   deleteOrder,
   listOrders,
   OrderStorageError,
   updateOrderStatus,
 } from "@/features/orders/storage";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
-import { OrderLineOptions } from "@/components/order/option-groups";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { authClient } from "@/lib/auth-client";
 import { GuidanceCard } from "@/components/ui/guidance-card";
-import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
 
 import { OrdersSkeleton, ServerOrdersBoard } from "./server-orders-board";
+import { KanbanBoard } from "@/components/orders/kanban-board";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 
 const REFRESH_MS = 5000;
@@ -46,22 +37,6 @@ export function OrdersBoard() {
     return <OrdersSkeleton />;
   }
   return session?.user ? <ServerOrdersBoard /> : <LocalOrdersBoard />;
-}
-
-/* Status is a dot plus a word, never a wash: `served` used to wear a green
-   surface beside `new`'s amber one, which made a finished order look like a
-   brand-highlighted one. */
-const STATUS_TONES: Record<OrderStatus, StatusTone> = {
-  new: "warning",
-  preparing: "info",
-  served: "success",
-  cancelled: "neutral",
-};
-
-function formatTime(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 function LocalOrdersBoard() {
@@ -107,12 +82,11 @@ function LocalOrdersBoard() {
     };
   }, [refresh]);
 
-  async function advance(order: Order) {
-    const next = nextOrderStatus(order.status);
-    if (next === order.status || busyId) return;
+  async function advance(order: Order, target: OrderStatus) {
+    if (target === order.status || busyId) return;
     setBusyId(order.id);
     try {
-      await updateOrderStatus(order.id, next);
+      await updateOrderStatus(order.id, target);
       await refresh();
     } catch (updateError: unknown) {
       setError(
@@ -222,100 +196,13 @@ function LocalOrdersBoard() {
           action={{ href: "/menus", label: "Go to My menus" }}
         />
       ) : (
-        <ul className="space-y-3">
-          {orders.map((order) => {
-            const total = orderTotal(order.lines);
-            const canAdvance = nextOrderStatus(order.status) !== order.status;
-            return (
-              <li key={order.id} className="rounded-2xl border border-line-200 bg-surface-base p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-bold text-ink-900">
-                        {formatTableLabel(order.tableLabel)}
-                      </p>
-                      <StatusChip tone={STATUS_TONES[order.status]}>
-                        {orderStatusLabel(order.status)}
-                      </StatusChip>
-                      <span className="text-xs font-medium text-ink-500">
-                        #{orderCode(order.id)} · {formatTime(order.createdAt)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-ink-500">{order.menuTitle}</p>
-                  </div>
-                  <p className="text-sm font-semibold tabular-nums text-ink-900">
-                    {formatPreviewPrice(total, null, order.currency)}
-                  </p>
-                </div>
-
-                <ul className="mt-3 space-y-1 border-t border-line-100 pt-3">
-                  {order.lines.map((line, index) => (
-                    <li
-                      key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
-                      className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
-                    >
-                      <span className="min-w-0">
-                        <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
-                        {line.name}
-                        {line.variantName && (
-                          <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
-                        )}
-                        <OrderLineOptions options={line.options} currency={order.currency} />
-                      </span>
-                      <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                        {line.unitPrice === null
-                          ? "no price"
-                          : formatPreviewPrice(
-                              line.unitPrice * line.quantity,
-                              null,
-                              order.currency
-                            )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {order.note && (
-                  <p className="mt-2 rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-900">
-                    Note: {order.note}
-                  </p>
-                )}
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {canAdvance && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => void advance(order)}
-                      className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:opacity-50"
-                    >
-                      Mark {orderStatusLabel(nextOrderStatus(order.status)).toLowerCase()}
-                    </button>
-                  )}
-                  {order.status !== "cancelled" && order.status !== "served" && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => void cancel(order)}
-                      className="rounded-full border border-line-300 px-3.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                  <span className="flex-1" />
-                  <button
-                    type="button"
-                    disabled={busyId === order.id}
-                    onClick={() => void remove(order)}
-                    className="text-xs font-medium text-ink-500 underline hover:text-danger-800 disabled:opacity-50"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <KanbanBoard
+          orders={orders}
+          busyId={busyId}
+          onAdvance={(order, target) => void advance(order, target)}
+          onCancel={(order) => void cancel(order)}
+          onDelete={(order) => void remove(order)}
+        />
       )}
       {dialog}
     </div>

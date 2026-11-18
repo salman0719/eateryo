@@ -255,12 +255,18 @@ export async function GET(request: Request) {
   const since = url.searchParams.get("since");
   const restaurantId = url.searchParams.get("restaurantId");
   const limitParam = Number(url.searchParams.get("limit") ?? "");
+  const from = url.searchParams.get("from");
+  const to = url.searchParams.get("to");
+  const cursor = url.searchParams.get("cursor");
 
   try {
     const result = await listOrdersForStaff(getDb(), userId, {
       since,
       restaurantId,
       limit: Number.isFinite(limitParam) && limitParam > 0 ? limitParam : undefined,
+      from,
+      to,
+      cursor,
     });
     const response = NextResponse.json(result);
     response.headers.set("Cache-Control", "no-store");

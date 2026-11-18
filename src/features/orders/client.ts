@@ -14,7 +14,7 @@ import { z } from "zod";
 
 import { SyncError, type SyncErrorCode } from "@/features/menus/sync";
 
-import { orderSchema, type Order, type OrderStatus } from "./schema";
+import { orderSchema, orderStatusSchema, type Order, type OrderStatus } from "./schema";
 
 const orderEnvelope = z.object({ order: orderSchema });
 const placedEnvelope = z.object({
@@ -27,6 +27,13 @@ const trackEnvelope = z.object({
 });
 const boardEnvelope = z.object({
   orders: z.array(orderSchema),
+  serverTime: z.string().min(1),
+  nextCursor: z.string().min(1).nullable().optional(),
+});
+
+const countsEnvelope = z.object({
+  counts: z.record(orderStatusSchema, z.number().int().nonnegative()),
+  total: z.number().int().nonnegative(),
   serverTime: z.string().min(1),
 });
 
@@ -168,23 +175,53 @@ export async function fetchTrackedOrder(
 }
 
 /**
- * Board query. Without `since` it returns the newest orders; with it, every
- * order changed after that server timestamp (status edits included).
+ * Board query. Without `since` it returns one newest-first history page
+ * (`from`/`to` narrow the window in SQL, `cursor` continues the page);
+ * with `since`, every order changed after that server timestamp (status
+ * edits included). `nextCursor` is null on the last page and on `since`.
  */
 export async function fetchStaffOrders(
   options: {
     since?: string | null;
     restaurantId?: string | null;
     limit?: number;
+    from?: string | null;
+    to?: string | null;
+    cursor?: string | null;
   } = {}
-): Promise<{ orders: Order[]; serverTime: string }> {
+): Promise<{ orders: Order[]; serverTime: string; nextCursor: string | null }> {
   const params = new URLSearchParams();
   if (options.since) params.set("since", options.since);
   if (options.restaurantId) params.set("restaurantId", options.restaurantId);
   if (options.limit) params.set("limit", String(options.limit));
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
+  if (options.cursor) params.set("cursor", options.cursor);
   const query = params.toString();
-  return requestJson(`/api/orders${query ? `?${query}` : ""}`, undefined, (payload) =>
-    boardEnvelope.parse(payload)
+  return requestJson(`/api/orders${query ? `?${query}` : ""}`, undefined, (payload) => {
+    const parsed = boardEnvelope.parse(payload);
+    return {
+      orders: parsed.orders,
+      serverTime: parsed.serverTime,
+      nextCursor: parsed.nextCursor ?? null,
+    };
+  });
+}
+
+/**
+ * Board totals: one cheap `COUNT(*) GROUP BY status` over the same
+ * restaurant + window scope as the history pages. No tickets attached.
+ */
+export async function fetchStaffOrderCounts(options: {
+  restaurantId: string;
+  from?: string | null;
+  to?: string | null;
+}): Promise<{ counts: Record<OrderStatus, number>; total: number; serverTime: string }> {
+  const params = new URLSearchParams({ restaurantId: options.restaurantId });
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
+  return requestJson(`/api/orders/counts?${params.toString()}`, undefined, (payload) =>
+    countsEnvelope.parse(payload)
   );
 }
 
