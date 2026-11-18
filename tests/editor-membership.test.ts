@@ -3,8 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MenuEditor } from "@/components/menu-editor/menu-editor";
-import { PublishPanel } from "@/components/menu-editor/publish-panel";
+import { PublishPanel, type PublishingControls } from "@/components/menu-editor/publish-panel";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
+import type { MenuDocument } from "@/features/menu/schema";
 
 /**
  * 003 — the editor opened saying "Saved in this browser" for a menu the
@@ -80,11 +81,16 @@ function renderEditor(
   );
 }
 
-function renderPublishPanel(inAccount: boolean | null, accountCheckFailed = false): string {
+function renderPublishPanel(
+  inAccount: boolean | null,
+  accountCheckFailed = false,
+  overrides: Partial<PublishingControls> = {},
+  draftDoc = createSampleMenuDocument()
+): string {
   return renderToStaticMarkup(
     createElement(PublishPanel, {
       signedIn: true,
-      draftDoc: createSampleMenuDocument(),
+      draftDoc,
       controls: {
         status: null,
         loaded: true,
@@ -97,6 +103,7 @@ function renderPublishPanel(inAccount: boolean | null, accountCheckFailed = fals
         liveDocState: "idle",
         onPublish: () => {},
         onUnpublish: () => {},
+        ...overrides,
       },
     })
   );
@@ -166,6 +173,62 @@ describe("editor copy after a failed account read", () => {
   });
 });
 
+describe("publish panel revalidation", () => {
+  /** A live menu and a draft that repriced one dish, by id. */
+  function repricedPair(): { live: MenuDocument; draft: MenuDocument } {
+    const live = createSampleMenuDocument();
+    const draft = structuredClone(live);
+    const item = draft.categories[0]?.items[0];
+    if (item) item.price = (item.price ?? 0) + 1;
+    return { live, draft };
+  }
+
+  it("keeps the last comparison on screen while it re-reads the live menu", () => {
+    // Entering the preview refreshes the publish state; that refresh used to
+    // swap a rendered summary for the skeleton and back, which looks like the
+    // answer was withdrawn and re-issued.
+    const { live, draft } = repricedPair();
+    const html = renderPublishPanel(
+      true,
+      false,
+      {
+        status: {
+          menuId: "menu-1",
+          restaurantId: "restaurant-1",
+          isLive: true,
+          publishedAt: "2026-11-01T20:20:50.100Z",
+          liveRevisionId: "revision-1",
+          sourceUpdatedAt: "2026-11-01T20:20:50.100Z",
+          hasUnpublishedChanges: true,
+        },
+        liveDoc: live,
+        liveDocState: "loading",
+      },
+      draft
+    );
+    expect(html).toContain("Since you last published: 1 repriced");
+    expect(html).not.toContain("animate-pulse");
+  });
+
+  it("still waits with a skeleton when there is nothing to compare yet", () => {
+    const html = renderPublishPanel(true, false, {
+      status: {
+        menuId: "menu-1",
+        restaurantId: "restaurant-1",
+        isLive: true,
+        publishedAt: "2026-11-01T20:20:50.100Z",
+        liveRevisionId: "revision-1",
+        sourceUpdatedAt: "2026-11-01T20:20:50.100Z",
+        hasUnpublishedChanges: true,
+      },
+      liveDoc: null,
+      liveDocState: "loading",
+    });
+    expect(html).toContain("animate-pulse");
+    expect(html).not.toContain("Since you last published");
+  });
+});
+
 describe("publish panel membership", () => {
   it("checks instead of offering to create a café while unknown", () => {
     const html = renderPublishPanel(null);
@@ -178,6 +241,16 @@ describe("publish panel membership", () => {
     const html = renderPublishPanel(false);
     expect(html).toContain("still only in this browser");
     expect(html).not.toContain("Checking whether this menu is on your account");
+  });
+
+  it('does not call an unread status "never published"', () => {
+    // A failed status read arrives as `loaded` with no status, which is the
+    // same shape as "never published" — so the panel must key off the error.
+    const html = renderPublishPanel(true, false, {
+      error: "Could not check the menu’s status. Try again in a moment.",
+    });
+    expect(html).not.toContain("never been published");
+    expect(html).toContain("Could not check the menu");
   });
 
   it("stops the café-creating setup while the account is unreadable", () => {
