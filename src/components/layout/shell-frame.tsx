@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/layout/site-footer";
 import { WorkspaceSwitcher } from "@/components/layout/workspace-switcher";
 import { BookIcon, CameraIcon, ChecklistIcon, MoreIcon, ReceiptIcon } from "@/components/ui/icons";
 import { MonitorToasts } from "@/components/orders/monitor-toasts";
+import { useSessionHint } from "@/features/session/use-session-hint";
 import { NewOrdersBadge } from "@/components/orders/new-orders-badge";
 import { OrderMonitorProvider, useOrderMonitor } from "@/features/orders/monitor";
 import {
@@ -69,6 +70,16 @@ function PhoneTabIcon({ id }: { id: AppSectionId }) {
 export interface ShellFrameProps {
   /** The confirm dialog (`useConfirm().dialog`), above everything else. */
   dialog: ReactNode;
+  /**
+   * The full-screen session loader (`session-loader.tsx`), when the shell is
+   * still waiting on the account. It covers the frame rather than replacing
+   * it: the reads that end the wait belong to the providers above, so the
+   * frame keeps running underneath. The frame never decides whether it shows
+   * — `sessionLoaderCovers` does — so this stays chrome. It is rendered
+   * outside the frame, and the frame goes `inert` while that node is actually
+   * covering it.
+   */
+  sessionLoader?: ReactNode;
   /** Which surface is showing: the sidebar's current entry, the phone nav. */
   screen: AppScreen;
   /** The editor's working measure, wider than the content screens'. */
@@ -133,6 +144,7 @@ export interface ShellFrameProps {
 
 export function ShellFrame({
   dialog,
+  sessionLoader,
   screen,
   wideMeasure,
   saveStatus,
@@ -155,9 +167,23 @@ export function ShellFrame({
   onSignOut,
   onOpenOrders,
 }: ShellFrameProps) {
+  const sessionHint = useSessionHint();
+  /**
+   * Whether the loader is genuinely covering the frame. CSS shows it from the
+   * boot script's `data-session` on <html>, and that attribute is only its copy
+   * of the hint cookie — so the cookie is what decides whether the frame under
+   * it can be reached. The node's mere presence would also inert a visitor's
+   * frame, whose element is mounted but hidden, and the hint stays `unknown`
+   * (no inert) until the browser can read its jar.
+   */
+  const covered = sessionLoader != null && sessionHint === "hinted";
+
   return (
     <OrderMonitorProvider userId={userId} restaurantId={restaurantId} pending={monitorPending}>
-      <div className="flex min-h-full flex-1 flex-col">
+      {/* `inert`, not removed: the reads that end the wait live above the
+        frame, so the shell keeps running — it just cannot be tabbed into or
+        read out while the wait covers it. */}
+      <div className="flex min-h-full flex-1 flex-col" inert={covered}>
         {dialog}
         <ViewingTracker viewing={signedIn && screen === "orders"} />
         {/* Default stretch: the content column fills the row, so its flex-1 main
@@ -365,6 +391,9 @@ export function ShellFrame({
         )}
         <MonitorToastStack onOpen={onOpenOrders} />
       </div>
+      {/* A sibling of the frame it covers: `inert` must never reach the loader
+        itself. */}
+      {sessionLoader}
     </OrderMonitorProvider>
   );
 }
