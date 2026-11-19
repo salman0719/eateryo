@@ -394,7 +394,11 @@ export function ExtractionResult({
                       key={`ready-${item.name}`}
                       className="flex items-baseline justify-between gap-3 py-1.5"
                     >
-                      <span className="min-w-0 truncate text-sm text-ink-800">{item.name}</span>
+                      {/* Wraps instead of truncating: a long dish name is the
+                          thing being checked, so it must be readable whole. */}
+                      <span className="min-w-0 flex-1 break-words text-sm text-ink-800">
+                        {item.name}
+                      </span>
                       <span className="shrink-0 text-sm font-medium text-ink-800 tabular-nums">
                         {formatPrice(item, data.currency)}
                       </span>
@@ -553,10 +557,12 @@ export function ExtractionResult({
         </div>
       </Attention>
 
+      {/* The preview is the draft's own page, so it gets room to read as one:
+          400px, the editor's width, instead of a form-sized 320. */}
       {previewDoc ? (
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
           <aside className="flex flex-col gap-2 lg:sticky lg:top-4">
-            <PhoneFrame label="What a table card opens">
+            <PhoneFrame label="What a table card opens" widthClass="max-w-[400px]">
               <OrderPagePreview doc={previewDoc} />
             </PhoneFrame>
           </aside>
