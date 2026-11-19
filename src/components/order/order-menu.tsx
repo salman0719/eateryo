@@ -218,7 +218,7 @@ export function CategoryRail({
 }) {
   if (categories.length === 0) return null;
   return (
-    <div className="sticky top-0 z-20 -mx-4 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur">
+    <div className="sticky top-0 z-20 -mx-4 -mt-2 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur">
       <ScrollArrowStrip label="Menu categories">
         {categories.map((category) => {
           const active = category.id === activeId;
