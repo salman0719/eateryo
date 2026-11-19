@@ -1,6 +1,6 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MenuEditor } from "@/components/menu-editor/menu-editor";
 import { createMenuDocument } from "@/features/menu/menu-utils";
@@ -72,6 +72,47 @@ describe("MenuEditor header", () => {
     );
     expect(html).toContain("Checking where this menu is saved…");
     expect(html).not.toMatch(/>\s*Saved\s*</);
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/**
+ * A menu started from scratch has nothing in it, so the category strip — the
+ * only "+ Category" control — is not rendered. The Categories tab still has to
+ * offer a way to add the first category itself instead of telling the owner to
+ * use a control that is not on the screen.
+ */
+describe("MenuEditor on an empty menu", () => {
+  it("offers the first category on the Categories tab", () => {
+    const doc = createMenuDocument({ title: "Untitled menu" });
+    const store = new Map<string, string>([[`menu-editor-subtab:${doc.id}`, "categories"]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+    });
+    const html = renderToStaticMarkup(
+      createElement(MenuEditor, {
+        doc,
+        mode: "edit",
+        onModeChange: () => {},
+        onChange: () => {},
+        saveState: { kind: "saved", message: "Saved" },
+        syncMode: "local",
+        imageUrl: null,
+        onExportJson: () => {},
+        onExportCsv: () => {},
+        onImportFile: () => {},
+        importError: null,
+        onDeleteMenu: () => {},
+      })
+    );
+    expect(html).toContain("No categories yet");
+    // One control, and it is the button — not a sentence about the strip.
+    expect(html.match(/\+ Add category/g)).toHaveLength(1);
+    expect(html).not.toContain("Add a category above");
   });
 });
 
