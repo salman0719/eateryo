@@ -553,10 +553,12 @@ export function ExtractionResult({
         </div>
       </Attention>
 
+      {/* The preview is the draft's own page, so it gets room to read as one:
+          400px, the editor's width, instead of a form-sized 320. */}
       {previewDoc ? (
-        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
           <aside className="flex flex-col gap-2 lg:sticky lg:top-4">
-            <PhoneFrame label="What a table card opens">
+            <PhoneFrame label="What a table card opens" widthClass="max-w-[400px]">
               <OrderPagePreview doc={previewDoc} />
             </PhoneFrame>
           </aside>
