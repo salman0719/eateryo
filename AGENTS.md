@@ -333,7 +333,9 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   `capture` | `review`) decides which. The work stop keeps three states —
   nothing read, reading, read — and a return visit shows the read summary
   (counts, saved notice, **Continue to review**) instead of a fresh call; only
-  the explicit, confirmed **Extract again** re-reads. Review is only a screen
+  the explicit, confirmed **Extract again** re-reads. That summary also carries
+  **Start over**, the same `onClear` the review offers, because the work stop
+  is where a return visit lands. Review is only a screen
   when there is a result, so a missing result falls back to the work stop, and
   the publish stop is only a screen once the shell has mounted its wizard
   (`publishSlot`), so a stale `publish` view falls back the same way. Entering
