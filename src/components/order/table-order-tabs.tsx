@@ -8,9 +8,10 @@
  * shared cart. One "Send order" posts a combined ticket — each line remembers
  * its menu, and the server re-prices every line from the right snapshot.
  *
- * Menu presentation reuses `OrderMenuSection` (the same list both the local
- * and single-menu server flows render), and search reuses the editor's
- * `searchMenu` matching so filtering behaves identically everywhere.
+ * Menu presentation reuses the shared diner pieces (`DinerCoverHeader` lives
+ * on the landing, `DinerSearchField`, `CategoryRail` + scroll-spy and
+ * `OrderMenuSection` here), and search reuses the editor's `searchMenu`
+ * matching so filtering behaves identically to the owner preview.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -37,9 +38,11 @@ import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import {
   CategoryRail,
+  DinerSearchField,
   OrderMenuSection,
   StickyCartBar,
   formatOrderTotal,
+  scrollToCategory,
   useScrollSpyCategory,
 } from "./order-menu";
 import { OrderSheet } from "./order-sheet";
@@ -209,13 +212,11 @@ export function TableOrderTabs({
     );
   }, [filtered]);
   const activeCategory = useScrollSpyCategory(railCategories.map((entry) => entry.id));
-
-  function jumpToCategory(id: string) {
-    document.getElementById(id)?.scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      block: "start",
-    });
-  }
+  const searchResultText = searching
+    ? visibleCount === 0
+      ? `No dishes match “${query.trim()}”.`
+      : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`
+    : null;
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
@@ -401,23 +402,12 @@ export function TableOrderTabs({
         <div className="flex min-w-0 flex-col gap-4">
           {bareSearch ? (
             <nav aria-label="Search the menu">
-              <label className="block">
-                <span className="sr-only">Search dishes</span>
-                <input
-                  type="search"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search dishes…"
-                  className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
-                />
-              </label>
-              {searching && (
-                <p className="mt-2 text-xs text-ink-500" role="status">
-                  {visibleCount === 0
-                    ? `No dishes match “${query.trim()}”.`
-                    : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
-                </p>
-              )}
+              <DinerSearchField
+                id="table-dish-search"
+                value={query}
+                onChange={setQuery}
+                resultText={searchResultText}
+              />
             </nav>
           ) : (
             <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
@@ -465,29 +455,19 @@ export function TableOrderTabs({
                   </p>
                 </div>
               ) : menus.length > 0 ? (
-                <>
-                  <label className={!singleMenu ? "mt-2 block" : "block"}>
-                    <span className="sr-only">Search dishes</span>
-                    <input
-                      type="search"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder={
-                        singleMenu
-                          ? "Search dishes…"
-                          : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
-                      }
-                      className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
-                    />
-                  </label>
-                  {searching && (
-                    <p className="mt-2 text-xs text-ink-500" role="status">
-                      {visibleCount === 0
-                        ? `No dishes match “${query.trim()}”.`
-                        : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
-                    </p>
-                  )}
-                </>
+                <div className={!singleMenu ? "mt-2" : undefined}>
+                  <DinerSearchField
+                    id="table-dish-search-panel"
+                    value={query}
+                    onChange={setQuery}
+                    placeholder={
+                      singleMenu
+                        ? "Search dishes…"
+                        : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
+                    }
+                    resultText={searchResultText}
+                  />
+                </div>
               ) : (
                 <p className="mt-2 text-xs text-ink-500">
                   Nothing to order at the moment — tap a menu to see when it opens.
@@ -499,7 +479,7 @@ export function TableOrderTabs({
           <CategoryRail
             categories={railCategories}
             activeId={activeCategory}
-            onSelect={jumpToCategory}
+            onSelect={scrollToCategory}
           />
 
           {menus.length === 0 ? (
