@@ -563,7 +563,7 @@ export function OrderMenuSection({
                       }
                       setCustomizingId(item.id);
                     }}
-                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {addLabel}
                   </button>
