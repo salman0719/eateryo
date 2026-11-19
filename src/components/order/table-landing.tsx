@@ -37,17 +37,6 @@ export interface TableLandingProps {
   resumeToken: string | null;
 }
 
-/** What the heading says about this visit, in the diner's terms. */
-function landingSummary(menus: TableOrderMenu[], closedMenus: ClosedTableOrderMenu[]): string {
-  if (menus.length === 0) {
-    return closedMenus.length === 1
-      ? "Nothing is being served right now — opening hours are below."
-      : "Nothing is being served right now — tap a menu to see when it opens.";
-  }
-  if (menus.length === 1) return "Here’s what’s on — tap a dish to add it.";
-  return `${menus.length} menus are open — browse the tabs or search them all at once.`;
-}
-
 export function TableLanding({
   restaurantName,
   restaurantSlug,
@@ -124,12 +113,12 @@ export function TableLanding({
     );
   }
 
+  // The cover names the restaurant and the table only — no helper copy.
+  // When nothing is served, the empty-state card below the tabs says so
+  // where the opening hours already live, not in the header.
   return (
-    <OrderShell tableLabel={tableLabel}>
-      <DinerCoverHeader
-        restaurantName={restaurantName}
-        subline={landingSummary(menus, closedMenus)}
-      />
+    <OrderShell bare>
+      <DinerCoverHeader restaurantName={restaurantName} tableLabel={tableLabel} />
 
       <TableOrderTabs
         restaurantName={restaurantName}
