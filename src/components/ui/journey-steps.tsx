@@ -4,12 +4,16 @@ import { JOURNEY_STEPS, journeyStepStatus } from "@/features/onboarding/journey"
 
 /**
  * The one progress tracker for onboarding: Upload & extract · Review ·
- * Publish. Rendered by capture (stops 1–2) and by the publish wizard (stop
- * 3), so leaving the review screen continues the same journey instead of
- * starting a second one at "1".
+ * Publish. Rendered on capture's signed-out front door and by the publish
+ * wizard when it is opened on its own URL, so leaving the review screen
+ * continues the same journey instead of starting a second one at "1".
  *
  * Upload and extraction share a stop: the read is an action inside the photo
  * step, so there is no stop that can be returned to and re-triggered.
+ *
+ * Full width by design: the stop, its label and the line that leads to the
+ * next stop each take an equal third, so the bar reads as one span from the
+ * first step to the last instead of a cluster around the current one.
  *
  * States follow the checkout convention: the current stop is filled, done
  * stops carry a check, and upcoming stops stay outlined and low-emphasis
@@ -28,12 +32,12 @@ export function JourneySteps({
   return (
     <ol
       aria-label="Getting your menu live"
-      className={["flex items-center gap-0.5 sm:gap-2", className].filter(Boolean).join(" ")}
+      className={["flex w-full items-start", className].filter(Boolean).join(" ")}
     >
       {JOURNEY_STEPS.map((label, index) => {
         const status = journeyStepStatus(index, current);
         return (
-          <li key={label} className="flex flex-1 items-center gap-0.5 last:flex-none sm:gap-2">
+          <li key={label} className="flex min-w-0 flex-1 items-center gap-2">
             <span
               aria-current={status === "current" ? "step" : undefined}
               className={[
@@ -54,7 +58,7 @@ export function JourneySteps({
             </span>
             <span
               className={[
-                "text-[11px] leading-tight sm:text-sm",
+                "min-w-0 text-[11px] leading-tight sm:text-sm",
                 status === "current"
                   ? "font-semibold text-ink-900"
                   : status === "done"
@@ -67,7 +71,10 @@ export function JourneySteps({
             {index < JOURNEY_STEPS.length - 1 && (
               <span
                 aria-hidden="true"
-                className={`h-px flex-1 ${index < current ? "bg-accent-300" : "bg-surface-200"}`}
+                className={[
+                  "h-px min-w-3 flex-1 rounded-full",
+                  index < current ? "bg-accent-300" : "bg-line-300",
+                ].join(" ")}
               />
             )}
           </li>

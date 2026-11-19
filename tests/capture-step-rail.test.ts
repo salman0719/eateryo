@@ -21,15 +21,21 @@ describe("CaptureStepRail", () => {
     expect(html).toContain("Review");
     expect(html).toContain("Publish");
     expect(html).not.toMatch(/>\s*Extract\s*</);
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/<button/g)).toHaveLength(3);
+    expect(html).toContain('aria-label="Menu photo to order page"');
+  });
+
+  it("draws one connector between each pair of stops", () => {
+    const html = render("capture", ["capture"]);
+    expect(html.match(/h-px/g)).toHaveLength(2);
   });
 
   it("marks exactly one stop current", () => {
     const html = render("review", ["capture", "review"]);
-    expect(html.match(/aria-selected="true"/g)).toHaveLength(1);
-    const beforeSelected = html.slice(0, html.indexOf('aria-selected="true"'));
-    expect(beforeSelected).toContain("Upload &amp; extract");
     expect(html.match(/aria-current="step"/g)).toHaveLength(1);
+    expect(html).not.toContain("aria-selected");
+    const beforeSelected = html.slice(0, html.indexOf('aria-current="step"'));
+    expect(beforeSelected).toContain("Upload &amp; extract");
   });
 
   it("only opens the stops the owner has reached", () => {
