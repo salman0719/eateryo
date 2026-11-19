@@ -111,16 +111,31 @@ export function DinerCoverHeader({
   restaurantName,
   tableLabel,
   subline,
+  bleed = false,
 }: {
   restaurantName: string;
   /** The diner's table: a filled pill top-right of the cover band. */
   tableLabel?: string;
   /** One quiet line under the name: the menu title on a single-menu page. */
   subline?: string;
+  /**
+   * On a phone the cover is the page's own top edge: the band reaches the
+   * viewport top and both sides with no page padding, and the card framing
+   * comes back from `sm` up. The negative margins cancel `OrderShell`'s
+   * `px-4 py-6`, which is where the inset came from. The owner preview sits
+   * inside a phone frame of its own and never bleeds.
+   */
+  bleed?: boolean;
 }) {
   const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
+    <div
+      className={
+        bleed
+          ? "-mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
+          : "overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+      }
+    >
       <div
         aria-hidden={tableLabel ? undefined : "true"}
         className="relative h-24"

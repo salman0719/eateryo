@@ -118,7 +118,7 @@ export function TableLanding({
   // where the opening hours already live, not in the header.
   return (
     <OrderShell bare>
-      <DinerCoverHeader restaurantName={restaurantName} tableLabel={tableLabel} />
+      <DinerCoverHeader restaurantName={restaurantName} tableLabel={tableLabel} bleed />
 
       <TableOrderTabs
         restaurantName={restaurantName}
