@@ -85,6 +85,53 @@ export function OrderShell({
 }
 
 /**
+ * Prototype A identity header for the diner pages: a slim cover band, an
+ * overlapping initial tile, the restaurant name, and one sub-line (the menu
+ * title on a single-menu page, the table summary on the landing page).
+ *
+ * There is no cover photo in the schema yet, so the band is a gradient drawn
+ * from the `accent` role tokens via `var(--color-accent-*)`: a theme change
+ * repaints it with no code change, and a photo later replaces the band's
+ * background only. The name always sits below the band — never on it — so
+ * any photo stays legible without a scrim. The table pill is not repeated
+ * here; `OrderShell` already carries it.
+ */
+export function DinerCoverHeader({
+  restaurantName,
+  subline,
+}: {
+  restaurantName: string;
+  /** One quiet line under the name: the menu title, or what is being served. */
+  subline?: string;
+}) {
+  const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
+      <div
+        aria-hidden="true"
+        className="h-24"
+        style={{
+          backgroundImage:
+            "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",
+        }}
+      />
+      <div className="flex items-center gap-3 px-5 pb-4">
+        <span
+          aria-hidden="true"
+          className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+        >
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg leading-snug font-bold text-ink-900">{restaurantName}</h1>
+          {subline && <p className="truncate text-sm text-ink-600">{subline}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * One quiet line under a customizable dish: what the Add tap will ask for.
  * Required groups are named (the diner cannot skip them); otherwise the row
  * just says add-ons exist, and the sheet carries the detail.
