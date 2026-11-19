@@ -312,11 +312,12 @@ export function ServerTableOrder({
   );
 
   return (
-    <OrderShell tableLabel={tableLabel}>
+    <OrderShell bare>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
           <DinerCoverHeader
             restaurantName={restaurantName}
+            tableLabel={tableLabel}
             subline={doc.title.trim() || undefined}
           />
 
