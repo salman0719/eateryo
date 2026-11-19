@@ -216,9 +216,23 @@ export function CategoryRail({
   activeId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const railRef = useRef<HTMLDivElement>(null);
+  // Scrolling the dishes moves the active pill; keep that pill in view so
+  // the rail mirrors the section without the diner chasing it. block stays
+  // nearest so the page itself never jumps — only the sideways strip moves.
+  useEffect(() => {
+    if (!activeId) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    railRef.current
+      ?.querySelector('[aria-current="true"]')
+      ?.scrollIntoView({ block: "nearest", inline: "center", behavior: reduce ? "auto" : "smooth" });
+  }, [activeId]);
   if (categories.length === 0) return null;
   return (
-    <div className="sticky top-0 z-20 -mx-4 -mt-3 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur">
+    <div
+      ref={railRef}
+      className="sticky top-0 z-20 -mx-4 -mt-3 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur"
+    >
       <ScrollArrowStrip label="Menu categories">
         {categories.map((category) => {
           const active = category.id === activeId;
