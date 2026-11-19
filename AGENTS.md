@@ -300,8 +300,11 @@ errors, or add lint/type suppressions just to make checks pass.
   neighbours arrives as doors, not shared state — the confirm dialog before a
   discard, the menu lifecycle that files a new menu (`ensureServerTarget`,
   `cacheServerDraft`, `pruneSignedOutOthers`), the screen's `revealResult`
-  scroll, and `reportError`. A resumed draft comes back as a document for the
-  banner to navigate with, instead of the hook navigating on its own.
+  (which now also opens the review stop), and `reportError`. A resumed draft
+  comes back as a document for the banner to navigate with, instead of the
+  hook navigating on its own. `handleExtract` is the guard against a silent
+  second paid read: with an extraction already on hand it asks first, because
+  re-reading replaces the draft and its review edits.
 - `src/features/menus/draft-claims.ts` — `useDraftClaims`: what happens to a
   menu that lives only in this browser when an account appears. Sign-in adopts
   every draft in one go (no remembered answers, no offer), so this unit owns
@@ -325,7 +328,14 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   yet: the theme landed first, then the drawn lockup replaces the text in
   `brand.tsx` only.
 - `src/components/pages/capture-page.tsx` — the capture screen, and therefore
-  the front door. Signed out with an empty page it renders the entry
+  the front door. It renders **one stop at a time**: the work stop (photo and
+  extraction, merged) or the review — never both — and `view` (client state,
+  `capture` | `review`) decides which. The work stop keeps three states —
+  nothing read, reading, read — and a return visit shows the read summary
+  (counts, saved notice, **Continue to review**) instead of a fresh call; only
+  the explicit, confirmed **Extract again** re-reads. Review is only a screen
+  when there is a result, so a missing result falls back to the work stop.
+  Signed out with an empty page it renders the entry
   composition (one promise, the photo field, three claims the app actually
   keeps; two columns from `lg`, one on a phone so the field is never below the
   fold). The moment a photo exists — or the visitor is known to be signed in —
@@ -347,12 +357,17 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   hand-edit them; `tests/theme-tokens.test.ts` catches that, and fails if a hex
   literal returns to `src/lib/email-layout.ts`.
 - `src/features/onboarding/journey.ts`, `src/components/ui/journey-steps.tsx` —
-  the one four-stop onboarding tracker (Upload · Extract · Review · Publish)
-  shared by capture and the publish wizard. Signing in is a gate inside
-  Publish, never a stop, so the tracker's length is fixed for everyone; the
-  wizard continues it only when the flow came through review
-  (`rememberPublishJourney`), so a plain library deep link gets a heading
-  instead of a tracker with a false "3 done".
+  the one three-stop onboarding tracker (Upload & extract · Review · Publish)
+  shared by capture and the publish wizard. Upload and extraction share a
+  stop: the read is an action inside the photo step, never a stop that can be
+  returned to and started again. Signing in is a gate inside Publish, never a
+  stop, so the tracker's length is fixed for everyone; the wizard continues it
+  only when the flow came through review (`rememberPublishJourney`), so a
+  plain library deep link gets a heading instead of a tracker with a false
+  "2 done". `CaptureStepRail`
+  (`src/components/upload/capture-step-rail.tsx`) is the clickable version
+  capture uses in the working layout; `JourneySteps` is the passive one on the
+  signed-out front door and in the wizard.
 - `src/components/ui/icons.tsx` — the hand-drawn icon set (no icon
   dependency): stroked 24-grid glyphs that inherit `currentColor` and are
   `aria-hidden`, so the control around them carries the label. Starts with
