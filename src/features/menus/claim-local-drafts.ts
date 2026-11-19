@@ -45,6 +45,25 @@ export function decideLocalDraftClaim(inputs: LocalDraftClaimInputs): LocalDraft
 }
 
 /**
+ * Which browser drafts the generic sign-in import owns.
+ *
+ * A draft the magic link is returning to (`journeyMenuId`) is the journey
+ * claim's: the emailed link is its consent, and that path names the café from
+ * the draft. Excluding it here is not cosmetic — when both paths took the
+ * same draft they each asked for a café on the same frame, and a brand-new
+ * account ended up with two. Any other journey-marked draft (a magic link
+ * that never came back, a later library sign-in) stays in, so nothing is
+ * stranded.
+ */
+export function draftsForAutoImport<T extends { id: string }>(
+  menus: readonly T[],
+  journeyMenuId: string | null
+): T[] {
+  if (!journeyMenuId) return [...menus];
+  return menus.filter((menu) => menu.id !== journeyMenuId);
+}
+
+/**
  * The onboarding promise ("Sign in to publish your menu"): the draft opened
  * in the publish wizard attaches to the owner's workspace on sign-in, with
  * no prior-menu check. The emailed magic link names that menu, so a
