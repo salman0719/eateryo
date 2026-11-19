@@ -416,6 +416,15 @@ export function CapturePage({
                 >
                   Continue to review →
                 </button>
+                {/* The same start over the review offers: this stop is where a
+                    return visit lands, so it needs the way out too. */}
+                <button
+                  type="button"
+                  onClick={onClear}
+                  className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  Start over
+                </button>
                 {savedNotice && <span className="text-xs text-ink-500">{savedNotice}</span>}
               </div>
             </section>

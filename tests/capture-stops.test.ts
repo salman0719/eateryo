@@ -97,6 +97,8 @@ describe("capture stops", () => {
     expect(html).toContain("Read 2 dishes in 1 category");
     expect(html).toContain("Extract again");
     expect(html).toContain("Continue to review →");
+    // The way out is on this stop too, not only on the review.
+    expect(html).toContain("Start over");
     // The review surface is not on screen at the same time.
     expect(html).not.toContain("Check what the AI read");
     expect(html).not.toContain("Check this");
