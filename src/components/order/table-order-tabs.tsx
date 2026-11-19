@@ -410,7 +410,7 @@ export function TableOrderTabs({
               />
             </nav>
           ) : (
-            <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
+            <nav aria-label={singleMenu ? "Search the menu" : "Menus"}>
               {!singleMenu && (
                 <ScrollArrowStrip label="Menus">
                   {menus.length > 0 && (
@@ -461,9 +461,7 @@ export function TableOrderTabs({
                     value={query}
                     onChange={setQuery}
                     placeholder={
-                      singleMenu
-                        ? "Search dishes…"
-                        : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
+                      singleMenu ? "Search dishes…" : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
                     resultText={searchResultText}
                   />
