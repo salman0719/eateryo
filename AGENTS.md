@@ -488,8 +488,9 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   means "make this menu orderable at the tables": it snapshots the menu and
   marks it live. There is no public menu page, no menu URL, no menu QR code
   and no view count — a menu is reached only through a table card at
-  `/r/<restaurant>/t/<table>`, and its own order address is
-  `/r/<restaurant>/m/<menu>/order?table=<label>`. Menu slugs are unique per
+  `/r/<restaurant>/t/<table>`; there is no per-menu order address (the
+  single-menu order route was retired — the table landing is the only
+  diner ordering page). Menu slugs are unique per
   restaurant (`published_menu_restaurant_slug_unique`), never globally, so
   two cafés may both hold `lunch`. Onboarding names the first menu itself
   (`resolveFirstMenuTitle`: "Main Menu", or the service the photo clearly
@@ -500,7 +501,10 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   `src/components/menu-editor/publish-panel.tsx`; the owner-facing preview is
   a read-only rendering of the diner order page
   (`src/components/order/order-page-preview.tsx`, ordering off), shared by
-  the editor, publish wizard and onboarding result. Tests:
+  the editor, publish wizard and onboarding result. It reuses the live
+  diner pieces (`DinerCoverHeader`, `DinerSearchField`, `CategoryRail` +
+  scroll-spy, `OrderMenuSection`) — only the table (constant "1") and the
+  fake send button are preview-only. Tests:
   `tests/publishing-slug.test.ts`, `tests/publishing-repo.test.ts`,
   `tests/publishing-api.test.ts`, `tests/menu-changes.test.ts`. Invariant: table ordering renders
   `menu_revision`, never `menu.doc`, so edits stay private until "Publish
@@ -512,12 +516,14 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   `storage.ts` + `table-links.ts` (Phase 1 local queue + link helpers).
   Routes: `src/app/api/orders/` (public POST, staff GET) and
   `src/app/api/orders/[orderId]/` (PATCH). Diner page
-  `src/app/r/[restaurantSlug]/m/[menuSlug]/order/page.tsx` (snapshot only,
+  `src/app/r/[restaurantSlug]/t/[tableLabel]/page.tsx` (snapshot only,
   noindex) with
-  `src/components/order/` (`order-menu.tsx` shared UI, `order-sheet.tsx` the
-  shared cart sheet, `server-table-order.tsx`, `table-order.tsx` for local
-  mode, `table-order-tabs.tsx` for the multi-menu landing and
-  `table-landing.tsx` the landing screen that owns it). The confirmation every
+  `src/components/order/` (`order-menu.tsx` shared diner UI: `DinerCoverHeader`,
+  `DinerSearchField`, `CategoryRail` + `useScrollSpyCategory` category rail,
+  `OrderMenuSection`, `order-sheet.tsx`
+  the shared cart sheet, `table-order.tsx` for local
+  mode, `table-order-tabs.tsx` for the menu tabs and shared cart (search and
+  rail come from the shared pieces), and `table-landing.tsx` the landing screen that owns it). The confirmation every
   flow ends on is its own module, `order-received.tsx`: it is a different
   screen from the ordering page (nothing may say "2 menus are open" after the
   order is in), it never borrows that page's chrome, and it is where the

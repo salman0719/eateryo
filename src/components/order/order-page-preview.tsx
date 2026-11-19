@@ -4,12 +4,15 @@
  * The diner's order page, rendered from a draft menu so an owner can try it
  * before anything is live.
  *
- * It is the real thing wherever it can be: `OrderShell`, the same
- * `OrderMenuSection` rows, the same labels, working size selection, dish
- * search, and the same "Send order to the kitchen" button. The one difference
- * is deliberate — the button never calls the API. There is no import of the
- * order client here, so a preview cannot place an order even by accident; a
- * diner's real order needs a published menu and a scanned table card.
+ * It is the real thing wherever it can be: `OrderShell` (bare, like the
+ * table landing), the same `DinerCoverHeader`, the same `DinerSearchField`,
+ * the same `CategoryRail` + scroll-spy, the same `OrderMenuSection` rows,
+ * working size selection, and the same "Send order to the kitchen" button.
+ * The differences are deliberate and preview-only: the table is the constant
+ * "1" (a draft has no table yet), and the button never calls the API. There
+ * is no import of the order client here, so a preview cannot place an order
+ * even by accident; a diner's real order needs a published menu and a
+ * scanned table card.
  *
  * The page is mobile-shaped because that is how diners use it — and it stays
  * that way at every viewport width, since the frame is a phone: one column,
@@ -17,12 +20,9 @@
  * from the bottom of the phone screen when "View order" is pressed. A real
  * diner on a wide screen gets the sticky order column instead; a preview
  * inside a 340px frame never should.
- *
- * The table label is a constant ("1") because a draft has no table yet: the
- * preview shows where the table appears on a real card.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu } from "@/features/menu/search";
@@ -36,7 +36,17 @@ import {
 import { addLine, orderTotal, setLineQuantity, type OrderLine } from "@/features/orders/schema";
 import { formatTableLabel } from "@/features/orders/table-links";
 
-import { OrderMenuSection, OrderShell, StickyCartBar, formatOrderTotal } from "./order-menu";
+import {
+  CategoryRail,
+  DinerCoverHeader,
+  DinerSearchField,
+  OrderMenuSection,
+  OrderShell,
+  StickyCartBar,
+  formatOrderTotal,
+  scrollToCategory,
+  useScrollSpyCategory,
+} from "./order-menu";
 import { OrderSheet } from "./order-sheet";
 
 /** A draft has no table; the preview shows the one a real card would fill in. */
@@ -77,9 +87,24 @@ export function OrderPagePreview({
   const frame = "rounded-2xl border border-line-200 bg-surface-base";
   const search = searchMenu(doc, query);
   const searching = query.trim().length > 0;
-  const tableName = `${restaurantName?.trim() || "Your café"} · ${formatTableLabel(
-    PREVIEW_TABLE_LABEL
-  )}`;
+  const caféName = restaurantName?.trim() || "Your café";
+  const tableName = `${caféName} · ${formatTableLabel(PREVIEW_TABLE_LABEL)}`;
+  const resultText = searching
+    ? search.matchCount === 0
+      ? `No dishes match “${query.trim()}”.`
+      : `${search.matchCount} ${search.matchCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`
+    : null;
+
+  /** The sticky rail mirrors the visible sections, like the table landing. */
+  const railCategories = useMemo(
+    () =>
+      search.categories.map((match) => ({
+        id: `category-${match.category.id}`,
+        label: match.category.name,
+      })),
+    [search.categories]
+  );
+  const activeCategory = useScrollSpyCategory(railCategories.map((entry) => entry.id));
 
   function chosenVariantName(item: MenuItem): string | null {
     if (item.variants.length === 0) return null;
@@ -134,7 +159,7 @@ export function OrderPagePreview({
   }
 
   return (
-    <OrderShell tableLabel={PREVIEW_TABLE_LABEL}>
+    <OrderShell bare>
       <div className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3">
         <p className="text-[11px] font-semibold tracking-wide text-warning-900 uppercase">
           Preview · nothing is sent
@@ -150,38 +175,23 @@ export function OrderPagePreview({
         )}
       </div>
 
-      <div className="flex min-w-0 flex-col gap-4">
-        <div className={`${frame} p-5`}>
-          <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
-            {tableName}
-          </p>
-          <h2 className="mt-1 text-2xl font-bold text-ink-900">
-            {doc.title.trim() || "Untitled menu"}
-          </h2>
-          <p className="mt-1 text-sm text-ink-600">
-            Here&apos;s what&apos;s on — tap a dish to add it.
-          </p>
-        </div>
+      <DinerCoverHeader restaurantName={caféName} tableLabel={PREVIEW_TABLE_LABEL} />
 
-        <nav aria-label="Search the menu" className={`${frame} p-3`}>
-          <label className="block">
-            <span className="sr-only">Search dishes</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search dishes…"
-              className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
-            />
-          </label>
-          {searching && (
-            <p className="mt-2 text-xs text-ink-500" role="status">
-              {search.matchCount === 0
-                ? `No dishes match “${query.trim()}”.`
-                : `${search.matchCount} ${search.matchCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
-            </p>
-          )}
+      <div className="flex min-w-0 flex-col gap-4">
+        <nav aria-label="Search the menu">
+          <DinerSearchField
+            id="preview-dish-search"
+            value={query}
+            onChange={setQuery}
+            resultText={resultText}
+          />
         </nav>
+
+        <CategoryRail
+          categories={railCategories}
+          activeId={activeCategory}
+          onSelect={scrollToCategory}
+        />
 
         {doc.categories.length === 0 ? (
           <div className={`${frame} p-8 text-center`}>
@@ -200,16 +210,21 @@ export function OrderPagePreview({
           </div>
         ) : (
           search.categories.map((match) => (
-            <OrderMenuSection
+            <div
               key={match.category.id}
-              category={{ ...match.category, items: match.items }}
-              currency={doc.currency}
-              variantChoice={variantChoice}
-              onVariantChange={(itemId, name) =>
-                setVariantChoice((current) => ({ ...current, [itemId]: name }))
-              }
-              onAdd={addItem}
-            />
+              id={`category-${match.category.id}`}
+              className="scroll-mt-20"
+            >
+              <OrderMenuSection
+                category={{ ...match.category, items: match.items }}
+                currency={doc.currency}
+                variantChoice={variantChoice}
+                onVariantChange={(itemId, name) =>
+                  setVariantChoice((current) => ({ ...current, [itemId]: name }))
+                }
+                onAdd={addItem}
+              />
+            </div>
           ))
         )}
       </div>

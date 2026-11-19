@@ -15,10 +15,9 @@
 
 import { useEffect, useState } from "react";
 
-import { formatTableLabel } from "@/features/orders/table-links";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
-import { OrderShell, OrderSkeleton } from "./order-menu";
+import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderTracker } from "./order-tracker";
 import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "./table-order-tabs";
@@ -36,17 +35,6 @@ export interface TableLandingProps {
    * would flash and vanish once the confirmation arrives.
    */
   resumeToken: string | null;
-}
-
-/** What the heading says about this visit, in the diner's terms. */
-function landingSummary(menus: TableOrderMenu[], closedMenus: ClosedTableOrderMenu[]): string {
-  if (menus.length === 0) {
-    return closedMenus.length === 1
-      ? "Nothing is being served right now — opening hours are below."
-      : "Nothing is being served right now — tap a menu to see when it opens.";
-  }
-  if (menus.length === 1) return "Here’s what’s on — tap a dish to add it.";
-  return `${menus.length} menus are open — browse the tabs or search them all at once.`;
 }
 
 export function TableLanding({
@@ -88,7 +76,7 @@ export function TableLanding({
 
   if (resolving) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <OrderShell bare>
         <OrderSkeleton label="Finding your order…" />
       </OrderShell>
     );
@@ -96,7 +84,7 @@ export function TableLanding({
 
   if (placed) {
     return (
-      <OrderShell tableLabel={placed.order.tableLabel}>
+      <OrderShell bare>
         <OrderReceived
           order={placed.order}
           restaurantName={restaurantName}
@@ -116,7 +104,7 @@ export function TableLanding({
 
   if (resumeError) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <OrderShell bare>
         <div className={`${frame} p-8 text-center`}>
           <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
@@ -125,15 +113,12 @@ export function TableLanding({
     );
   }
 
+  // The cover names the restaurant and the table only — no helper copy.
+  // When nothing is served, the empty-state card below the tabs says so
+  // where the opening hours already live, not in the header.
   return (
-    <OrderShell tableLabel={tableLabel}>
-      <div className={`${frame} p-5`}>
-        <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
-          {restaurantName} · {formatTableLabel(tableLabel)}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
-        <p className="mt-1 text-sm text-ink-600">{landingSummary(menus, closedMenus)}</p>
-      </div>
+    <OrderShell bare>
+      <DinerCoverHeader restaurantName={restaurantName} tableLabel={tableLabel} />
 
       <TableOrderTabs
         restaurantName={restaurantName}

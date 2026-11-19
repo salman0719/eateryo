@@ -1,9 +1,10 @@
 /**
  * Shared diner-facing pieces of the table ordering screen: the page frame,
- * the add-to-order menu list, and total formatting. Used by both the local
- * (`/order`, IndexedDB) and server (`/r/<restaurant>/m/<menu>/order`,
- * published snapshot) flows so a diner sees the same menu whichever path
- * the café uses.
+ * the cover header, the search field, the category rail + scroll-spy, the
+ * add-to-order menu list, and total formatting. Used by the live table
+ * landing (`/r/<restaurant>/t/<table>`) and the owner preview
+ * (`OrderPagePreview`, a draft single menu with ordering off) so a diner
+ * sees the same menu whichever path the café uses.
  *
  * Deliberately free of editing chrome and of any storage import: the server
  * page must not pull IndexedDB code into its bundle just to render a menu.
@@ -14,6 +15,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "@/components/ui/brand";
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
@@ -25,6 +27,7 @@ import {
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { itemImageCopy } from "@/features/item-images/ref";
 import { ClampedDescription } from "./clamped-description";
 import { CustomizeSheet } from "./customize-sheet";
 import { MenuItemPhoto } from "./menu-item-photo";
@@ -63,24 +66,240 @@ export function OrderSkeleton({ label }: { label: string }) {
 
 export function OrderShell({
   tableLabel,
+  bare = false,
   children,
 }: {
   tableLabel?: string;
+  /**
+   * Diner pages hide the frame header (brand lockup + table pill): the
+   * cover header below already names the restaurant and the table, so the
+   * shell's row would repeat the table and add a second brand.
+   */
+  bare?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between gap-3">
-        <BrandLockup tagline="Order from your table" />
-        {tableLabel && (
-          <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
-            {formatTableLabel(tableLabel)}
-          </span>
-        )}
-      </header>
+      {!bare && (
+        <header className="flex items-center justify-between gap-3">
+          <BrandLockup tagline="Order from your table" />
+          {tableLabel && (
+            <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
+              {formatTableLabel(tableLabel)}
+            </span>
+          )}
+        </header>
+      )}
       {children}
     </div>
   );
+}
+
+/**
+ * Prototype A identity header for the diner pages: a slim cover band, an
+ * overlapping initial tile, the restaurant name, and one sub-line (the menu
+ * title on a single-menu page, the table summary on the landing page).
+ *
+ * There is no cover photo in the schema yet, so the band is a gradient drawn
+ * from the `accent` role tokens via `var(--color-accent-*)`: a theme change
+ * repaints it with no code change, and a photo later replaces the band's
+ * background only. The name always sits below the band — never on it — so
+ * any photo stays legible without a scrim. The table sits top-right of the
+ * band as a filled pill; `OrderShell` already carries it in non-bare mode.
+ */
+export function DinerCoverHeader({
+  restaurantName,
+  tableLabel,
+  subline,
+}: {
+  restaurantName: string;
+  /** The diner's table: a filled pill top-right of the cover band. */
+  tableLabel?: string;
+  /** One quiet line under the name: the menu title on a single-menu page. */
+  subline?: string;
+}) {
+  const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
+      <div
+        aria-hidden={tableLabel ? undefined : "true"}
+        className="relative h-24"
+        style={{
+          backgroundImage:
+            "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",
+        }}
+      >
+        {tableLabel && (
+          <span className="absolute top-3 right-3 rounded-full bg-surface-base px-3 py-1 text-xs font-semibold text-ink-900">
+            {formatTableLabel(tableLabel)}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3 px-5 pb-4">
+        <span
+          aria-hidden="true"
+          className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+        >
+          {initial}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg leading-snug font-bold text-ink-900">{restaurantName}</h1>
+          {subline && <p className="truncate text-sm text-ink-600">{subline}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The search field every diner ordering surface shares: the same input,
+ * the same placeholder, the same match-count line. `resultText` is the
+ * already-counted line (null hides it), so single- and multi-menu callers
+ * count differently but read identically.
+ */
+export function DinerSearchField({
+  value,
+  onChange,
+  placeholder = "Search dishes…",
+  resultText,
+  id = "diner-dish-search",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  /** The counted line under the input; null renders no line. */
+  resultText: string | null;
+  id?: string;
+}) {
+  return (
+    <>
+      <label className="block" htmlFor={id}>
+        <span className="sr-only">Search dishes</span>
+        <input
+          id={id}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+        />
+      </label>
+      {resultText !== null && (
+        <p className="mt-2 text-xs text-ink-500" role="status">
+          {resultText}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Jump to a category section, honouring reduced motion. */
+export function scrollToCategory(id: string) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
+/**
+ * Prototype A category rail: the sticky pill row above the dishes.
+ * `ScrollArrowStrip` owns the sideways scroll; this owns which pill reads
+ * active. Active follows the viewport (see `useScrollSpyCategory`); a tap
+ * jumps to that category's section.
+ */
+export function CategoryRail({
+  categories,
+  activeId,
+  onSelect,
+}: {
+  categories: { id: string; label: string }[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const railRef = useRef<HTMLDivElement>(null);
+  // Scrolling the dishes moves the active pill; keep that pill in view so
+  // the rail mirrors the section without the diner chasing it. block stays
+  // nearest so the page itself never jumps — only the sideways strip moves.
+  useEffect(() => {
+    if (!activeId) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    railRef.current
+      ?.querySelector('[aria-current="true"]')
+      ?.scrollIntoView({
+        block: "nearest",
+        inline: "center",
+        behavior: reduce ? "auto" : "smooth",
+      });
+  }, [activeId]);
+  if (categories.length === 0) return null;
+  return (
+    <div
+      ref={railRef}
+      className="sticky top-0 z-20 -mx-4 -mt-3 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur"
+    >
+      <ScrollArrowStrip label="Menu categories">
+        {categories.map((category) => {
+          const active = category.id === activeId;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              aria-current={active ? "true" : undefined}
+              onClick={() => onSelect(category.id)}
+              className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+                active
+                  ? "border-accent-700 bg-accent-700 text-on-accent shadow-sm"
+                  : "border-line-300 bg-surface-base text-ink-700 hover:border-accent-700 hover:text-accent-900"
+              }`}
+            >
+              {category.label}
+            </button>
+          );
+        })}
+      </ScrollArrowStrip>
+    </div>
+  );
+}
+
+/**
+ * Scroll-spy for the category rail: the id of the category nearest the top
+ * of the viewport. The band sits below the sticky rail and above the fold's
+ * bottom, so the pill changes as the diner moves through the menu, not after.
+ * When nothing intersects (fast fling between sections) the last answer
+ * stands instead of flickering to null.
+ */
+export function useScrollSpyCategory(ids: string[]): string | null {
+  const key = ids.join("|");
+  const [active, setActive] = useState<string | null>(() => ids[0] ?? null);
+  // The list is stable per document; when it does change, reset the pill
+  // with a render-time adjustment (the endorsed pattern), not an effect,
+  // so there is no cascading update.
+  const [watched, setWatched] = useState(key);
+  if (watched !== key) {
+    setWatched(key);
+    const list = key.split("|").filter(Boolean);
+    setActive((current) => (current && list.includes(current) ? current : (list[0] ?? null)));
+  }
+  useEffect(() => {
+    const list = key.split("|").filter(Boolean);
+    if (list.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const top = visible[0];
+        if (top && top.target.id) setActive(top.target.id);
+      },
+      { rootMargin: "-25% 0px -65% 0px" }
+    );
+    for (const id of list) {
+      const node = document.getElementById(id);
+      if (node) observer.observe(node);
+    }
+    return () => observer.disconnect();
+  }, [key]);
+  return active;
 }
 
 /**
@@ -137,12 +356,12 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
           {/* White reads on any owner photo; no theme role can name "light
               text over an arbitrary photo", so the raw utility stays on
               this bespoke banner with this comment (AGENTS.md). */}
-          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-lg font-bold text-white">
+          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-xl font-bold text-white">
             {category.name}
           </h2>
         </div>
       ) : (
-        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-lg font-bold tracking-wide text-ink-800 uppercase">
+        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-xl font-bold tracking-wide text-ink-800 uppercase">
           {category.name}
         </h2>
       )}
@@ -224,6 +443,9 @@ export function OrderMenuSection({
     setOptionError((current) => ({ ...current, [item.id]: null }));
     setCustomizingId(null);
   }
+  /** One photo in the list earns every row a thumb: photo rows keep their
+      image while the rest hold an initial tile, so the text stays aligned. */
+  const showPlaceholders = category.items.some((candidate) => itemImageCopy(candidate.image));
   const customizing =
     customizingId === null
       ? null
@@ -281,7 +503,7 @@ export function OrderMenuSection({
           return (
             <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-3">
-                <MenuItemPhoto item={item} />
+                <MenuItemPhoto item={item} showPlaceholder={showPlaceholders} />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>
@@ -359,7 +581,7 @@ export function OrderMenuSection({
                       }
                       setCustomizingId(item.id);
                     }}
-                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {addLabel}
                   </button>
