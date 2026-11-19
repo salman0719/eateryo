@@ -258,6 +258,14 @@ export function AppShell() {
    */
   const [captureView, setCaptureView] = useState<CaptureView>("capture");
 
+  /**
+   * The saved draft the publish stop works on. Set by the first press of
+   * Publish and cleared with the capture, so the stop is mounted here instead
+   * of being a route: publishing finishes the journey on the screen it was
+   * walked on. The routed publish screen remains for the magic link.
+   */
+  const [publishDraft, setPublishDraft] = useState<MenuDocument | null>(null);
+
   // The capture document — pages, extraction, the result under review and its
   // draft. It ends where the menu begins; this screen keeps the menu.
   const {
@@ -650,6 +658,7 @@ export function AppShell() {
   /** Start over: the result is gone, so the screen returns to the photos. */
   function handleClearCapture() {
     clearCapture();
+    setPublishDraft(null);
     setCaptureView("capture");
   }
 
@@ -661,17 +670,49 @@ export function AppShell() {
     }
   }
 
-  /** From the extraction result: save the draft, then open the publish wizard.
-   * The marker lets that screen continue the three-stop journey; a menu opened
-   * straight from the library gets a plain heading instead of a false "2 done". */
+  /**
+   * From the review stop: save the draft, then show the publish stop here.
+   * No navigation — capture's third stop is the wizard, so the URL stays put.
+   * The saved id is also the marker the routed screen (the magic link's
+   * landing) reads to continue the same three-stop journey.
+   */
   async function handleStartPublish() {
     try {
       const saved = await saveResultAndOpen(false);
       rememberPublishJourney(saved.id);
-      navigate({ screen: "editor", menuId: saved.id, mode: "publish" });
+      setPublishDraft(saved);
+      setCaptureView("publish");
     } catch (error) {
       showOpenError(error);
     }
+  }
+
+  /**
+   * The publish stop, built once and mounted twice: inside capture (third stop,
+   * under the rail, no tracker of its own) and on the routed publish screen a
+   * magic link returns to (its own page, so it carries the tracker).
+   */
+  function publishWizardStop(
+    doc: MenuDocument,
+    options: { onBack: () => void; backLabel: string; showJourney: boolean }
+  ) {
+    return (
+      <PublishWizard
+        key={doc.id}
+        doc={doc}
+        signedIn={signedIn}
+        sessionPending={sessionPending}
+        accountKey={accountKey}
+        ownedRestaurants={ownedRestaurantsForAccount}
+        restaurantsLoading={restaurantsLoading}
+        onPublished={handleWizardPublished}
+        onBack={options.onBack}
+        onOpenTables={() => navigate({ screen: "tables" })}
+        onOpenEditor={() => navigate({ screen: "editor", menuId: doc.id, mode: "edit" })}
+        showJourney={options.showJourney}
+        backLabel={options.backLabel}
+      />
+    );
   }
 
   const assistantPending = sessionPending || (signedIn && featureFlagsLoading);
@@ -1434,21 +1475,11 @@ export function AppShell() {
                 </p>
               )}
               {editorMode === "publish" && activeMenuCanPublish ? (
-                <PublishWizard
-                  key={routedDoc.id}
-                  doc={routedDoc}
-                  signedIn={signedIn}
-                  sessionPending={sessionPending}
-                  accountKey={accountKey}
-                  ownedRestaurants={ownedRestaurantsForAccount}
-                  restaurantsLoading={restaurantsLoading}
-                  onPublished={handleWizardPublished}
-                  onBack={() => navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" })}
-                  onOpenTables={() => navigate({ screen: "tables" })}
-                  onOpenEditor={() =>
-                    navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
-                  }
-                />
+                publishWizardStop(routedDoc, {
+                  onBack: () => navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" }),
+                  backLabel: "← Back to editing",
+                  showJourney: true,
+                })
               ) : (
                 <MenuEditor
                   doc={routedDoc}
@@ -1543,6 +1574,15 @@ export function AppShell() {
           onRenameTitle={handleRenameResultTitle}
           onPublish={
             source === "demo" || draftSave === "saved" ? () => void handleStartPublish() : undefined
+          }
+          publishSlot={
+            publishDraft
+              ? publishWizardStop(publishDraft, {
+                  onBack: () => setCaptureView("review"),
+                  backLabel: "← Back to review",
+                  showJourney: false,
+                })
+              : null
           }
         />
       )}

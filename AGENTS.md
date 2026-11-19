@@ -334,7 +334,11 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   nothing read, reading, read — and a return visit shows the read summary
   (counts, saved notice, **Continue to review**) instead of a fresh call; only
   the explicit, confirmed **Extract again** re-reads. Review is only a screen
-  when there is a result, so a missing result falls back to the work stop.
+  when there is a result, so a missing result falls back to the work stop, and
+  the publish stop is only a screen once the shell has mounted its wizard
+  (`publishSlot`), so a stale `publish` view falls back the same way. The rail
+  leads every stop, above the heading, so Publish finishes the journey on the
+  screen it was walked on instead of on a page of its own.
   Signed out with an empty page it renders the entry
   composition (one promise, the photo field, three claims the app actually
   keeps; two columns from `lg`, one on a phone so the field is never below the
@@ -367,7 +371,14 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   "2 done". `CaptureStepRail`
   (`src/components/upload/capture-step-rail.tsx`) is the clickable version
   capture uses in the working layout; `JourneySteps` is the passive one on the
-  signed-out front door and in the wizard.
+  signed-out front door and on the routed publish screen. Both are full-width
+  bars: each stop owns a third of the row and a connector line runs into the
+  next one. Capture mounts the publish stop in place (`publishSlot`), so
+  pressing Publish keeps the URL and the rail; `/menus/:id/publish` still
+  renders the same wizard, because that is where the magic link returns a
+  signed-out owner — the only place the wizard shows its own tracker. The
+  rail is a `nav` with `aria-current="step"`, not a tablist: the connector
+  line has to sit beside each button, which a tablist cannot hold.
 - `src/components/ui/icons.tsx` — the hand-drawn icon set (no icon
   dependency): stroked 24-grid glyphs that inherit `currentColor` and are
   `aria-hidden`, so the control around them carries the label. Starts with
