@@ -1052,11 +1052,23 @@ export function MenuEditor({
             />
           )}
           {doc.categories.length === 0 ? (
+            // A menu started from scratch has no categories, so the strip above
+            // (which carries "+ Category") is not rendered yet: the first
+            // category is added here, where the empty canvas is, instead of
+            // pointing at a control that isn't on the screen.
             <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
               <p className="font-medium text-ink-900">No categories yet</p>
-              <p className="mt-1 text-sm text-ink-600">
-                Add a category above, then add items to it.
+              <p className="mx-auto mt-1 max-w-sm text-sm text-ink-600">
+                A category is the group a menu is read in — “Coffee”, “Mains”, “Desserts”. Add the
+                first one, then add dishes to it.
               </p>
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                + Add category
+              </button>
             </div>
           ) : isFiltering ? (
             <div className="flex flex-col gap-2">

@@ -113,7 +113,7 @@ export function clearWizardState(menuId: string): void {
 /**
  * Whether publish was opened from the review screen.
  *
- * The publish screen continues the same four-stop journey only when the
+ * The publish screen continues the same three-stop journey only when the
  * flow came through upload, extraction and review. A menu opened straight
  * from My menus has no marker, so it gets a plain heading rather than a
  * tracker claiming three stops are done. The marker lives in localStorage

@@ -253,7 +253,19 @@ export function useCapture(options: CaptureOptions) {
     options.revealResult();
   }
 
-  function handleExtract() {
+  /**
+   * Read the selected pages. A read that already produced this draft is not
+   * repeated implicitly: pressing again replaces the draft (and any review
+   * edits) and spends another AI call, so it asks first.
+   */
+  async function handleExtract() {
+    if (phase === "extracting") return;
+    if (extracted !== null || resultDoc !== null) {
+      const ok = await options.confirmDiscard(
+        "Extract again? This replaces the current draft and any review edits, and spends another AI call."
+      );
+      if (!ok) return;
+    }
     void extractFiles(pages.map((page) => page.file));
   }
 
