@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentProps, RefObject } from "react";
+import type { ComponentProps, ReactNode, RefObject } from "react";
 
 import { Attention } from "@/components/ui/attention";
 import { JourneySteps } from "@/components/ui/journey-steps";
@@ -16,8 +16,12 @@ import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
 /** The capture flow's phase, shared with the shell that owns the extraction. */
 export type CapturePhase = "upload" | "ready" | "extracting" | "done";
 
-/** Capture's two stops. Publish is the wizard, a screen of its own. */
-export type CaptureView = "capture" | "review";
+/**
+ * Capture's three stops. Publish is the wizard, mounted here as the last stop
+ * so pressing Publish does not leave the screen; its own URL still exists for
+ * the magic link that brings a signed-out owner back.
+ */
+export type CaptureView = "capture" | "review" | "publish";
 
 type ResultProps = ComponentProps<typeof ExtractionResult>;
 
@@ -42,6 +46,11 @@ export interface CapturePageProps {
    */
   view: CaptureView;
   onViewChange: (view: CaptureView) => void;
+  /**
+   * The publish stop, mounted by the shell once the draft is saved. Null means
+   * there is nothing to publish yet, so the stop cannot be opened.
+   */
+  publishSlot?: ReactNode;
   phase: CapturePhase;
   pages: PageImage[];
   fileError: string | null;
@@ -114,6 +123,7 @@ export function CapturePage({
   sessionPending,
   view,
   onViewChange,
+  publishSlot = null,
   phase,
   pages,
   fileError,
@@ -150,17 +160,20 @@ export function CapturePage({
    */
   const entering = !signedIn && !sessionPending && phase === "upload" && pages.length === 0;
 
+  /** Publish is only a screen once the shell has mounted its wizard. */
+  const publishOpen = view === "publish" && publishSlot !== null;
   /** Review is only a screen once there is something to review. */
-  const reviewOpen = view === "review" && result !== null;
+  const reviewOpen = !publishOpen && view === "review" && result !== null;
   const extracting = phase === "extracting";
 
   const dishCount =
     result?.categories.reduce((sum, category) => sum + category.items.length, 0) ?? 0;
   const categoryCount = result?.categories.length ?? 0;
 
+  const currentStop: CaptureStop = publishOpen ? "publish" : reviewOpen ? "review" : "capture";
   const reachable = new Set<CaptureStop>(["capture"]);
   if (result !== null) reachable.add("review");
-  if (onPublish) reachable.add("publish");
+  if (onPublish || publishSlot !== null) reachable.add("publish");
 
   const savedNotice =
     source === "ai" && draftSave === "saved"
@@ -172,7 +185,10 @@ export function CapturePage({
         : null;
 
   function selectStop(stop: CaptureStop) {
-    if (stop === "publish") {
+    if (stop === currentStop) return;
+    // The shell saves the draft before it can mount the wizard, so an unopened
+    // Publish stop is an action, not a view change.
+    if (stop === "publish" && publishSlot === null) {
       onPublish?.();
       return;
     }
@@ -237,33 +253,33 @@ export function CapturePage({
         </div>
       ) : (
         <>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-              {reviewOpen ? "Check what the AI read" : "Turn your photo into a menu"}
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-              {reviewOpen
-                ? "Fix anything the read got wrong — prices, names, descriptions. Nothing is published until you say so."
-                : "Upload a photo or scan, and the read happens on this screen. Then you check it, correct it, and publish."}
-            </p>
-            {!signedIn && !sessionPending && !reviewOpen && (
-              <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
-                You can upload and review first. Publishing needs an account — we’ll email you a
-                sign-in link, and your draft stays in this browser.
+          {/* The rail leads: it is the same three stops on every one of them. */}
+          <CaptureStepRail current={currentStop} reachable={reachable} onSelect={selectStop} />
+          {publishOpen ? (
+            <div>{publishSlot}</div>
+          ) : (
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
+                {reviewOpen ? "Check what the AI read" : "Turn your photo into a menu"}
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
+                {reviewOpen
+                  ? "Fix anything the read got wrong — prices, names, descriptions. Nothing is published until you say so."
+                  : "Upload a photo or scan, and the read happens on this screen. Then you check it, correct it, and publish."}
               </p>
-            )}
-          </div>
-
-          <CaptureStepRail
-            current={reviewOpen ? "review" : "capture"}
-            reachable={reachable}
-            onSelect={selectStop}
-          />
+              {!signedIn && !sessionPending && !reviewOpen && (
+                <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
+                  You can upload and review first. Publishing needs an account — we’ll email you a
+                  sign-in link, and your draft stays in this browser.
+                </p>
+              )}
+            </div>
+          )}
         </>
       )}
 
       {/* ------------------------------- stop 1 ------------------------------- */}
-      {!entering && !reviewOpen && (
+      {!entering && !reviewOpen && !publishOpen && (
         <>
           {pages.length === 0 && phase === "upload" && result === null && (
             <div className="flex flex-col gap-3">

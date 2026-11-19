@@ -1,4 +1,4 @@
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -45,7 +45,12 @@ const PAGES: PageImage[] = [
 ];
 
 function render(
-  overrides: { view?: CaptureView; result?: PreviewMenu | null; pages?: PageImage[] } = {}
+  overrides: {
+    view?: CaptureView;
+    result?: PreviewMenu | null;
+    pages?: PageImage[];
+    publishSlot?: ReactNode;
+  } = {}
 ) {
   return renderToStaticMarkup(
     createElement(CapturePage, {
@@ -53,6 +58,7 @@ function render(
       sessionPending: false,
       view: overrides.view ?? "capture",
       onViewChange: noop,
+      publishSlot: overrides.publishSlot ?? null,
       phase: "done",
       pages: overrides.pages ?? PAGES,
       fileError: null,
@@ -123,6 +129,25 @@ describe("capture stops", () => {
   it("shows Publish as a stop but does not open it before there is a draft", () => {
     const html = render();
     expect(html).toContain("Publish");
+    expect(html.match(/disabled=""/g)).toHaveLength(1);
+  });
+
+  it("renders the publish stop in place of the review once the shell mounts it", () => {
+    const html = render({
+      view: "publish",
+      publishSlot: createElement("p", null, "Publish my menu"),
+    });
+    expect(html).toContain("Publish my menu");
+    expect(html).not.toContain("Check what the AI read");
+    expect(html).not.toContain("Extract again");
+    // Every stop is now reachable, so none of them is disabled.
+    expect(html).not.toContain('disabled=""');
+  });
+
+  it("does not open the publish stop when there is no wizard to mount", () => {
+    const html = render({ view: "publish" });
+    // Back to the work stop, which still holds the read.
+    expect(html).toContain("Read 2 dishes in 1 category");
     expect(html.match(/disabled=""/g)).toHaveLength(1);
   });
 });
