@@ -15,10 +15,9 @@
 
 import { useEffect, useState } from "react";
 
-import { formatTableLabel } from "@/features/orders/table-links";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
-import { OrderShell, OrderSkeleton } from "./order-menu";
+import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderTracker } from "./order-tracker";
 import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "./table-order-tabs";
@@ -127,13 +126,10 @@ export function TableLanding({
 
   return (
     <OrderShell tableLabel={tableLabel}>
-      <div className={`${frame} p-5`}>
-        <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
-          {restaurantName} · {formatTableLabel(tableLabel)}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
-        <p className="mt-1 text-sm text-ink-600">{landingSummary(menus, closedMenus)}</p>
-      </div>
+      <DinerCoverHeader
+        restaurantName={restaurantName}
+        subline={landingSummary(menus, closedMenus)}
+      />
 
       <TableOrderTabs
         restaurantName={restaurantName}

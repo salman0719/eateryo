@@ -38,6 +38,7 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import {
+  DinerCoverHeader,
   OrderMenuSection,
   OrderShell,
   OrderSkeleton,
@@ -90,7 +91,6 @@ export function ServerTableOrder({
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
   function chosenVariantName(item: MenuItem): string | null {
     if (item.variants.length === 0) return null;
@@ -296,17 +296,10 @@ export function ServerTableOrder({
     <OrderShell tableLabel={tableLabel}>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <div className={`${frame} p-5`}>
-            <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
-              {restaurantName} · {formatTableLabel(tableLabel)}
-            </p>
-            <h1 className="mt-1 text-2xl font-bold text-ink-900">
-              {doc.title.trim() || "Untitled menu"}
-            </h1>
-            <p className="mt-1 text-sm text-ink-600">
-              Tap a dish to add it. No account or app needed.
-            </p>
-          </div>
+          <DinerCoverHeader
+            restaurantName={restaurantName}
+            subline={doc.title.trim() || undefined}
+          />
 
           {doc.categories.map((category) => (
             <OrderMenuSection
