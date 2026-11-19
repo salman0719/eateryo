@@ -199,12 +199,15 @@ export function CapturePage({
     <>
       {entering ? (
         /**
-         * One column on a phone — headline, the photo field, then the
-         * promises — so the only action is never pushed below the fold. Two
-         * columns from `lg`, where the field gets a column of its own.
+         * One column on a phone — headline, the three stops, the photo field,
+         * then the promises — so the only action is never pushed below the
+         * fold. The stepper is a row of its own at the full content width, not
+         * a note inside the headline column: three stops confined to half a
+         * column wrap their own labels, which is what made this look broken.
+         * Two columns from `lg`, where the field gets a column of its own.
          */
-        <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] lg:items-start lg:gap-x-12 lg:gap-y-8">
-          <div className="order-1 lg:col-start-1 lg:row-start-1">
+        <div className="flex flex-col gap-8">
+          <div>
             <p className="text-xs font-semibold tracking-[0.16em] text-accent-700 uppercase">
               Photo in, orders out
             </p>
@@ -215,40 +218,43 @@ export function CapturePage({
               Upload the photo you already have. AI types out the categories, dishes and prices, you
               correct anything it read wrong, and publishing puts a QR code on every table.
             </p>
-            <JourneySteps current={0} className="mt-6 max-w-xl" />
           </div>
 
-          <div className="order-2 flex flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            <Dropzone onSelect={onSelectFiles} />
-            {fileError && <FileErrorNotice message={fileError} />}
-            <p className="text-center text-sm text-ink-500">
-              No menu handy?{" "}
-              <button
-                type="button"
-                onClick={onDemo}
-                className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-              >
-                Preview with demo data
-              </button>
-            </p>
-          </div>
+          <JourneySteps current={0} />
 
-          <div className="order-3 lg:col-start-1 lg:row-start-2">
-            <ul className="flex max-w-xl flex-col gap-3">
-              {ENTRY_POINTS.map((point) => (
-                <li key={point} className="flex gap-3 text-sm leading-6 text-ink-700">
-                  <span
-                    aria-hidden="true"
-                    className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-700"
-                  />
-                  {point}
-                </li>
-              ))}
-            </ul>
-            <p className="mt-5 max-w-xl text-xs leading-5 text-ink-500">
-              Free while it lasts — no card, no payment step. Publishing needs a sign-in link sent
-              to your email, and until you publish your draft stays in this browser.
-            </p>
+          <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] lg:items-start lg:gap-x-12">
+            <div className="order-1 flex flex-col gap-3 lg:order-2 lg:col-start-2 lg:row-start-1">
+              <Dropzone onSelect={onSelectFiles} />
+              {fileError && <FileErrorNotice message={fileError} />}
+              <p className="text-center text-sm text-ink-500">
+                No menu handy?{" "}
+                <button
+                  type="button"
+                  onClick={onDemo}
+                  className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  Preview with demo data
+                </button>
+              </p>
+            </div>
+
+            <div className="order-2 lg:order-1 lg:col-start-1 lg:row-start-1">
+              <ul className="flex max-w-xl flex-col gap-3">
+                {ENTRY_POINTS.map((point) => (
+                  <li key={point} className="flex gap-3 text-sm leading-6 text-ink-700">
+                    <span
+                      aria-hidden="true"
+                      className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-700"
+                    />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-5 max-w-xl text-xs leading-5 text-ink-500">
+                Free while it lasts — no card, no payment step. Publishing needs a sign-in link sent
+                to your email, and until you publish your draft stays in this browser.
+              </p>
+            </div>
           </div>
         </div>
       ) : (

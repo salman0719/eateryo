@@ -14,10 +14,11 @@ import { JOURNEY_STEPS, journeyStepStatus } from "@/features/onboarding/journey"
  * it is usable reads as a different screen each time.
  *
  * A row, not tabs: the three stops are navigation and they span the screen,
- * each stop owning a third of it with the connector line running into the next
- * one. That needs the line to sit beside the button, which a tablist cannot
- * hold — so the semantics are `nav` + `aria-current="step"`, which is what the
- * levels actually are.
+ * the connector line taking up all the slack between one label and the next.
+ * That needs the line to sit beside the button, which a tablist cannot hold —
+ * so the semantics are `nav` + `aria-current="step"`, which is what the levels
+ * actually are. Labels stay on one line and truncate rather than wrap: a
+ * wrapped label puts the stops at different heights, which reads as broken.
  *
  * Presentational: the page owns which stop is showing and what is reachable.
  */
@@ -42,8 +43,12 @@ export function CaptureStepRail({
         {STOP_ORDER.map((stop, index) => {
           const status = journeyStepStatus(index, currentIndex);
           const open = reachable.has(stop);
+          const last = index === STOP_ORDER.length - 1;
           return (
-            <li key={stop} className="flex min-w-0 flex-1 items-center gap-2">
+            <li
+              key={stop}
+              className={["flex min-w-0 items-center gap-2", last ? "shrink-0" : "grow"].join(" ")}
+            >
               <button
                 type="button"
                 aria-current={status === "current" ? "step" : undefined}
@@ -52,7 +57,7 @@ export function CaptureStepRail({
                   if (open) onSelect(stop);
                 }}
                 className={[
-                  "flex min-w-0 items-center gap-2 rounded-full px-2 py-1.5 text-sm transition-colors",
+                  "flex min-w-0 items-center gap-1.5 rounded-full px-1 py-1.5 text-xs transition-colors sm:gap-2 sm:px-2 sm:text-sm",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700",
                   status === "current"
                     ? "bg-accent-100 font-semibold text-accent-900"
@@ -66,7 +71,7 @@ export function CaptureStepRail({
                 <span
                   aria-hidden="true"
                   className={[
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold sm:h-6 sm:w-6 sm:text-[11px]",
                     status === "upcoming"
                       ? "border border-line-300 bg-surface-base text-ink-600"
                       : "bg-accent-700 text-on-accent",
@@ -74,13 +79,13 @@ export function CaptureStepRail({
                 >
                   {status === "done" ? "✓" : index + 1}
                 </span>
-                <span className="min-w-0 truncate">{JOURNEY_STEPS[index]}</span>
+                <span className="min-w-0 truncate whitespace-nowrap">{JOURNEY_STEPS[index]}</span>
               </button>
-              {index < STOP_ORDER.length - 1 && (
+              {!last && (
                 <span
                   aria-hidden="true"
                   className={[
-                    "h-px min-w-3 flex-1 rounded-full",
+                    "h-px min-w-1 flex-1 rounded-full sm:min-w-4",
                     index < currentIndex ? "bg-accent-300" : "bg-line-300",
                   ].join(" ")}
                 />

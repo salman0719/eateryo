@@ -11,9 +11,14 @@ import { JOURNEY_STEPS, journeyStepStatus } from "@/features/onboarding/journey"
  * Upload and extraction share a stop: the read is an action inside the photo
  * step, so there is no stop that can be returned to and re-triggered.
  *
- * Full width by design: the stop, its label and the line that leads to the
- * next stop each take an equal third, so the bar reads as one span from the
- * first step to the last instead of a cluster around the current one.
+ * Full width by design: every stop but the last holds a flexible connector,
+ * so the lines take up all the slack and the bar ends on the final label at
+ * the right edge instead of clustering around the current step. The stops
+ * `grow` from their own content width rather than splitting into equal
+ * thirds — equal thirds squeeze "Upload & extract" into an ellipsis on a
+ * phone even when the row has room to spare. Labels stay on one line and
+ * truncate rather than wrap: a wrapped label makes the stops stand at
+ * different heights, which is what a broken stepper looks like.
  *
  * States follow the checkout convention: the current stop is filled, done
  * stops carry a check, and upcoming stops stay outlined and low-emphasis
@@ -32,12 +37,16 @@ export function JourneySteps({
   return (
     <ol
       aria-label="Getting your menu live"
-      className={["flex w-full items-start", className].filter(Boolean).join(" ")}
+      className={["flex w-full items-center gap-2 sm:gap-3", className].filter(Boolean).join(" ")}
     >
       {JOURNEY_STEPS.map((label, index) => {
         const status = journeyStepStatus(index, current);
+        const last = index === JOURNEY_STEPS.length - 1;
         return (
-          <li key={label} className="flex min-w-0 flex-1 items-center gap-2">
+          <li
+            key={label}
+            className={["flex min-w-0 items-center gap-2", last ? "shrink-0" : "grow"].join(" ")}
+          >
             <span
               aria-current={status === "current" ? "step" : undefined}
               className={[
@@ -58,7 +67,7 @@ export function JourneySteps({
             </span>
             <span
               className={[
-                "min-w-0 text-[11px] leading-tight sm:text-sm",
+                "min-w-0 truncate text-[11px] whitespace-nowrap leading-tight sm:text-sm",
                 status === "current"
                   ? "font-semibold text-ink-900"
                   : status === "done"
@@ -68,11 +77,11 @@ export function JourneySteps({
             >
               {label}
             </span>
-            {index < JOURNEY_STEPS.length - 1 && (
+            {!last && (
               <span
                 aria-hidden="true"
                 className={[
-                  "h-px min-w-3 flex-1 rounded-full",
+                  "h-px min-w-4 flex-1 rounded-full",
                   index < current ? "bg-accent-300" : "bg-line-300",
                 ].join(" ")}
               />

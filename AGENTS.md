@@ -372,8 +372,13 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   (`src/components/upload/capture-step-rail.tsx`) is the clickable version
   capture uses in the working layout; `JourneySteps` is the passive one on the
   signed-out front door and on the routed publish screen. Both are full-width
-  bars: each stop owns a third of the row and a connector line runs into the
-  next one. Capture mounts the publish stop in place (`publishSlot`), so
+  bars: the connector line takes up the slack between one label and the next,
+  and the stops `grow` from their own content width instead of splitting into
+  equal thirds — equal thirds truncated "Upload & extract" on a phone while
+  the row still had room. Labels stay on one line and truncate rather than
+  wrap; a wrapped label puts the stops at different heights. On the signed-out
+  entry the bar is a row of its own at the content width, never a note inside
+  the headline column. Capture mounts the publish stop in place (`publishSlot`), so
   pressing Publish keeps the URL and the rail; `/menus/:id/publish` still
   renders the same wizard, because that is where the magic link returns a
   signed-out owner — the only place the wizard shows its own tracker. The
