@@ -158,9 +158,6 @@ export function OrderPagePreview({
           <h2 className="mt-1 text-2xl font-bold text-ink-900">
             {doc.title.trim() || "Untitled menu"}
           </h2>
-          <p className="mt-1 text-sm text-ink-600">
-            Here&apos;s what&apos;s on — tap a dish to add it.
-          </p>
         </div>
 
         <nav aria-label="Search the menu" className={`${frame} p-3`}>
