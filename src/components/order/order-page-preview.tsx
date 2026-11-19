@@ -182,7 +182,7 @@ export function OrderPagePreview({
       />
 
       <div className="flex min-w-0 flex-col gap-4">
-        <nav aria-label="Search the menu" className={`${frame} p-3`}>
+        <nav aria-label="Search the menu">
           <DinerSearchField
             id="preview-dish-search"
             value={query}

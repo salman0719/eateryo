@@ -171,7 +171,7 @@ export function DinerSearchField({
   id?: string;
 }) {
   return (
-    <div>
+    <>
       <label className="block" htmlFor={id}>
         <span className="sr-only">Search dishes</span>
         <input
@@ -188,7 +188,7 @@ export function DinerSearchField({
           {resultText}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
