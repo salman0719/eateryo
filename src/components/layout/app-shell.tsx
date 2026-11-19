@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { SessionLoader } from "./session-loader";
 import { ShellFrame } from "./shell-frame";
 import { AssistantPage } from "@/components/pages/assistant-page";
-import { CapturePage } from "@/components/pages/capture-page";
+import { CapturePage, type CaptureView } from "@/components/pages/capture-page";
 import { MenusPage } from "@/components/pages/menus-page";
 import { OrdersPage } from "@/components/pages/orders-page";
 import { SettingsPage } from "@/components/pages/settings-page";
@@ -95,14 +95,6 @@ import {
   forgetPendingNewMenu,
   isPendingNewMenu,
 } from "@/features/menus/routed-doc";
-
-type Phase = "upload" | "ready" | "extracting" | "done";
-
-function stepIndex(phase: Phase, hasResult: boolean): number {
-  if (hasResult || phase === "done") return 2;
-  if (phase === "ready" || phase === "extracting") return 1;
-  return 0;
-}
 
 /**
  * The app's shell — what every `(app)/` route file renders, and the last place
@@ -258,6 +250,14 @@ export function AppShell() {
     onServerRevision,
   });
 
+  /**
+   * Which capture stop is on screen. Client state, not a route: capture is
+   * one address, and the two stops are views of one piece of work. Entering
+   * review is driven by the extraction finishing (through `revealResult`),
+   * and going back is the rail — never a fresh read.
+   */
+  const [captureView, setCaptureView] = useState<CaptureView>("capture");
+
   // The capture document — pages, extraction, the result under review and its
   // draft. It ends where the menu begins; this screen keeps the menu.
   const {
@@ -294,7 +294,10 @@ export function AppShell() {
     ensureServerTarget,
     cacheServerDraft,
     pruneSignedOutOthers,
-    revealResult: scrollToResult,
+    revealResult: () => {
+      setCaptureView("review");
+      scrollToResult();
+    },
     reportError: reportLibraryError,
   });
   /**
@@ -638,8 +641,16 @@ export function AppShell() {
     const doc = await resumeDraft(menuId);
     if (!doc) return;
     setResumeDismissed(true);
+    // A resumed draft is a result, and the result lives on the review stop.
+    setCaptureView("review");
     navigate({ screen: "capture" });
     scrollToResult();
+  }
+
+  /** Start over: the result is gone, so the screen returns to the photos. */
+  function handleClearCapture() {
+    clearCapture();
+    setCaptureView("capture");
   }
 
   async function handleEditResult() {
@@ -663,7 +674,6 @@ export function AppShell() {
     }
   }
 
-  const activeStep = stepIndex(phase, result !== null);
   const assistantPending = sessionPending || (signedIn && featureFlagsLoading);
 
   // Sign-out is a privacy boundary: stamped rows belong to their owner and
@@ -1502,7 +1512,8 @@ export function AppShell() {
         <CapturePage
           signedIn={signedIn}
           sessionPending={sessionPending}
-          step={activeStep}
+          view={captureView}
+          onViewChange={setCaptureView}
           phase={phase}
           pages={pages}
           fileError={fileError}
@@ -1524,7 +1535,7 @@ export function AppShell() {
           draftSave={draftSave}
           draftOnServer={resultDoc ? serverIds.has(resultDoc.id) : false}
           initialReviewCount={initialReviewCount}
-          onClear={clearCapture}
+          onClear={handleClearCapture}
           onEdit={() => void handleEditResult()}
           onResolveItem={handleResolveResultItem}
           onResolveAll={handleResolveAllResultItems}
