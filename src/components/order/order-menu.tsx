@@ -137,12 +137,12 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
           {/* White reads on any owner photo; no theme role can name "light
               text over an arbitrary photo", so the raw utility stays on
               this bespoke banner with this comment (AGENTS.md). */}
-          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-lg font-bold text-white">
+          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-xl font-bold text-white">
             {category.name}
           </h2>
         </div>
       ) : (
-        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-lg font-bold tracking-wide text-ink-800 uppercase">
+        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-xl font-bold tracking-wide text-ink-800 uppercase">
           {category.name}
         </h2>
       )}
