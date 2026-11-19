@@ -104,8 +104,8 @@ export function OrderShell({
  * from the `accent` role tokens via `var(--color-accent-*)`: a theme change
  * repaints it with no code change, and a photo later replaces the band's
  * background only. The name always sits below the band — never on it — so
- * any photo stays legible without a scrim. The table pill is not repeated
- * here; `OrderShell` already carries it.
+ * any photo stays legible without a scrim. The table sits top-right of the
+ * band as a filled pill; `OrderShell` already carries it in non-bare mode.
  */
 export function DinerCoverHeader({
   restaurantName,
@@ -113,22 +113,28 @@ export function DinerCoverHeader({
   subline,
 }: {
   restaurantName: string;
-  /** The diner's table: rendered under the name, never in the shell header. */
+  /** The diner's table: a filled pill top-right of the cover band. */
   tableLabel?: string;
-  /** One quiet line under the table: the menu title on a single-menu page. */
+  /** One quiet line under the name: the menu title on a single-menu page. */
   subline?: string;
 }) {
   const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
   return (
     <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
       <div
-        aria-hidden="true"
-        className="h-24"
+        aria-hidden={tableLabel ? undefined : "true"}
+        className="relative h-24"
         style={{
           backgroundImage:
             "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",
         }}
-      />
+      >
+        {tableLabel && (
+          <span className="absolute top-3 right-3 rounded-full bg-surface-base px-3 py-1 text-xs font-semibold text-ink-900">
+            {formatTableLabel(tableLabel)}
+          </span>
+        )}
+      </div>
       <div className="flex items-center gap-3 px-5 pb-4">
         <span
           aria-hidden="true"
@@ -138,11 +144,6 @@ export function DinerCoverHeader({
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg leading-snug font-bold text-ink-900">{restaurantName}</h1>
-          {tableLabel && (
-            <p className="truncate text-sm font-semibold text-ink-700">
-              {formatTableLabel(tableLabel)}
-            </p>
-          )}
           {subline && <p className="truncate text-sm text-ink-600">{subline}</p>}
         </div>
       </div>
