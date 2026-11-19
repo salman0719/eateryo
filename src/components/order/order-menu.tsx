@@ -25,6 +25,7 @@ import {
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
+import { itemImageCopy } from "@/features/item-images/ref";
 import { ClampedDescription } from "./clamped-description";
 import { CustomizeSheet } from "./customize-sheet";
 import { MenuItemPhoto } from "./menu-item-photo";
@@ -224,6 +225,9 @@ export function OrderMenuSection({
     setOptionError((current) => ({ ...current, [item.id]: null }));
     setCustomizingId(null);
   }
+  /** One photo in the list earns every row a thumb: photo rows keep their
+      image while the rest hold an initial tile, so the text stays aligned. */
+  const showPlaceholders = category.items.some((candidate) => itemImageCopy(candidate.image));
   const customizing =
     customizingId === null
       ? null
@@ -281,7 +285,7 @@ export function OrderMenuSection({
           return (
             <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
               <div className="flex items-start justify-between gap-3">
-                <MenuItemPhoto item={item} />
+                <MenuItemPhoto item={item} showPlaceholder={showPlaceholders} />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span>{item.name}</span>

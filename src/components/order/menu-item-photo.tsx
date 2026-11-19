@@ -13,9 +13,31 @@
 import { itemImageCopy } from "@/features/item-images/ref";
 import type { MenuItem } from "@/features/menu/schema";
 
-export function MenuItemPhoto({ item }: { item: MenuItem }) {
+export function MenuItemPhoto({
+  item,
+  showPlaceholder = false,
+}: {
+  item: MenuItem;
+  /**
+   * Render an initial tile when this dish has no photo. The list opts in
+   * only when a sibling carries a photo, so text-only categories stay
+   * text-only while mixed rows keep their thumbs aligned.
+   */
+  showPlaceholder?: boolean;
+}) {
   const copy = itemImageCopy(item.image);
-  if (!copy) return null;
+  if (!copy) {
+    if (!showPlaceholder) return null;
+    const initial = item.name.trim().charAt(0).toUpperCase() || "?";
+    return (
+      <span
+        aria-hidden="true"
+        className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg border border-line-200 bg-surface-100 text-xl font-bold text-ink-400"
+      >
+        {initial}
+      </span>
+    );
+  }
 
   return (
     // eslint-disable-next-line @next/next/no-img-element -- dish photo served straight from the CDN at its stored size; the optimizer must never touch it
