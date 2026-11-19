@@ -217,19 +217,26 @@ export function CategoryRail({
   onSelect: (id: string) => void;
 }) {
   const railRef = useRef<HTMLDivElement>(null);
-  // Scrolling the dishes moves the active pill; keep that pill in view so
-  // the rail mirrors the section without the diner chasing it. block stays
-  // nearest so the page itself never jumps — only the sideways strip moves.
+  // Scrolling the dishes moves the active pill; keep that pill in view so the
+  // rail mirrors the section without the diner chasing it. The strip is what
+  // scrolls, never the page: `scrollIntoView` walks every scrollable ancestor,
+  // so where the rail starts below the fold — the embedded preview in capture's
+  // review and publish stops — it dragged the whole page down to the pill row.
   useEffect(() => {
     if (!activeId) return;
+    const track = railRef.current?.querySelector<HTMLElement>('[role="region"], nav[aria-label]');
+    const pill = track?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!track || !pill) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    railRef.current
-      ?.querySelector('[aria-current="true"]')
-      ?.scrollIntoView({
-        block: "nearest",
-        inline: "center",
-        behavior: reduce ? "auto" : "smooth",
-      });
+    const trackBox = track.getBoundingClientRect();
+    const pillBox = pill.getBoundingClientRect();
+    // Centre by measurement, not `offsetLeft`: a pill's offset parent is not
+    // the track, so its offsets live in a different frame.
+    track.scrollTo({
+      left:
+        track.scrollLeft + (pillBox.left - trackBox.left) - (trackBox.width - pillBox.width) / 2,
+      behavior: reduce ? "auto" : "smooth",
+    });
   }, [activeId]);
   if (categories.length === 0) return null;
   return (
