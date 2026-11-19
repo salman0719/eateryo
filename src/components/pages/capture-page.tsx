@@ -201,44 +201,34 @@ export function CapturePage({
         /**
          * One column on a phone — headline, the three stops, the photo field,
          * then the promises — so the only action is never pushed below the
-         * fold. The stepper is a row of its own at the full content width, not
-         * a note inside the headline column: three stops confined to half a
-         * column wrap their own labels, which is what made this look broken.
-         * Two columns from `lg`, where the field gets a column of its own.
+         * fold. Two columns from `lg`, where the field gets a column of its
+         * own; the stepper then owns the left column at its full width, since
+         * that column is the reading column it belongs to.
+         *
+         * The left column is `display: contents` on a phone so its three parts
+         * order themselves around the photo field, and becomes a real column
+         * from `lg`. `order` keeps that phone reading order: the stops come
+         * before the field, the promises after it.
          */
-        <div className="flex flex-col gap-8">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.16em] text-accent-700 uppercase">
-              Photo in, orders out
-            </p>
-            <h1 className="mt-2 max-w-xl text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
-              Turn a menu photo into a table-ordering page
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-              Upload the photo you already have. AI types out the categories, dishes and prices, you
-              correct anything it read wrong, and publishing puts a QR code on every table.
-            </p>
-          </div>
-
-          <JourneySteps current={0} />
-
-          <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] lg:items-start lg:gap-x-12">
-            <div className="order-1 flex flex-col gap-3 lg:order-2 lg:col-start-2 lg:row-start-1">
-              <Dropzone onSelect={onSelectFiles} />
-              {fileError && <FileErrorNotice message={fileError} />}
-              <p className="text-center text-sm text-ink-500">
-                No menu handy?{" "}
-                <button
-                  type="button"
-                  onClick={onDemo}
-                  className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                >
-                  Preview with demo data
-                </button>
+        <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,0.92fr)] lg:items-start lg:gap-x-12">
+          <div className="contents lg:col-start-1 lg:row-start-1 lg:flex lg:flex-col lg:gap-8">
+            <div>
+              <p className="text-xs font-semibold tracking-[0.16em] text-accent-700 uppercase">
+                Photo in, orders out
+              </p>
+              <h1 className="mt-2 max-w-xl text-3xl font-bold tracking-tight text-ink-900 sm:text-4xl">
+                Turn a menu photo into a table-ordering page
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
+                Upload the photo you already have. AI types out the categories, dishes and prices,
+                you correct anything it read wrong, and publishing puts a QR code on every table.
               </p>
             </div>
 
-            <div className="order-2 lg:order-1 lg:col-start-1 lg:row-start-1">
+            {/* The reading column's width, from the first stop to the last. */}
+            <JourneySteps current={0} />
+
+            <div className="order-2 lg:order-none">
               <ul className="flex max-w-xl flex-col gap-3">
                 {ENTRY_POINTS.map((point) => (
                   <li key={point} className="flex gap-3 text-sm leading-6 text-ink-700">
@@ -255,6 +245,21 @@ export function CapturePage({
                 to your email, and until you publish your draft stays in this browser.
               </p>
             </div>
+          </div>
+
+          <div className="order-1 flex flex-col gap-3 lg:order-none lg:col-start-2 lg:row-start-1">
+            <Dropzone onSelect={onSelectFiles} />
+            {fileError && <FileErrorNotice message={fileError} />}
+            <p className="text-center text-sm text-ink-500">
+              No menu handy?{" "}
+              <button
+                type="button"
+                onClick={onDemo}
+                className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                Preview with demo data
+              </button>
+            </p>
           </div>
         </div>
       ) : (

@@ -342,7 +342,10 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   Signed out with an empty page it renders the entry
   composition (one promise, the photo field, three claims the app actually
   keeps; two columns from `lg`, one on a phone so the field is never below the
-  fold). The moment a photo exists — or the visitor is known to be signed in —
+  fold). The stepper spans the reading column at its full width, between the
+  headline and the claims; on a phone that column is `display: contents`, so
+  the stops still sit between the headline and the field. The moment a photo
+  exists — or the visitor is known to be signed in —
   it returns to the plain working layout, and an owner never sees the entry.
   Signed out, the review result is the whole journey: the inline price and
   "check this" fixes stay, the "Fine-tune in the editor" second path does not
@@ -377,8 +380,9 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   equal thirds — equal thirds truncated "Upload & extract" on a phone while
   the row still had room. Labels stay on one line and truncate rather than
   wrap; a wrapped label puts the stops at different heights. On the signed-out
-  entry the bar is a row of its own at the content width, never a note inside
-  the headline column. Capture mounts the publish stop in place (`publishSlot`), so
+  entry the bar spans the reading column — the one the headline and the claims
+  sit in — not the whole page: the photo field's column is not part of that
+  journey. Capture mounts the publish stop in place (`publishSlot`), so
   pressing Publish keeps the URL and the rail; `/menus/:id/publish` still
   renders the same wizard, because that is where the magic link returns a
   signed-out owner — the only place the wizard shows its own tracker. The
