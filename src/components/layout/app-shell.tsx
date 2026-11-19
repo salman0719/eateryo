@@ -651,8 +651,8 @@ export function AppShell() {
   }
 
   /** From the extraction result: save the draft, then open the publish wizard.
-   * The marker lets that screen continue the four-stop journey; a menu opened
-   * straight from the library gets a plain heading instead of a false "3 done". */
+   * The marker lets that screen continue the three-stop journey; a menu opened
+   * straight from the library gets a plain heading instead of a false "2 done". */
   async function handleStartPublish() {
     try {
       const saved = await saveResultAndOpen(false);
