@@ -90,7 +90,7 @@ interface PublishWizardProps {
 /**
  * The publish stop — the fourth step of onboarding, and the R1 publish wizard.
  *
- * Reached from the review screen, it continues the one four-stop journey
+ * Reached from the review screen, it continues the one three-stop journey
  * (Upload · Extract · Review · Publish) rather than starting a second one; a
  * menu opened straight from My menus has no journey marker, so it gets a
  * plain heading instead of a tracker it did not just walk.
@@ -119,7 +119,7 @@ export function PublishWizard({
 }: PublishWizardProps) {
   const fallback = useMemo(() => defaultWizardState(doc), [doc]);
   const [form, setForm] = useState<PublishWizardState>(() => loadWizardState(doc.id, fallback));
-  /** Opened from the review screen, so the four-stop journey continues here. */
+  /** Opened from the review screen, so the three-stop journey continues here. */
   const [continuesJourney] = useState(() => hasPublishJourney(doc.id));
   // A link requested earlier restores its panel after reloads and returns.
   const initialLinkSent = useMemo(() => loadWizardLinkSent(doc.id), [doc.id]);

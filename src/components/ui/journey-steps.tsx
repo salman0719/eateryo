@@ -3,10 +3,13 @@
 import { JOURNEY_STEPS, journeyStepStatus } from "@/features/onboarding/journey";
 
 /**
- * The one progress tracker for onboarding: Upload · Extract · Review ·
- * Publish. Rendered by capture (stops 1–3) and by the publish wizard (stop
- * 4), so leaving the review screen continues the same journey instead of
+ * The one progress tracker for onboarding: Upload & extract · Review ·
+ * Publish. Rendered by capture (stops 1–2) and by the publish wizard (stop
+ * 3), so leaving the review screen continues the same journey instead of
  * starting a second one at "1".
+ *
+ * Upload and extraction share a stop: the read is an action inside the photo
+ * step, so there is no stop that can be returned to and re-triggered.
  *
  * States follow the checkout convention: the current stop is filled, done
  * stops carry a check, and upcoming stops stay outlined and low-emphasis
