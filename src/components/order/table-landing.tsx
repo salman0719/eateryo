@@ -76,7 +76,7 @@ export function TableLanding({
 
   if (resolving) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <OrderShell bare>
         <OrderSkeleton label="Finding your order…" />
       </OrderShell>
     );
@@ -84,7 +84,7 @@ export function TableLanding({
 
   if (placed) {
     return (
-      <OrderShell tableLabel={placed.order.tableLabel}>
+      <OrderShell bare>
         <OrderReceived
           order={placed.order}
           restaurantName={restaurantName}
@@ -104,7 +104,7 @@ export function TableLanding({
 
   if (resumeError) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <OrderShell bare>
         <div className={`${frame} p-8 text-center`}>
           <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
