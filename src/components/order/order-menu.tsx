@@ -396,6 +396,25 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
   );
 }
 
+/**
+ * The category list. On a phone it runs edge to edge — no page padding, no
+ * rounded cards — and the categories are separated by a short bare gutter
+ * rather than a hairline, so a category that opens on a photo is visibly a
+ * new one even though the photo itself has no card edge. The width above
+ * `sm` keeps the inset, rounded cards the desktop page was designed around.
+ *
+ * The negative margin cancels `OrderShell`'s `px-4`; the sections themselves
+ * give up their borders and radius below `sm` (see `OrderMenuSection`), so
+ * the gutters here are the only separation between categories.
+ */
+export function CategorySections({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="-mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
+      {children}
+    </div>
+  );
+}
+
 export function OrderMenuSection({
   category,
   currency,
@@ -497,7 +516,9 @@ export function OrderMenuSection({
   return (
     <section
       aria-label={category.name}
-      className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+      // A phone gets the category edge to edge (see `CategorySections`); the
+      // inset card is the wide-screen treatment.
+      className="overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
     >
       <CategoryHeading category={category} />
       <ul className="divide-y divide-line-100">
