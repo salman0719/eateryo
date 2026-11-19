@@ -38,6 +38,7 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import {
   CategoryRail,
+  CategorySections,
   DinerCoverHeader,
   DinerSearchField,
   OrderMenuSection,
@@ -209,23 +210,25 @@ export function OrderPagePreview({
             </p>
           </div>
         ) : (
-          search.categories.map((match) => (
-            <div
-              key={match.category.id}
-              id={`category-${match.category.id}`}
-              className="scroll-mt-20"
-            >
-              <OrderMenuSection
-                category={{ ...match.category, items: match.items }}
-                currency={doc.currency}
-                variantChoice={variantChoice}
-                onVariantChange={(itemId, name) =>
-                  setVariantChoice((current) => ({ ...current, [itemId]: name }))
-                }
-                onAdd={addItem}
-              />
-            </div>
-          ))
+          <CategorySections>
+            {search.categories.map((match) => (
+              <div
+                key={match.category.id}
+                id={`category-${match.category.id}`}
+                className="scroll-mt-20"
+              >
+                <OrderMenuSection
+                  category={{ ...match.category, items: match.items }}
+                  currency={doc.currency}
+                  variantChoice={variantChoice}
+                  onVariantChange={(itemId, name) =>
+                    setVariantChoice((current) => ({ ...current, [itemId]: name }))
+                  }
+                  onAdd={addItem}
+                />
+              </div>
+            ))}
+          </CategorySections>
         )}
       </div>
 

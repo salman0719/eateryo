@@ -39,6 +39,7 @@ import { OrderCartPanel, useWideLayout } from "./order-cart";
 import {
   CategoryRail,
   DinerSearchField,
+  CategorySections,
   OrderMenuSection,
   StickyCartBar,
   formatOrderTotal,
@@ -509,26 +510,28 @@ export function TableOrderTabs({
                       {menuLabel(menu)}
                     </h2>
                   )}
-                  {result.categories.map((match: SearchMatch) => (
-                    <div
-                      key={`${menu.menuId}:${match.category.id}`}
-                      id={`menu-${menu.menuId}-category-${match.category.id}`}
-                      className="scroll-mt-20"
-                    >
-                      <OrderMenuSection
-                        category={{ ...match.category, items: match.items }}
-                        currency={menu.doc.currency}
-                        variantChoice={scopedVariantChoice(menu.menuId, match.items)}
-                        onVariantChange={(itemId, name) =>
-                          setVariantChoice((current) => ({
-                            ...current,
-                            [choiceKey(menu.menuId, itemId)]: name,
-                          }))
-                        }
-                        onAdd={(item, picks) => addItem(menu, item, picks)}
-                      />
-                    </div>
-                  ))}
+                  <CategorySections>
+                    {result.categories.map((match: SearchMatch) => (
+                      <div
+                        key={`${menu.menuId}:${match.category.id}`}
+                        id={`menu-${menu.menuId}-category-${match.category.id}`}
+                        className="scroll-mt-20"
+                      >
+                        <OrderMenuSection
+                          category={{ ...match.category, items: match.items }}
+                          currency={menu.doc.currency}
+                          variantChoice={scopedVariantChoice(menu.menuId, match.items)}
+                          onVariantChange={(itemId, name) =>
+                            setVariantChoice((current) => ({
+                              ...current,
+                              [choiceKey(menu.menuId, itemId)]: name,
+                            }))
+                          }
+                          onAdd={(item, picks) => addItem(menu, item, picks)}
+                        />
+                      </div>
+                    ))}
+                  </CategorySections>
                 </div>
               )
             )

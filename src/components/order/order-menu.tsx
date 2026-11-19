@@ -111,16 +111,31 @@ export function DinerCoverHeader({
   restaurantName,
   tableLabel,
   subline,
+  bleed = false,
 }: {
   restaurantName: string;
   /** The diner's table: a filled pill top-right of the cover band. */
   tableLabel?: string;
   /** One quiet line under the name: the menu title on a single-menu page. */
   subline?: string;
+  /**
+   * On a phone the cover is the page's own top edge: the band reaches the
+   * viewport top and both sides with no page padding, and the card framing
+   * comes back from `sm` up. The negative margins cancel `OrderShell`'s
+   * `px-4 py-6`, which is where the inset came from. The owner preview sits
+   * inside a phone frame of its own and never bleeds.
+   */
+  bleed?: boolean;
 }) {
   const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
+    <div
+      className={
+        bleed
+          ? "-mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
+          : "overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+      }
+    >
       <div
         aria-hidden={tableLabel ? undefined : "true"}
         className="relative h-24"
@@ -368,7 +383,7 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
           </h2>
         </div>
       ) : (
-        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-xl font-bold tracking-wide text-ink-800 uppercase">
+        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-lg font-bold tracking-wide text-ink-800 uppercase">
           {category.name}
         </h2>
       )}
@@ -378,6 +393,25 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
         </p>
       ) : null}
     </>
+  );
+}
+
+/**
+ * The category list. On a phone it runs edge to edge — no page padding, no
+ * rounded cards — and the categories are separated by a short bare gutter
+ * rather than a hairline, so a category that opens on a photo is visibly a
+ * new one even though the photo itself has no card edge. The width above
+ * `sm` keeps the inset, rounded cards the desktop page was designed around.
+ *
+ * The negative margin cancels `OrderShell`'s `px-4`; the sections themselves
+ * give up their borders and radius below `sm` (see `OrderMenuSection`), so
+ * the gutters here are the only separation between categories.
+ */
+export function CategorySections({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="-mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
+      {children}
+    </div>
   );
 }
 
@@ -482,7 +516,9 @@ export function OrderMenuSection({
   return (
     <section
       aria-label={category.name}
-      className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+      // A phone gets the category edge to edge (see `CategorySections`); the
+      // inset card is the wide-screen treatment.
+      className="overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
     >
       <CategoryHeading category={category} />
       <ul className="divide-y divide-line-100">
@@ -544,7 +580,11 @@ export function OrderMenuSection({
                 </p>
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              {/* Right-aligned control cluster: the size picker (when the
+                  dish has variants) sits beside Add rather than under it, and
+                  both hug the row's right edge so the text column keeps its
+                  full width. */}
+              <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
                 {item.variants.length > 0 && (
                   <label className="text-xs text-ink-600">
                     <span className="sr-only">Size for {item.name}</span>
