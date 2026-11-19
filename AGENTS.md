@@ -310,7 +310,11 @@ errors, or add lint/type suppressions just to make checks pass.
   every draft in one go (no remembered answers, no offer), so this unit owns
   the claim gate's tri-state, the adopt/disregard decision, the café a draft
   lands in, the stamp that makes it the account's, and the dissolving of the
-  browser copy the account just took. The editor's two facts arrive as named
+  browser copy the account just took. The draft the magic link is returning
+  to belongs to the journey claim alone: the generic import leaves it out
+  (`draftsForAutoImport`), because two paths claiming one draft each created
+  a first café on the same frame. A journey-marked draft no route is
+  returning to still goes through the generic import, so nothing is stranded. The editor's two facts arrive as named
   doors — `getOpenDocId` and `onClaimedOpenDoc` — so neither side mirrors the
   other; an open row is pinned to the agreed revision instead of forking it.
 - `src/components/ui/brand.tsx`, `src/components/layout/brand-bar.tsx` — the
@@ -455,6 +459,16 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
 - `src/features/tenancy/repo.ts`, `src/app/api/restaurants/` —
   ownership-scoped restaurant repository + API (session id only);
   `src/features/tenancy/client.ts` — typed browser client for it
+- `src/features/tenancy/first-restaurant.ts` — the one door for creating an
+  account's first café (`ensureFirstRestaurant`): one in-flight attempt per
+  account shared by every caller in the tab, a fresh owned-café read before
+  creating, and a lost race (`conflict`) resolved by adopting the winner. The
+  journey claim, the generic sign-in import and the editor's autosave all ask
+  it instead of calling the API, because asking separately is what gave a
+  brand-new account two cafés. It does not enforce a database constraint —
+  owning several cafés may return — so a second tab, or a publish submit
+  landing in the same instant as a claim's create, is the case left open;
+  only a constraint could close it. Tests: `tests/first-restaurant.test.ts`.
 - `src/features/tenancy/workspace.ts`,
   `src/components/layout/workspace-switcher.tsx` — the one membership the
   shell acts in. One sign-in can hold an owner café and a staff café, so the
