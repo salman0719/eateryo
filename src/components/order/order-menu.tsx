@@ -65,21 +65,30 @@ export function OrderSkeleton({ label }: { label: string }) {
 
 export function OrderShell({
   tableLabel,
+  bare = false,
   children,
 }: {
   tableLabel?: string;
+  /**
+   * Diner pages hide the frame header (brand lockup + table pill): the
+   * cover header below already names the restaurant and the table, so the
+   * shell's row would repeat the table and add a second brand.
+   */
+  bare?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between gap-3">
-        <BrandLockup tagline="Order from your table" />
-        {tableLabel && (
-          <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
-            {formatTableLabel(tableLabel)}
-          </span>
-        )}
-      </header>
+      {!bare && (
+        <header className="flex items-center justify-between gap-3">
+          <BrandLockup tagline="Order from your table" />
+          {tableLabel && (
+            <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
+              {formatTableLabel(tableLabel)}
+            </span>
+          )}
+        </header>
+      )}
       {children}
     </div>
   );
@@ -99,10 +108,13 @@ export function OrderShell({
  */
 export function DinerCoverHeader({
   restaurantName,
+  tableLabel,
   subline,
 }: {
   restaurantName: string;
-  /** One quiet line under the name: the menu title, or what is being served. */
+  /** The diner's table: rendered under the name, never in the shell header. */
+  tableLabel?: string;
+  /** One quiet line under the table: the menu title on a single-menu page. */
   subline?: string;
 }) {
   const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
@@ -125,6 +137,11 @@ export function DinerCoverHeader({
         </span>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg leading-snug font-bold text-ink-900">{restaurantName}</h1>
+          {tableLabel && (
+            <p className="truncate text-sm font-semibold text-ink-700">
+              {formatTableLabel(tableLabel)}
+            </p>
+          )}
           {subline && <p className="truncate text-sm text-ink-600">{subline}</p>}
         </div>
       </div>
@@ -147,7 +164,7 @@ export function CategoryRail({
   activeId: string | null;
   onSelect: (id: string) => void;
 }) {
-  if (categories.length < 2) return null;
+  if (categories.length === 0) return null;
   return (
     <div className="sticky top-0 z-20 -mx-4 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur">
       <ScrollArrowStrip label="Menu categories">
