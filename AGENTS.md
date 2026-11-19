@@ -336,7 +336,14 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   the explicit, confirmed **Extract again** re-reads. Review is only a screen
   when there is a result, so a missing result falls back to the work stop, and
   the publish stop is only a screen once the shell has mounted its wizard
-  (`publishSlot`), so a stale `publish` view falls back the same way. The rail
+  (`publishSlot`), so a stale `publish` view falls back the same way. Entering
+  Review scrolls to its "Check what the AI read" heading, and Publish to the
+  wizard's opening block ("Final step" signed out): the stops share one
+  address, so nothing else resets the document's scroll, and the next stop used
+  to open at the previous one's offset (the wizard clamped to its own height
+  and landing mid-form, the review with its heading and menu title above the
+  fold). The scroll is smooth, and a reduced-motion or hidden document jumps
+  instead (a hidden document never animates one). The rail
   leads every stop, above the heading, so Publish finishes the journey on the
   screen it was walked on instead of on a page of its own.
   Signed out with an empty page it renders the entry
@@ -554,8 +561,11 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   `src/app/r/[restaurantSlug]/t/[tableLabel]/page.tsx` (snapshot only,
   noindex) with
   `src/components/order/` (`order-menu.tsx` shared diner UI: `DinerCoverHeader`,
-  `DinerSearchField`, `CategoryRail` + `useScrollSpyCategory` category rail,
-  `OrderMenuSection`, `order-sheet.tsx`
+  `DinerSearchField`, `CategoryRail` + `useScrollSpyCategory` category rail
+  (the active pill is centred by scrolling the rail's own strip — never
+  `scrollIntoView`, which walks every scrollable ancestor and dragged the page
+  to the pill row wherever the rail starts below the fold, as in capture's
+  embedded preview), `OrderMenuSection`, `order-sheet.tsx`
   the shared cart sheet, `table-order.tsx` for local
   mode, `table-order-tabs.tsx` for the menu tabs and shared cart (search and
   rail come from the shared pieces), and `table-landing.tsx` the landing screen that owns it). The confirmation every

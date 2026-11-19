@@ -302,10 +302,8 @@ export function AppShell() {
     ensureServerTarget,
     cacheServerDraft,
     pruneSignedOutOthers,
-    revealResult: () => {
-      setCaptureView("review");
-      scrollToResult();
-    },
+    // The review stop scrolls itself to the top of the page when it opens.
+    revealResult: () => setCaptureView("review"),
     reportError: reportLibraryError,
   });
   /**
@@ -652,7 +650,6 @@ export function AppShell() {
     // A resumed draft is a result, and the result lives on the review stop.
     setCaptureView("review");
     navigate({ screen: "capture" });
-    scrollToResult();
   }
 
   /** Start over: the result is gone, so the screen returns to the photos. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { ComponentProps, ReactNode, RefObject } from "react";
 
 import { Attention } from "@/components/ui/attention";
@@ -170,6 +171,14 @@ export function CapturePage({
     result?.categories.reduce((sum, category) => sum + category.items.length, 0) ?? 0;
   const categoryCount = result?.categories.length ?? 0;
 
+  /**
+   * The first line of the stop on screen: the review's "Check what the AI
+   * read" heading, or the wizard's own opening block ("Final step" signed
+   * out). A stop change scrolls to this, not to the page top, so the reader
+   * lands on the heading they came for.
+   */
+  const stopTopRef = useRef<HTMLDivElement | null>(null);
+
   const currentStop: CaptureStop = publishOpen ? "publish" : reviewOpen ? "review" : "capture";
   const reachable = new Set<CaptureStop>(["capture"]);
   if (result !== null) reachable.add("review");
@@ -183,6 +192,30 @@ export function CapturePage({
       : source === "ai" && draftSave === "saving"
         ? "Saving draft…"
         : null;
+
+  /**
+   * Entering Review or Publish scrolls to the stop's own first line: Review to
+   * "Check what the AI read", Publish to the wizard's opening block. The three
+   * stops share one address, so nothing else resets the scroll — before this,
+   * Publish opened at the review's offset (clamped to the shorter wizard, mid
+   * form) and Review came back with its heading above the viewport.
+   *
+   * Nothing else scrolls the page on a stop change now that the rail centres
+   * its own strip, so one smooth scroll is the whole fix. A document that is
+   * not visible never animates one, which is what a background tab would show
+   * on return, so that case jumps instead. Going back to the photos is not a
+   * move forward in the journey, so it does not scroll.
+   */
+  useEffect(() => {
+    if (view === "capture" || typeof window === "undefined") return;
+    const reduce =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const behavior: ScrollBehavior = reduce || document.hidden ? "auto" : "smooth";
+    const top = stopTopRef.current;
+    if (top) top.scrollIntoView({ block: "start", behavior });
+    else window.scrollTo({ top: 0, behavior });
+  }, [view]);
 
   function selectStop(stop: CaptureStop) {
     if (stop === currentStop) return;
@@ -267,9 +300,11 @@ export function CapturePage({
           {/* The rail leads: it is the same three stops on every one of them. */}
           <CaptureStepRail current={currentStop} reachable={reachable} onSelect={selectStop} />
           {publishOpen ? (
-            <div>{publishSlot}</div>
+            <div ref={stopTopRef} className="scroll-mt-4">
+              {publishSlot}
+            </div>
           ) : (
-            <div>
+            <div ref={stopTopRef} className="scroll-mt-4">
               <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
                 {reviewOpen ? "Check what the AI read" : "Turn your photo into a menu"}
               </h1>
