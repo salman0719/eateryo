@@ -175,11 +175,7 @@ export function OrderPagePreview({
         )}
       </div>
 
-      <DinerCoverHeader
-        restaurantName={caféName}
-        tableLabel={PREVIEW_TABLE_LABEL}
-        subline={doc.title.trim() || "Untitled menu"}
-      />
+      <DinerCoverHeader restaurantName={caféName} tableLabel={PREVIEW_TABLE_LABEL} />
 
       <div className="flex min-w-0 flex-col gap-4">
         <nav aria-label="Search the menu">
