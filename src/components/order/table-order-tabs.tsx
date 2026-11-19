@@ -35,7 +35,13 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
-import { OrderMenuSection, StickyCartBar, formatOrderTotal } from "./order-menu";
+import {
+  CategoryRail,
+  OrderMenuSection,
+  StickyCartBar,
+  formatOrderTotal,
+  useScrollSpyCategory,
+} from "./order-menu";
 import { OrderSheet } from "./order-sheet";
 
 /** One open menu on the table landing (serializable for the client). */
@@ -186,6 +192,30 @@ export function TableOrderTabs({
   );
 
   const visibleCount = filtered.reduce((sum, entry) => sum + entry.result.matchCount, 0);
+
+  /**
+   * The sticky category rail: one anchor per visible section. On the All
+   * tab with several menus the pill names its menu (`Lunch · Starters`),
+   * so two menus with the same category stay distinguishable; scoped to
+   * one menu the pill is just the category. Search-aware, like the list.
+   */
+  const railCategories = useMemo(() => {
+    const scoped = filtered.length > 1;
+    return filtered.flatMap(({ menu, result }) =>
+      result.categories.map((match) => ({
+        id: `menu-${menu.menuId}-category-${match.category.id}`,
+        label: scoped ? `${menuLabel(menu)} · ${match.category.name}` : match.category.name,
+      }))
+    );
+  }, [filtered]);
+  const activeCategory = useScrollSpyCategory(railCategories.map((entry) => entry.id));
+
+  function jumpToCategory(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
@@ -466,6 +496,12 @@ export function TableOrderTabs({
             </nav>
           )}
 
+          <CategoryRail
+            categories={railCategories}
+            activeId={activeCategory}
+            onSelect={jumpToCategory}
+          />
+
           {menus.length === 0 ? (
             <div className={`${frame} p-8 text-center`}>
               <p className="text-lg font-semibold text-ink-900">Nothing is open right now</p>
@@ -494,19 +530,24 @@ export function TableOrderTabs({
                     </h2>
                   )}
                   {result.categories.map((match: SearchMatch) => (
-                    <OrderMenuSection
+                    <div
                       key={`${menu.menuId}:${match.category.id}`}
-                      category={{ ...match.category, items: match.items }}
-                      currency={menu.doc.currency}
-                      variantChoice={scopedVariantChoice(menu.menuId, match.items)}
-                      onVariantChange={(itemId, name) =>
-                        setVariantChoice((current) => ({
-                          ...current,
-                          [choiceKey(menu.menuId, itemId)]: name,
-                        }))
-                      }
-                      onAdd={(item, picks) => addItem(menu, item, picks)}
-                    />
+                      id={`menu-${menu.menuId}-category-${match.category.id}`}
+                      className="scroll-mt-20"
+                    >
+                      <OrderMenuSection
+                        category={{ ...match.category, items: match.items }}
+                        currency={menu.doc.currency}
+                        variantChoice={scopedVariantChoice(menu.menuId, match.items)}
+                        onVariantChange={(itemId, name) =>
+                          setVariantChoice((current) => ({
+                            ...current,
+                            [choiceKey(menu.menuId, itemId)]: name,
+                          }))
+                        }
+                        onAdd={(item, picks) => addItem(menu, item, picks)}
+                      />
+                    </div>
                   ))}
                 </div>
               )
