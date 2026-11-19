@@ -501,7 +501,10 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   `src/components/menu-editor/publish-panel.tsx`; the owner-facing preview is
   a read-only rendering of the diner order page
   (`src/components/order/order-page-preview.tsx`, ordering off), shared by
-  the editor, publish wizard and onboarding result. Tests:
+  the editor, publish wizard and onboarding result. It reuses the live
+  diner pieces (`DinerCoverHeader`, `DinerSearchField`, `CategoryRail` +
+  scroll-spy, `OrderMenuSection`) — only the table (constant "1") and the
+  fake send button are preview-only. Tests:
   `tests/publishing-slug.test.ts`, `tests/publishing-repo.test.ts`,
   `tests/publishing-api.test.ts`, `tests/menu-changes.test.ts`. Invariant: table ordering renders
   `menu_revision`, never `menu.doc`, so edits stay private until "Publish
@@ -515,11 +518,12 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   `src/app/api/orders/[orderId]/` (PATCH). Diner page
   `src/app/r/[restaurantSlug]/t/[tableLabel]/page.tsx` (snapshot only,
   noindex) with
-  `src/components/order/` (`order-menu.tsx` shared UI, including the
-  `CategoryRail` + `useScrollSpyCategory` category rail, `order-sheet.tsx`
+  `src/components/order/` (`order-menu.tsx` shared diner UI: `DinerCoverHeader`,
+  `DinerSearchField`, `CategoryRail` + `useScrollSpyCategory` category rail,
+  `OrderMenuSection`, `order-sheet.tsx`
   the shared cart sheet, `table-order.tsx` for local
-  mode, `table-order-tabs.tsx` for the menu tabs, search, category rail and
-  shared cart, and `table-landing.tsx` the landing screen that owns it). The confirmation every
+  mode, `table-order-tabs.tsx` for the menu tabs and shared cart (search and
+  rail come from the shared pieces), and `table-landing.tsx` the landing screen that owns it). The confirmation every
   flow ends on is its own module, `order-received.tsx`: it is a different
   screen from the ordering page (nothing may say "2 menus are open" after the
   order is in), it never borrows that page's chrome, and it is where the

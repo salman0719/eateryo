@@ -1,9 +1,10 @@
 /**
  * Shared diner-facing pieces of the table ordering screen: the page frame,
- * the add-to-order menu list, and total formatting. Used by both the local
- * (`/order`, IndexedDB) and server (`/r/<restaurant>/m/<menu>/order`,
- * published snapshot) flows so a diner sees the same menu whichever path
- * the café uses.
+ * the cover header, the search field, the category rail + scroll-spy, the
+ * add-to-order menu list, and total formatting. Used by the live table
+ * landing (`/r/<restaurant>/t/<table>`) and the owner preview
+ * (`OrderPagePreview`, a draft single menu with ordering off) so a diner
+ * sees the same menu whichever path the café uses.
  *
  * Deliberately free of editing chrome and of any storage import: the server
  * page must not pull IndexedDB code into its bundle just to render a menu.
@@ -147,6 +148,56 @@ export function DinerCoverHeader({
       </div>
     </div>
   );
+}
+
+/**
+ * The search field every diner ordering surface shares: the same input,
+ * the same placeholder, the same match-count line. `resultText` is the
+ * already-counted line (null hides it), so single- and multi-menu callers
+ * count differently but read identically.
+ */
+export function DinerSearchField({
+  value,
+  onChange,
+  placeholder = "Search dishes…",
+  resultText,
+  id = "diner-dish-search",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  /** The counted line under the input; null renders no line. */
+  resultText: string | null;
+  id?: string;
+}) {
+  return (
+    <div>
+      <label className="block" htmlFor={id}>
+        <span className="sr-only">Search dishes</span>
+        <input
+          id={id}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+        />
+      </label>
+      {resultText !== null && (
+        <p className="mt-2 text-xs text-ink-500" role="status">
+          {resultText}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Jump to a category section, honouring reduced motion. */
+export function scrollToCategory(id: string) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start",
+  });
 }
 
 /**
