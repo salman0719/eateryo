@@ -36,6 +36,11 @@ if (process.env.NODE_ENV === "production") {
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  // `next upgrade --agent=security` records its intent here so a later run can
+  // see this app asks for security-only patch upgrades.
+  experimental: {
+    agentUpgrade: "security",
+  },
   // Do not advertise the framework on every response.
   poweredByHeader: false,
   turbopack: {
