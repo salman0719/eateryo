@@ -138,7 +138,7 @@ export function DinerCoverHeader({
       <div className="flex items-center gap-3 px-5 pb-4">
         <span
           aria-hidden="true"
-          className="-mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+          className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
         >
           {initial}
         </span>
