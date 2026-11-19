@@ -632,10 +632,10 @@ function TabButton({
       type="button"
       aria-current={active ? "true" : undefined}
       onClick={onClick}
-      className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+      className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
-          ? "bg-surface-900 text-on-accent"
-          : "border border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
+          ? "border-accent-700 bg-accent-700 text-on-accent shadow-sm"
+          : "border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
       }`}
     >
       {label}
