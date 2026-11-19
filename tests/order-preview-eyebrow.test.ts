@@ -6,12 +6,11 @@ import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 
 /**
- * The PhoneFrame owner preview showed "Your café · Table 1" in the old
- * warning colour while every live diner page had already moved that
- * eyebrow to the brand accent. The preview is what the owner judges the
- * table page by, so it must wear the same colour.
+ * The preview is what the owner judges the table page by, so it wears the
+ * same cover as the live landing: the café name, the table underneath, and
+ * the menu title as the subline — never a stitched "Name · Table 1" line.
  */
-describe("OrderPagePreview eyebrow", () => {
+describe("OrderPagePreview cover", () => {
   function render(): string {
     return renderToStaticMarkup(
       createElement(OrderPagePreview, {
@@ -21,11 +20,11 @@ describe("OrderPagePreview eyebrow", () => {
     );
   }
 
-  it("names the café and table in the brand accent, not the warning colour", () => {
+  it("shares the diner cover: café name, table, and menu title", () => {
     const html = render();
-    expect(html).toContain("Corner Café · Table 1");
-    expect(html).toContain("text-accent-700 uppercase");
-    expect(html).not.toContain("text-warning-800 uppercase");
+    expect(html).toContain("Corner Café");
+    expect(html).toContain("Table 1");
+    expect(html).not.toContain("Corner Café · Table 1");
   });
 });
 
