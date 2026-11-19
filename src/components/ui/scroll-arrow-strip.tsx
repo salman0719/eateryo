@@ -71,7 +71,7 @@ export function ScrollArrowStrip({
   }
 
   const arrow =
-    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-line-300 bg-surface-base p-1.5 text-ink-700 shadow-sm transition-opacity hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
+    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-surface-900 bg-surface-900 p-1.5 text-on-accent shadow-md transition-opacity hover:bg-surface-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
   // The tablist sits on the header rule: no vertical padding of its own, and
   // the track itself carries the -mb-px pull so the active tab's border
