@@ -368,7 +368,7 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
           </h2>
         </div>
       ) : (
-        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-xl font-bold tracking-wide text-ink-800 uppercase">
+        <h2 className="border-b border-line-100 bg-surface-50 px-5 py-2.5 text-lg font-bold tracking-wide text-ink-800 uppercase">
           {category.name}
         </h2>
       )}

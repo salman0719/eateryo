@@ -47,6 +47,9 @@ describe("order category heading", () => {
     expect(html).toContain("Small plates to open.");
     // The band treatment is gone where the banner is.
     expect(html).not.toContain("uppercase");
+    // The overlay title keeps the banner's own scale.
+    expect(html).toContain("pb-2 text-xl font-bold text-white");
+    expect(html).not.toContain("text-lg font-bold tracking-wide");
   });
 
   it("renders today's band plus the description without a cover", () => {
@@ -56,6 +59,10 @@ describe("order category heading", () => {
     expect(html).toContain("Small plates to open.");
     expect(html).not.toContain("object-cover");
     expect(html).not.toContain(COVER_URL);
+    // Caps at 20px optically outgrew the banner's sentence-case title, so the
+    // band steps down a size and the two read the same weight.
+    expect(html).toContain("bg-surface-50 px-5 py-2.5 text-lg font-bold tracking-wide");
+    expect(html).not.toContain("pb-2 text-xl font-bold text-white");
   });
 
   it("renders the bare band when neither cover nor description is set", () => {
