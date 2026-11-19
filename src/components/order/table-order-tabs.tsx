@@ -201,6 +201,11 @@ export function TableOrderTabs({
    */
   const singleMenu = menus.length + closedMenus.length <= 1;
   const onlyClosedMenu = singleMenu && menus.length === 0 ? (closedMenus[0] ?? null) : null;
+  /**
+   * One open menu and nothing else: there are no tabs to sit in a card,
+   * so the search stands alone instead of inside the tab panel's frame.
+   */
+  const bareSearch = singleMenu && menus.length > 0;
 
   function choiceKey(menuId: string, itemId: string): string {
     return `${menuId}:${itemId}`;
@@ -364,80 +369,102 @@ export function TableOrderTabs({
     <div className="flex min-w-0 flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
-            {!singleMenu && (
-              <ScrollArrowStrip label="Menus">
-                {menus.length > 0 && (
-                  <TabButton
-                    active={activeTab === ALL_TAB}
-                    onClick={() => {
-                      hideClosedInfo();
-                      setActiveTab(ALL_TAB);
-                    }}
-                    label="All"
-                  />
-                )}
-                {menus.map((menu) => (
-                  <TabButton
-                    key={menu.menuId}
-                    active={activeTab === menu.menuId}
-                    onClick={() => {
-                      hideClosedInfo();
-                      setActiveTab(menu.menuId);
-                    }}
-                    label={menuLabel(menu)}
-                  />
-                ))}
-                {closedMenus.map((menu) => (
-                  <ClosedTabButton
-                    key={menu.menuId}
-                    menu={menu}
-                    show={closedInfo?.menuId === menu.menuId}
-                    onShow={(anchor) => showClosedInfo(menu, anchor)}
-                    onHide={hideClosedInfo}
-                  />
-                ))}
-              </ScrollArrowStrip>
-            )}
-            {onlyClosedMenu ? (
-              <div>
-                <p className="text-sm font-semibold text-ink-900">
-                  {menuLabel(onlyClosedMenu)} is closed right now
+          {bareSearch ? (
+            <nav aria-label="Search the menu">
+              <label className="block">
+                <span className="sr-only">Search dishes</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search dishes…"
+                  className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+                />
+              </label>
+              {searching && (
+                <p className="mt-2 text-xs text-ink-500" role="status">
+                  {visibleCount === 0
+                    ? `No dishes match “${query.trim()}”.`
+                    : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
                 </p>
-                <p className="mt-1 text-sm leading-6 text-ink-600">
-                  Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
-                </p>
-              </div>
-            ) : menus.length > 0 ? (
-              <>
-                <label className={!singleMenu ? "mt-2 block" : "block"}>
-                  <span className="sr-only">Search dishes</span>
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder={
-                      singleMenu
-                        ? "Search dishes…"
-                        : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
-                    }
-                    className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
-                  />
-                </label>
-                {searching && (
-                  <p className="mt-2 text-xs text-ink-500" role="status">
-                    {visibleCount === 0
-                      ? `No dishes match “${query.trim()}”.`
-                      : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
+              )}
+            </nav>
+          ) : (
+            <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
+              {!singleMenu && (
+                <ScrollArrowStrip label="Menus">
+                  {menus.length > 0 && (
+                    <TabButton
+                      active={activeTab === ALL_TAB}
+                      onClick={() => {
+                        hideClosedInfo();
+                        setActiveTab(ALL_TAB);
+                      }}
+                      label="All"
+                    />
+                  )}
+                  {menus.map((menu) => (
+                    <TabButton
+                      key={menu.menuId}
+                      active={activeTab === menu.menuId}
+                      onClick={() => {
+                        hideClosedInfo();
+                        setActiveTab(menu.menuId);
+                      }}
+                      label={menuLabel(menu)}
+                    />
+                  ))}
+                  {closedMenus.map((menu) => (
+                    <ClosedTabButton
+                      key={menu.menuId}
+                      menu={menu}
+                      show={closedInfo?.menuId === menu.menuId}
+                      onShow={(anchor) => showClosedInfo(menu, anchor)}
+                      onHide={hideClosedInfo}
+                    />
+                  ))}
+                </ScrollArrowStrip>
+              )}
+              {onlyClosedMenu ? (
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">
+                    {menuLabel(onlyClosedMenu)} is closed right now
                   </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-2 text-xs text-ink-500">
-                Nothing to order at the moment — tap a menu to see when it opens.
-              </p>
-            )}
-          </nav>
+                  <p className="mt-1 text-sm leading-6 text-ink-600">
+                    Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
+                  </p>
+                </div>
+              ) : menus.length > 0 ? (
+                <>
+                  <label className={!singleMenu ? "mt-2 block" : "block"}>
+                    <span className="sr-only">Search dishes</span>
+                    <input
+                      type="search"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder={
+                        singleMenu
+                          ? "Search dishes…"
+                          : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
+                      }
+                      className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+                    />
+                  </label>
+                  {searching && (
+                    <p className="mt-2 text-xs text-ink-500" role="status">
+                      {visibleCount === 0
+                        ? `No dishes match “${query.trim()}”.`
+                        : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="mt-2 text-xs text-ink-500">
+                  Nothing to order at the moment — tap a menu to see when it opens.
+                </p>
+              )}
+            </nav>
+          )}
 
           {menus.length === 0 ? (
             <div className={`${frame} p-8 text-center`}>
