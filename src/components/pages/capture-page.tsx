@@ -4,6 +4,7 @@ import type { ComponentProps, RefObject } from "react";
 
 import { Attention } from "@/components/ui/attention";
 import { JourneySteps } from "@/components/ui/journey-steps";
+import { CaptureStepRail, type CaptureStop } from "@/components/upload/capture-step-rail";
 import { Dropzone } from "@/components/upload/dropzone";
 import { ExtractionProgress } from "@/components/upload/extraction-progress";
 import { ExtractionResult, type PreviewMenu } from "@/components/upload/extraction-result";
@@ -14,6 +15,9 @@ import { SUPPORTED_IMAGE_MIME_TYPES } from "@/lib/image-constraints";
 
 /** The capture flow's phase, shared with the shell that owns the extraction. */
 export type CapturePhase = "upload" | "ready" | "extracting" | "done";
+
+/** Capture's two stops. Publish is the wizard, a screen of its own. */
+export type CaptureView = "capture" | "review";
 
 type ResultProps = ComponentProps<typeof ExtractionResult>;
 
@@ -32,8 +36,12 @@ export interface CapturePageProps {
   signedIn: boolean;
   /** Session still resolving: never claim "publishing needs an account" yet. */
   sessionPending: boolean;
-  /** Which onboarding stop the tracker marks (0 upload, 1 extract, 2 review). */
-  step: number;
+  /**
+   * Which stop is showing. Capture renders *only* this one, so the step you
+   * are on never shares the screen with the work of another.
+   */
+  view: CaptureView;
+  onViewChange: (view: CaptureView) => void;
   phase: CapturePhase;
   pages: PageImage[];
   fileError: string | null;
@@ -82,9 +90,18 @@ function FileErrorNotice({ message }: { message: string }) {
 }
 
 /**
- * Capture: photo in, extraction progress, review out. It owns no data — the
- * shell keeps the pages, the extraction and the saved draft — so a retry or a
- * navigation does not reset the flow.
+ * Capture: photo in, extraction progress, review out — one stop at a time.
+ *
+ * The page owns no data; the shell keeps the pages, the extraction and the
+ * saved draft. What it does own is which stop is on screen: the work view
+ * (photo + extraction, merged into the first stop) or the review. Only one is
+ * rendered, so the upload field is never stacked above a review list and the
+ * extraction's progress appears under the pages it is reading.
+ *
+ * The first stop keeps three honest states — nothing read, reading, read —
+ * and only "nothing read" can start a read. A return visit shows what the
+ * extraction produced and how to continue; re-reading is one explicit action
+ * that says it replaces the draft.
  *
  * Signed out on an empty page it also has to be the front door: nobody has a
  * sidebar destination to click, so the photo field carries the product's one
@@ -95,7 +112,8 @@ function FileErrorNotice({ message }: { message: string }) {
 export function CapturePage({
   signedIn,
   sessionPending,
-  step,
+  view,
+  onViewChange,
   phase,
   pages,
   fileError,
@@ -132,6 +150,35 @@ export function CapturePage({
    */
   const entering = !signedIn && !sessionPending && phase === "upload" && pages.length === 0;
 
+  /** Review is only a screen once there is something to review. */
+  const reviewOpen = view === "review" && result !== null;
+  const extracting = phase === "extracting";
+
+  const dishCount =
+    result?.categories.reduce((sum, category) => sum + category.items.length, 0) ?? 0;
+  const categoryCount = result?.categories.length ?? 0;
+
+  const reachable = new Set<CaptureStop>(["capture"]);
+  if (result !== null) reachable.add("review");
+  if (onPublish) reachable.add("publish");
+
+  const savedNotice =
+    source === "ai" && draftSave === "saved"
+      ? draftOnServer
+        ? "Draft saved to your account"
+        : "Draft saved in this browser"
+      : source === "ai" && draftSave === "saving"
+        ? "Saving draft…"
+        : null;
+
+  function selectStop(stop: CaptureStop) {
+    if (stop === "publish") {
+      onPublish?.();
+      return;
+    }
+    onViewChange(stop);
+  }
+
   return (
     <>
       {entering ? (
@@ -152,7 +199,7 @@ export function CapturePage({
               Upload the photo you already have. AI types out the categories, dishes and prices, you
               correct anything it read wrong, and publishing puts a QR code on every table.
             </p>
-            <JourneySteps current={step} className="mt-6 max-w-xl" />
+            <JourneySteps current={0} className="mt-6 max-w-xl" />
           </div>
 
           <div className="order-2 flex flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-1">
@@ -192,13 +239,14 @@ export function CapturePage({
         <>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">
-              Turn your photo into a menu
+              {reviewOpen ? "Check what the AI read" : "Turn your photo into a menu"}
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-6 text-ink-600 sm:text-base">
-              Upload a photo or scan of a menu, extract it into categories and items with AI, then
-              review and correct the draft. AI output is never guaranteed — you stay in charge.
+              {reviewOpen
+                ? "Fix anything the read got wrong — prices, names, descriptions. Nothing is published until you say so."
+                : "Upload a photo or scan, and the read happens on this screen. Then you check it, correct it, and publish."}
             </p>
-            {!signedIn && !sessionPending && (
+            {!signedIn && !sessionPending && !reviewOpen && (
               <p className="mt-1.5 max-w-xl text-xs leading-5 text-ink-500">
                 You can upload and review first. Publishing needs an account — we’ll email you a
                 sign-in link, and your draft stays in this browser.
@@ -206,115 +254,171 @@ export function CapturePage({
             )}
           </div>
 
-          <JourneySteps current={step} />
+          <CaptureStepRail
+            current={reviewOpen ? "review" : "capture"}
+            reachable={reachable}
+            onSelect={selectStop}
+          />
         </>
       )}
 
-      {!entering && phase === "upload" && pages.length === 0 && (
-        <div className="flex flex-col gap-3">
-          <Dropzone onSelect={onSelectFiles} />
-          {fileError && <FileErrorNotice message={fileError} />}
-          <p className="text-center text-sm text-ink-500">
-            No menu handy?{" "}
-            <button
-              type="button"
-              onClick={onDemo}
-              className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-            >
-              Preview with demo data
-            </button>
-          </p>
-        </div>
-      )}
-
-      {pages.length > 0 && (
-        <div className="flex flex-col gap-4">
-          <ImagePreview
-            pages={pages}
-            onAdd={() => addInputRef.current?.click()}
-            onReplace={(index) => {
-              replaceIndexRef.current = index;
-              replaceInputRef.current?.click();
-            }}
-            onRemove={onRemovePage}
-          />
-          <input
-            ref={addInputRef}
-            type="file"
-            multiple
-            accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-            className="sr-only"
-            tabIndex={-1}
-            onChange={(event) => {
-              const added = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              if (added.length > 0) onAddPages(added);
-            }}
-          />
-          <input
-            ref={replaceInputRef}
-            type="file"
-            accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
-            className="sr-only"
-            tabIndex={-1}
-            onChange={(event) => {
-              const next = event.target.files?.[0];
-              const index = replaceIndexRef.current;
-              event.target.value = "";
-              replaceIndexRef.current = null;
-              if (next && index !== null) onReplacePageAt(index, next);
-            }}
-          />
-          {fileError && <FileErrorNotice message={fileError} />}
-          <div>
-            <button
-              type="button"
-              onClick={onExtract}
-              disabled={phase === "extracting"}
-              className="w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
-            >
-              {phase === "extracting" ? "Extracting… this can take up to a minute" : "Extract menu"}
-            </button>
-            <p className="mt-2 text-xs text-ink-500">
-              Calls the AI once, only when you press this. Accuracy depends on image quality.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <Attention
-        active={phase === "extracting"}
-        pulse={false}
-        scrollBlock="start"
-        className="scroll-mt-4"
-      >
-        {phase === "extracting" && extractProgress && (
-          <ExtractionProgress
-            pageCount={extractProgress.pageCount}
-            preparedPages={extractProgress.preparedPages}
-            requestStartedAt={extractProgress.requestStartedAt}
-            signedIn={signedIn}
-          />
-        )}
-      </Attention>
-
-      {extractError && phase !== "extracting" && (
-        <div role="alert" className="rounded-2xl border border-danger-200 bg-danger-50 px-5 py-4">
-          <p className="font-medium text-danger-900">Extraction failed</p>
-          <p className="mt-1 text-sm text-danger-800">{extractError.message}</p>
-          {extractError.code === "missing_api_key" && (
-            <button
-              type="button"
-              onClick={onDemo}
-              className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-            >
-              Preview with demo data instead
-            </button>
+      {/* ------------------------------- stop 1 ------------------------------- */}
+      {!entering && !reviewOpen && (
+        <>
+          {pages.length === 0 && phase === "upload" && result === null && (
+            <div className="flex flex-col gap-3">
+              <Dropzone onSelect={onSelectFiles} />
+              {fileError && <FileErrorNotice message={fileError} />}
+              <p className="text-center text-sm text-ink-500">
+                No menu handy?{" "}
+                <button
+                  type="button"
+                  onClick={onDemo}
+                  className="font-medium text-accent-800 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  Preview with demo data
+                </button>
+              </p>
+            </div>
           )}
-        </div>
+
+          {pages.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <ImagePreview
+                pages={pages}
+                onAdd={() => addInputRef.current?.click()}
+                onReplace={(index) => {
+                  replaceIndexRef.current = index;
+                  replaceInputRef.current?.click();
+                }}
+                onRemove={onRemovePage}
+              />
+              <input
+                ref={addInputRef}
+                type="file"
+                multiple
+                accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
+                className="sr-only"
+                tabIndex={-1}
+                onChange={(event) => {
+                  const added = Array.from(event.target.files ?? []);
+                  event.target.value = "";
+                  if (added.length > 0) onAddPages(added);
+                }}
+              />
+              <input
+                ref={replaceInputRef}
+                type="file"
+                accept={SUPPORTED_IMAGE_MIME_TYPES.join(",")}
+                className="sr-only"
+                tabIndex={-1}
+                onChange={(event) => {
+                  const next = event.target.files?.[0];
+                  const index = replaceIndexRef.current;
+                  event.target.value = "";
+                  replaceIndexRef.current = null;
+                  if (next && index !== null) onReplacePageAt(index, next);
+                }}
+              />
+            </div>
+          )}
+
+          {fileError && pages.length > 0 && <FileErrorNotice message={fileError} />}
+
+          {/* A return visit: the read that produced the draft, not a fresh call. */}
+          {result !== null && !extracting && (
+            <section
+              aria-label="What this read produced"
+              className="rounded-2xl border border-line-200 bg-surface-base p-4"
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-semibold text-ink-900">
+                  {source === "demo" ? "Sample menu" : "Read"} {dishCount}{" "}
+                  {dishCount === 1 ? "dish" : "dishes"} in {categoryCount}{" "}
+                  {categoryCount === 1 ? "category" : "categories"}
+                </p>
+                <span className="rounded-full border border-accent-300 bg-accent-100 px-2 py-0.5 text-[11px] font-semibold text-accent-800">
+                  {source === "demo" ? "Demo data" : "Extracted"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-ink-600">
+                {source === "demo"
+                  ? "This is demo data, labelled as such — no AI read ran. Upload a photo to replace it with a real draft."
+                  : "This is the read behind your draft. Coming back to this stop does not start another one — extracting again replaces the draft and spends another AI call."}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <button
+                  type="button"
+                  onClick={() => onViewChange("review")}
+                  className="rounded-full bg-accent-700 px-4 py-1.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  Continue to review →
+                </button>
+                {savedNotice && <span className="text-xs text-ink-500">{savedNotice}</span>}
+              </div>
+            </section>
+          )}
+
+          {pages.length > 0 && (
+            <div>
+              <button
+                type="button"
+                onClick={onExtract}
+                disabled={extracting}
+                className={
+                  result === null
+                    ? "w-full rounded-full bg-accent-700 px-6 py-3 text-base font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 sm:w-auto"
+                    : "rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:cursor-wait disabled:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                }
+              >
+                {extracting
+                  ? "Extracting… this can take up to a minute"
+                  : result === null
+                    ? "Extract menu"
+                    : "Extract again"}
+              </button>
+              <p className="mt-2 text-xs text-ink-500">
+                {result === null
+                  ? "Calls the AI once, only when you press this. Accuracy depends on image quality."
+                  : "Replaces the current draft and its review edits. Asks before it runs."}
+              </p>
+            </div>
+          )}
+
+          <Attention active={extracting} pulse={false} scrollBlock="start" className="scroll-mt-4">
+            {extracting && extractProgress && (
+              <ExtractionProgress
+                pageCount={extractProgress.pageCount}
+                preparedPages={extractProgress.preparedPages}
+                requestStartedAt={extractProgress.requestStartedAt}
+                signedIn={signedIn}
+              />
+            )}
+          </Attention>
+
+          {extractError && !extracting && (
+            <div
+              role="alert"
+              className="rounded-2xl border border-danger-200 bg-danger-50 px-5 py-4"
+            >
+              <p className="font-medium text-danger-900">Extraction failed</p>
+              <p className="mt-1 text-sm text-danger-800">{extractError.message}</p>
+              {extractError.code === "missing_api_key" && (
+                <button
+                  type="button"
+                  onClick={onDemo}
+                  className="mt-3 rounded-full bg-danger-800 px-4 py-1.5 text-sm font-medium text-on-accent transition-colors hover:bg-danger-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                >
+                  Preview with demo data instead
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {result && (
+      {/* ------------------------------- stop 2 ------------------------------- */}
+      {reviewOpen && result && (
         <div ref={resultRef}>
           <ExtractionResult
             data={result}
@@ -331,15 +435,7 @@ export function CapturePage({
             initialReviewCount={initialReviewCount}
             onPublish={onPublish}
             previewDoc={previewDoc}
-            savedNotice={
-              source === "ai" && draftSave === "saved"
-                ? draftOnServer
-                  ? "Draft saved to your account"
-                  : "Draft saved in this browser"
-                : source === "ai" && draftSave === "saving"
-                  ? "Saving draft…"
-                  : null
-            }
+            savedNotice={savedNotice}
             editLabel={
               source === "ai"
                 ? draftSave === "saved"
