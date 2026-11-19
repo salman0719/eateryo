@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "@/components/ui/brand";
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
@@ -129,6 +130,89 @@ export function DinerCoverHeader({
       </div>
     </div>
   );
+}
+
+/**
+ * Prototype A category rail: the sticky pill row above the dishes.
+ * `ScrollArrowStrip` owns the sideways scroll; this owns which pill reads
+ * active. Active follows the viewport (see `useScrollSpyCategory`); a tap
+ * jumps to that category's section.
+ */
+export function CategoryRail({
+  categories,
+  activeId,
+  onSelect,
+}: {
+  categories: { id: string; label: string }[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  if (categories.length < 2) return null;
+  return (
+    <div className="sticky top-0 z-20 -mx-4 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur">
+      <ScrollArrowStrip label="Menu categories">
+        {categories.map((category) => {
+          const active = category.id === activeId;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              aria-current={active ? "true" : undefined}
+              onClick={() => onSelect(category.id)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+                active
+                  ? "bg-surface-900 text-on-accent"
+                  : "border border-line-300 bg-surface-base text-ink-700 hover:border-accent-700 hover:text-accent-900"
+              }`}
+            >
+              {category.label}
+            </button>
+          );
+        })}
+      </ScrollArrowStrip>
+    </div>
+  );
+}
+
+/**
+ * Scroll-spy for the category rail: the id of the category nearest the top
+ * of the viewport. The band sits below the sticky rail and above the fold's
+ * bottom, so the pill changes as the diner moves through the menu, not after.
+ * When nothing intersects (fast fling between sections) the last answer
+ * stands instead of flickering to null.
+ */
+export function useScrollSpyCategory(ids: string[]): string | null {
+  const key = ids.join("|");
+  const [active, setActive] = useState<string | null>(() => ids[0] ?? null);
+  // The list is stable per document; when it does change, reset the pill
+  // with a render-time adjustment (the endorsed pattern), not an effect,
+  // so there is no cascading update.
+  const [watched, setWatched] = useState(key);
+  if (watched !== key) {
+    setWatched(key);
+    const list = key.split("|").filter(Boolean);
+    setActive((current) => (current && list.includes(current) ? current : (list[0] ?? null)));
+  }
+  useEffect(() => {
+    const list = key.split("|").filter(Boolean);
+    if (list.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const top = visible[0];
+        if (top && top.target.id) setActive(top.target.id);
+      },
+      { rootMargin: "-25% 0px -65% 0px" }
+    );
+    for (const id of list) {
+      const node = document.getElementById(id);
+      if (node) observer.observe(node);
+    }
+    return () => observer.disconnect();
+  }, [key]);
+  return active;
 }
 
 /**

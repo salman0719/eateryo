@@ -14,7 +14,7 @@
  * plainly instead of pretending it was sent.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { fetchTrackedOrder, placeOrderWithTracking } from "@/features/orders/client";
@@ -38,12 +38,14 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { OrderCartPanel, useWideLayout } from "./order-cart";
 import {
+  CategoryRail,
   DinerCoverHeader,
   OrderMenuSection,
   OrderShell,
   OrderSkeleton,
   StickyCartBar,
   formatOrderTotal,
+  useScrollSpyCategory,
 } from "./order-menu";
 import { OrderReceived } from "./order-received";
 import { OrderSheet } from "./order-sheet";
@@ -91,6 +93,23 @@ export function ServerTableOrder({
 
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
+  /** Category rail targets: one anchor per section for the sticky pills. */
+  const railCategories = useMemo(
+    () =>
+      doc.categories.map((category) => ({
+        id: `category-${category.id}`,
+        label: category.name,
+      })),
+    [doc.categories]
+  );
+  const activeCategory = useScrollSpyCategory(railCategories.map((entry) => entry.id));
+
+  function jumpToCategory(id: string) {
+    document.getElementById(id)?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }
 
   function chosenVariantName(item: MenuItem): string | null {
     if (item.variants.length === 0) return null;
@@ -301,17 +320,24 @@ export function ServerTableOrder({
             subline={doc.title.trim() || undefined}
           />
 
-          {doc.categories.map((category) => (
-            <OrderMenuSection
-              key={category.id}
-              category={category}
-              currency={doc.currency}
-              variantChoice={variantChoice}
-              onVariantChange={(itemId, name) =>
-                setVariantChoice((current) => ({ ...current, [itemId]: name }))
-              }
-              onAdd={addItem}
-            />
+          <CategoryRail
+            categories={railCategories}
+            activeId={activeCategory}
+            onSelect={jumpToCategory}
+          />
+
+          {doc.categories.map((category, index) => (
+            <div key={category.id} id={railCategories[index]?.id} className="scroll-mt-20">
+              <OrderMenuSection
+                category={category}
+                currency={doc.currency}
+                variantChoice={variantChoice}
+                onVariantChange={(itemId, name) =>
+                  setVariantChoice((current) => ({ ...current, [itemId]: name }))
+                }
+                onAdd={addItem}
+              />
+            </div>
           ))}
         </div>
 
