@@ -559,7 +559,11 @@ export function OrderMenuSection({
                 </p>
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              {/* Right-aligned control cluster: the size picker (when the
+                  dish has variants) sits beside Add rather than under it, and
+                  both hug the row's right edge so the text column keeps its
+                  full width. */}
+              <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
                 {item.variants.length > 0 && (
                   <label className="text-xs text-ink-600">
                     <span className="sr-only">Size for {item.name}</span>
