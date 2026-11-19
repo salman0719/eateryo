@@ -120,10 +120,10 @@ export function DinerCoverHeader({
 }) {
   const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="rounded-2xl border border-line-200 bg-surface-base">
+    <div className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base">
       <div
         aria-hidden={tableLabel ? undefined : "true"}
-        className="relative h-24 overflow-hidden rounded-t-2xl"
+        className="relative h-24"
         style={{
           backgroundImage:
             "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",

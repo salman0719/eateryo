@@ -410,42 +410,40 @@ export function TableOrderTabs({
               />
             </nav>
           ) : (
-            <>
+            <nav aria-label={singleMenu ? "Search the menu" : "Menus"}>
               {!singleMenu && (
-                <nav aria-label="Menus">
-                  <ScrollArrowStrip label="Menus">
-                    {menus.length > 0 && (
-                      <TabButton
-                        active={activeTab === ALL_TAB}
-                        onClick={() => {
-                          hideClosedInfo();
-                          setActiveTab(ALL_TAB);
-                        }}
-                        label="All"
-                      />
-                    )}
-                    {menus.map((menu) => (
-                      <TabButton
-                        key={menu.menuId}
-                        active={activeTab === menu.menuId}
-                        onClick={() => {
-                          hideClosedInfo();
-                          setActiveTab(menu.menuId);
-                        }}
-                        label={menuLabel(menu)}
-                      />
-                    ))}
-                    {closedMenus.map((menu) => (
-                      <ClosedTabButton
-                        key={menu.menuId}
-                        menu={menu}
-                        show={closedInfo?.menuId === menu.menuId}
-                        onShow={(anchor) => showClosedInfo(menu, anchor)}
-                        onHide={hideClosedInfo}
-                      />
-                    ))}
-                  </ScrollArrowStrip>
-                </nav>
+                <ScrollArrowStrip label="Menus">
+                  {menus.length > 0 && (
+                    <TabButton
+                      active={activeTab === ALL_TAB}
+                      onClick={() => {
+                        hideClosedInfo();
+                        setActiveTab(ALL_TAB);
+                      }}
+                      label="All"
+                    />
+                  )}
+                  {menus.map((menu) => (
+                    <TabButton
+                      key={menu.menuId}
+                      active={activeTab === menu.menuId}
+                      onClick={() => {
+                        hideClosedInfo();
+                        setActiveTab(menu.menuId);
+                      }}
+                      label={menuLabel(menu)}
+                    />
+                  ))}
+                  {closedMenus.map((menu) => (
+                    <ClosedTabButton
+                      key={menu.menuId}
+                      menu={menu}
+                      show={closedInfo?.menuId === menu.menuId}
+                      onShow={(anchor) => showClosedInfo(menu, anchor)}
+                      onHide={hideClosedInfo}
+                    />
+                  ))}
+                </ScrollArrowStrip>
               )}
               {onlyClosedMenu ? (
                 <div>
@@ -457,25 +455,23 @@ export function TableOrderTabs({
                   </p>
                 </div>
               ) : menus.length > 0 ? (
-                <nav aria-label="Search the menu">
+                <div className={!singleMenu ? "mt-2" : undefined}>
                   <DinerSearchField
                     id="table-dish-search-panel"
                     value={query}
                     onChange={setQuery}
                     placeholder={
-                      singleMenu
-                        ? "Search dishes…"
-                        : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
+                      singleMenu ? "Search dishes…" : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
                     resultText={searchResultText}
                   />
-                </nav>
+                </div>
               ) : (
-                <p className="text-xs text-ink-500">
+                <p className="mt-2 text-xs text-ink-500">
                   Nothing to order at the moment — tap a menu to see when it opens.
                 </p>
               )}
-            </>
+            </nav>
           )}
 
           <CategoryRail
