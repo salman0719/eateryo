@@ -461,7 +461,9 @@ export function TableOrderTabs({
                     value={query}
                     onChange={setQuery}
                     placeholder={
-                      singleMenu ? "Search dishes…" : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
+                      singleMenu
+                        ? "Search dishes…"
+                        : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
                     resultText={searchResultText}
                   />

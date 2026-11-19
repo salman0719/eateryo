@@ -225,7 +225,11 @@ export function CategoryRail({
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     railRef.current
       ?.querySelector('[aria-current="true"]')
-      ?.scrollIntoView({ block: "nearest", inline: "center", behavior: reduce ? "auto" : "smooth" });
+      ?.scrollIntoView({
+        block: "nearest",
+        inline: "center",
+        behavior: reduce ? "auto" : "smooth",
+      });
   }, [activeId]);
   if (categories.length === 0) return null;
   return (
