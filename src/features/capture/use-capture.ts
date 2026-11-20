@@ -499,6 +499,34 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
+  /** Replace a dish's size rows in place. Sizes carry their own prices,
+   * so adding the first one clears a misread single root price to null
+   * with it (per-size pricing has a null root by design). Removing the
+   * last size re-flags the price honestly; notes stay until confirmed. */
+  function handleUpdateResultVariants(
+    loc: ReviewItemLocation,
+    variants: { name: string; price: number | null }[]
+  ) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item) return;
+    const cleaned = variants
+      .map((variant) => ({ name: variant.name.trim(), price: variant.price }))
+      .filter((variant) => variant.name !== "");
+    const next = updateItem(
+      doc,
+      category.id,
+      item.id,
+      item.variants.length === 0 && cleaned.length > 0
+        ? { variants: cleaned, price: null }
+        : { variants: cleaned }
+    );
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   /** Q2: the result title is an editable field, never a naming gate.
    * Commits persist to the draft like price fixes; blank is ignored. */
   function handleRenameResultTitle(title: string) {
@@ -608,6 +636,7 @@ export function useCapture(options: CaptureOptions) {
     handleResolveAllResultItems,
     handleRenameResultItem,
     handleUpdateResultDescription,
+    handleUpdateResultVariants,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,

@@ -53,6 +53,7 @@ function render(withRename: boolean) {
       onUpdatePrice: noop,
       onRenameItem: withRename ? noop : undefined,
       onUpdateDescription: noop,
+      onUpdateVariants: noop,
       initialReviewCount: 1,
       previewDoc: null,
     })
@@ -63,28 +64,55 @@ describe("review inline fixes: fix card", () => {
   const loc = { categoryIndex: 0, itemIndex: 0 };
   const item = RESULT.categories[0].items[0];
 
-  function renderCard(withDescription: boolean) {
+  function renderCard(options: { description?: boolean; variants?: boolean } = {}) {
     return renderToStaticMarkup(
       createElement(ReviewFixCard, {
         item,
         loc,
         onRenameItem: noop,
-        onUpdateDescription: withDescription ? noop : undefined,
+        onUpdateDescription: options.description ? noop : undefined,
+        onUpdateVariants: options.variants ? noop : undefined,
       })
     );
   }
 
   it("edits the name and the description side by side", () => {
-    const html = renderCard(true);
+    const html = renderCard({ description: true });
     expect(html).toContain("Dish name");
     expect(html).toContain("Description");
     expect(html).toContain("confirm separately");
   });
 
   it("omits the description field when not wired", () => {
-    const html = renderCard(false);
+    const html = renderCard();
     expect(html).toContain("Dish name");
     expect(html).not.toContain("Description");
+  });
+
+  it("edits per-size prices with an add-size path when wired", () => {
+    const sized = {
+      ...item,
+      price: null,
+      variants: [
+        { name: "S", price: 11 },
+        { name: "M", price: null },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      createElement(ReviewFixCard, {
+        item: sized,
+        loc,
+        onRenameItem: noop,
+        onUpdateVariants: noop,
+      })
+    );
+    expect(html).toContain("Sizes");
+    expect(html).toContain("+ Add size");
+  });
+
+  it("omits the sizes section when not wired", () => {
+    const html = renderCard({ description: true });
+    expect(html).not.toContain("Sizes");
   });
 });
 
