@@ -80,8 +80,9 @@ interface ExtractionResultProps {
   onMoveItem?: (loc: ReviewItemLocation, toCategoryIndex: number) => void;
   /** Delete a dish from the draft in place (the shell confirms first). */
   onDeleteItem?: (loc: ReviewItemLocation) => void;
-  /** Add a dish the AI missed to a category (lands at the end, unpriced). */
-  onAddItem?: (categoryIndex: number, name: string) => void;
+  /** Add a dish the AI missed to a category (lands at the end, unpriced
+   * unless the owner prices it in the same form). */
+  onAddItem?: (categoryIndex: number, draft: NewDishDraft) => void;
   /** Resolve every flagged item at once — the impatient path. Prices stay
    * as shown; unpriced items ship with honestly null totals. */
   onResolveAll?: () => void;
@@ -355,14 +356,40 @@ export function ReviewFixCard({
   );
 }
 
+/** Fields the owner fills in when adding a dish the AI missed — the same
+ * fix-it-here shape as the row card (name, description, price or sizes),
+ * so a missed line is fixed with the same interface, not a name-only box. */
+export interface NewDishDraft {
+  name: string;
+  description: string | null;
+  price: number | null;
+  variants: { name: string; price: number | null }[];
+}
+
 /**
- * The "the AI missed a line" path: one toggle per category card holding a
- * name field. The dish lands at the end of the category, unpriced — so it
- * shows up in Check this honestly instead of sneaking into Ready.
+ * The "the AI missed a line" path: one toggle per category card holding the
+ * same fix-it-here form as a row card. The dish lands at the end of the
+ * category — unpriced unless the owner prices it here — so it shows up in
+ * Check this honestly instead of sneaking into Ready.
  */
-export function AddDishRow({ onAdd }: { onAdd: (name: string) => void }) {
+export function AddDishRow({
+  onAdd,
+  currency,
+}: {
+  onAdd: (draft: NewDishDraft) => void;
+  currency?: string | null;
+}) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState("");
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState<number | null>(null);
+  const [variants, setVariants] = useState<{ name: string; price: number | null }[]>([]);
+  function reset() {
+    setName("");
+    setDescription("");
+    setPrice(null);
+    setVariants([]);
+  }
   if (!open) {
     return (
       <button
@@ -374,47 +401,135 @@ export function AddDishRow({ onAdd }: { onAdd: (name: string) => void }) {
       </button>
     );
   }
+  const canSave = name.trim() !== "";
+  function submit() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const trimmedDescription = description.trim();
+    onAdd({
+      name: trimmed,
+      description: trimmedDescription ? trimmedDescription : null,
+      // Per-size pricing carries a null root by design (same rule as the
+      // row card) — the sizes are the prices.
+      price: variants.length > 0 ? null : price,
+      variants: variants
+        .map((variant) => ({ name: variant.name.trim(), price: variant.price }))
+        .filter((variant) => variant.name !== ""),
+    });
+    reset();
+    setOpen(false);
+  }
   return (
-    <div className="mt-2 flex flex-wrap items-end gap-2">
-      <label className="min-w-44 flex-1 text-xs">
-        <span className="mb-1 block font-medium text-ink-500">Dish name as shown</span>
-        <input
-          type="text"
-          value={draft}
-          autoFocus
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              const trimmed = draft.trim();
-              if (trimmed) {
-                onAdd(trimmed);
-                setDraft("");
-                setOpen(false);
-              }
-            }
-            if (event.key === "Escape") {
-              setDraft("");
-              setOpen(false);
-            }
-          }}
-          placeholder="e.g. Garlic Bread"
-          className="w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+    <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
+      <CommitInput
+        label="Dish name as shown"
+        value={name}
+        placeholder="e.g. Garlic Bread"
+        onCommit={(next) => setName(next.trim())}
+      />
+      <div className="mt-2">
+        <CommitInput
+          label="Description"
+          value={description}
+          validate={() => null}
+          placeholder="Blank if none shown"
+          multiline
+          onCommit={(next) => setDescription(next.trim())}
         />
-      </label>
-      <button
-        type="button"
-        disabled={!draft.trim()}
-        onClick={() => {
-          const trimmed = draft.trim();
-          if (!trimmed) return;
-          onAdd(trimmed);
-          setDraft("");
-          setOpen(false);
-        }}
-        className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-      >
-        Add dish
-      </button>
+      </div>
+      {variants.length === 0 ? (
+        <div className="mt-2">
+          <CommitNumber
+            label={currency ? `Price (${currency})` : "Price"}
+            value={price}
+            placeholder="Blank if unknown"
+            onCommit={setPrice}
+          />
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-ink-500">Priced per size — the dish price stays blank.</p>
+      )}
+      <div className="mt-2">
+        <p className="mb-1 text-xs font-medium text-ink-500">Sizes</p>
+        {variants.length === 0 ? (
+          <p className="text-xs text-ink-500">None — add one if the menu shows sizes.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {variants.map((variant, variantIndex) => (
+              <li
+                key={`${variant.name}-${variantIndex}`}
+                className="grid grid-cols-[minmax(0,1fr)_104px_auto] items-end gap-2"
+              >
+                <CommitInput
+                  label={variantIndex === 0 ? "Size" : `Size ${variantIndex + 1}`}
+                  value={variant.name}
+                  onCommit={(next) => {
+                    const trimmed = next.trim();
+                    if (!trimmed || trimmed === variant.name) return;
+                    setVariants((current) =>
+                      current.map((entry, index) =>
+                        index === variantIndex ? { ...entry, name: trimmed } : entry
+                      )
+                    );
+                  }}
+                />
+                <CommitNumber
+                  label="Price"
+                  value={variant.price}
+                  onCommit={(nextPrice) => {
+                    if (nextPrice === variant.price) return;
+                    setVariants((current) =>
+                      current.map((entry, index) =>
+                        index === variantIndex ? { ...entry, price: nextPrice } : entry
+                      )
+                    );
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove size ${variant.name}`}
+                  onClick={() =>
+                    setVariants((current) => current.filter((_, index) => index !== variantIndex))
+                  }
+                  className="mb-0.5 rounded-full border border-line-300 px-2 py-1 text-xs text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button
+          type="button"
+          onClick={() => setVariants((current) => [...current, { name: "New size", price: null }])}
+          className="mt-2 rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+        >
+          + Add size
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={!canSave}
+          onClick={submit}
+          className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+        >
+          Add dish
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+          className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+        >
+          Cancel
+        </button>
+      </div>
+      <p className="mt-1 text-[11px] text-ink-500">
+        Lands in Check this — confirm once it reads right.
+      </p>
     </div>
   );
 }
@@ -574,11 +689,16 @@ export function ExtractionResult({
             return (
               <li key={`${categoryName}-${item.name}-${rowIndex}`} className="px-5 py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="flex items-center gap-2 font-medium text-ink-900">
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-medium text-ink-900">
                     <span>{item.name}</span>
                     {item.available === false && (
                       <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-700">
                         Unavailable
+                      </span>
+                    )}
+                    {needsReview && (
+                      <span className="shrink-0 rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
+                        {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
                       </span>
                     )}
                   </p>
@@ -618,21 +738,18 @@ export function ExtractionResult({
                     ))}
                   </ul>
                 )}
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {dedupeDietaryLabels(item.dietaryLabels).map((label) => (
-                    <span
-                      key={label}
-                      className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
-                    >
-                      {label}
-                    </span>
-                  ))}
-                  {needsReview && (
-                    <span className="rounded-full bg-warning-100 px-2 py-0.5 text-[11px] font-medium text-warning-900">
-                      {hasAnyPrice(item) ? "Couldn't read" : "Check price"}
-                    </span>
-                  )}
-                </div>
+                {dedupeDietaryLabels(item.dietaryLabels).length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {dedupeDietaryLabels(item.dietaryLabels).map((label) => (
+                      <span
+                        key={label}
+                        className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {item.reviewNotes.length > 0 && (
                   <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-warning-800">
                     {item.reviewNotes.map((note) => (
@@ -640,48 +757,50 @@ export function ExtractionResult({
                     ))}
                   </ul>
                 )}
-                {canFixName && (
+                {(canFixName || canResolve) && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      aria-expanded={expanded}
-                      onClick={() => setExpandedKey(expanded ? null : expandKey)}
-                      className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                    >
-                      {expanded ? "Close" : needsReview ? "Fix…" : "Edit…"}
-                    </button>
+                    {canFixName && (
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={() => setExpandedKey(expanded ? null : expandKey)}
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      >
+                        {expanded ? "Close" : needsReview ? "Fix…" : "Edit…"}
+                      </button>
+                    )}
+                    {canResolve &&
+                      (hasAnyPrice(item) ? (
+                        <button
+                          type="button"
+                          onClick={() => onResolveItem?.(loc, "looks-good")}
+                          className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                        >
+                          ✓ Looks good
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onResolveItem?.(loc, "leave-unpriced")}
+                          title="Keeps the price blank — totals stay honestly blank for this item."
+                          className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                        >
+                          ✓ Leave unpriced
+                        </button>
+                      ))}
                   </div>
                 )}
                 {expanded && loc !== null && fixCard(loc, item)}
-                {canResolve && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {hasAnyPrice(item) ? (
-                      <button
-                        type="button"
-                        onClick={() => onResolveItem?.(loc, "looks-good")}
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                      >
-                        ✓ Looks good
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => onResolveItem?.(loc, "leave-unpriced")}
-                        title="Keeps the price blank — totals stay honestly blank for this item."
-                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                      >
-                        ✓ Leave unpriced
-                      </button>
-                    )}
-                  </div>
-                )}
               </li>
             );
           })}
         </ul>
         {onAddItem !== undefined && (
           <div className="border-t border-line-100 px-5 py-3">
-            <AddDishRow onAdd={(name) => onAddItem(categoryIndex, name)} />
+            <AddDishRow
+              currency={data.currency}
+              onAdd={(draft) => onAddItem(categoryIndex, draft)}
+            />
           </div>
         )}
       </div>
