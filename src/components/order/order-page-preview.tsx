@@ -161,6 +161,8 @@ export function OrderPagePreview({
 
   return (
     <OrderShell bare>
+      <DinerCoverHeader restaurantName={caféName} tableLabel={PREVIEW_TABLE_LABEL} bleed />
+
       <div className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3">
         <p className="text-[11px] font-semibold tracking-wide text-warning-900 uppercase">
           Preview · nothing is sent
@@ -175,8 +177,6 @@ export function OrderPagePreview({
           </p>
         )}
       </div>
-
-      <DinerCoverHeader restaurantName={caféName} tableLabel={PREVIEW_TABLE_LABEL} />
 
       <div className="flex min-w-0 flex-col gap-4">
         <nav aria-label="Search the menu">

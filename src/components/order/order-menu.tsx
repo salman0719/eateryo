@@ -122,8 +122,10 @@ export function DinerCoverHeader({
    * On a phone the cover is the page's own top edge: the band reaches the
    * viewport top and both sides with no page padding, and the card framing
    * comes back from `sm` up. The negative margins cancel `OrderShell`'s
-   * `px-4 py-6`, which is where the inset came from. The owner preview sits
-   * inside a phone frame of its own and never bleeds.
+   * `px-4 py-6`, which is where the inset came from. The owner preview
+   * bleeds the same way inside its phone frame, so it reads edge to edge
+   * like the table page; its notice sits below the cover to keep the top
+   * edge clear.
    */
   bleed?: boolean;
 }) {
@@ -132,7 +134,7 @@ export function DinerCoverHeader({
     <div
       className={
         bleed
-          ? "-mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
+          ? "diner-cover-bleed -mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
           : "overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
       }
     >
@@ -409,7 +411,7 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
  */
 export function CategorySections({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
+    <div className="diner-category-sections -mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
       {children}
     </div>
   );
@@ -518,7 +520,7 @@ export function OrderMenuSection({
       aria-label={category.name}
       // A phone gets the category edge to edge (see `CategorySections`); the
       // inset card is the wide-screen treatment.
-      className="overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
+      className="diner-menu-section overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
     >
       <CategoryHeading category={category} />
       <ul className="divide-y divide-line-100">

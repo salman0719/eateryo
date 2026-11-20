@@ -182,6 +182,47 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   }
 }
 
+/* Phone-frame diner preview (src/components/ui/phone-frame.tsx).
+
+   The frame is a phone at every viewport width, but Tailwind's `sm:`
+   variants answer the viewport, not the frame: on a desktop window the
+   framed cover, list and sections would flip to the wide-screen inset
+   cards while a real phone shows them edge to edge. These overrides pin
+   the framed copies to the below-`sm` phone treatment, so the preview
+   reads exactly like the table page on mobile. Unlayered, so they win
+   over the layered `sm:` utilities at every width. */
+.phone-scroll .diner-cover-bleed {
+  margin-top: -1.5rem;
+  margin-left: -1rem;
+  margin-right: -1rem;
+  border-radius: 0;
+  border-top-width: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+}
+
+.phone-scroll .diner-category-sections {
+  margin-left: -1rem;
+  margin-right: -1rem;
+  gap: 0;
+  border-top-width: 1px;
+  border-bottom-width: 1px;
+  border-left-width: 0;
+  border-right-width: 0;
+  background-color: var(--color-surface-base);
+}
+
+.phone-scroll .diner-category-sections > :not([hidden]) ~ :not([hidden]) {
+  border-top-width: 8px;
+  border-bottom-width: 0;
+  border-color: var(--color-surface-100);
+}
+
+.phone-scroll .diner-menu-section {
+  border-radius: 0;
+  border-width: 0;
+}
+
 /* The preview's order sheet rises from the phone screen's bottom edge. */
 @keyframes sheet-up {
   from {
