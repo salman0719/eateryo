@@ -200,7 +200,6 @@ export function ReviewFixCard({
   categoryNames,
   currentCategoryIndex,
   onMoveItem,
-  onDeleteItem,
 }: {
   item: PreviewItem;
   loc: ReviewItemLocation;
@@ -214,7 +213,6 @@ export function ReviewFixCard({
   categoryNames?: string[];
   currentCategoryIndex?: number;
   onMoveItem?: (loc: ReviewItemLocation, toCategoryIndex: number) => void;
-  onDeleteItem?: (loc: ReviewItemLocation) => void;
 }) {
   return (
     <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
@@ -336,18 +334,6 @@ export function ReviewFixCard({
             </select>
           </label>
         )}
-      {onDeleteItem !== undefined && (
-        <div className="mt-2">
-          <button
-            type="button"
-            onClick={() => onDeleteItem(loc)}
-            title="Removes the dish from the draft — a published revision may still show it until you republish."
-            className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
-          >
-            Delete dish
-          </button>
-        </div>
-      )}
       <p className="mt-1 text-[11px] text-ink-500">
         Fixes keep the check — confirm separately once it reads right. Photos, add-ons and labels
         stay in the editor.
@@ -616,8 +602,8 @@ export function ExtractionResult({
   // identical CTAs were the confusion.
 
   /** The row's own fix-it-here form with every field the review owns.
-   * Moving and deleting re-key every index path, so those close the card:
-   * its locator would point at a different dish. */
+   * Moving re-keys every index path, so it closes the card: its locator
+   * would point at a different dish. Deleting lives on the row itself. */
   function fixCard(loc: ReviewItemLocation, item: PreviewItem) {
     if (onRenameItem === undefined) return null;
     return (
@@ -634,15 +620,6 @@ export function ExtractionResult({
             ? (moveLoc, toCategoryIndex) => {
                 setExpandedKey(null);
                 onMoveItem(moveLoc, toCategoryIndex);
-              }
-            : undefined
-        }
-        // The shell confirms before this fires.
-        onDeleteItem={
-          onDeleteItem !== undefined
-            ? (deleteLoc) => {
-                setExpandedKey(null);
-                onDeleteItem(deleteLoc);
               }
             : undefined
         }
@@ -677,6 +654,9 @@ export function ExtractionResult({
             // Renaming never clears the check — the notes may concern the
             // price, so confirming stays a separate explicit tap.
             const canFixName = loc !== null && onRenameItem !== undefined;
+            // The shell confirms before this fires; deleting re-keys every
+            // index path, so it closes the card like moving does.
+            const canDelete = loc !== null && onDeleteItem !== undefined;
             const expandKey =
               loc !== null ? `${loc.categoryIndex}-${loc.itemIndex}` : `row-${rowIndex}`;
             const expanded = expandedKey === expandKey;
@@ -757,7 +737,7 @@ export function ExtractionResult({
                     ))}
                   </ul>
                 )}
-                {(canFixName || canResolve) && (
+                {(canFixName || canResolve || canDelete) && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {canFixName && (
                       <button
@@ -767,6 +747,20 @@ export function ExtractionResult({
                         className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                       >
                         {expanded ? "Close" : needsReview ? "Fix…" : "Edit…"}
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        type="button"
+                        aria-label={`Delete ${item.name}`}
+                        onClick={() => {
+                          setExpandedKey(null);
+                          if (loc !== null) onDeleteItem?.(loc);
+                        }}
+                        title="Removes the dish from the draft — a published revision may still show it until you republish."
+                        className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                      >
+                        Delete
                       </button>
                     )}
                     {canResolve &&
@@ -864,6 +858,20 @@ export function ExtractionResult({
                                 className="rounded-full border border-line-300 px-2 py-0.5 text-[11px] font-medium text-ink-500 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                               >
                                 {readyExpanded ? "Close" : "Edit…"}
+                              </button>
+                            )}
+                            {onDeleteItem !== undefined && (
+                              <button
+                                type="button"
+                                aria-label={`Delete ${item.name}`}
+                                onClick={() => {
+                                  setExpandedKey(null);
+                                  onDeleteItem(readyLoc);
+                                }}
+                                title="Removes the dish from the draft — a published revision may still show it until you republish."
+                                className="rounded-full border border-line-300 px-2 py-0.5 text-[11px] font-medium text-ink-500 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+                              >
+                                Delete
                               </button>
                             )}
                           </span>

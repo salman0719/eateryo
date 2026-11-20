@@ -67,9 +67,7 @@ describe("review inline fixes: fix card", () => {
   const loc = { categoryIndex: 0, itemIndex: 0 };
   const item = RESULT.categories[0].items[0];
 
-  function renderCard(
-    options: { description?: boolean; variants?: boolean; move?: boolean; del?: boolean } = {}
-  ) {
+  function renderCard(options: { description?: boolean; variants?: boolean; move?: boolean } = {}) {
     return renderToStaticMarkup(
       createElement(ReviewFixCard, {
         item,
@@ -80,7 +78,6 @@ describe("review inline fixes: fix card", () => {
         categoryNames: options.move ? ["Starters", "Mains"] : undefined,
         currentCategoryIndex: options.move ? 0 : undefined,
         onMoveItem: options.move ? noop : undefined,
-        onDeleteItem: options.del ? noop : undefined,
       })
     );
   }
@@ -130,10 +127,36 @@ describe("review inline fixes: fix card", () => {
     expect(html).toContain("Mains");
   });
 
-  it("deletes a dish from the card when wired", () => {
-    const html = renderCard({ del: true });
-    expect(html).toContain("Delete dish");
-    expect(renderCard()).not.toContain("Delete dish");
+  it("keeps delete off the fix card: deleting lives on the row", () => {
+    expect(renderCard()).not.toContain("Delete");
+  });
+
+  it("puts Delete beside Fix on a flagged row and beside Edit on a Ready row", () => {
+    const html = render(true);
+    expect(html).toContain("Fix…");
+    expect(html).toContain("Edit…");
+    expect(html).toContain("Delete");
+  });
+
+  it("omits the row Delete when not wired", () => {
+    const html = renderToStaticMarkup(
+      createElement(ExtractionResult, {
+        data: RESULT,
+        source: "ai",
+        onStartOver: noop,
+        onResolveItem: noop,
+        onResolveAll: noop,
+        onUpdatePrice: noop,
+        onRenameItem: noop,
+        onUpdateDescription: noop,
+        onUpdateVariants: noop,
+        onMoveItem: noop,
+        onAddItem: noop,
+        initialReviewCount: 1,
+        previewDoc: null,
+      })
+    );
+    expect(html).not.toContain("Delete");
   });
 
   it("adds a dish the AI missed per category when wired", () => {
