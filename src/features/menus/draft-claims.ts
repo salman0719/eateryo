@@ -11,6 +11,7 @@ import {
   decideLocalDraftClaimSurface,
   decidePublishJourneyClaim,
   deriveClaimGate,
+  draftsForAutoImport,
   resolveAutoClaimTarget,
 } from "@/features/menus/claim-local-drafts";
 import { clearDirectSignInIntent, loadDirectSignInIntent } from "@/features/menus/direct-sign-in";
@@ -24,7 +25,7 @@ import {
   forgetPublishJourney,
   hasPublishJourney,
 } from "@/features/publishing/wizard-state";
-import { createRestaurant } from "@/features/tenancy/client";
+import { ensureFirstRestaurant } from "@/features/tenancy/first-restaurant";
 import { useWorkspace } from "@/features/tenancy/workspace-context";
 import type { AppScreen } from "@/features/navigation/routes";
 
@@ -61,7 +62,7 @@ export type DraftClaimsValue = {
   /** Neither claim surface renders while the account is unknown. */
   claimSurfaceQuiet: boolean;
   /** Copy the browser's visible drafts into one owned café. */
-  runLocalDraftClaim(restaurantId: string): Promise<void>;
+  runLocalDraftClaim(restaurantId: string, menuIds?: readonly string[]): Promise<void>;
   /** Remove a browser row and its stamp (after a claim, or for demo data). */
   dissolveBrowserMenu(menuId: string): Promise<void>;
   /** Remove several browser rows with every mark they carry. */
@@ -114,7 +115,24 @@ export function useDraftClaims({
   const journeyClaimRef = useRef<string | null>(null);
 
   const localOnly = menus.filter((menu) => !serverIds.has(menu.id));
-  const localOnlyCount = localOnly.length;
+  /**
+   * The draft the magic link is returning to, when this browser has one.
+   *
+   * That draft is the journey claim's to take: the emailed link is its
+   * consent, and the journey path is the one that names the café from it.
+   * The generic import leaves it alone — both paths deciding on the same
+   * draft is what made a brand-new account create two cafés, since each read
+   * "no café yet" and each created one. A journey draft nobody is returning
+   * to (any other route) is not excluded, so it still joins the account.
+   */
+  const journeyMenuId =
+    routeMenuId !== null &&
+    hasPublishJourney(routeMenuId) &&
+    localOnly.some((menu) => menu.id === routeMenuId)
+      ? routeMenuId
+      : null;
+  const autoClaimDrafts = draftsForAutoImport(localOnly, journeyMenuId);
+  const autoClaimMenuIds = autoClaimDrafts.map((menu) => menu.id);
 
   // "pending" and "unavailable" are real answers, not stand-ins for "none".
   // While the session or the account's inventory is still loading the
@@ -148,7 +166,7 @@ export function useDraftClaims({
         gate: claimGate,
         signedIn,
         claim: {
-          localCount: localOnlyCount,
+          localCount: autoClaimDrafts.length,
           accountMenuCount: serverIds.size,
           restaurantCount: restaurantList?.length ?? 0,
           ownedRestaurantCount: ownedRestaurantsForAccount.length,
@@ -190,15 +208,21 @@ export function useDraftClaims({
    * by the automatic import, the direct sign-in intent, and the import that
    * follows the wizard creating the account's first café. Freshly imported
    * rows dissolve; the notice reports per-batch totals.
+   *
+   * `menuIds` defaults to the drafts the generic import owns: the visible
+   * browser-only rows minus a draft its own journey claim is taking.
    */
-  async function runLocalDraftClaim(restaurantId: string) {
+  async function runLocalDraftClaim(
+    restaurantId: string,
+    menuIds: readonly string[] = autoClaimMenuIds
+  ) {
     setClaimError(null);
     try {
       // Only the visible browser-only rows move: hidden rows belong to
       // another session and are never swept into this account. Sample rows
       // are disregarded, never imported — signing in must not file demo
       // data into a real café.
-      const { real, demo } = await partitionRealMenus(localOnly.map((menu) => menu.id));
+      const { real, demo } = await partitionRealMenus(menuIds);
       for (const id of demo) await dissolveBrowserMenu(id);
       if (real.length === 0) {
         // Nothing but sample rows, already disregarded above: no import,
@@ -267,7 +291,10 @@ export function useDraftClaims({
         await runLocalDraftClaim(target.restaurantId);
         return;
       }
-      const created = await createRestaurant(target.name);
+      // One creation per account, shared with the journey claim and the
+      // editor's autosave: asking the same question three times at once used
+      // to produce two cafés.
+      const created = await ensureFirstRestaurant(accountKey, target.name);
       workspace.addRestaurant(created);
       await runLocalDraftClaim(created.id);
     } catch {
@@ -298,7 +325,10 @@ export function useDraftClaims({
       } else if (ownedRestaurantsForAccount.length > 0 && ownedRestaurantsForAccount[0]) {
         targetId = ownedRestaurantsForAccount[0].id;
       } else if ((restaurantList?.length ?? 0) === 0) {
-        const created = await createRestaurant(
+        // Same door as the generic import and the editor's autosave: the
+        // account's first café is created once, by whichever path asks first.
+        const created = await ensureFirstRestaurant(
+          actor,
           suggestRestaurantName([draft.title]) ?? "My restaurant"
         );
         workspace.addRestaurant(created);
@@ -491,7 +521,7 @@ export function useDraftClaims({
     // save while signed in) must still be claimed instead of inheriting a
     // decision made when the browser held nothing.
     claimEvaluatedRef.current = accountKey;
-    const titles = localOnly.map((menu) => menu.title);
+    const titles = autoClaimDrafts.map((menu) => menu.title);
     // Deferred: the effect must not set state synchronously while rendering
     // the frame that made the decision.
     void Promise.resolve().then(() => handleAutoClaim(titles));
