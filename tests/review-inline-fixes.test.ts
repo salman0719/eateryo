@@ -174,6 +174,29 @@ describe("review inline fixes: fix card", () => {
   });
 });
 
+describe("review inline fixes: compact row", () => {
+  it("keeps the flag badge beside the name", () => {
+    const html = render(true);
+    const nameAt = html.indexOf("Truffle Fires");
+    // Priced but noted: the badge reads "Couldn't read".
+    const badgeAt = html.indexOf("Couldn&#x27;t read");
+    expect(nameAt).toBeGreaterThanOrEqual(0);
+    expect(badgeAt).toBeGreaterThan(nameAt);
+    // Same paragraph: no paragraph break between the name and its badge.
+    expect(html.slice(nameAt, badgeAt)).not.toContain("</p>");
+  });
+
+  it("keeps Fix and its confirm on one line", () => {
+    const html = render(true);
+    const fixAt = html.indexOf("Fix…");
+    const confirmAt = html.indexOf("Looks good");
+    expect(fixAt).toBeGreaterThanOrEqual(0);
+    expect(confirmAt).toBeGreaterThan(fixAt);
+    // One shared action row: no closing div between the two buttons.
+    expect(html.slice(fixAt, confirmAt)).not.toContain("</div>");
+  });
+});
+
 describe("review inline fixes: rename", () => {
   it("offers a Fix affordance on a flagged row when renaming is wired", () => {
     const html = render(true);

@@ -1590,7 +1590,7 @@ export function AppShell() {
               if (ok) handleDeleteResultItem(loc);
             })();
           }}
-          onAddItem={(categoryIndex, name) => void handleAddResultItem(categoryIndex, name)}
+          onAddItem={(categoryIndex, draft) => void handleAddResultItem(categoryIndex, draft)}
           onRenameTitle={handleRenameResultTitle}
           onPublish={
             source === "demo" || draftSave === "saved" ? () => void handleStartPublish() : undefined

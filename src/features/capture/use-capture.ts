@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { PageImage } from "@/components/upload/image-preview";
 import type {
+  NewDishDraft,
   PreviewMenu,
   ReviewItemLocation,
   ReviewResolution,
@@ -558,17 +559,29 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
-  /** Add a dish the AI missed. Lands at the end of the category, unpriced
-   * and review-noted — so it shows up in Check this honestly. */
-  function handleAddResultItem(categoryIndex: number, name: string) {
-    const trimmed = name.trim();
+  /** Add a dish the AI missed with the same fix-it-here fields as a row
+   * card. Lands at the end of the category — priced as entered, or unpriced
+   * and review-noted when the price stays blank. */
+  function handleAddResultItem(categoryIndex: number, draft: NewDishDraft) {
+    const trimmed = draft.name.trim();
     if (!trimmed) return;
     const doc = source === "demo" ? demoDoc : resultDoc;
     const category = doc?.categories[categoryIndex];
     if (!doc || !category) return;
+    const description = draft.description?.trim() ? draft.description.trim() : null;
+    const variants = draft.variants
+      .map((variant) => ({ name: variant.name.trim(), price: variant.price }))
+      .filter((variant) => variant.name !== "");
+    const price = variants.length > 0 ? null : draft.price;
     const next = addItem(doc, category.id, {
       name: trimmed,
-      reviewNotes: ["Added by hand — check the price."],
+      description,
+      price,
+      variants,
+      reviewNotes:
+        price === null && variants.every((variant) => variant.price === null)
+          ? ["Added by hand — check the price."]
+          : [],
     });
     patchResultDoc(next);
     void persistResultDoc(next);
