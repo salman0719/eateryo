@@ -471,6 +471,21 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
+  /** Rename a dish in place. The name is the fix; the AI's uncertainty
+   * about it (reviewNotes) stays until the owner confirms separately. */
+  function handleRenameResultItem(loc: ReviewItemLocation, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item || item.name === trimmed) return;
+    const next = updateItem(doc, category.id, item.id, { name: trimmed });
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   /** Q2: the result title is an editable field, never a naming gate.
    * Commits persist to the draft like price fixes; blank is ignored. */
   function handleRenameResultTitle(title: string) {
@@ -578,6 +593,7 @@ export function useCapture(options: CaptureOptions) {
     handleResolveResultItem,
     handleUpdateResultPrice,
     handleResolveAllResultItems,
+    handleRenameResultItem,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,
