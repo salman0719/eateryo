@@ -76,6 +76,8 @@ interface ExtractionResultProps {
     loc: ReviewItemLocation,
     variants: { name: string; price: number | null }[]
   ) => void;
+  /** Move a dish to another category in place (lands at the end). */
+  onMoveItem?: (loc: ReviewItemLocation, toCategoryIndex: number) => void;
   /** Resolve every flagged item at once — the impatient path. Prices stay
    * as shown; unpriced items ship with honestly null totals. */
   onResolveAll?: () => void;
@@ -190,6 +192,9 @@ export function ReviewFixCard({
   onRenameItem,
   onUpdateDescription,
   onUpdateVariants,
+  categoryNames,
+  currentCategoryIndex,
+  onMoveItem,
 }: {
   item: PreviewItem;
   loc: ReviewItemLocation;
@@ -199,6 +204,10 @@ export function ReviewFixCard({
     loc: ReviewItemLocation,
     variants: { name: string; price: number | null }[]
   ) => void;
+  /** Category names in document order; the move list excludes the current. */
+  categoryNames?: string[];
+  currentCategoryIndex?: number;
+  onMoveItem?: (loc: ReviewItemLocation, toCategoryIndex: number) => void;
 }) {
   return (
     <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
@@ -293,6 +302,33 @@ export function ReviewFixCard({
           </button>
         </div>
       )}
+      {onMoveItem !== undefined &&
+        categoryNames !== undefined &&
+        currentCategoryIndex !== undefined &&
+        categoryNames.length > 1 && (
+          <label className="mt-2 flex items-center gap-1.5 text-xs text-ink-600">
+            Move to
+            <select
+              aria-label={`Move ${item.name} to another category`}
+              defaultValue=""
+              onChange={(event) => {
+                const target = Number(event.target.value);
+                event.target.value = "";
+                if (Number.isInteger(target)) onMoveItem(loc, target);
+              }}
+              className="rounded-full border border-line-300 bg-surface-base px-2 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+            >
+              <option value="">Category…</option>
+              {categoryNames.map((name, index) =>
+                index === currentCategoryIndex ? null : (
+                  <option key={`${name}-${index}`} value={index}>
+                    {name}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+        )}
       <p className="mt-1 text-[11px] text-ink-500">
         Fixes keep the check — confirm separately once it reads right.
       </p>
@@ -312,6 +348,7 @@ export function ExtractionResult({
   onRenameItem,
   onUpdateDescription,
   onUpdateVariants,
+  onMoveItem,
   onRenameTitle,
   initialReviewCount = null,
   editLabel = "Edit menu",
@@ -497,6 +534,18 @@ export function ExtractionResult({
                     onRenameItem={onRenameItem}
                     onUpdateDescription={onUpdateDescription}
                     onUpdateVariants={onUpdateVariants}
+                    categoryNames={data.categories.map((category) => category.name)}
+                    currentCategoryIndex={loc.categoryIndex}
+                    // Moving re-keys every index path, so the card closes:
+                    // its locator would point at a different dish.
+                    onMoveItem={
+                      onMoveItem !== undefined
+                        ? (moveLoc, toCategoryIndex) => {
+                            setExpandedKey(null);
+                            onMoveItem(moveLoc, toCategoryIndex);
+                          }
+                        : undefined
+                    }
                   />
                 )}
                 {canResolve && (

@@ -54,6 +54,7 @@ function render(withRename: boolean) {
       onRenameItem: withRename ? noop : undefined,
       onUpdateDescription: noop,
       onUpdateVariants: noop,
+      onMoveItem: noop,
       initialReviewCount: 1,
       previewDoc: null,
     })
@@ -64,7 +65,9 @@ describe("review inline fixes: fix card", () => {
   const loc = { categoryIndex: 0, itemIndex: 0 };
   const item = RESULT.categories[0].items[0];
 
-  function renderCard(options: { description?: boolean; variants?: boolean } = {}) {
+  function renderCard(
+    options: { description?: boolean; variants?: boolean; move?: boolean } = {}
+  ) {
     return renderToStaticMarkup(
       createElement(ReviewFixCard, {
         item,
@@ -72,6 +75,9 @@ describe("review inline fixes: fix card", () => {
         onRenameItem: noop,
         onUpdateDescription: options.description ? noop : undefined,
         onUpdateVariants: options.variants ? noop : undefined,
+        categoryNames: options.move ? ["Starters", "Mains"] : undefined,
+        currentCategoryIndex: options.move ? 0 : undefined,
+        onMoveItem: options.move ? noop : undefined,
       })
     );
   }
@@ -113,6 +119,27 @@ describe("review inline fixes: fix card", () => {
   it("omits the sizes section when not wired", () => {
     const html = renderCard({ description: true });
     expect(html).not.toContain("Sizes");
+  });
+
+  it("moves a dish to another category, excluding its own", () => {
+    const html = renderCard({ move: true });
+    expect(html).toContain("Move to");
+    expect(html).toContain("Mains");
+  });
+
+  it("omits the move list with a single category or when not wired", () => {
+    expect(renderCard()).not.toContain("Move to");
+    const single = renderToStaticMarkup(
+      createElement(ReviewFixCard, {
+        item,
+        loc,
+        onRenameItem: noop,
+        categoryNames: ["Starters"],
+        currentCategoryIndex: 0,
+        onMoveItem: noop,
+      })
+    );
+    expect(single).not.toContain("Move to");
   });
 });
 
