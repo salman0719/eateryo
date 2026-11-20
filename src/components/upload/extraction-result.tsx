@@ -68,6 +68,8 @@ interface ExtractionResultProps {
   onUpdatePrice?: (loc: ReviewItemLocation, price: number | null) => void;
   /** Rename a dish in place (persists to the draft; keeps review notes). */
   onRenameItem?: (loc: ReviewItemLocation, name: string) => void;
+  /** Edit a dish's description in place (null = blank; keeps review notes). */
+  onUpdateDescription?: (loc: ReviewItemLocation, description: string | null) => void;
   /** Resolve every flagged item at once — the impatient path. Prices stay
    * as shown; unpriced items ship with honestly null totals. */
   onResolveAll?: () => void;
@@ -168,6 +170,58 @@ function ReviewPriceInput({
   );
 }
 
+/**
+ * Variant A fix card: the row's own fix-it-here form, so a wrong name or
+ * description is fixed where it is seen instead of in the editor. Every
+ * field persists to the draft through its callback; fixes never clear the
+ * check — the notes may concern another field, so confirming stays a
+ * separate explicit tap. Exported for tests (which render it directly:
+ * expansion itself is client state).
+ */
+export function ReviewFixCard({
+  item,
+  loc,
+  onRenameItem,
+  onUpdateDescription,
+}: {
+  item: PreviewItem;
+  loc: ReviewItemLocation;
+  onRenameItem: (loc: ReviewItemLocation, name: string) => void;
+  onUpdateDescription?: (loc: ReviewItemLocation, description: string | null) => void;
+}) {
+  return (
+    <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
+      <CommitInput
+        label="Dish name"
+        value={item.name}
+        onCommit={(name) => {
+          const trimmed = name.trim();
+          if (trimmed && trimmed !== item.name) onRenameItem(loc, trimmed);
+        }}
+      />
+      {onUpdateDescription !== undefined && (
+        <div className="mt-2">
+          <CommitInput
+            label="Description"
+            value={item.description ?? ""}
+            validate={() => null}
+            placeholder="Blank if none shown"
+            multiline
+            onCommit={(description) => {
+              const trimmed = description.trim();
+              const next = trimmed ? trimmed : null;
+              if (next !== item.description) onUpdateDescription(loc, next);
+            }}
+          />
+        </div>
+      )}
+      <p className="mt-1 text-[11px] text-ink-500">
+        Fixes keep the check — confirm separately once it reads right.
+      </p>
+    </div>
+  );
+}
+
 export function ExtractionResult({
   data,
   source,
@@ -178,6 +232,7 @@ export function ExtractionResult({
   onResolveAll,
   onUpdatePrice,
   onRenameItem,
+  onUpdateDescription,
   onRenameTitle,
   initialReviewCount = null,
   editLabel = "Edit menu",
@@ -357,19 +412,12 @@ export function ExtractionResult({
                   </div>
                 )}
                 {expanded && loc !== null && onRenameItem !== undefined && (
-                  <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
-                    <CommitInput
-                      label="Dish name"
-                      value={item.name}
-                      onCommit={(name) => {
-                        const trimmed = name.trim();
-                        if (trimmed && trimmed !== item.name) onRenameItem(loc, trimmed);
-                      }}
-                    />
-                    <p className="mt-1 text-[11px] text-ink-500">
-                      Renaming keeps the check — confirm separately once it reads right.
-                    </p>
-                  </div>
+                  <ReviewFixCard
+                    item={item}
+                    loc={loc}
+                    onRenameItem={onRenameItem}
+                    onUpdateDescription={onUpdateDescription}
+                  />
                 )}
                 {canResolve && (
                   <div className="mt-2 flex flex-wrap gap-2">
