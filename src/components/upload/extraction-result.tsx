@@ -348,7 +348,8 @@ export function ReviewFixCard({
         </div>
       )}
       <p className="mt-1 text-[11px] text-ink-500">
-        Fixes keep the check — confirm separately once it reads right.
+        Fixes keep the check — confirm separately once it reads right. Photos, add-ons and labels
+        stay in the editor.
       </p>
     </div>
   );
@@ -485,15 +486,54 @@ export function ExtractionResult({
     }
     onPublish?.();
   }
-  const readyItems = data.categories.flatMap((category) =>
-    category.items.filter((item) => !isFlagged(item))
+  // Ready rows carry their index paths too: a confident read can still be
+  // wrong, so every row — flagged or not — opens the same fix card.
+  const readyEntries = data.categories.flatMap((category, categoryIndex) =>
+    category.items
+      .map((item, itemIndex) => ({ item, loc: { categoryIndex, itemIndex } }))
+      .filter(({ item }) => !isFlagged(item))
   );
-  const visibleReady = showAllReady ? readyItems : readyItems.slice(0, 5);
+  const visibleReadyEntries = showAllReady ? readyEntries : readyEntries.slice(0, 5);
 
   // Q7: exactly one primary road. Continue takes the primary slot as soon as
   // the draft is safe; the editor stays as a quiet secondary, never a
   // competing equal. The old amber publish card is gone on purpose — two
   // identical CTAs were the confusion.
+
+  /** The row's own fix-it-here form with every field the review owns.
+   * Moving and deleting re-key every index path, so those close the card:
+   * its locator would point at a different dish. */
+  function fixCard(loc: ReviewItemLocation, item: PreviewItem) {
+    if (onRenameItem === undefined) return null;
+    return (
+      <ReviewFixCard
+        item={item}
+        loc={loc}
+        onRenameItem={onRenameItem}
+        onUpdateDescription={onUpdateDescription}
+        onUpdateVariants={onUpdateVariants}
+        categoryNames={data.categories.map((category) => category.name)}
+        currentCategoryIndex={loc.categoryIndex}
+        onMoveItem={
+          onMoveItem !== undefined
+            ? (moveLoc, toCategoryIndex) => {
+                setExpandedKey(null);
+                onMoveItem(moveLoc, toCategoryIndex);
+              }
+            : undefined
+        }
+        // The shell confirms before this fires.
+        onDeleteItem={
+          onDeleteItem !== undefined
+            ? (deleteLoc) => {
+                setExpandedKey(null);
+                onDeleteItem(deleteLoc);
+              }
+            : undefined
+        }
+      />
+    );
+  }
 
   /** One category card with full detail rows (badges + notes + resolve actions).
    * `locator` maps a rendered row back to its index path in `data`, so a
@@ -612,37 +652,7 @@ export function ExtractionResult({
                     </button>
                   </div>
                 )}
-                {expanded && loc !== null && onRenameItem !== undefined && (
-                  <ReviewFixCard
-                    item={item}
-                    loc={loc}
-                    onRenameItem={onRenameItem}
-                    onUpdateDescription={onUpdateDescription}
-                    onUpdateVariants={onUpdateVariants}
-                    categoryNames={data.categories.map((category) => category.name)}
-                    currentCategoryIndex={loc.categoryIndex}
-                    // Moving re-keys every index path, so the card closes:
-                    // its locator would point at a different dish.
-                    onMoveItem={
-                      onMoveItem !== undefined
-                        ? (moveLoc, toCategoryIndex) => {
-                            setExpandedKey(null);
-                            onMoveItem(moveLoc, toCategoryIndex);
-                          }
-                        : undefined
-                    }
-                    // Deleting re-keys every index path too, so the card
-                    // closes with it. The shell confirms before this fires.
-                    onDeleteItem={
-                      onDeleteItem !== undefined
-                        ? (deleteLoc) => {
-                            setExpandedKey(null);
-                            onDeleteItem(deleteLoc);
-                          }
-                        : undefined
-                    }
-                  />
-                )}
+                {expanded && loc !== null && fixCard(loc, item)}
                 {canResolve && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {hasAnyPrice(item) ? (
@@ -691,8 +701,12 @@ export function ExtractionResult({
       </div>
     ) : reviewCount === 0 ? (
       <div className="flex flex-col gap-3">
+        {/* A clean extraction still gets fix cards: confidence is not trust. */}
         {data.categories.map((category, categoryIndex) =>
-          renderCategoryCard(category.name, categoryIndex, category.items)
+          renderCategoryCard(category.name, categoryIndex, category.items, (rowIndex) => ({
+            categoryIndex,
+            itemIndex: rowIndex,
+          }))
         )}
       </div>
     ) : (
@@ -702,38 +716,58 @@ export function ExtractionResult({
             aria-label="Ready items"
             className="rounded-2xl border border-line-200 bg-surface-base p-5"
           >
-            <h3 className="text-sm font-semibold text-ink-900">✓ Ready ({readyItems.length})</h3>
-            {readyItems.length === 0 ? (
+            <h3 className="text-sm font-semibold text-ink-900">✓ Ready ({readyEntries.length})</h3>
+            {readyEntries.length === 0 ? (
               <p className="mt-1 text-sm text-ink-600">Every item needs a look — start below.</p>
             ) : (
               <>
                 <ul className="mt-2 divide-y divide-line-100">
-                  {visibleReady.map((item) => (
-                    <li
-                      key={`ready-${item.name}`}
-                      className="flex items-baseline justify-between gap-3 py-1.5"
-                    >
-                      {/* Wraps instead of truncating: a long dish name is the
-                          thing being checked, so it must be readable whole. */}
-                      <span className="min-w-0 flex-1 break-words text-sm text-ink-800">
-                        {item.name}
-                      </span>
-                      <span className="shrink-0 text-sm font-medium text-ink-800 tabular-nums">
-                        {formatPrice(item, data.currency)}
-                      </span>
-                    </li>
-                  ))}
+                  {visibleReadyEntries.map(({ item, loc: readyLoc }) => {
+                    const readyKey = `ready-${readyLoc.categoryIndex}-${readyLoc.itemIndex}`;
+                    const readyExpanded = expandedKey === readyKey;
+                    return (
+                      <li key={readyKey} className="py-1.5">
+                        <div className="flex items-baseline justify-between gap-3">
+                          {/* Wraps instead of truncating: a long dish name is the
+                              thing being checked, so it must be readable whole. */}
+                          <span className="min-w-0 flex-1 break-words text-sm text-ink-800">
+                            {item.name}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="text-sm font-medium text-ink-800 tabular-nums">
+                              {formatPrice(item, data.currency)}
+                            </span>
+                            {onRenameItem !== undefined && (
+                              <button
+                                type="button"
+                                aria-expanded={readyExpanded}
+                                onClick={() => setExpandedKey(readyExpanded ? null : readyKey)}
+                                className="rounded-full border border-line-300 px-2 py-0.5 text-[11px] font-medium text-ink-500 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                              >
+                                {readyExpanded ? "Close" : "Edit…"}
+                              </button>
+                            )}
+                          </span>
+                        </div>
+                        {readyExpanded && fixCard(readyLoc, item)}
+                      </li>
+                    );
+                  })}
                 </ul>
-                {readyItems.length > visibleReady.length ? (
+                {readyEntries.length > visibleReadyEntries.length ? (
                   <button
                     type="button"
                     onClick={() => setShowAllReady(true)}
                     className="mt-2 text-xs font-medium text-ink-500 underline underline-offset-2 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
-                    …and {readyItems.length - visibleReady.length} more — no action needed
+                    …and {readyEntries.length - visibleReadyEntries.length} more — no action needed
                   </button>
                 ) : (
-                  <p className="mt-2 text-xs text-ink-500">No badges, no action needed.</p>
+                  <p className="mt-2 text-xs text-ink-500">
+                    {onRenameItem !== undefined
+                      ? "No badges, no action needed — Edit… still opens any row."
+                      : "No badges, no action needed."}
+                  </p>
                 )}
               </>
             )}
