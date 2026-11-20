@@ -297,6 +297,8 @@ export function AppShell() {
     handleUpdateResultDescription,
     handleUpdateResultVariants,
     handleMoveResultItem,
+    handleDeleteResultItem,
+    handleAddResultItem,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,
@@ -1576,6 +1578,19 @@ export function AppShell() {
           onUpdateDescription={handleUpdateResultDescription}
           onUpdateVariants={handleUpdateResultVariants}
           onMoveItem={handleMoveResultItem}
+          onDeleteItem={(loc) => {
+            void (async () => {
+              const category = resultDoc?.categories[loc.categoryIndex];
+              const name = category?.items[loc.itemIndex]?.name ?? "this dish";
+              const ok = await confirm({
+                message: `Delete “${name}” from the draft? A published revision may still show it until you republish.`,
+                confirmLabel: "Delete",
+                destructive: true,
+              });
+              if (ok) handleDeleteResultItem(loc);
+            })();
+          }}
+          onAddItem={(categoryIndex, name) => void handleAddResultItem(categoryIndex, name)}
           onRenameTitle={handleRenameResultTitle}
           onPublish={
             source === "demo" || draftSave === "saved" ? () => void handleStartPublish() : undefined
