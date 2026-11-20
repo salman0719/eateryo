@@ -41,7 +41,7 @@ import {
 } from "@/features/menus/sync";
 import { useNavigation } from "@/features/navigation/navigation-context";
 import { accessCan, isPublishedOnlyAccess, type MenuAccess } from "@/features/tenancy/access";
-import { createRestaurant } from "@/features/tenancy/client";
+import { ensureFirstRestaurant } from "@/features/tenancy/first-restaurant";
 import { useWorkspace } from "@/features/tenancy/workspace-context";
 
 /**
@@ -237,7 +237,13 @@ export function useActiveMenu(options: ActiveMenuOptions) {
     }
     if ((restaurants?.length ?? 0) > 0) return null;
     try {
-      const created = await createRestaurant(suggestRestaurantName([menuTitle]) ?? "My restaurant");
+      // The account's first café is one decision shared with the draft claims:
+      // an autosave landing while the sign-in claim is also creating one used
+      // to mean two cafés on a brand-new account.
+      const created = await ensureFirstRestaurant(
+        accountKeyRef.current,
+        suggestRestaurantName([menuTitle]) ?? "My restaurant"
+      );
       addRestaurant(created);
       return created.id;
     } catch {
