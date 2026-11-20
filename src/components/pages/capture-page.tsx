@@ -84,6 +84,12 @@ export interface CapturePageProps {
   onResolveItem: ResultProps["onResolveItem"];
   onResolveAll: ResultProps["onResolveAll"];
   onUpdatePrice: ResultProps["onUpdatePrice"];
+  onRenameItem: ResultProps["onRenameItem"];
+  onUpdateDescription: ResultProps["onUpdateDescription"];
+  onUpdateVariants: ResultProps["onUpdateVariants"];
+  onMoveItem: ResultProps["onMoveItem"];
+  onDeleteItem: ResultProps["onDeleteItem"];
+  onAddItem: ResultProps["onAddItem"];
   onRenameTitle: ResultProps["onRenameTitle"];
   onPublish: (() => void) | undefined;
 }
@@ -151,6 +157,12 @@ export function CapturePage({
   onResolveItem,
   onResolveAll,
   onUpdatePrice,
+  onRenameItem,
+  onUpdateDescription,
+  onUpdateVariants,
+  onMoveItem,
+  onDeleteItem,
+  onAddItem,
   onRenameTitle,
   onPublish,
 }: CapturePageProps) {
@@ -502,6 +514,12 @@ export function CapturePage({
             onResolveItem={onResolveItem}
             onResolveAll={onResolveAll}
             onUpdatePrice={onUpdatePrice}
+            onRenameItem={onRenameItem}
+            onUpdateDescription={onUpdateDescription}
+            onUpdateVariants={onUpdateVariants}
+            onMoveItem={onMoveItem}
+            onDeleteItem={onDeleteItem}
+            onAddItem={onAddItem}
             onRenameTitle={onRenameTitle}
             initialReviewCount={initialReviewCount}
             onPublish={onPublish}
