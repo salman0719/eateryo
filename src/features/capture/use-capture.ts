@@ -14,6 +14,7 @@ import {
   confirmItemReviewed,
   hasAnyPrice,
   isItemFlagged,
+  moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
@@ -527,6 +528,20 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
+  /** Move a dish to another category in place. Lands at the end; the
+   * review card closes because every index path re-keys. */
+  function handleMoveResultItem(loc: ReviewItemLocation, toCategoryIndex: number) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const target = doc.categories[toCategoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item || !target || target.id === category.id) return;
+    const next = moveItemToCategory(doc, category.id, target.id, item.id);
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   /** Q2: the result title is an editable field, never a naming gate.
    * Commits persist to the draft like price fixes; blank is ignored. */
   function handleRenameResultTitle(title: string) {
@@ -637,6 +652,7 @@ export function useCapture(options: CaptureOptions) {
     handleRenameResultItem,
     handleUpdateResultDescription,
     handleUpdateResultVariants,
+    handleMoveResultItem,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,
