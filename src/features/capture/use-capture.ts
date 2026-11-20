@@ -11,7 +11,9 @@ import type {
 import { extractedMenuToDocument } from "@/features/menu/convert";
 import {
   acceptItemUnpriced,
+  addItem,
   confirmItemReviewed,
+  deleteItem,
   hasAnyPrice,
   isItemFlagged,
   moveItemToCategory,
@@ -542,6 +544,36 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
+  /** Delete a dish from the draft in place. The shell confirms before
+   * this fires; a published revision may still serve the old dish until
+   * the next publish. */
+  function handleDeleteResultItem(loc: ReviewItemLocation) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item) return;
+    const next = deleteItem(doc, category.id, item.id);
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Add a dish the AI missed. Lands at the end of the category, unpriced
+   * and review-noted — so it shows up in Check this honestly. */
+  function handleAddResultItem(categoryIndex: number, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    const category = doc?.categories[categoryIndex];
+    if (!doc || !category) return;
+    const next = addItem(doc, category.id, {
+      name: trimmed,
+      reviewNotes: ["Added by hand — check the price."],
+    });
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   /** Q2: the result title is an editable field, never a naming gate.
    * Commits persist to the draft like price fixes; blank is ignored. */
   function handleRenameResultTitle(title: string) {
@@ -653,6 +685,8 @@ export function useCapture(options: CaptureOptions) {
     handleUpdateResultDescription,
     handleUpdateResultVariants,
     handleMoveResultItem,
+    handleDeleteResultItem,
+    handleAddResultItem,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,

@@ -55,6 +55,8 @@ function render(withRename: boolean) {
       onUpdateDescription: noop,
       onUpdateVariants: noop,
       onMoveItem: noop,
+      onDeleteItem: noop,
+      onAddItem: noop,
       initialReviewCount: 1,
       previewDoc: null,
     })
@@ -66,7 +68,7 @@ describe("review inline fixes: fix card", () => {
   const item = RESULT.categories[0].items[0];
 
   function renderCard(
-    options: { description?: boolean; variants?: boolean; move?: boolean } = {}
+    options: { description?: boolean; variants?: boolean; move?: boolean; del?: boolean } = {}
   ) {
     return renderToStaticMarkup(
       createElement(ReviewFixCard, {
@@ -78,6 +80,7 @@ describe("review inline fixes: fix card", () => {
         categoryNames: options.move ? ["Starters", "Mains"] : undefined,
         currentCategoryIndex: options.move ? 0 : undefined,
         onMoveItem: options.move ? noop : undefined,
+        onDeleteItem: options.del ? noop : undefined,
       })
     );
   }
@@ -125,6 +128,34 @@ describe("review inline fixes: fix card", () => {
     const html = renderCard({ move: true });
     expect(html).toContain("Move to");
     expect(html).toContain("Mains");
+  });
+
+  it("deletes a dish from the card when wired", () => {
+    const html = renderCard({ del: true });
+    expect(html).toContain("Delete dish");
+    expect(renderCard()).not.toContain("Delete dish");
+  });
+
+  it("adds a dish the AI missed per category when wired", () => {
+    const html = renderToStaticMarkup(
+      createElement(ExtractionResult, {
+        data: RESULT,
+        source: "ai",
+        onStartOver: noop,
+        onResolveItem: noop,
+        onResolveAll: noop,
+        onUpdatePrice: noop,
+        onRenameItem: noop,
+        onUpdateDescription: noop,
+        onUpdateVariants: noop,
+        onMoveItem: noop,
+        onDeleteItem: noop,
+        onAddItem: noop,
+        initialReviewCount: 1,
+        previewDoc: null,
+      })
+    );
+    expect(html).toContain("Add a dish the AI missed");
   });
 
   it("omits the move list with a single category or when not wired", () => {

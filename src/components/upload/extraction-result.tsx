@@ -78,6 +78,10 @@ interface ExtractionResultProps {
   ) => void;
   /** Move a dish to another category in place (lands at the end). */
   onMoveItem?: (loc: ReviewItemLocation, toCategoryIndex: number) => void;
+  /** Delete a dish from the draft in place (the shell confirms first). */
+  onDeleteItem?: (loc: ReviewItemLocation) => void;
+  /** Add a dish the AI missed to a category (lands at the end, unpriced). */
+  onAddItem?: (categoryIndex: number, name: string) => void;
   /** Resolve every flagged item at once — the impatient path. Prices stay
    * as shown; unpriced items ship with honestly null totals. */
   onResolveAll?: () => void;
@@ -195,6 +199,7 @@ export function ReviewFixCard({
   categoryNames,
   currentCategoryIndex,
   onMoveItem,
+  onDeleteItem,
 }: {
   item: PreviewItem;
   loc: ReviewItemLocation;
@@ -208,6 +213,7 @@ export function ReviewFixCard({
   categoryNames?: string[];
   currentCategoryIndex?: number;
   onMoveItem?: (loc: ReviewItemLocation, toCategoryIndex: number) => void;
+  onDeleteItem?: (loc: ReviewItemLocation) => void;
 }) {
   return (
     <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
@@ -329,9 +335,85 @@ export function ReviewFixCard({
             </select>
           </label>
         )}
+      {onDeleteItem !== undefined && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => onDeleteItem(loc)}
+            title="Removes the dish from the draft — a published revision may still show it until you republish."
+            className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-danger-700"
+          >
+            Delete dish
+          </button>
+        </div>
+      )}
       <p className="mt-1 text-[11px] text-ink-500">
         Fixes keep the check — confirm separately once it reads right.
       </p>
+    </div>
+  );
+}
+
+/**
+ * The "the AI missed a line" path: one toggle per category card holding a
+ * name field. The dish lands at the end of the category, unpriced — so it
+ * shows up in Check this honestly instead of sneaking into Ready.
+ */
+export function AddDishRow({ onAdd }: { onAdd: (name: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-2 rounded-full border border-dashed border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+      >
+        + Add a dish the AI missed
+      </button>
+    );
+  }
+  return (
+    <div className="mt-2 flex flex-wrap items-end gap-2">
+      <label className="min-w-44 flex-1 text-xs">
+        <span className="mb-1 block font-medium text-ink-500">Dish name as shown</span>
+        <input
+          type="text"
+          value={draft}
+          autoFocus
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              const trimmed = draft.trim();
+              if (trimmed) {
+                onAdd(trimmed);
+                setDraft("");
+                setOpen(false);
+              }
+            }
+            if (event.key === "Escape") {
+              setDraft("");
+              setOpen(false);
+            }
+          }}
+          placeholder="e.g. Garlic Bread"
+          className="w-full rounded-lg border border-line-300 bg-surface-base px-2.5 py-1.5 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+        />
+      </label>
+      <button
+        type="button"
+        disabled={!draft.trim()}
+        onClick={() => {
+          const trimmed = draft.trim();
+          if (!trimmed) return;
+          onAdd(trimmed);
+          setDraft("");
+          setOpen(false);
+        }}
+        className="rounded-full bg-accent-700 px-3 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+      >
+        Add dish
+      </button>
     </div>
   );
 }
@@ -349,6 +431,8 @@ export function ExtractionResult({
   onUpdateDescription,
   onUpdateVariants,
   onMoveItem,
+  onDeleteItem,
+  onAddItem,
   onRenameTitle,
   initialReviewCount = null,
   editLabel = "Edit menu",
@@ -416,6 +500,7 @@ export function ExtractionResult({
    * confirm hits the same item in the draft the wizard will save. */
   function renderCategoryCard(
     categoryName: string,
+    categoryIndex: number,
     items: PreviewItem[],
     locator?: (itemIndex: number) => ReviewItemLocation | null
   ) {
@@ -546,6 +631,16 @@ export function ExtractionResult({
                           }
                         : undefined
                     }
+                    // Deleting re-keys every index path too, so the card
+                    // closes with it. The shell confirms before this fires.
+                    onDeleteItem={
+                      onDeleteItem !== undefined
+                        ? (deleteLoc) => {
+                            setExpandedKey(null);
+                            onDeleteItem(deleteLoc);
+                          }
+                        : undefined
+                    }
                   />
                 )}
                 {canResolve && (
@@ -574,6 +669,11 @@ export function ExtractionResult({
             );
           })}
         </ul>
+        {onAddItem !== undefined && (
+          <div className="border-t border-line-100 px-5 py-3">
+            <AddDishRow onAdd={(name) => onAddItem(categoryIndex, name)} />
+          </div>
+        )}
       </div>
     );
   }
@@ -591,7 +691,9 @@ export function ExtractionResult({
       </div>
     ) : reviewCount === 0 ? (
       <div className="flex flex-col gap-3">
-        {data.categories.map((category) => renderCategoryCard(category.name, category.items))}
+        {data.categories.map((category, categoryIndex) =>
+          renderCategoryCard(category.name, categoryIndex, category.items)
+        )}
       </div>
     ) : (
       <div className="flex flex-col gap-3">
@@ -665,6 +767,7 @@ export function ExtractionResult({
         {flaggedGroups.map((group) =>
           renderCategoryCard(
             group.name,
+            group.categoryIndex,
             group.entries.map(({ item }) => item),
             (rowIndex) => ({
               categoryIndex: group.categoryIndex,

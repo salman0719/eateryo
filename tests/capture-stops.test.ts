@@ -89,6 +89,8 @@ function render(
       onUpdateDescription: noop,
       onUpdateVariants: noop,
       onMoveItem: noop,
+      onDeleteItem: noop,
+      onAddItem: noop,
       onRenameTitle: noop,
       onPublish: undefined,
     })
