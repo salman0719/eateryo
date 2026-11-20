@@ -184,4 +184,10 @@ describe("review inline fixes: rename", () => {
     const html = render(false);
     expect(html).not.toContain("Fix…");
   });
+
+  it("offers Edit on Ready rows too: confidence is not trust", () => {
+    const html = render(true);
+    expect(html).toContain("Edit…");
+    expect(render(false)).not.toContain("Edit…");
+  });
 });
