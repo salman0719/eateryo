@@ -294,6 +294,7 @@ export function AppShell() {
     handleUpdateResultPrice,
     handleResolveAllResultItems,
     handleRenameResultItem,
+    handleUpdateResultDescription,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,
@@ -1570,6 +1571,7 @@ export function AppShell() {
           onResolveAll={handleResolveAllResultItems}
           onUpdatePrice={handleUpdateResultPrice}
           onRenameItem={handleRenameResultItem}
+          onUpdateDescription={handleUpdateResultDescription}
           onRenameTitle={handleRenameResultTitle}
           onPublish={
             source === "demo" || draftSave === "saved" ? () => void handleStartPublish() : undefined

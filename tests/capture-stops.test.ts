@@ -86,6 +86,7 @@ function render(
       onResolveAll: noop,
       onUpdatePrice: noop,
       onRenameItem: noop,
+      onUpdateDescription: noop,
       onRenameTitle: noop,
       onPublish: undefined,
     })

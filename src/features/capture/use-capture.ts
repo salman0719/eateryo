@@ -486,6 +486,19 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
+  /** Edit a dish's description in place. Blank clears it (null = not
+   * shown); notes stay until the owner confirms separately. */
+  function handleUpdateResultDescription(loc: ReviewItemLocation, description: string | null) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item || item.description === description) return;
+    const next = updateItem(doc, category.id, item.id, { description });
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   /** Q2: the result title is an editable field, never a naming gate.
    * Commits persist to the draft like price fixes; blank is ignored. */
   function handleRenameResultTitle(title: string) {
@@ -594,6 +607,7 @@ export function useCapture(options: CaptureOptions) {
     handleUpdateResultPrice,
     handleResolveAllResultItems,
     handleRenameResultItem,
+    handleUpdateResultDescription,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,
