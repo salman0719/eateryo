@@ -66,6 +66,8 @@ interface ExtractionResultProps {
   onResolveItem?: (loc: ReviewItemLocation, resolution: ReviewResolution) => void;
   /** Fix a flagged item's price in place (null = blank; persists to the draft). */
   onUpdatePrice?: (loc: ReviewItemLocation, price: number | null) => void;
+  /** Rename a dish in place (persists to the draft; keeps review notes). */
+  onRenameItem?: (loc: ReviewItemLocation, name: string) => void;
   /** Resolve every flagged item at once — the impatient path. Prices stay
    * as shown; unpriced items ship with honestly null totals. */
   onResolveAll?: () => void;
@@ -175,6 +177,7 @@ export function ExtractionResult({
   onResolveItem,
   onResolveAll,
   onUpdatePrice,
+  onRenameItem,
   onRenameTitle,
   initialReviewCount = null,
   editLabel = "Edit menu",
@@ -188,6 +191,8 @@ export function ExtractionResult({
   // visible work. Both derive from the same flags the editor uses.
   const [showAllReady, setShowAllReady] = useState(false);
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  /** One expanded inline fix card at a time, keyed by index path. */
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   // Index paths survive filtering: resolving item (2, 5) must hit the same
   // item in the draft the publish wizard will save.
   const flaggedGroups = data.categories
@@ -256,6 +261,14 @@ export function ExtractionResult({
             const needsReview = isFlagged(item);
             const loc = locator?.(rowIndex) ?? null;
             const canResolve = needsReview && loc !== null && onResolveItem !== undefined;
+            // Variant A: the fix-it-here card lives on the row itself, so a
+            // wrong name is fixed where it is seen instead of in the editor.
+            // Renaming never clears the check — the notes may concern the
+            // price, so confirming stays a separate explicit tap.
+            const canFixName = loc !== null && onRenameItem !== undefined;
+            const expandKey =
+              loc !== null ? `${loc.categoryIndex}-${loc.itemIndex}` : `row-${rowIndex}`;
+            const expanded = expandedKey === expandKey;
             // The Check-this queue is the price-review step: flagged rows get
             // a fix-it-here price field. The whole-list views stay read-only,
             // and a size-priced item keeps its prices in its variants — its
@@ -330,6 +343,33 @@ export function ExtractionResult({
                       <li key={note}>{note}</li>
                     ))}
                   </ul>
+                )}
+                {canFixName && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() => setExpandedKey(expanded ? null : expandKey)}
+                      className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                    >
+                      {expanded ? "Close" : needsReview ? "Fix…" : "Edit…"}
+                    </button>
+                  </div>
+                )}
+                {expanded && loc !== null && onRenameItem !== undefined && (
+                  <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
+                    <CommitInput
+                      label="Dish name"
+                      value={item.name}
+                      onCommit={(name) => {
+                        const trimmed = name.trim();
+                        if (trimmed && trimmed !== item.name) onRenameItem(loc, trimmed);
+                      }}
+                    />
+                    <p className="mt-1 text-[11px] text-ink-500">
+                      Renaming keeps the check — confirm separately once it reads right.
+                    </p>
+                  </div>
                 )}
                 {canResolve && (
                   <div className="mt-2 flex flex-wrap gap-2">
