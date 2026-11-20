@@ -86,6 +86,7 @@ export interface CapturePageProps {
   onUpdatePrice: ResultProps["onUpdatePrice"];
   onRenameItem: ResultProps["onRenameItem"];
   onUpdateDescription: ResultProps["onUpdateDescription"];
+  onUpdateVariants: ResultProps["onUpdateVariants"];
   onRenameTitle: ResultProps["onRenameTitle"];
   onPublish: (() => void) | undefined;
 }
@@ -155,6 +156,7 @@ export function CapturePage({
   onUpdatePrice,
   onRenameItem,
   onUpdateDescription,
+  onUpdateVariants,
   onRenameTitle,
   onPublish,
 }: CapturePageProps) {
@@ -508,6 +510,7 @@ export function CapturePage({
             onUpdatePrice={onUpdatePrice}
             onRenameItem={onRenameItem}
             onUpdateDescription={onUpdateDescription}
+            onUpdateVariants={onUpdateVariants}
             onRenameTitle={onRenameTitle}
             initialReviewCount={initialReviewCount}
             onPublish={onPublish}

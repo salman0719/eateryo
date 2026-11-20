@@ -15,7 +15,7 @@
 import { useRef, useState } from "react";
 
 import { Attention, didClearAll } from "@/components/ui/attention";
-import { CommitInput } from "@/components/menu-editor/fields";
+import { CommitInput, CommitNumber } from "@/components/menu-editor/fields";
 import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
@@ -70,6 +70,12 @@ interface ExtractionResultProps {
   onRenameItem?: (loc: ReviewItemLocation, name: string) => void;
   /** Edit a dish's description in place (null = blank; keeps review notes). */
   onUpdateDescription?: (loc: ReviewItemLocation, description: string | null) => void;
+  /** Replace a dish's size rows in place (blank prices stay null). Adding
+   * the first size clears a misread single price to null with it. */
+  onUpdateVariants?: (
+    loc: ReviewItemLocation,
+    variants: { name: string; price: number | null }[]
+  ) => void;
   /** Resolve every flagged item at once — the impatient path. Prices stay
    * as shown; unpriced items ship with honestly null totals. */
   onResolveAll?: () => void;
@@ -183,11 +189,16 @@ export function ReviewFixCard({
   loc,
   onRenameItem,
   onUpdateDescription,
+  onUpdateVariants,
 }: {
   item: PreviewItem;
   loc: ReviewItemLocation;
   onRenameItem: (loc: ReviewItemLocation, name: string) => void;
   onUpdateDescription?: (loc: ReviewItemLocation, description: string | null) => void;
+  onUpdateVariants?: (
+    loc: ReviewItemLocation,
+    variants: { name: string; price: number | null }[]
+  ) => void;
 }) {
   return (
     <div className="mt-2 rounded-xl border border-line-200 bg-surface-50 p-3">
@@ -215,6 +226,73 @@ export function ReviewFixCard({
           />
         </div>
       )}
+      {onUpdateVariants !== undefined && (
+        <div className="mt-2">
+          <p className="mb-1 text-xs font-medium text-ink-500">Sizes</p>
+          {item.variants.length === 0 ? (
+            <p className="text-xs text-ink-500">None — add one if the menu shows sizes.</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {item.variants.map((variant, variantIndex) => (
+                <li
+                  key={`${variant.name}-${variantIndex}`}
+                  className="grid grid-cols-[minmax(0,1fr)_104px_auto] items-end gap-2"
+                >
+                  <CommitInput
+                    label={variantIndex === 0 ? "Size" : `Size ${variantIndex + 1}`}
+                    value={variant.name}
+                    onCommit={(name) => {
+                      const trimmed = name.trim();
+                      if (!trimmed || trimmed === variant.name) return;
+                      onUpdateVariants(
+                        loc,
+                        item.variants.map((entry, index) =>
+                          index === variantIndex ? { ...entry, name: trimmed } : entry
+                        )
+                      );
+                    }}
+                  />
+                  <CommitNumber
+                    label="Price"
+                    value={variant.price}
+                    onCommit={(price) => {
+                      if (price === variant.price) return;
+                      onUpdateVariants(
+                        loc,
+                        item.variants.map((entry, index) =>
+                          index === variantIndex ? { ...entry, price } : entry
+                        )
+                      );
+                    }}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`Remove size ${variant.name}`}
+                    onClick={() =>
+                      onUpdateVariants(
+                        loc,
+                        item.variants.filter((_, index) => index !== variantIndex)
+                      )
+                    }
+                    className="mb-0.5 rounded-full border border-line-300 px-2 py-1 text-xs text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <button
+            type="button"
+            onClick={() =>
+              onUpdateVariants(loc, [...item.variants, { name: "New size", price: null }])
+            }
+            className="mt-2 rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            + Add size
+          </button>
+        </div>
+      )}
       <p className="mt-1 text-[11px] text-ink-500">
         Fixes keep the check — confirm separately once it reads right.
       </p>
@@ -233,6 +311,7 @@ export function ExtractionResult({
   onUpdatePrice,
   onRenameItem,
   onUpdateDescription,
+  onUpdateVariants,
   onRenameTitle,
   initialReviewCount = null,
   editLabel = "Edit menu",
@@ -417,6 +496,7 @@ export function ExtractionResult({
                     loc={loc}
                     onRenameItem={onRenameItem}
                     onUpdateDescription={onUpdateDescription}
+                    onUpdateVariants={onUpdateVariants}
                   />
                 )}
                 {canResolve && (
