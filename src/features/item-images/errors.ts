@@ -52,20 +52,35 @@ function statusFromMessage(message: string): string {
   return /status\s+(\d{3})/i.exec(message)?.[1] ?? "";
 }
 
-export function mapItemImageUploadError(error: unknown): ItemImageError {
+/**
+ * The two sentences that name the asset. Dish wording is the default so
+ * existing callers are untouched; the brand-asset pipeline passes its own.
+ */
+export interface ItemImageErrorWords {
+  notConfigured: string;
+  signIn: string;
+}
+
+const DISH_WORDS: ItemImageErrorWords = {
+  notConfigured:
+    "Dish photos are not set up on this server yet. Ask the operator to configure photo storage.",
+  signIn: "Sign in to add dish photos to your menu.",
+};
+
+export function mapItemImageUploadError(
+  error: unknown,
+  words: ItemImageErrorWords = DISH_WORDS
+): ItemImageError {
   const code = uploadedErrorCode(error);
   const bodyCode = responseBodyCode(error);
   const message = error instanceof Error ? error.message : "";
   const status = statusFromMessage(message);
 
   if (bodyCode === "not_configured" || code === "not_configured") {
-    return new ItemImageError(
-      "not_configured",
-      "Dish photos are not set up on this server yet. Ask the operator to configure photo storage."
-    );
+    return new ItemImageError("not_configured", words.notConfigured);
   }
   if (code === "FORBIDDEN" || code === "UNAUTHORIZED" || status === "403" || status === "401") {
-    return new ItemImageError("sign_in", "Sign in to add dish photos to your menu.");
+    return new ItemImageError("sign_in", words.signIn);
   }
   if (code === "TOO_LARGE" || status === "413") {
     return new ItemImageError("too_large", "That photo is too large to upload. Try a smaller one.");

@@ -19,6 +19,8 @@ import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
+import { brandAssetCopy } from "@/features/brand-assets/ref";
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import {
   priceWithOptions,
   validateOptionSelections,
@@ -97,20 +99,23 @@ export function OrderShell({
 
 /**
  * Prototype A identity header for the diner pages: a slim cover band, an
- * overlapping initial tile, the restaurant name, and one sub-line (the menu
+ * overlapping logo tile, the restaurant name, and one sub-line (the menu
  * title on a single-menu page, the table summary on the landing page).
  *
- * There is no cover photo in the schema yet, so the band is a gradient drawn
- * from the `accent` role tokens via `var(--color-accent-*)`: a theme change
- * repaints it with no code change, and a photo later replaces the band's
- * background only. The name always sits below the band — never on it — so
- * any photo stays legible without a scrim. The table sits top-right of the
- * band as a filled pill; `OrderShell` already carries it in non-bare mode.
+ * Without brand assets the band is a gradient drawn from the `accent` role
+ * tokens via `var(--color-accent-*)`, and the tile is the name's initial: a
+ * theme change repaints it with no code change. A cover photo replaces the
+ * band's background only, a logo replaces the tile only. The name always
+ * sits below the band — never on it — so any photo stays legible without a
+ * scrim. The table sits top-right of the band as a filled pill; `OrderShell`
+ * already carries it in non-bare mode.
  */
 export function DinerCoverHeader({
   restaurantName,
   tableLabel,
   subline,
+  logo = null,
+  cover = null,
   bleed = false,
 }: {
   restaurantName: string;
@@ -118,32 +123,62 @@ export function DinerCoverHeader({
   tableLabel?: string;
   /** One quiet line under the name: the menu title on a single-menu page. */
   subline?: string;
+  /** The restaurant's logo: a 56px tile when set, the initial otherwise. */
+  logo?: BrandAssetImage | null;
+  /** The restaurant's cover photo: the band background when set. */
+  cover?: BrandAssetImage | null;
   /**
    * On a phone the cover is the page's own top edge: the band reaches the
    * viewport top and both sides with no page padding, and the card framing
    * comes back from `sm` up. The negative margins cancel `OrderShell`'s
-   * `px-4 py-6`, which is where the inset came from. The owner preview sits
-   * inside a phone frame of its own and never bleeds.
+   * `px-4 py-6`, which is where the inset came from. The owner preview
+   * bleeds the same way inside its phone frame, so it reads edge to edge
+   * like the table page; its notice sits below the cover to keep the top
+   * edge clear.
    */
   bleed?: boolean;
 }) {
   const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
+  // A failed photo falls back to the gradient band / initial tile — never a
+  // broken icon. The band loads the display copy (up to ~896px wide at 2x);
+  // the 56px tile takes the thumb when one was uploaded.
+  const [coverFailed, setCoverFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const coverCopy = !coverFailed && cover ? cover : null;
+  const logoCopy = !logoFailed ? brandAssetCopy(logo) : null;
   return (
     <div
       className={
         bleed
-          ? "-mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
+          ? "diner-cover-bleed -mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
           : "overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
       }
     >
       <div
         aria-hidden={tableLabel ? undefined : "true"}
         className="relative h-24"
-        style={{
-          backgroundImage:
-            "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",
-        }}
+        style={
+          coverCopy
+            ? undefined
+            : {
+                backgroundImage:
+                  "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",
+              }
+        }
       >
+        {coverCopy && (
+          // eslint-disable-next-line @next/next/no-img-element -- cover served straight from the CDN at its stored size; the optimizer must never touch it
+          <img
+            src={coverCopy.url}
+            alt=""
+            width={coverCopy.width}
+            height={coverCopy.height}
+            loading="lazy"
+            decoding="async"
+            onError={() => setCoverFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
         {tableLabel && (
           <span className="absolute top-3 right-3 rounded-full bg-surface-base px-3 py-1 text-xs font-semibold text-ink-900">
             {formatTableLabel(tableLabel)}
@@ -151,12 +186,26 @@ export function DinerCoverHeader({
         )}
       </div>
       <div className="flex items-center gap-3 px-5 pb-4">
-        <span
-          aria-hidden="true"
-          className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
-        >
-          {initial}
-        </span>
+        {logoCopy ? (
+          // eslint-disable-next-line @next/next/no-img-element -- logo served straight from the CDN at its stored size; the optimizer must never touch it
+          <img
+            src={logoCopy.url}
+            alt=""
+            width={logoCopy.width}
+            height={logoCopy.height}
+            loading="lazy"
+            decoding="async"
+            onError={() => setLogoFailed(true)}
+            className="relative z-10 -mt-7 h-14 w-14 shrink-0 rounded-2xl border-2 border-surface-base bg-surface-base object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+          >
+            {initial}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg leading-snug font-bold text-ink-900">{restaurantName}</h1>
           {subline && <p className="truncate text-sm text-ink-600">{subline}</p>}
@@ -409,7 +458,7 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
  */
 export function CategorySections({ children }: { children: React.ReactNode }) {
   return (
-    <div className="-mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
+    <div className="diner-category-sections -mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
       {children}
     </div>
   );
@@ -518,7 +567,7 @@ export function OrderMenuSection({
       aria-label={category.name}
       // A phone gets the category edge to edge (see `CategorySections`); the
       // inset card is the wide-screen treatment.
-      className="overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
+      className="diner-menu-section overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
     >
       <CategoryHeading category={category} />
       <ul className="divide-y divide-line-100">

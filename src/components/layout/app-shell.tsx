@@ -1500,9 +1500,21 @@ export function AppShell() {
                   onRetryAccountCheck={retryAccountCheck}
                   restaurantName={
                     ownedRestaurantsForAccount.find(
-                      (restaurant) => restaurant.id === activePublication?.restaurantId
+                      (restaurant) => restaurant.id === activeRestaurantId
                     )?.name ?? null
                   }
+                  restaurantLogo={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activeRestaurantId
+                    )?.logo ?? null
+                  }
+                  restaurantCover={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activeRestaurantId
+                    )?.cover ?? null
+                  }
+                  restaurantId={activeRestaurantId}
+                  onBrandChanged={(updated) => workspace.addRestaurant(updated)}
                   onStartPublish={() =>
                     navigate({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
                   }

@@ -133,6 +133,8 @@ async function TableLandingContent({
     <TableLandingScreen
       restaurantName={landing.restaurantName}
       restaurantSlug={landing.restaurantSlug}
+      restaurantLogo={landing.restaurantLogo}
+      restaurantCover={landing.restaurantCover}
       tableLabel={tableLabel}
       menus={landing.menus.map((menu) => ({
         menuId: menu.menuId,
