@@ -1,12 +1,12 @@
 /**
- * Server-only Stripe provider wrapper (Commit 2).
+ * Server-only Stripe provider wrapper (Commits 2–3).
  *
  * Direct charges on the café's own account (`Stripe-Account: acct_…`),
  * never the platform balance; no `application_fee_amount` anywhere in v1.
  * The webhook route never imports this — it verifies with `node:crypto`
  * only, so a dependency that mints sessions can never widen into a route
- * that must never charge. Commit 3 adds the Checkout SDK path; this file
- * covers onboarding only (account create, account link, status read).
+ * that must never charge. Checkout session creation lives here (Commit 3);
+ * the webhook still never touches it.
  *
  * HTTP goes through injectable `fetchImpl` so tests stub Stripe instead of
  * calling it. API version is pinned: capability status paths move between
@@ -189,4 +189,112 @@ export async function retrieveAccountStatus(
     defaultCurrency: asString(json["default_currency"]),
     requirementCodes,
   };
+}
+
+export interface CheckoutLineInput {
+  name: string;
+  unitAmountCents: number;
+  quantity: number;
+}
+
+export interface CheckoutSessionRef {
+  id: string;
+  url: string | null;
+  status: string | null;
+  paymentStatus: string | null;
+  paymentIntentId: string | null;
+  expiresAt: number | null;
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function directChargeHeaders(secret: string, accountId: string): Record<string, string> {
+  return { ...authHeaders(secret), "stripe-account": accountId };
+}
+
+/**
+ * Mint a Checkout Session as a direct charge on the café's account.
+ * Amounts arrive as integer minor units (never decimals); the body sets
+ * no `application_fee_amount` — v1 is 0% by construction. Pairing rides
+ * in `metadata[orderId]` so the webhook can authorise the event against
+ * the order's restaurant.
+ */
+export async function createCheckoutSession(
+  secret: string,
+  input: {
+    accountId: string;
+    orderId: string;
+    currency: string;
+    lines: CheckoutLineInput[];
+    successUrl: string;
+    cancelUrl: string;
+    expiresAtUnix: number;
+  },
+  opts?: { fetchImpl?: FetchImpl; idempotencyKey?: string }
+): Promise<CheckoutSessionRef> {
+  const fetchImpl = opts?.fetchImpl ?? fetch;
+  const body = new URLSearchParams();
+  body.set("mode", "payment");
+  body.set("success_url", input.successUrl);
+  body.set("cancel_url", input.cancelUrl);
+  body.set("metadata[orderId]", input.orderId);
+  body.set("expires_at", String(input.expiresAtUnix));
+  input.lines.forEach((line, index) => {
+    body.set(`line_items[${index}][price_data][currency]`, input.currency.toLowerCase());
+    body.set(`line_items[${index}][price_data][unit_amount]`, String(line.unitAmountCents));
+    body.set(`line_items[${index}][price_data][product_data][name]`, line.name.slice(0, 120));
+    body.set(`line_items[${index}][quantity]`, String(line.quantity));
+  });
+
+  const response = await fetchImpl("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      ...directChargeHeaders(secret, input.accountId),
+      ...(opts?.idempotencyKey ? { "idempotency-key": opts.idempotencyKey } : {}),
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    body: body.toString(),
+  });
+  if (!response.ok) throw new Error(`stripe_checkout_create_failed:${response.status}`);
+  return parseCheckoutSession(await readJson(response));
+}
+
+/** Re-read a session on the café's account (reuse check + return page). */
+export async function retrieveCheckoutSession(
+  secret: string,
+  accountId: string,
+  sessionId: string,
+  opts?: { fetchImpl?: FetchImpl }
+): Promise<CheckoutSessionRef> {
+  const fetchImpl = opts?.fetchImpl ?? fetch;
+  const response = await fetchImpl(
+    `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "GET", headers: directChargeHeaders(secret, accountId) }
+  );
+  if (!response.ok) throw new Error(`stripe_checkout_read_failed:${response.status}`);
+  return parseCheckoutSession(await readJson(response));
+}
+
+function parseCheckoutSession(json: Record<string, unknown>): CheckoutSessionRef {
+  const id = asString(json["id"]);
+  if (!id) throw new Error("stripe_checkout_failed:missing_id");
+  return {
+    id,
+    url: asString(json["url"]),
+    status: asString(json["status"]),
+    paymentStatus: asString(json["payment_status"]),
+    paymentIntentId: intentString(json["payment_intent"]),
+    expiresAt: asNumber(json["expires_at"]),
+  };
+}
+
+function intentString(value: unknown): string | null {
+  if (typeof value === "string") return value || null;
+  if (typeof value === "object" && value !== null) {
+    const id = (value as Record<string, unknown>)["id"];
+    return typeof id === "string" && id.length > 0 ? id : null;
+  }
+  return null;
 }

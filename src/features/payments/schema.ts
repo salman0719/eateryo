@@ -24,7 +24,9 @@ const ALLOWED_PAYMENT_TRANSITIONS: Record<PaymentStatus, readonly PaymentStatus[
   unpaid: ["pending", "paid", "failed"],
   pending: ["paid", "failed"],
   paid: ["refunded"],
-  failed: ["paid"],
+  // A failed attempt may be retried: back to pending for a fresh session,
+  // then paid when the retry succeeds.
+  failed: ["pending", "paid"],
   refunded: [],
 };
 
