@@ -1,6 +1,13 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
+  aspectLabel,
+  BRAND_COVER_MIN_ASPECT,
+  BRAND_LOGO_MAX_ASPECT,
+  BRAND_LOGO_MIN_ASPECT,
+  brandAssetAspectWarning,
+} from "@/features/brand-assets/aspect";
+import {
   BRAND_COVER_DISPLAY_EDGE,
   BRAND_LOGO_DISPLAY_EDGE,
   brandAssetVariants,
@@ -98,6 +105,67 @@ describe("brand asset copies", () => {
   it("identifies the photo by its stored key", () => {
     expect(brandAssetKey(LOGO)).toBe(LOGO.key);
     expect(brandAssetKey(null)).toBeNull();
+  });
+});
+
+describe("brand asset shape warnings", () => {
+  it("accepts a squarish logo and a wide cover without a word", () => {
+    expect(brandAssetAspectWarning("logo", { width: 512, height: 512 })).toBeNull();
+    // 3:4 and 4:3 are the edges of "squarish" and both pass.
+    expect(brandAssetAspectWarning("logo", { width: 900, height: 1200 })).toBeNull();
+    expect(brandAssetAspectWarning("logo", { width: 1200, height: 900 })).toBeNull();
+    expect(brandAssetAspectWarning("cover", { width: 2400, height: 1000 })).toBeNull();
+    // 3:2 is the floor for a cover.
+    expect(brandAssetAspectWarning("cover", { width: 3000, height: 2000 })).toBeNull();
+  });
+
+  it("warns about a tall logo but still describes the file", () => {
+    const warning = brandAssetAspectWarning("logo", { width: 1000, height: 1500 });
+    expect(warning).toMatchObject({ aspect: 2 / 3, label: "2:3" });
+    expect(warning?.message).toContain("square tile");
+    expect(warning?.message).toContain("2:3");
+  });
+
+  it("warns about a cover that is not wide enough", () => {
+    const warning = brandAssetAspectWarning("cover", { width: 1200, height: 1600 });
+    expect(warning).toMatchObject({ label: "3:4" });
+    expect(warning?.message).toContain("wide band");
+
+    // Just under the 3:2 floor is still flagged; just over it is not.
+    expect(brandAssetAspectWarning("cover", { width: 1499, height: 1000 })).not.toBeNull();
+    expect(
+      brandAssetAspectWarning("cover", {
+        width: Math.ceil(BRAND_COVER_MIN_ASPECT * 1000),
+        height: 1000,
+      })
+    ).toBeNull();
+  });
+
+  it("flags a wide logo just past the squarish range", () => {
+    expect(
+      brandAssetAspectWarning("logo", {
+        width: Math.floor(BRAND_LOGO_MAX_ASPECT * 1000) + 5,
+        height: 1000,
+      })
+    ).not.toBeNull();
+    expect(
+      brandAssetAspectWarning("logo", {
+        width: Math.floor(BRAND_LOGO_MIN_ASPECT * 1000) - 5,
+        height: 1000,
+      })
+    ).not.toBeNull();
+  });
+
+  it("labels odd shapes as a ratio rather than a huge fraction", () => {
+    expect(aspectLabel({ width: 1200, height: 1600 })).toBe("3:4");
+    expect(aspectLabel({ width: 1600, height: 900 })).toBe("16:9");
+    expect(aspectLabel({ width: 1001, height: 999 })).toBe("1:1");
+    expect(aspectLabel({ width: 2000, height: 873 })).toBe("2.29:1");
+  });
+
+  it("does not invent an aspect problem for a zero-sized image", () => {
+    expect(brandAssetAspectWarning("logo", { width: 0, height: 0 })).toBeNull();
+    expect(brandAssetAspectWarning("cover", { width: 0, height: 500 })).toBeNull();
   });
 });
 
