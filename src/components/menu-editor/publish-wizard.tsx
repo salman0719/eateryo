@@ -230,6 +230,8 @@ export function PublishWizard({
       submitResult?.restaurant.name ??
       ownedRestaurants.find((restaurant) => restaurant.id === published.restaurantId)?.name ??
       null;
+    const successBrand =
+      ownedRestaurants.find((restaurant) => restaurant.id === published.restaurantId) ?? null;
 
     return (
       <div className="flex w-full flex-col gap-5">
@@ -305,7 +307,12 @@ export function PublishWizard({
 
           <aside className="flex flex-col gap-2">
             <PhoneFrame label="Diner page at a table">
-              <OrderPagePreview doc={doc} restaurantName={restaurantName} />
+              <OrderPagePreview
+                doc={doc}
+                restaurantName={restaurantName}
+                restaurantLogo={successBrand?.logo ?? null}
+                restaurantCover={successBrand?.cover ?? null}
+              />
             </PhoneFrame>
             <p className="text-center text-xs text-ink-500">
               Ordering is off in this preview; a real table card turns it on.
@@ -471,6 +478,18 @@ export function PublishWizard({
               doc={doc}
               restaurantName={
                 choice.kind === "existing" || choice.kind === "create" ? choice.name : null
+              }
+              restaurantLogo={
+                choice.kind === "existing"
+                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.logo ??
+                    null)
+                  : null
+              }
+              restaurantCover={
+                choice.kind === "existing"
+                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.cover ??
+                    null)
+                  : null
               }
             />
           </PhoneFrame>
