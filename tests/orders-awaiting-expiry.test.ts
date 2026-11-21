@@ -253,6 +253,8 @@ describe("expired pay-link responses", () => {
     // The stale ticket never reaches the board; the fresh counter-style
     // assertions below pin the poll still working.
     expect(body.orders.map((order: { id: string }) => order.id)).not.toContain(stale);
+    // The pill rides the same poll — no second request from the board.
+    expect(body.awaiting.orders.map((order: { id: string }) => order.id)).toEqual([fresh]);
     expect(await rowStatus(stale)).toMatchObject({ status: "cancelled" });
     expect(await rowStatus(fresh)).toMatchObject({ status: "new" });
   });

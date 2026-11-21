@@ -57,6 +57,11 @@ export type MonitorConnection = "idle" | "connecting" | "live" | "reconnecting";
 
 interface MonitorValue {
   orders: Order[];
+  /**
+   * Card tickets the board hides until paid, riding the same poll — the
+   * strip above the Kanban reads this, never a second request.
+   */
+  awaitingOrders: Order[];
   phase: "loading" | "ready" | "error";
   connection: MonitorConnection;
   lastSyncedAt: string | null;
@@ -147,6 +152,7 @@ export function OrderMonitorProvider({
   children: ReactNode;
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [awaitingOrders, setAwaitingOrders] = useState<Order[]>([]);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [connection, setConnection] = useState<MonitorConnection>("idle");
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
@@ -190,6 +196,7 @@ export function OrderMonitorProvider({
   if (monitorFor !== monitorKey) {
     setMonitorFor(monitorKey);
     setOrders([]);
+    setAwaitingOrders([]);
     setPhase("loading");
     setConnection("idle");
     setLastSyncedAt(null);
@@ -273,6 +280,7 @@ export function OrderMonitorProvider({
       if (initial) {
         // The first load is context, not news: nothing badges or toasts.
         setOrders(result.orders);
+        setAwaitingOrders(result.awaiting.orders);
         nextCursorRef.current = result.nextCursor;
         pageScopeRef.current = { cafeId, from };
         setHasMore(result.nextCursor !== null);
@@ -289,6 +297,9 @@ export function OrderMonitorProvider({
       } else {
         const arrivals = detectNewOrders(result.orders, seenAtRef.current);
         setOrders((current) => mergeBoardOrders(current, result.orders, guardedRef.current));
+        // A full snapshot every poll: paid tickets vanish from the strip
+        // the moment the board adopts them, with no second request.
+        setAwaitingOrders(result.awaiting.orders);
         if (arrivals.length > 0) {
           setHasArrived(true);
           // Sound follows the toggle, not the screen: a board left open on a
@@ -346,6 +357,7 @@ export function OrderMonitorProvider({
       // not a loading one. Deferred so the effect body never sets state.
       const settle = setTimeout(() => {
         setOrders([]);
+        setAwaitingOrders([]);
         setPhase("ready");
         setConnection("idle");
         setLastSyncedAt(null);
@@ -520,6 +532,7 @@ export function OrderMonitorProvider({
   const value = useMemo<MonitorValue>(
     () => ({
       orders,
+      awaitingOrders,
       phase,
       connection,
       lastSyncedAt,
@@ -547,6 +560,7 @@ export function OrderMonitorProvider({
     }),
     [
       orders,
+      awaitingOrders,
       phase,
       connection,
       lastSyncedAt,
