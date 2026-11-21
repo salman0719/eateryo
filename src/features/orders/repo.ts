@@ -863,19 +863,34 @@ export async function updateOrderStatusForStaff(
   if (current.status === status) return current;
 
   const now = new Date();
-  const conditions = [eq(orderTable.id, orderId)];
   if (expectedUpdatedAt) {
     const expected = new Date(expectedUpdatedAt);
     if (Number.isNaN(expected.getTime())) {
       throw new OrderRepoError("invalid", "expectedUpdatedAt must be an ISO 8601 timestamp.");
     }
-    conditions.push(eq(orderTable.updatedAt, expected));
+    // Stale check in JS, not SQL: `updated_at` is `timestamp without tz`
+    // (wall time) while the wire is a UTC ISO string, so any SQL cast
+    // (`::timestamp` vs `::timestamptz`) depends on the DB session TimeZone
+    // and 409s forever on some hosts (Sydney wall vs UTC wire differed by
+    // 11h). JS Dates are absolute instants on both sides, and the pg driver
+    // already truncates stored microseconds to ms — so getTime() compares
+    // exactly what the board saw.
+    if (new Date(current.updatedAt).getTime() !== expected.getTime()) {
+      throw new OrderRepoError(
+        "stale",
+        "This order was changed elsewhere since you last saw it.",
+        current
+      );
+    }
   }
 
+  // Guard the write on the status read above: a concurrent status move
+  // 409s instead of silently winning, while a payment-only touch (webhook
+  // marking paid, same status) never blocks the kitchen's Start/Serve.
   const updated = await db
     .update(orderTable)
     .set({ status, updatedAt: now })
-    .where(and(...conditions))
+    .where(and(eq(orderTable.id, orderId), eq(orderTable.status, current.status)))
     .returning();
 
   if (updated.length === 0) {
