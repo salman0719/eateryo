@@ -1,6 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
+
+import { DinerCoverHeader } from "@/components/order/order-menu";
+import { PhoneFrame } from "@/components/ui/phone-frame";
 
 import {
   brandAssetAspectWarning,
@@ -21,8 +25,9 @@ import { updateBrandAssets, type RestaurantOption } from "@/features/tenancy/cli
  * Each slot picks a file, validates it, uploads the pre-sized copies, and
  * stores the reference on the restaurant — the same pipeline as dish photos,
  * so the menu-config and live-preview entry points reuse it unchanged.
- * There is deliberately no crop and no preview in this step: the stored
- * pixels stay whole and the render crops (`object-cover`).
+ * There is deliberately no crop in this step: the stored pixels stay whole
+ * and the render crops (`object-cover`). The Preview button opens the diner
+ * header in a phone frame, so the settings page itself stays compact.
  *
  * Images render as a plain CDN `<img>`, the same rule as dish photos: the
  * optimizer must never touch owner images.
@@ -68,8 +73,10 @@ export function BrandCard({
 }) {
   const [logoState, setLogoState] = useState<SlotState>({ status: "idle" });
   const [coverState, setCoverState] = useState<SlotState>({ status: "idle" });
+  const [previewOpen, setPreviewOpen] = useState(false);
   const logoInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
+  const previewButtonRef = useRef<HTMLButtonElement>(null);
 
   const setState = (kind: BrandAssetKind, state: SlotState) =>
     (kind === "logo" ? setLogoState : setCoverState)(state);
@@ -275,6 +282,163 @@ export function BrandCard({
           </div>
         );
       })}
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line-100 pt-3">
+        <p className="text-xs leading-5 text-ink-500">
+          See the header the way a table card opens it, with your logo and cover.
+        </p>
+        <button
+          ref={previewButtonRef}
+          type="button"
+          onClick={() => setPreviewOpen(true)}
+          className={smallButton}
+        >
+          Preview
+        </button>
+      </div>
+
+      {previewOpen && (
+        <BrandPreviewDialog
+          restaurant={restaurant}
+          canManage={canManage}
+          onPick={(kind) => {
+            // Back to the slot's picker in one tap: shut the preview first,
+            // then open the file dialog the Change button names.
+            setPreviewOpen(false);
+            (kind === "logo" ? logoInput : coverInput).current?.click();
+            previewButtonRef.current?.focus();
+          }}
+          onClose={() => {
+            setPreviewOpen(false);
+            previewButtonRef.current?.focus();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * The deferred Settings preview: the diner header in a phone frame, not a
+ * second upload flow. The header is the real `DinerCoverHeader` (table 1 as
+ * the example), so the owner judges the same band and tile a diner sees;
+ * the full menu with dishes stays in the editor's Preview tab, which has a
+ * document to render.
+ */
+function BrandPreviewDialog({
+  restaurant,
+  canManage,
+  onPick,
+  onClose,
+}: {
+  restaurant: RestaurantOption;
+  canManage: boolean;
+  /** Close the preview, then open the named slot's file picker. */
+  onPick: (kind: BrandAssetKind) => void;
+  onClose: () => void;
+}) {
+  const titleId = useId();
+  const doneRef = useRef<HTMLButtonElement>(null);
+  // False on the server and during hydration, true once mounted on the client.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
+  // Focus the way out on open; Escape and the scrim close it.
+  useEffect(() => {
+    doneRef.current?.focus();
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  // Lock the page scroll while the preview is open.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close preview"
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 bg-surface-900/40"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative flex max-h-full w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-surface-base shadow-xl"
+      >
+        <div className="flex items-start justify-between gap-3 p-5 pb-0">
+          <div>
+            <h2 id={titleId} className="text-sm font-bold text-ink-900">
+              Diner header preview
+            </h2>
+            <p className="mt-1 text-xs leading-5 text-ink-500">
+              The band and tile from a table card, with your brand on it. Table 1 is the example.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close preview"
+            className="shrink-0 rounded-full border border-line-300 px-2 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="min-h-0 overflow-y-auto p-5">
+          <PhoneFrame label="Diner header with your logo and cover">
+            <DinerCoverHeader
+              restaurantName={restaurant.name}
+              tableLabel="1"
+              logo={restaurant.logo ?? null}
+              cover={restaurant.cover ?? null}
+              bleed
+            />
+          </PhoneFrame>
+          <p className="mt-2 text-center text-xs text-ink-500">
+            The full menu with your dishes is in the editor&apos;s Preview tab.
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-line-100 p-4">
+          {canManage && (
+            <>
+              <button type="button" onClick={() => onPick("logo")} className={smallButton}>
+                Change logo
+              </button>
+              <button type="button" onClick={() => onPick("cover")} className={smallButton}>
+                Change cover
+              </button>
+            </>
+          )}
+          <button
+            ref={doneRef}
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-accent-700 px-4 py-1 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
