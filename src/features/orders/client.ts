@@ -308,6 +308,26 @@ export async function checkOrderPayment(
 }
 
 /**
+ * The slim strip above the Kanban: card tickets the board hides until paid.
+ * Empty for cash-only cafés — the strip then renders nothing.
+ */
+export async function fetchAwaitingPayment(options: {
+  restaurantId?: string | null;
+}): Promise<{ orders: Order[]; serverTime: string }> {
+  const params = new URLSearchParams();
+  if (options.restaurantId) params.set("restaurantId", options.restaurantId);
+  const query = params.toString();
+  return requestJson(
+    `/api/orders/awaiting-payment${query ? `?${query}` : ""}`,
+    undefined,
+    (payload) => {
+      const parsed = boardEnvelope.parse(payload);
+      return { orders: parsed.orders, serverTime: parsed.serverTime };
+    }
+  );
+}
+
+/**
  * Move an order's status. Pass the `updatedAt` last seen so a concurrent
  * change from another device results in `SyncError("conflict")` rather than
  * an overwrite.
