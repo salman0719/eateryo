@@ -141,6 +141,9 @@ interface MenuEditorProps {
   onRetryAccountCheck?: () => void;
   /** The café's name, shown on the diner preview when the account knows it. */
   restaurantName?: string | null;
+  /** Brand assets, shown on the diner preview when the account knows them. */
+  restaurantLogo?: import("@/features/brand-assets/schema").BrandAssetImage | null;
+  restaurantCover?: import("@/features/brand-assets/schema").BrandAssetImage | null;
   /** Open the publish wizard for a browser-only menu (R1). */
   onStartPublish?: () => void;
   /**
@@ -172,6 +175,8 @@ export function MenuEditor({
   canManage = true,
   onServer = false,
   restaurantName = null,
+  restaurantLogo = null,
+  restaurantCover = null,
   accountCheckFailed = false,
   onRetryAccountCheck,
   onStartPublish,
@@ -756,6 +761,8 @@ export function MenuEditor({
               <OrderPagePreview
                 doc={doc}
                 restaurantName={restaurantName}
+                restaurantLogo={restaurantLogo}
+                restaurantCover={restaurantCover}
                 draftAheadOfLive={needsPublish}
               />
             </PhoneFrame>

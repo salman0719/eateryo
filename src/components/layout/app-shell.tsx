@@ -1503,6 +1503,16 @@ export function AppShell() {
                       (restaurant) => restaurant.id === activePublication?.restaurantId
                     )?.name ?? null
                   }
+                  restaurantLogo={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activePublication?.restaurantId
+                    )?.logo ?? null
+                  }
+                  restaurantCover={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activePublication?.restaurantId
+                    )?.cover ?? null
+                  }
                   onStartPublish={() =>
                     navigate({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
                   }

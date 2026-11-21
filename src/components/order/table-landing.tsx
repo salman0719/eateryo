@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
 import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
@@ -25,6 +26,9 @@ import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "
 export interface TableLandingProps {
   restaurantName: string;
   restaurantSlug: string;
+  /** Brand assets; the header falls back to gradient + initial without. */
+  restaurantLogo?: BrandAssetImage | null;
+  restaurantCover?: BrandAssetImage | null;
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
@@ -40,6 +44,8 @@ export interface TableLandingProps {
 export function TableLanding({
   restaurantName,
   restaurantSlug,
+  restaurantLogo = null,
+  restaurantCover = null,
   tableLabel,
   menus,
   closedMenus,
@@ -118,7 +124,13 @@ export function TableLanding({
   // where the opening hours already live, not in the header.
   return (
     <OrderShell bare>
-      <DinerCoverHeader restaurantName={restaurantName} tableLabel={tableLabel} bleed />
+      <DinerCoverHeader
+        restaurantName={restaurantName}
+        tableLabel={tableLabel}
+        logo={restaurantLogo}
+        cover={restaurantCover}
+        bleed
+      />
 
       <TableOrderTabs
         restaurantName={restaurantName}
