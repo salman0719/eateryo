@@ -29,6 +29,12 @@ const boardEnvelope = z.object({
   orders: z.array(orderSchema),
   serverTime: z.string().min(1),
   nextCursor: z.string().min(1).nullable().optional(),
+  // The awaiting-payment pill rides the board poll: hidden card tickets
+  // arrive in the same response, so the strip needs no second request.
+  awaiting: z.object({
+    orders: z.array(orderSchema),
+    serverTime: z.string().min(1),
+  }),
 });
 
 const countsEnvelope = z.object({
@@ -185,6 +191,8 @@ export async function fetchTrackedOrder(
  * (`from`/`to` narrow the window in SQL, `cursor` continues the page);
  * with `since`, every order changed after that server timestamp (status
  * edits included). `nextCursor` is null on the last page and on `since`.
+ * Every response also carries the awaiting-payment snapshot, so the strip
+ * above the Kanban follows the same poll instead of fetching on its own.
  */
 export async function fetchStaffOrders(
   options: {
@@ -195,7 +203,12 @@ export async function fetchStaffOrders(
     to?: string | null;
     cursor?: string | null;
   } = {}
-): Promise<{ orders: Order[]; serverTime: string; nextCursor: string | null }> {
+): Promise<{
+  orders: Order[];
+  serverTime: string;
+  nextCursor: string | null;
+  awaiting: { orders: Order[]; serverTime: string };
+}> {
   const params = new URLSearchParams();
   if (options.since) params.set("since", options.since);
   if (options.restaurantId) params.set("restaurantId", options.restaurantId);
@@ -210,6 +223,7 @@ export async function fetchStaffOrders(
       orders: parsed.orders,
       serverTime: parsed.serverTime,
       nextCursor: parsed.nextCursor ?? null,
+      awaiting: parsed.awaiting,
     };
   });
 }
@@ -306,26 +320,6 @@ export async function checkOrderPayment(
     `/api/orders/${encodeURIComponent(orderId)}/payment-check`,
     jsonInit("POST", {}),
     (payload) => paymentCheckEnvelope.parse(payload)
-  );
-}
-
-/**
- * The slim strip above the Kanban: card tickets the board hides until paid.
- * Empty for cash-only cafés — the strip then renders nothing.
- */
-export async function fetchAwaitingPayment(options: {
-  restaurantId?: string | null;
-}): Promise<{ orders: Order[]; serverTime: string }> {
-  const params = new URLSearchParams();
-  if (options.restaurantId) params.set("restaurantId", options.restaurantId);
-  const query = params.toString();
-  return requestJson(
-    `/api/orders/awaiting-payment${query ? `?${query}` : ""}`,
-    undefined,
-    (payload) => {
-      const parsed = boardEnvelope.parse(payload);
-      return { orders: parsed.orders, serverTime: parsed.serverTime };
-    }
   );
 }
 

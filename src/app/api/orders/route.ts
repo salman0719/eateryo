@@ -6,6 +6,7 @@ import {
   consumeOrderRateLimit,
   createOrderTrackingToken,
   expireStaleAwaitingPaymentsForStaff,
+  listAwaitingPaymentForStaff,
   listOrdersForStaff,
   OrderRepoError,
   placeOrderFromSlug,
@@ -279,7 +280,16 @@ export async function GET(request: Request) {
       to,
       cursor,
     });
-    const response = NextResponse.json(result);
+    // The awaiting-payment pill rides this same poll — the board makes no
+    // second request. A snapshot failure must never fail the board, so the
+    // strip simply renders empty until the next poll heals it.
+    let awaiting: { orders: typeof result.orders; serverTime: string };
+    try {
+      awaiting = await listAwaitingPaymentForStaff(getDb(), userId, { restaurantId });
+    } catch {
+      awaiting = { orders: [], serverTime: result.serverTime };
+    }
+    const response = NextResponse.json({ ...result, awaiting });
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {

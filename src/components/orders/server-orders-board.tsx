@@ -17,14 +17,14 @@
  * adopts the server's version rather than overwriting.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { orderCode, orderTotal, type Order, type OrderStatus } from "@/features/orders/schema";
 import { formatElapsed } from "@/features/orders/board-filters";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusChip } from "@/components/ui/status-chip";
-import { checkOrderPayment, fetchAwaitingPayment, setOrderStatus } from "@/features/orders/client";
+import { checkOrderPayment, setOrderStatus } from "@/features/orders/client";
 import { useOrderMonitor } from "@/features/orders/monitor";
 import {
   normalizePaymentStatus,
@@ -32,7 +32,6 @@ import {
   paymentStatusTone,
 } from "@/features/payments/status-view";
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
-import { useWorkspace } from "@/features/tenancy/workspace-context";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -106,6 +105,9 @@ export function ServerOrdersBoard() {
   // badge and toasts); the board only guards its own optimistic writes.
   const {
     orders,
+    // The strip reads the monitor's snapshot: it appears, heals, and
+    // disappears on the 5-second poll with no request of its own.
+    awaitingOrders,
     phase,
     connection,
     lastSyncedAt,
@@ -131,47 +133,14 @@ export function ServerOrdersBoard() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [checkNote, setCheckNote] = useState<{ orderId: string; text: string } | null>(null);
-  // Option A strip: card tickets the board hides until paid. Empty for
-  // cash-only cafés — the strip then renders nothing.
-  const { active } = useWorkspace();
-  const restaurantId = active?.restaurantId ?? null;
-  const [awaitingOrders, setAwaitingOrders] = useState<Order[]>([]);
-  const [awaitingLoading, setAwaitingLoading] = useState(false);
   // Collapsed by default: the strip costs one small pill until staff
   // expand it — no wasted rows when card tickets are waiting.
   const [awaitingOpen, setAwaitingOpen] = useState(false);
   // Lazy auto-reconcile: each pending/failed ticket is checked once per
-  // list — a missed webhook then heals itself without staff clicking.
+  // snapshot — a missed webhook then heals itself without staff clicking.
+  // The next poll already carries the fresh snapshot, so a quiet pass
+  // needs no refresh at all.
   const autoTriedRef = useRef<Set<string>>(new Set());
-
-  const loadAwaiting = useCallback(async () => {
-    if (!restaurantId) {
-      setAwaitingOrders([]);
-      return;
-    }
-    setAwaitingLoading(true);
-    try {
-      const result = await fetchAwaitingPayment({ restaurantId });
-      setAwaitingOrders(result.orders);
-    } catch {
-      // The board stays the truth; a strip failure never blocks the kitchen.
-    } finally {
-      setAwaitingLoading(false);
-    }
-  }, [restaurantId]);
-
-  useEffect(() => {
-    autoTriedRef.current = new Set();
-    // Deferred so the effect body never sets state synchronously: the
-    // strip fills in after paint, like the monitor's own first poll.
-    const timer = setTimeout(() => void loadAwaiting(), 0);
-    return () => clearTimeout(timer);
-  }, [loadAwaiting]);
-
-  const refreshAll = useCallback(() => {
-    refresh();
-    void loadAwaiting();
-  }, [refresh, loadAwaiting]);
 
   useEffect(() => {
     const candidates = awaitingOrders
@@ -193,10 +162,9 @@ export function ServerOrdersBoard() {
           // Manual "Check payment" remains; auto never nags.
         }
       }
-      if (anyPaid) refreshAll();
-      else void loadAwaiting();
+      if (anyPaid) refresh();
     })();
-  }, [awaitingOrders, loadAwaiting, refreshAll]);
+  }, [awaitingOrders, refresh]);
 
   async function move(order: Order, target: OrderStatus) {
     if (busyId) return;
@@ -243,11 +211,11 @@ export function ServerOrdersBoard() {
     setError(null);
     try {
       await setOrderStatus(order.id, "cancelled", order.updatedAt);
-      refreshAll();
+      refresh();
     } catch (clearError) {
       if (clearError instanceof SyncError && clearError.code === "conflict") {
         setError("That order changed elsewhere — showing the latest version.");
-        refreshAll();
+        refresh();
       } else {
         setError(errorMessage(clearError));
       }
@@ -265,7 +233,7 @@ export function ServerOrdersBoard() {
     try {
       const result = await checkOrderPayment(order.id);
       if (result.reconciled) {
-        refreshAll();
+        refresh();
         setCheckNote({ orderId: order.id, text: "Payment confirmed — the board now shows Paid." });
       } else {
         setCheckNote({
@@ -331,7 +299,7 @@ export function ServerOrdersBoard() {
           </button>
           <button
             type="button"
-            onClick={() => refreshAll()}
+            onClick={() => refresh()}
             className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
           >
             Refresh
@@ -428,10 +396,6 @@ export function ServerOrdersBoard() {
           )}
         </section>
       )}
-      {awaitingLoading && awaitingOrders.length === 0 && (
-        <p className="text-xs text-ink-500">Checking for card payments…</p>
-      )}
-
       {(error ?? pollError) && (
         <p
           role="alert"
