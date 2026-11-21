@@ -17,13 +17,22 @@
  * adopts the server's version rather than overwriting.
  */
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { orderCode, type Order, type OrderStatus } from "@/features/orders/schema";
+import { orderCode, orderTotal, type Order, type OrderStatus } from "@/features/orders/schema";
+import { formatElapsed } from "@/features/orders/board-filters";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { checkOrderPayment, setOrderStatus } from "@/features/orders/client";
+import { StatusChip } from "@/components/ui/status-chip";
+import { checkOrderPayment, fetchAwaitingPayment, setOrderStatus } from "@/features/orders/client";
 import { useOrderMonitor } from "@/features/orders/monitor";
+import {
+  normalizePaymentStatus,
+  paymentStatusLabel,
+  paymentStatusTone,
+} from "@/features/payments/status-view";
+import { formatPreviewPrice } from "@/features/menu/preview-utils";
+import { useWorkspace } from "@/features/tenancy/workspace-context";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { useConfirm } from "@/components/ui/confirm-dialog";
@@ -113,6 +122,72 @@ export function ServerOrdersBoard() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [checkNote, setCheckNote] = useState<{ orderId: string; text: string } | null>(null);
+  // Option A strip: card tickets the board hides until paid. Empty for
+  // cash-only cafés — the strip then renders nothing.
+  const { active } = useWorkspace();
+  const restaurantId = active?.restaurantId ?? null;
+  const [awaitingOrders, setAwaitingOrders] = useState<Order[]>([]);
+  const [awaitingLoading, setAwaitingLoading] = useState(false);
+  // Collapsed by default: the strip costs one small pill until staff
+  // expand it — no wasted rows when card tickets are waiting.
+  const [awaitingOpen, setAwaitingOpen] = useState(false);
+  // Lazy auto-reconcile: each pending/failed ticket is checked once per
+  // list — a missed webhook then heals itself without staff clicking.
+  const autoTriedRef = useRef<Set<string>>(new Set());
+
+  const loadAwaiting = useCallback(async () => {
+    if (!restaurantId) {
+      setAwaitingOrders([]);
+      return;
+    }
+    setAwaitingLoading(true);
+    try {
+      const result = await fetchAwaitingPayment({ restaurantId });
+      setAwaitingOrders(result.orders);
+    } catch {
+      // The board stays the truth; a strip failure never blocks the kitchen.
+    } finally {
+      setAwaitingLoading(false);
+    }
+  }, [restaurantId]);
+
+  useEffect(() => {
+    autoTriedRef.current = new Set();
+    // Deferred so the effect body never sets state synchronously: the
+    // strip fills in after paint, like the monitor's own first poll.
+    const timer = setTimeout(() => void loadAwaiting(), 0);
+    return () => clearTimeout(timer);
+  }, [loadAwaiting]);
+
+  const refreshAll = useCallback(() => {
+    refresh();
+    void loadAwaiting();
+  }, [refresh, loadAwaiting]);
+
+  useEffect(() => {
+    const candidates = awaitingOrders
+      .filter(
+        (order) =>
+          (order.paymentStatus === "pending" || order.paymentStatus === "failed") &&
+          !autoTriedRef.current.has(order.id)
+      )
+      .slice(0, 10);
+    if (candidates.length === 0) return;
+    for (const order of candidates) autoTriedRef.current.add(order.id);
+    void (async () => {
+      let anyPaid = false;
+      for (const order of candidates) {
+        try {
+          const result = await checkOrderPayment(order.id);
+          if (result.reconciled) anyPaid = true;
+        } catch {
+          // Manual "Check payment" remains; auto never nags.
+        }
+      }
+      if (anyPaid) refreshAll();
+      else void loadAwaiting();
+    })();
+  }, [awaitingOrders, loadAwaiting, refreshAll]);
 
   async function move(order: Order, target: OrderStatus) {
     if (busyId) return;
@@ -154,7 +229,7 @@ export function ServerOrdersBoard() {
     try {
       const result = await checkOrderPayment(order.id);
       if (result.reconciled) {
-        refresh();
+        refreshAll();
         setCheckNote({ orderId: order.id, text: "Payment confirmed — the board now shows Paid." });
       } else {
         setCheckNote({
@@ -220,7 +295,7 @@ export function ServerOrdersBoard() {
           </button>
           <button
             type="button"
-            onClick={() => refresh()}
+            onClick={() => refreshAll()}
             className="rounded-full border border-line-300 px-4 py-1.5 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
           >
             Refresh
@@ -244,6 +319,70 @@ export function ServerOrdersBoard() {
         <p className="text-xs text-ink-500">
           Browser notifications are on — new orders alert you even from another tab.
         </p>
+      )}
+
+      {/* Compact pill above the Kanban: hidden card tickets stay one tap
+          away. Paid arrivals land on the board through the poll. */}
+      {awaitingOrders.length > 0 && (
+        <section aria-label={`Awaiting payment (${awaitingOrders.length})`}>
+          <button
+            type="button"
+            onClick={() => setAwaitingOpen((open) => !open)}
+            aria-expanded={awaitingOpen}
+            className="inline-flex items-center gap-2 rounded-full border border-line-200 bg-surface-base px-3 py-1 text-xs font-semibold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
+          >
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-600" />
+            {awaitingOrders.length} awaiting payment
+            <span aria-hidden="true" className="text-ink-400">
+              {awaitingOpen ? "▾" : "▸"}
+            </span>
+          </button>
+          {awaitingOpen && (
+            <div className="mt-2 rounded-2xl border border-line-200 bg-surface-base p-3">
+              <p className="text-[11px] text-ink-500">
+                Cards stay off the board until Stripe confirms — paid tickets appear below.
+              </p>
+              <ul className="mt-1 divide-y divide-line-100">
+                {awaitingOrders.map((order) => {
+                  const total = orderTotal(order.lines);
+                  const badge = normalizePaymentStatus(order.paymentStatus);
+                  return (
+                    <li
+                      key={order.id}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm"
+                    >
+                      <span className="font-bold text-ink-900">#{orderCode(order.id)}</span>
+                      <span className="text-ink-700">{formatTableLabel(order.tableLabel)}</span>
+                      <span className="text-xs text-ink-500">
+                        {formatElapsed(order.createdAt)} ·{" "}
+                        {total === null
+                          ? "no price"
+                          : formatPreviewPrice(total, null, order.currency)}
+                      </span>
+                      <StatusChip size="sm" tone={paymentStatusTone(badge)}>
+                        {paymentStatusLabel(badge)}
+                      </StatusChip>
+                      <button
+                        type="button"
+                        disabled={checkingId === order.id}
+                        onClick={() => void checkPayment(order)}
+                        className="ml-auto rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:opacity-50"
+                      >
+                        {checkingId === order.id ? "Checking…" : "Check payment"}
+                      </button>
+                      {checkNote && checkNote.orderId === order.id && (
+                        <span className="basis-full text-xs text-ink-600">{checkNote.text}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+      {awaitingLoading && awaitingOrders.length === 0 && (
+        <p className="text-xs text-ink-500">Checking for card payments…</p>
       )}
 
       {(error ?? pollError) && (

@@ -818,6 +818,56 @@ export async function countOrdersForStaff(
   };
 }
 
+/**
+ * Tickets the kitchen board hides (Option A): card orders not yet paid.
+ * The slim strip above the Kanban reads this — paid/refunded rows never
+ * appear here because the board already shows them. Capped at 50, newest
+ * first; cash-only cafés simply get an empty list.
+ */
+export async function listAwaitingPaymentForStaff(
+  db: TenancyDb,
+  userId: string,
+  query: { restaurantId?: string | null } = {}
+): Promise<{ orders: Order[]; serverTime: string }> {
+  if (query.restaurantId) {
+    const membership = await db
+      .select({ id: restaurantMembership.id })
+      .from(restaurantMembership)
+      .where(
+        and(
+          eq(restaurantMembership.userId, userId),
+          eq(restaurantMembership.restaurantId, query.restaurantId)
+        )
+      );
+    if (membership.length === 0) {
+      throw new OrderRepoError("not_found", "That restaurant does not exist.");
+    }
+  }
+  const serverTime = new Date();
+  const conditions = [
+    eq(restaurantMembership.userId, userId),
+    eq(orderTable.paymentProvider, "stripe"),
+    inArray(orderTable.paymentStatus, ["unpaid", "pending", "failed"]),
+    ...(query.restaurantId ? [eq(orderTable.restaurantId, query.restaurantId)] : []),
+  ];
+  const rows = await db
+    .select({ order: orderTable })
+    .from(orderTable)
+    .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, orderTable.restaurantId))
+    .where(and(...conditions))
+    .orderBy(desc(orderTable.createdAt), desc(orderTable.id))
+    .limit(50);
+  const orderRows = rows.map((entry) => entry.order);
+  const { lines, options } = await linesWithOptions(
+    db,
+    orderRows.map((row) => row.id)
+  );
+  return {
+    orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [], options)),
+    serverTime: iso(serverTime),
+  };
+}
+
 /** One order for a member of its restaurant (owner or staff), or null. */
 export async function getOrderForStaff(
   db: TenancyDb,
