@@ -139,6 +139,17 @@ export function OrderPaySection({
     );
   }
 
+  // Dead pay link (30-minute expiry or staff-cleared): no button, just the
+  // way back — a new order or the counter.
+  if (read.checkout.reason === "expired") {
+    return (
+      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+        <p className="text-sm font-semibold text-ink-900">This payment link has expired.</p>
+        <p className="mt-1 text-sm text-ink-600">{read.checkout.copy}</p>
+      </div>
+    );
+  }
+
   // Counter-only café, unpriced order, tiny total: the resolver's sentence.
   if (read.checkout.mode !== "online") {
     return (

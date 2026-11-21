@@ -73,6 +73,15 @@ function formatTime(iso: string): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Staff may clear an abandoned ticket by hand once it is 5 minutes old. */
+const CLEAR_AFTER_MS = 5 * 60 * 1000;
+
+function canClearAwaiting(order: Order): boolean {
+  const created = new Date(order.createdAt).getTime();
+  if (Number.isNaN(created)) return false;
+  return Date.now() - created >= CLEAR_AFTER_MS;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof SyncError) {
     switch (error.code) {
@@ -218,6 +227,33 @@ export function ServerOrdersBoard() {
     });
     if (!ok) return;
     void move(order, "cancelled");
+  }
+
+  /** Staff clear: an abandoned card ticket (5+ minutes old) is cancelled by
+      hand — the row stays in the DB as `cancelled`, the pay link dies. */
+  async function clearAwaiting(order: Order) {
+    if (busyId) return;
+    const ok = await confirm({
+      message: `Clear #${orderCode(order.id)} for ${formatTableLabel(order.tableLabel)}? The diner's pay link stops working. Kept as cancelled.`,
+      confirmLabel: "Clear order",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(order.id);
+    setError(null);
+    try {
+      await setOrderStatus(order.id, "cancelled", order.updatedAt);
+      refreshAll();
+    } catch (clearError) {
+      if (clearError instanceof SyncError && clearError.code === "conflict") {
+        setError("That order changed elsewhere — showing the latest version.");
+        refreshAll();
+      } else {
+        setError(errorMessage(clearError));
+      }
+    } finally {
+      setBusyId(null);
+    }
   }
 
   /** Missed-webhook reconciliation: read the session off the café's account. */
@@ -370,6 +406,17 @@ export function ServerOrdersBoard() {
                       >
                         {checkingId === order.id ? "Checking…" : "Check payment"}
                       </button>
+                      {canClearAwaiting(order) && (
+                        <button
+                          type="button"
+                          disabled={busyId === order.id}
+                          onClick={() => void clearAwaiting(order)}
+                          title="Cancel this unpaid ticket — the pay link stops working. Kept as cancelled."
+                          className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-800 disabled:opacity-50"
+                        >
+                          {busyId === order.id ? "Clearing…" : "Clear"}
+                        </button>
+                      )}
                       {checkNote && checkNote.orderId === order.id && (
                         <span className="basis-full text-xs text-ink-600">{checkNote.text}</span>
                       )}

@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   consumeOrderRateLimit,
   createOrderTrackingToken,
+  expireStaleAwaitingPaymentsForStaff,
   listOrdersForStaff,
   OrderRepoError,
   placeOrderFromSlug,
@@ -260,6 +261,16 @@ export async function GET(request: Request) {
   const cursor = url.searchParams.get("cursor");
 
   try {
+    // Abandoned-card sweep rides the board poll: every poll first retires
+    // unpaid card tickets past the 30-minute TTL (best-effort — a sweep
+    // failure must never fail the board), then the list reads clean.
+    if (restaurantId) {
+      try {
+        await expireStaleAwaitingPaymentsForStaff(getDb(), userId, { restaurantId });
+      } catch {
+        // The list below is still the truth.
+      }
+    }
     const result = await listOrdersForStaff(getDb(), userId, {
       since,
       restaurantId,
