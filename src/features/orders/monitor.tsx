@@ -505,9 +505,15 @@ export function OrderMonitorProvider({
 
   const newCount = useMemo(
     () =>
-      orders.filter(
-        (order) => order.status === "new" && (seenAt === null || order.createdAt > seenAt)
-      ).length,
+      orders.filter((order) => {
+        if (order.status !== "new" || seenAt === null) return order.status === "new";
+        if (order.createdAt > seenAt) return true;
+        return (
+          order.paymentProvider === "stripe" &&
+          order.paymentStatus === "paid" &&
+          order.updatedAt > seenAt
+        );
+      }).length,
     [orders, seenAt]
   );
 

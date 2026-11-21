@@ -25,9 +25,20 @@ export function mergeBoardOrders(
 }
 
 export function detectNewOrders(incoming: Order[], seenAt: string | null): Order[] {
-  return incoming.filter(
-    (order) => order.status === "new" && (seenAt === null || order.createdAt > seenAt)
-  );
+  return incoming.filter((order) => {
+    if (order.status !== "new" || seenAt === null) {
+      return order.status === "new" && seenAt === null;
+    }
+    // Fresh tickets arrive by creation time. Option A (hide-until-paid): a
+    // card ticket first appears when the webhook marks it paid, with an old
+    // `createdAt` — the paid transition (`updatedAt`) is its arrival.
+    if (order.createdAt > seenAt) return true;
+    return (
+      order.paymentProvider === "stripe" &&
+      order.paymentStatus === "paid" &&
+      order.updatedAt > seenAt
+    );
+  });
 }
 
 /**

@@ -166,7 +166,8 @@ export function OrderPaySection({
     returnPay === "cancelled" && !failed ? "Payment was cancelled — no money moved. " : "";
   const lead = failed
     ? "That card payment didn't go through — nothing was charged. "
-    : cancelledNote || "Pay by card now — the money goes to the café. ";
+    : cancelledNote ||
+      "Pay by card now to send your order to the kitchen — the money goes straight to the café. ";
 
   return (
     <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
