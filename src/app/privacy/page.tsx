@@ -61,7 +61,13 @@ export default function PrivacyPage() {
             <li>
               <strong className="font-medium text-ink-800">Table orders:</strong> the table label,
               the items and prices at the time of ordering, an optional free-text note from the
-              diner, the status, and timestamps.
+              diner, the status, and timestamps. For a café that takes cards, the order also records
+              the payment state and the café&apos;s Stripe references — never a card number.
+            </li>
+            <li>
+              <strong className="font-medium text-ink-800">Card payment connection</strong> (only
+              when a café turns it on): the café&apos;s Stripe account reference and settings, so
+              the board knows where to send diners. No card data.
             </li>
             <li>
               <strong className="font-medium text-ink-800">Extraction usage:</strong> how many pages
@@ -93,8 +99,10 @@ export default function PrivacyPage() {
               email, no phone, no account, no device identifier.
             </li>
             <li>
-              <strong className="font-medium text-ink-800">Payment data.</strong> Nothing is charged
-              during the launch promotion, so we never see a card number.
+              <strong className="font-medium text-ink-800">Card numbers.</strong> Even when a café
+              takes card payment, the diner pays on the café&apos;s own Stripe account: card details
+              go to Stripe, never to us. Payouts and refunds happen in the café&apos;s Stripe
+              dashboard. We never see, store, or hold the money.
             </li>
             <li>
               <strong className="font-medium text-ink-800">Advertising profiles.</strong> There are
@@ -116,8 +124,9 @@ export default function PrivacyPage() {
           <p>
             Hosting and request logs: Vercel. Database: Neon. Sign-in email delivery: Resend. Menu
             extraction: Google&apos;s Gemini API, which receives the menu image and prompt for that
-            request. Dish photo storage and delivery: UploadThing. We do not sell data or share it
-            for advertising.
+            request. Dish photo storage and delivery: UploadThing. Card payment processing: Stripe,
+            acting for the café on its own Stripe account — the diner&apos;s card details go to
+            Stripe, not to us. We do not sell data or share it for advertising.
           </p>
         </Section>
 

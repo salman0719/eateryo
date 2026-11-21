@@ -48,7 +48,13 @@ export interface CheckoutOrder {
 export const MIN_CHARGE_CENTS = 50;
 
 /** v1 presentment list: AU cafés settle in AUD only. */
-const SUPPORTED_CURRENCIES = ["AUD"] as const;
+export const SUPPORTED_CURRENCIES = ["AUD"] as const;
+
+/** The card-setup warning and the checkout gate read the same list. */
+export function isCardCurrencySupported(currency: unknown): boolean {
+  if (typeof currency !== "string") return false;
+  return (SUPPORTED_CURRENCIES as readonly string[]).includes(currency.trim().toUpperCase());
+}
 
 export interface CheckoutDecision {
   mode: PaymentMode;

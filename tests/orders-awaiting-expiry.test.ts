@@ -300,6 +300,42 @@ describe("expired pay-link responses", () => {
     expect(await rowStatus(orderId)).toMatchObject({ status: "cancelled" });
   });
 
+  it("refuses an oversized checkout body before parsing it", async () => {
+    const orderId = await insertAwaitingCardOrder({ ageMin: 5 });
+    const res = await postCheckout(
+      new Request(`http://test.local/api/orders/${orderId}/checkout`, {
+        method: "POST",
+        headers: { ...callerHeaders(), "content-length": "99999" },
+        body: JSON.stringify({ trackingToken: "x" }),
+      }),
+      orderParams(orderId)
+    );
+    expect(res.status).toBe(413);
+    expect((await res.json()).error.code).toBe("payload_too_large");
+  });
+
+  it("rate-limits checkout attempts and says when to retry", async () => {
+    const orderId = await insertAwaitingCardOrder({ ageMin: 5 });
+    const ip = "203.0.113.77";
+    const attempt = () =>
+      postCheckout(
+        new Request(`http://test.local/api/orders/${orderId}/checkout`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": ip },
+          body: JSON.stringify({ trackingToken: "no-such-token" }),
+        }),
+        orderParams(orderId)
+      );
+    for (let n = 0; n < 12; n += 1) {
+      const res = await attempt();
+      expect(res.status).toBe(404);
+    }
+    const blocked = await attempt();
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("Retry-After")).toBe("60");
+    expect((await blocked.json()).error.code).toBe("rate_limited");
+  });
+
   it("sweeps stale tickets on the next board poll", async () => {
     const stale = await insertAwaitingCardOrder({ ageMin: 31 });
     const fresh = await insertAwaitingCardOrder({ ageMin: 5 });

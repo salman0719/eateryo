@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getPaymentAccountForMember, setPaymentModeForOwner } from "@/features/payments/accounts";
+import {
+  getLiveMenuCurrencyWarnings,
+  getPaymentAccountForMember,
+  setPaymentModeForOwner,
+} from "@/features/payments/accounts";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
@@ -51,7 +55,10 @@ async function refusalResponse(
     : errorResponse("not_found", "That restaurant does not exist.", 404);
 }
 
-function serialize(account: NonNullable<Awaited<ReturnType<typeof getPaymentAccountForMember>>>) {
+function serialize(
+  account: NonNullable<Awaited<ReturnType<typeof getPaymentAccountForMember>>>,
+  currencyWarnings: Awaited<ReturnType<typeof getLiveMenuCurrencyWarnings>>
+) {
   return {
     id: account.id,
     provider: account.provider,
@@ -67,6 +74,7 @@ function serialize(account: NonNullable<Awaited<ReturnType<typeof getPaymentAcco
     requirementCodes: account.requirementCodes,
     connectedAt: account.connectedAt?.toISOString() ?? null,
     statusCheckedAt: account.statusCheckedAt?.toISOString() ?? null,
+    currencyWarnings,
   };
 }
 
@@ -87,7 +95,8 @@ export async function GET(request: Request, { params }: RouteParams) {
       if (!member) return errorResponse("not_found", "That restaurant does not exist.", 404);
       return noStore(NextResponse.json({ account: null }));
     }
-    return noStore(NextResponse.json({ account: serialize(account) }));
+    const currencyWarnings = await getLiveMenuCurrencyWarnings(getDb(), userId, restaurantId);
+    return noStore(NextResponse.json({ account: serialize(account, currencyWarnings) }));
   } catch {
     return errorResponse("server_db_unavailable", "Could not load card payments.", 503);
   }
@@ -135,7 +144,8 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (!updated) {
       return refusalResponse(userId, restaurantId, "Only an owner can change card payments.");
     }
-    return noStore(NextResponse.json({ account: serialize(updated) }));
+    const currencyWarnings = await getLiveMenuCurrencyWarnings(getDb(), userId, restaurantId);
+    return noStore(NextResponse.json({ account: serialize(updated, currencyWarnings) }));
   } catch {
     return errorResponse("server_db_unavailable", "Could not change the payment mode.", 503);
   }

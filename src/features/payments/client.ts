@@ -8,6 +8,13 @@ import { z } from "zod";
 
 import { SyncError } from "@/features/menus/sync";
 
+const currencyWarningSchema = z.object({
+  menuTitle: z.string().min(1),
+  currency: z.string().nullable(),
+});
+
+export type CurrencyWarning = z.infer<typeof currencyWarningSchema>;
+
 const accountSchema = z.object({
   id: z.string().min(1),
   provider: z.literal("stripe"),
@@ -23,6 +30,9 @@ const accountSchema = z.object({
   requirementCodes: z.array(z.string()),
   connectedAt: z.string().nullable(),
   statusCheckedAt: z.string().nullable(),
+  // Present on the status read and the mode switch; older sibling routes
+  // omit it and the card keeps its previous warnings.
+  currencyWarnings: z.array(currencyWarningSchema).optional(),
 });
 
 export type PaymentsAccount = z.infer<typeof accountSchema>;
