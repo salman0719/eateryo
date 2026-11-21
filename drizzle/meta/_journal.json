@@ -134,6 +134,13 @@
       "when": 1795230276540,
       "tag": "0018_needy_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795246748782,
+      "tag": "0019_aspiring_sue_storm",
+      "breakpoints": true
     }
   ]
 }
