@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, asc, desc, eq, gt, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import {
   menu as menuTable,
@@ -24,6 +24,8 @@ import { getPublishedMenuByPath, type PublishedMenuPage } from "@/features/publi
 import { getRestaurantBySlug } from "@/features/tables/repo";
 import { menuDocumentSchema, type MenuDocument, type MenuItem } from "@/features/menu/schema";
 
+import { getPaymentAccount } from "@/features/payments/accounts";
+import { resolveCheckout } from "@/features/payments/resolver";
 import {
   canTransitionOrderStatus,
   orderSchema,
@@ -436,6 +438,38 @@ async function insertLinesWithOptions(
  * snapshot* (the menu the diner saw), so a client cannot invent a name, a
  * price, a total, or an add-on. Unpriced lines make the total `null`.
  */
+/**
+ * Option A (hide-until-paid): when the café takes cards online for this
+ * ticket, the row is marked `payment_provider = 'stripe'` at creation so
+ * the staff board can hide it until the webhook marks it paid. Counter
+ * tickets keep a null provider and show immediately. Fail-closed: any
+ * lookup failure behaves like pay-at-the-counter (the kitchen sees it).
+ */
+async function onlinePaymentIntent(
+  db: TenancyDb,
+  restaurantId: string,
+  currency: string | null,
+  totalCents: number | null
+): Promise<boolean> {
+  try {
+    const account = await getPaymentAccount(db, restaurantId);
+    const decision = resolveCheckout({
+      mode: account?.mode ?? "at_venue",
+      account: account
+        ? {
+            status: account.status,
+            chargesEnabled: account.chargesEnabled,
+            currency,
+          }
+        : null,
+      order: { currency, totalCents },
+    });
+    return decision.mode === "online";
+  } catch {
+    return false;
+  }
+}
+
 export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput): Promise<Order> {
   const page = await getPublishedMenuByPath(db, input.restaurantSlug, input.slug);
   if (!page) {
@@ -463,6 +497,7 @@ export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput):
     : lines.reduce((sum, line) => sum + (line.unitPriceCents ?? 0) * line.quantity, 0);
 
   const now = input.now ?? new Date();
+  const needsCard = await onlinePaymentIntent(db, page.restaurantId, doc.currency, totalCents);
   const inserted = await db
     .insert(orderTable)
     .values({
@@ -474,6 +509,7 @@ export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput):
       note,
       status: "new",
       totalCents,
+      ...(needsCard ? { paymentProvider: "stripe" } : {}),
       createdAt: now,
       updatedAt: now,
     })
@@ -564,6 +600,8 @@ export async function placeTableOrder(db: TenancyDb, input: PlaceTableOrderInput
     if (title && !titles.includes(title)) titles.push(title);
   }
 
+  const ticketCurrency = orderCurrency([...pages.values()].map((page) => page.doc));
+  const needsCard = await onlinePaymentIntent(db, restaurant.id, ticketCurrency, totalCents);
   const inserted = await db
     .insert(orderTable)
     .values({
@@ -571,10 +609,11 @@ export async function placeTableOrder(db: TenancyDb, input: PlaceTableOrderInput
       menuId: null,
       menuTitle: titles.length > 0 ? titles.join(" + ") : restaurant.name,
       tableLabel,
-      currency: orderCurrency([...pages.values()].map((page) => page.doc)),
+      currency: ticketCurrency,
       note,
       status: "new",
       totalCents,
+      ...(needsCard ? { paymentProvider: "stripe" } : {}),
       createdAt: now,
       updatedAt: now,
     })
@@ -652,7 +691,20 @@ export async function listOrdersForStaff(
   // this, so a row committed mid-query cannot fall between the two windows.
   const serverTime = new Date();
 
+  // Option A (hide-until-paid): a card ticket stays off the kitchen board
+  // until the webhook marks it paid (or refunded). Counter tickets (null
+  // provider) always show. Direct reads (`getOrderForStaff`) still return
+  // hidden rows so a payment can be reconciled by id. `ne` alone is not
+  // enough: `null <> 'stripe'` is null in SQL, so null-provider rows need
+  // the explicit `isNull` arm.
+  const kitchenVisible = or(
+    isNull(orderTable.paymentProvider),
+    ne(orderTable.paymentProvider, "stripe"),
+    eq(orderTable.paymentStatus, "paid"),
+    eq(orderTable.paymentStatus, "refunded")
+  );
   const conditions = [eq(restaurantMembership.userId, userId)];
+  if (kitchenVisible) conditions.push(kitchenVisible);
   if (query.restaurantId) conditions.push(eq(orderTable.restaurantId, query.restaurantId));
   if (since) {
     conditions.push(gt(orderTable.updatedAt, since));
@@ -738,8 +790,17 @@ export async function countOrdersForStaff(
   }
 
   const serverTime = new Date();
+  const hideUnpaidCard = or(
+    isNull(orderTable.paymentProvider),
+    ne(orderTable.paymentProvider, "stripe"),
+    eq(orderTable.paymentStatus, "paid"),
+    eq(orderTable.paymentStatus, "refunded")
+  );
   const conditions = [
     eq(orderTable.restaurantId, query.restaurantId),
+    // Same hide-until-paid rule as the board list, so the header total
+    // never counts tickets the board hides.
+    ...(hideUnpaidCard ? [hideUnpaidCard] : []),
     ...(from ? [gte(orderTable.createdAt, from)] : []),
     ...(to ? [lte(orderTable.createdAt, to)] : []),
   ];

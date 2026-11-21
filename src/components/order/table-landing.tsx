@@ -95,12 +95,23 @@ export function TableLanding({
   }
 
   if (placed) {
+    // Option A (hide-until-paid): a card ticket stays off the kitchen board
+    // until payment completes, so the footnote must not promise the kitchen
+    // already has it. Counter tickets keep the old promise.
+    const needsCard =
+      placed.order.paymentProvider === "stripe" &&
+      placed.order.paymentStatus !== "paid" &&
+      placed.order.paymentStatus !== "refunded";
     return (
       <OrderShell bare>
         <OrderReceived
           order={placed.order}
           restaurantName={restaurantName}
-          footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+          footnote={
+            needsCard
+              ? "Complete payment below — the kitchen starts your order once payment goes through."
+              : "The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+          }
           onOrderAgain={() => setPlaced(null)}
         >
           <OrderPaySection
