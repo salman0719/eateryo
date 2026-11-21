@@ -83,8 +83,17 @@ async function TableLandingContent({
   const query = await searchParams;
   // A reload of a confirmation link carries `?track=`; hand it to the
   // client so its first paint is the loading state, not the menu tabs.
+  // A Stripe return adds `?pay=success&session_id=…` (or `pay=cancelled`).
   const resumeToken =
     typeof query.track === "string" && query.track.length > 0 ? query.track : null;
+  const payParam = typeof query.pay === "string" ? query.pay : null;
+  const returnPay: "success" | "cancelled" | null =
+    payParam === "success" || payParam === "cancelled" ? payParam : null;
+  const sessionParam = typeof query.session_id === "string" ? query.session_id.trim() : "";
+  const returnSessionId =
+    returnPay === "success" && sessionParam.length >= 8 && sessionParam.length <= 200
+      ? sessionParam
+      : null;
   const landing = await loadLanding(restaurantSlug);
   if (!landing) notFound();
 
@@ -144,6 +153,8 @@ async function TableLandingContent({
       }))}
       closedMenus={landing.closedMenus}
       resumeToken={resumeToken}
+      returnPay={returnPay}
+      returnSessionId={returnSessionId}
     />
   );
 }

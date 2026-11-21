@@ -98,17 +98,21 @@ async function setPaymentStatus(
 }
 
 /**
- * Conservative cached-status mapping for `account.updated`. `active` needs
- * both capabilities; a submitted account that still cannot charge needs
- * action; anything else is still onboarding. The Commit 1 resolver refines
- * this into the card states — this column never gates a charge by itself.
+ * Conservative cached-status mapping for `account.updated` and the manual
+ * check. `active` means Stripe says the account can charge
+ * (`charges_enabled`): a fresh account routinely has payouts still pending
+ * verification while charges already work, and that must not read as
+ * "paused" — payouts pending never blocks a charge. A submitted account
+ * that still cannot charge needs action; anything else is still
+ * onboarding. The Commit 1 resolver refines this into the card states —
+ * this column never gates a charge by itself.
  */
 export function mapAccountStatus(input: {
   chargesEnabled: boolean | null;
   payoutsEnabled: boolean | null;
   detailsSubmitted: boolean | null;
 }): "active" | "pending" | "restricted" {
-  if (input.chargesEnabled === true && input.payoutsEnabled === true) return "active";
+  if (input.chargesEnabled === true) return "active";
   if (input.detailsSubmitted === true) return "restricted";
   return "pending";
 }

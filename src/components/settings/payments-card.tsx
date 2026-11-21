@@ -345,6 +345,13 @@ export function PaymentsCard({
         </div>
       )}
 
+      {!loading && account?.status === "active" && account.payoutsEnabled === false && (
+        <p className="mt-3 text-xs leading-5 text-warning-800">
+          Stripe is still verifying payouts — cards work now, and the money reaches your bank
+          account once verification clears.
+        </p>
+      )}
+
       {error && (
         <p role="alert" className="mt-3 text-xs text-danger-700">
           {error}

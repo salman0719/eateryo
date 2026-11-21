@@ -11,6 +11,10 @@
  * HTTP goes through injectable `fetchImpl` so tests stub Stripe instead of
  * calling it. API version is pinned: capability status paths move between
  * versions, and a parse failure must read as `unavailable`, never `active`.
+ *
+ * Accounts v2 (`/v2/core/accounts`) speaks JSON only — form-encoding draws
+ * a 415, which the connect route surfaces as `provider_unavailable` (503).
+ * v1 endpoints (account links, reads, Checkout) stay form-encoded.
  */
 
 export const STRIPE_API_VERSION = "2026-11-18.endive";
@@ -103,23 +107,29 @@ export async function createCoreAccount(
   opts?: { fetchImpl?: FetchImpl; idempotencyKey?: string }
 ): Promise<StripeAccountRef> {
   const fetchImpl = opts?.fetchImpl ?? fetch;
-  const body = new URLSearchParams();
-  body.set("dashboard", "full");
-  body.set("defaults[fees_collector]", "stripe");
-  body.set("defaults[losses_collector]", "stripe");
-  body.set("defaults[country]", input.country ?? "AU");
-  body.set("configuration[merchant][card_payments]", "true");
-  body.set("configuration[merchant][support_phone]", "false");
-  body.set("identity[business_details][country]", input.country ?? "AU");
-  if (input.email) body.set("contact_email", input.email);
+  // v2 create is JSON-only with nested objects: merchant card payments are
+  // a requested capability, the country lives on `identity` (lowercase ISO),
+  // and Stripe collects the fees/losses itself (0% platform cut, direct
+  // charge on the café's account). Proven live 2026-11-21.
+  const payload: Record<string, unknown> = {
+    dashboard: "full",
+    identity: { country: (input.country ?? "AU").toLowerCase() },
+    configuration: {
+      merchant: { capabilities: { card_payments: { requested: true } } },
+    },
+    defaults: {
+      responsibilities: { fees_collector: "stripe", losses_collector: "stripe" },
+    },
+  };
+  if (input.email) payload.contact_email = input.email;
 
   const response = await fetchImpl("https://api.stripe.com/v2/core/accounts", {
     method: "POST",
     headers: {
       ...authHeaders(secret, opts?.idempotencyKey),
-      "content-type": "application/x-www-form-urlencoded",
+      "content-type": "application/json",
     },
-    body: body.toString(),
+    body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(`stripe_account_create_failed:${response.status}`);
   const json = await readJson(response);
@@ -204,6 +214,8 @@ export interface CheckoutSessionRef {
   paymentStatus: string | null;
   paymentIntentId: string | null;
   expiresAt: number | null;
+  /** The order this session was minted for — asserted on every read. */
+  metadataOrderId: string | null;
 }
 
 function asNumber(value: unknown): number | null {
@@ -280,6 +292,11 @@ export async function retrieveCheckoutSession(
 function parseCheckoutSession(json: Record<string, unknown>): CheckoutSessionRef {
   const id = asString(json["id"]);
   if (!id) throw new Error("stripe_checkout_failed:missing_id");
+  const metadata =
+    typeof json["metadata"] === "object" && json["metadata"] !== null
+      ? (json["metadata"] as Record<string, unknown>)
+      : null;
+  const metadataOrderId = metadata ? asString(metadata["orderId"]) : null;
   return {
     id,
     url: asString(json["url"]),
@@ -287,6 +304,7 @@ function parseCheckoutSession(json: Record<string, unknown>): CheckoutSessionRef
     paymentStatus: asString(json["payment_status"]),
     paymentIntentId: intentString(json["payment_intent"]),
     expiresAt: asNumber(json["expires_at"]),
+    metadataOrderId,
   };
 }
 

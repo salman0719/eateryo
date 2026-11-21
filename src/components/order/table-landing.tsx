@@ -19,6 +19,7 @@ import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
 import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
+import { OrderPaySection } from "./order-pay-section";
 import { OrderReceived } from "./order-received";
 import { OrderTracker } from "./order-tracker";
 import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "./table-order-tabs";
@@ -39,6 +40,9 @@ export interface TableLandingProps {
    * would flash and vanish once the confirmation arrives.
    */
   resumeToken: string | null;
+  /** Stripe return state (`?pay=success&session_id=…`), also server-read. */
+  returnPay: "success" | "cancelled" | null;
+  returnSessionId: string | null;
 }
 
 export function TableLanding({
@@ -50,6 +54,8 @@ export function TableLanding({
   menus,
   closedMenus,
   resumeToken,
+  returnPay,
+  returnSessionId,
 }: TableLandingProps) {
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [resolving, setResolving] = useState(resumeToken !== null);
@@ -97,6 +103,12 @@ export function TableLanding({
           footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
           onOrderAgain={() => setPlaced(null)}
         >
+          <OrderPaySection
+            orderId={placed.order.id}
+            trackingToken={placed.tracking?.token ?? null}
+            returnPay={returnPay}
+            sessionId={returnSessionId}
+          />
           <OrderTracker
             orderId={placed.order.id}
             token={placed.tracking?.token ?? null}
