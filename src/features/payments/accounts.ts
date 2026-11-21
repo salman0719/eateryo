@@ -1,11 +1,17 @@
-import { eq } from "drizzle-orm";
+import { and, asc, eq, isNotNull } from "drizzle-orm";
 
 import type { TenancyDb } from "@/features/tenancy/repo";
 import { can, getMembershipAccess } from "@/features/tenancy/policy";
-import { restaurantPaymentAccount } from "@/lib/db/schema";
+import {
+  menu as menuTable,
+  menuRevision as menuRevisionTable,
+  publishedMenu as publishedMenuTable,
+  restaurantPaymentAccount,
+} from "@/lib/db/schema";
 
 import { mapAccountStatus } from "./repo";
 import type { AccountStatusRead } from "./provider";
+import { isCardCurrencySupported } from "./resolver";
 
 export type PaymentAccountRow = typeof restaurantPaymentAccount.$inferSelect;
 
@@ -118,6 +124,59 @@ export async function disableOnlinePaymentsForOwner(
   restaurantId: string
 ): Promise<PaymentAccountRow | null> {
   return setPaymentModeForOwner(db, userId, restaurantId, "at_venue");
+}
+
+export interface LiveMenuCurrencyWarning {
+  menuTitle: string;
+  /** The stored print value (`$`, `€`, …) or null when the menu names none. */
+  currency: string | null;
+}
+
+/**
+ * Live menus whose prices cannot be charged by card (C4 card-setup warn).
+ * Reads the same live snapshots ordering prices from — `menu_revision.doc`
+ * behind the live pointer — and names only the menus whose stored currency
+ * is missing or outside the v1 presentment list. Those orders fail closed to
+ * pay-at-counter, so the card warns instead of promising cards everywhere.
+ * Member-scoped like the status read; outsiders get an empty list.
+ */
+export async function getLiveMenuCurrencyWarnings(
+  db: TenancyDb,
+  userId: string,
+  restaurantId: string
+): Promise<LiveMenuCurrencyWarning[]> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!access) return [];
+  const rows = await db
+    .select({
+      menuId: menuTable.id,
+      title: menuTable.title,
+      doc: menuRevisionTable.doc,
+    })
+    .from(menuTable)
+    .innerJoin(publishedMenuTable, eq(publishedMenuTable.menuId, menuTable.id))
+    .innerJoin(menuRevisionTable, eq(menuRevisionTable.id, publishedMenuTable.liveRevisionId))
+    .where(
+      and(
+        eq(menuTable.restaurantId, restaurantId),
+        isNotNull(publishedMenuTable.publishedAt),
+        isNotNull(publishedMenuTable.liveRevisionId)
+      )
+    )
+    .orderBy(asc(menuTable.title));
+  const warnings: LiveMenuCurrencyWarning[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const raw =
+      typeof row.doc === "object" && row.doc !== null
+        ? ((row.doc as { currency?: unknown }).currency ?? null)
+        : null;
+    const normalized = typeof raw === "string" && raw.trim() !== "" ? raw : null;
+    if (isCardCurrencySupported(normalized) || seen.has(row.menuId)) continue;
+    seen.add(row.menuId);
+    warnings.push({ menuTitle: row.title, currency: normalized });
+  }
+  return warnings;
 }
 
 /** Sync the cached verdict from a fresh Stripe read. */

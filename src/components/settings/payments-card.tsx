@@ -22,6 +22,7 @@ import {
   refreshPaymentsLink,
   setPaymentsMode,
   startPaymentsConnect,
+  type CurrencyWarning,
   type PaymentsAccount,
 } from "@/features/payments/client";
 import { SyncError } from "@/features/menus/sync";
@@ -58,12 +59,24 @@ export function PaymentsCard({
   restaurantName: string;
   canManage?: boolean;
 }) {
-  const [account, setAccount] = useState<PaymentsAccount | null>(null);
+  const [account, setAccountState] = useState<PaymentsAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // The status read and the mode switch carry live-menu currency warnings;
+  // sibling routes omit them, so adopting an answer without warnings keeps
+  // the previous ones instead of flashing the warning away.
+  const warnings: CurrencyWarning[] = account?.currencyWarnings ?? [];
+  function adoptAccount(next: PaymentsAccount | null) {
+    setAccountState((prev) =>
+      next && next.currencyWarnings === undefined
+        ? { ...next, currencyWarnings: prev?.currencyWarnings }
+        : next
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +85,7 @@ export function PaymentsCard({
       setError(null);
       try {
         const status = await fetchPaymentsStatus(restaurantId);
-        if (!cancelled) setAccount(status);
+        if (!cancelled) adoptAccount(status);
       } catch (failure) {
         if (!cancelled) setError(describeFailure(failure));
       } finally {
@@ -92,7 +105,7 @@ export function PaymentsCard({
     if (params.get("restaurant") !== restaurantId) return;
     void (async () => {
       try {
-        setAccount(await checkPaymentsNow(restaurantId));
+        adoptAccount(await checkPaymentsNow(restaurantId));
         setNotice("Checked with Stripe just now.");
       } catch (failure) {
         setError(describeFailure(failure));
@@ -121,7 +134,7 @@ export function PaymentsCard({
     setError(null);
     setNotice(null);
     try {
-      setAccount(await checkPaymentsNow(restaurantId));
+      adoptAccount(await checkPaymentsNow(restaurantId));
       setNotice("Checked with Stripe just now.");
     } catch (failure) {
       setError(describeFailure(failure));
@@ -136,7 +149,7 @@ export function PaymentsCard({
     setError(null);
     setNotice(null);
     try {
-      setAccount(await setPaymentsMode(restaurantId, mode));
+      adoptAccount(await setPaymentsMode(restaurantId, mode));
     } catch (failure) {
       setError(describeFailure(failure));
     } finally {
@@ -149,7 +162,7 @@ export function PaymentsCard({
     setBusy(true);
     setError(null);
     try {
-      setAccount(await disableOnlinePayments(restaurantId));
+      adoptAccount(await disableOnlinePayments(restaurantId));
       setNotice("Card payment is off — diners see pay at the counter.");
     } catch (failure) {
       setError(describeFailure(failure));
@@ -343,6 +356,14 @@ export function PaymentsCard({
             </button>
           )}
         </div>
+      )}
+
+      {!loading && account && warnings.length > 0 && (
+        <p className="mt-3 text-xs leading-5 text-warning-800">
+          Card payment skips{" "}
+          {warnings.map((w) => `${w.menuTitle} (${w.currency ?? "no currency"})`).join(", ")} —
+          those orders stay pay-at-the-counter until the menu names AUD.
+        </p>
       )}
 
       {!loading && account?.status === "active" && account.payoutsEnabled === false && (
