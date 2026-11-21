@@ -2,10 +2,16 @@
 
 import { useRef, useState } from "react";
 
+import {
+  brandAssetAspectWarning,
+  type BrandAssetAspectWarning,
+} from "@/features/brand-assets/aspect";
+import { readBrandAssetSize } from "@/features/brand-assets/prepare";
 import type { BrandAssetKind } from "@/features/brand-assets/schema";
 import { brandAssetCopy } from "@/features/brand-assets/ref";
 import { uploadBrandAsset } from "@/features/brand-assets/upload";
 import { ItemImageError } from "@/features/item-images/errors";
+import { ItemImagePrepareError } from "@/features/item-images/prepare";
 import { validateImageFile } from "@/lib/image-constraints";
 import { updateBrandAssets, type RestaurantOption } from "@/features/tenancy/client";
 
@@ -29,6 +35,10 @@ const smallButton =
 
 type SlotState =
   | { status: "idle" }
+  /** Measuring the picked file before deciding whether to warn. */
+  | { status: "checking" }
+  /** Wrong shape: the owner can continue anyway or pick another file. */
+  | { status: "aspect"; file: File; warning: BrandAssetAspectWarning }
   | { status: "working"; percent: number }
   | { status: "error"; message: string };
 
@@ -64,14 +74,10 @@ export function BrandCard({
   const setState = (kind: BrandAssetKind, state: SlotState) =>
     (kind === "logo" ? setLogoState : setCoverState)(state);
 
-  async function handleFile(kind: BrandAssetKind, file: File) {
+  /** Upload the file the owner has already agreed to, warning and all. */
+  async function upload(kind: BrandAssetKind, file: File) {
     setState(kind, { status: "working", percent: 0 });
     try {
-      const early = validateImageFile(file);
-      if (!early.valid) {
-        setState(kind, { status: "error", message: early.message });
-        return;
-      }
       const image = await uploadBrandAsset(file, kind, {
         onProgress: (percent) => setState(kind, { status: "working", percent }),
       });
@@ -87,6 +93,40 @@ export function BrandCard({
             : "The photo could not be uploaded. Try again.",
       });
     }
+  }
+
+  /**
+   * Measure the picked file first. A shape that does not suit the slot is a
+   * prompt, not a refusal: the owner may still continue, and only then does
+   * the upload start.
+   */
+  async function handleFile(kind: BrandAssetKind, file: File) {
+    setState(kind, { status: "checking" });
+    const early = validateImageFile(file);
+    if (!early.valid) {
+      setState(kind, { status: "error", message: early.message });
+      return;
+    }
+
+    let warning: BrandAssetAspectWarning | null;
+    try {
+      warning = brandAssetAspectWarning(kind, await readBrandAssetSize(file));
+    } catch (error) {
+      setState(kind, {
+        status: "error",
+        message:
+          error instanceof ItemImagePrepareError || error instanceof ItemImageError
+            ? error.message
+            : "This photo could not be read in your browser. Try a JPEG, PNG, or WebP.",
+      });
+      return;
+    }
+
+    if (warning) {
+      setState(kind, { status: "aspect", file, warning });
+      return;
+    }
+    await upload(kind, file);
   }
 
   async function handleRemove(kind: BrandAssetKind) {
@@ -116,6 +156,9 @@ export function BrandCard({
         const state = kind === "logo" ? logoState : coverState;
         const inputRef = kind === "logo" ? logoInput : coverInput;
         const working = state.status === "working";
+        // Measuring counts as busy: the owner cannot pick a second file in the
+        // middle of the first one's decode.
+        const busy = working || state.status === "checking";
         const slot = SLOT_COPY[kind];
         return (
           <div key={kind} className="mt-4 flex gap-3">
@@ -159,12 +202,43 @@ export function BrandCard({
               {working && state.status === "working" && (
                 <p className="text-xs text-ink-500">Uploading… {state.percent}%</p>
               )}
-              {canManage && (
+              {state.status === "checking" && (
+                <p className="text-xs text-ink-500">Checking the photo…</p>
+              )}
+              {state.status === "aspect" && (
+                <div className="rounded-lg border border-warning-300 bg-warning-50 px-2 py-1.5">
+                  <p role="alert" className="text-xs leading-5 text-warning-800">
+                    {state.warning.message}
+                  </p>
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void upload(kind, state.file)}
+                      className={smallButton}
+                    >
+                      Upload anyway
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Back to a clean slot and straight into the picker, so
+                        // answering the warning costs one click.
+                        setState(kind, { status: "idle" });
+                        inputRef.current?.click();
+                      }}
+                      className={smallButton}
+                    >
+                      Choose another
+                    </button>
+                  </div>
+                </div>
+              )}
+              {canManage && state.status !== "aspect" && (
                 <div className="mt-1 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => inputRef.current?.click()}
-                    disabled={working}
+                    disabled={busy}
                     className={smallButton}
                   >
                     {copy
@@ -175,7 +249,7 @@ export function BrandCard({
                     <button
                       type="button"
                       onClick={() => void handleRemove(kind)}
-                      disabled={working}
+                      disabled={busy}
                       className={smallButton}
                     >
                       Remove
@@ -187,7 +261,7 @@ export function BrandCard({
                     accept="image/*"
                     aria-label={slot.inputLabel}
                     className="hidden"
-                    disabled={working}
+                    disabled={busy}
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       // Reset so the same file can be picked again after an error.

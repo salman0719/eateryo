@@ -16,6 +16,7 @@ import {
   ItemImagePrepareError,
   type PreparedItemImageVariant,
 } from "@/features/item-images/prepare";
+import type { PixelSize } from "@/features/item-images/sizes";
 
 import { brandAssetVariants } from "./sizes";
 import type { BrandAssetKind } from "./schema";
@@ -34,13 +35,10 @@ function extensionForMimeType(mimeType: string): string {
 }
 
 /**
- * Decode one photo and return the copies to upload for the given slot.
- * Throws {@link ItemImagePrepareError} with a message the owner can act on.
+ * Check the source and decode it. Both public entry points share this so the
+ * size limits and the decode message never diverge.
  */
-export async function prepareBrandAsset(
-  file: File,
-  kind: BrandAssetKind
-): Promise<PreparedBrandAssetVariant[]> {
+async function decodeBrandAsset(file: File): Promise<ImageBitmap> {
   if (file.size === 0) {
     throw new ItemImagePrepareError("empty", "That file is empty. Choose another photo.");
   }
@@ -51,16 +49,40 @@ export async function prepareBrandAsset(
     );
   }
 
-  let bitmap: ImageBitmap;
   try {
     // Orientation is honoured so a portrait phone photo never arrives sideways.
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    return await createImageBitmap(file, { imageOrientation: "from-image" });
   } catch {
     throw new ItemImagePrepareError(
       "decode_failed",
       "This photo could not be read in your browser. Try a JPEG, PNG, or WebP."
     );
   }
+}
+
+/**
+ * The picked image's pixel size, for the shape check before an upload. Decodes
+ * and closes the bitmap, so the owner pays for one decode here and the prepare
+ * step's own decode when they continue.
+ */
+export async function readBrandAssetSize(file: File): Promise<PixelSize> {
+  const bitmap = await decodeBrandAsset(file);
+  try {
+    return { width: bitmap.width, height: bitmap.height };
+  } finally {
+    bitmap.close();
+  }
+}
+
+/**
+ * Decode one photo and return the copies to upload for the given slot.
+ * Throws {@link ItemImagePrepareError} with a message the owner can act on.
+ */
+export async function prepareBrandAsset(
+  file: File,
+  kind: BrandAssetKind
+): Promise<PreparedBrandAssetVariant[]> {
+  const bitmap = await decodeBrandAsset(file);
 
   try {
     const variants = brandAssetVariants(kind, { width: bitmap.width, height: bitmap.height });
