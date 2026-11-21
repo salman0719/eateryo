@@ -24,6 +24,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import type { MenuDocument, MenuItem } from "@/features/menu/schema";
 import { searchMenu } from "@/features/menu/search";
 import {
@@ -58,11 +59,16 @@ const NOTICE_MS = 8000;
 export function OrderPagePreview({
   doc,
   restaurantName,
+  restaurantLogo = null,
+  restaurantCover = null,
   draftAheadOfLive = false,
 }: {
   doc: MenuDocument;
   /** The café's name when the caller knows it; nothing is invented if not. */
   restaurantName?: string | null;
+  /** Brand assets when the caller knows them; the header falls back without. */
+  restaurantLogo?: BrandAssetImage | null;
+  restaurantCover?: BrandAssetImage | null;
   /** The draft differs from the published snapshot diners are served today. */
   draftAheadOfLive?: boolean;
 }) {
@@ -161,6 +167,14 @@ export function OrderPagePreview({
 
   return (
     <OrderShell bare>
+      <DinerCoverHeader
+        restaurantName={caféName}
+        tableLabel={PREVIEW_TABLE_LABEL}
+        logo={restaurantLogo}
+        cover={restaurantCover}
+        bleed
+      />
+
       <div className="rounded-2xl border border-warning-300 bg-warning-50 px-4 py-3">
         <p className="text-[11px] font-semibold tracking-wide text-warning-900 uppercase">
           Preview · nothing is sent
@@ -175,8 +189,6 @@ export function OrderPagePreview({
           </p>
         )}
       </div>
-
-      <DinerCoverHeader restaurantName={caféName} tableLabel={PREVIEW_TABLE_LABEL} />
 
       <div className="flex min-w-0 flex-col gap-4">
         <nav aria-label="Search the menu">

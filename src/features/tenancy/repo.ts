@@ -3,6 +3,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 
 import { restaurant, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole, RestaurantWithRole } from "@/lib/db/schema";
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import { recordAuditEvent } from "./audit";
 import { accessFromMembership, can, getMembershipAccess, type MembershipAccess } from "./policy";
 
@@ -23,6 +24,8 @@ const restaurantColumns = {
   id: restaurant.id,
   name: restaurant.name,
   slug: restaurant.slug,
+  logo: restaurant.logo,
+  cover: restaurant.cover,
   createdAt: restaurant.createdAt,
   updatedAt: restaurant.updatedAt,
 } as const;
@@ -139,6 +142,44 @@ export async function renameRestaurantForOwner(
   const updated = await db
     .update(restaurant)
     .set({ name })
+    .where(eq(restaurant.id, restaurantId))
+    .returning(restaurantColumns);
+  const row = updated[0];
+  return row ? { ...row, role: access.role, access } : null;
+}
+
+/**
+ * Which brand slots a write touches. A key present with null clears that
+ * slot; an absent key leaves it alone — so logo and cover update
+ * independently and a rename-only PATCH never wipes them.
+ */
+export interface RestaurantBrandAssets {
+  logo?: BrandAssetImage | null;
+  cover?: BrandAssetImage | null;
+}
+
+/**
+ * Owner-only logo/cover write. Returns null when the user isn't a member or
+ * isn't an owner. Files are never deleted here: clearing only drops the
+ * reference, because a published page may still serve the old file.
+ */
+export async function setRestaurantBrandAssetsForOwner(
+  db: TenancyDb,
+  userId: string,
+  restaurantId: string,
+  assets: RestaurantBrandAssets
+): Promise<RestaurantWithAccess | null> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return null;
+  const set: { logo?: BrandAssetImage | null; cover?: BrandAssetImage | null } = {};
+  if (assets.logo !== undefined) set.logo = assets.logo;
+  if (assets.cover !== undefined) set.cover = assets.cover;
+  if (Object.keys(set).length === 0) {
+    return getRestaurantForUser(db, userId, restaurantId);
+  }
+  const updated = await db
+    .update(restaurant)
+    .set(set)
     .where(eq(restaurant.id, restaurantId))
     .returning(restaurantColumns);
   const row = updated[0];

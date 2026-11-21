@@ -1042,13 +1042,13 @@ export function ExtractionResult({
           400px, the editor's width, instead of a form-sized 320. */}
       {previewDoc ? (
         <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
-          <aside className="flex flex-col gap-2 lg:sticky lg:top-4">
+          <aside className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4">
             <PhoneFrame label="What a table card opens" widthClass="max-w-[400px]">
               <OrderPagePreview doc={previewDoc} />
             </PhoneFrame>
           </aside>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.18em] text-warning-800 uppercase">
                 First look

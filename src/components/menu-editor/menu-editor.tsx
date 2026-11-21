@@ -69,6 +69,7 @@ import {
 
 import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
+import { PreviewBrandBar } from "./preview-brand-bar";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
@@ -141,6 +142,17 @@ interface MenuEditorProps {
   onRetryAccountCheck?: () => void;
   /** The café's name, shown on the diner preview when the account knows it. */
   restaurantName?: string | null;
+  /** Brand assets, shown on the diner preview when the account knows them. */
+  restaurantLogo?: import("@/features/brand-assets/schema").BrandAssetImage | null;
+  restaurantCover?: import("@/features/brand-assets/schema").BrandAssetImage | null;
+  /**
+   * The café these assets belong to. Present when the menu lives in an
+   * account café; absent for a browser-only menu, which has no café to
+   * brand — the preview then shows no Change buttons.
+   */
+  restaurantId?: string | null;
+  /** Files the server's answer after a preview upload, so the header updates. */
+  onBrandChanged?: (updated: import("@/features/tenancy/client").RestaurantOption) => void;
   /** Open the publish wizard for a browser-only menu (R1). */
   onStartPublish?: () => void;
   /**
@@ -172,6 +184,10 @@ export function MenuEditor({
   canManage = true,
   onServer = false,
   restaurantName = null,
+  restaurantLogo = null,
+  restaurantCover = null,
+  restaurantId = null,
+  onBrandChanged,
   accountCheckFailed = false,
   onRetryAccountCheck,
   onStartPublish,
@@ -741,7 +757,16 @@ export function MenuEditor({
               : ""
           }`}
         >
-          <div className="order-2 min-w-0 lg:order-none">
+          <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-none">
+            {/*
+            Preview brand entry points: signed-in menus live in a café, so
+            the bar shows whenever the editor runs in account mode; a
+            browser-only menu has no café to brand. Staff see the header
+            without the Change buttons (canManage is false for them).
+            */}
+            {syncMode === "account" && canManage && restaurantId && onBrandChanged && (
+              <PreviewBrandBar restaurantId={restaurantId} onBrandChanged={onBrandChanged} />
+            )}
             <PhoneFrame
               label="What a table card opens"
               heightClass={
@@ -756,6 +781,8 @@ export function MenuEditor({
               <OrderPagePreview
                 doc={doc}
                 restaurantName={restaurantName}
+                restaurantLogo={restaurantLogo}
+                restaurantCover={restaurantCover}
                 draftAheadOfLive={needsPublish}
               />
             </PhoneFrame>

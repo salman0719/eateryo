@@ -49,7 +49,18 @@ function extensionForMimeType(mimeType: string): string {
   return "img";
 }
 
-async function encodeVariant(bitmap: ImageBitmap, width: number, height: number): Promise<Blob> {
+/**
+ * Draw a decoded bitmap at the variant size and return the encoded blob.
+ * Shared with the brand-asset pipeline (`src/features/brand-assets/`), so a
+ * second canvas encoder never drifts from this one. The WebP fallback note
+ * below applies to every caller: name the file from `blob.type`.
+ */
+export async function encodeBitmapToWebP(
+  bitmap: ImageBitmap,
+  width: number,
+  height: number,
+  quality: number = ENCODE_QUALITY
+): Promise<Blob> {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -61,7 +72,7 @@ async function encodeVariant(bitmap: ImageBitmap, width: number, height: number)
   context.drawImage(bitmap, 0, 0, width, height);
 
   const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/webp", ENCODE_QUALITY)
+    canvas.toBlob(resolve, "image/webp", quality)
   );
   if (!blob) {
     throw new ItemImagePrepareError("decode_failed", "Your browser could not prepare this photo.");
@@ -70,6 +81,10 @@ async function encodeVariant(bitmap: ImageBitmap, width: number, height: number)
   // in the blob's own type. The caller names the file from that type, so the
   // name on the CDN never disagrees with the bytes.
   return blob;
+}
+
+async function encodeVariant(bitmap: ImageBitmap, width: number, height: number): Promise<Blob> {
+  return encodeBitmapToWebP(bitmap, width, height);
 }
 
 /**
