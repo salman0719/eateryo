@@ -5,13 +5,17 @@ import {
   deleteRestaurantForOwner,
   getRestaurantForUser,
   renameRestaurantForOwner,
+  setRestaurantBrandAssetsForOwner,
 } from "@/features/tenancy/repo";
+import { brandAssetImageSchema } from "@/features/brand-assets/schema";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 
 /**
- * PATCH  /api/restaurants/[restaurantId] — owner-only rename.
+ * PATCH  /api/restaurants/[restaurantId] — owner-only rename and/or brand
+ *   assets (logo, cover). Each field is independent: an absent key is left
+ *   alone, an explicit null clears that brand slot.
  * DELETE /api/restaurants/[restaurantId] — owner-only delete. Memberships,
  *   menus, published pages and orders cascade in the database, so the UI
  *   must warn about that before calling.
@@ -20,9 +24,16 @@ import { rejectCrossOrigin } from "@/lib/http/origin";
  * rule as /api/menus/[menuId]). Error shape: { error: { code, message } }.
  */
 
-const renameBody = z.object({
-  name: z.string().trim().min(1, "Name is required.").max(120),
-});
+const updateBody = z
+  .object({
+    name: z.string().trim().min(1, "Name is required.").max(120).optional(),
+    logo: brandAssetImageSchema.nullable().optional(),
+    cover: brandAssetImageSchema.nullable().optional(),
+  })
+  .refine(
+    (value) => value.name !== undefined || value.logo !== undefined || value.cover !== undefined,
+    "Nothing to update."
+  );
 
 function errorResponse(code: string, message: string, status: number) {
   return NextResponse.json({ error: { code, message } }, { status });
@@ -83,26 +94,47 @@ export async function PATCH(
   } catch {
     return errorResponse("invalid_body", "Expected a JSON body.", 400);
   }
-  const parsed = renameBody.safeParse(body);
+  const parsed = updateBody.safeParse(body);
   if (!parsed.success) {
     return errorResponse("invalid_body", parsed.error.issues[0]?.message ?? "Invalid body.", 400);
   }
 
   try {
-    const restaurant = await renameRestaurantForOwner(
-      getDb(),
-      userId,
-      restaurantId,
-      parsed.data.name
-    );
+    const db = getDb();
+    const { name, logo, cover } = parsed.data;
+    // When no rename is asked for, any member reads the row so a staff
+    // writer still lands on the 403 branch below instead of a 404.
+    let restaurant =
+      name !== undefined
+        ? await renameRestaurantForOwner(db, userId, restaurantId, name)
+        : await getRestaurantForUser(db, userId, restaurantId);
     if (!restaurant) {
-      return refusalResponse(userId, restaurantId, "Only an owner can rename this restaurant.");
+      return refusalResponse(
+        userId,
+        restaurantId,
+        name !== undefined
+          ? "Only an owner can rename this restaurant."
+          : "Only an owner can change this restaurant's brand."
+      );
+    }
+    if (logo !== undefined || cover !== undefined) {
+      restaurant = await setRestaurantBrandAssetsForOwner(db, userId, restaurantId, {
+        logo,
+        cover,
+      });
+      if (!restaurant) {
+        return refusalResponse(
+          userId,
+          restaurantId,
+          "Only an owner can change this restaurant's brand."
+        );
+      }
     }
     return noStore(NextResponse.json({ restaurant }));
   } catch {
     return errorResponse(
       "server_db_unavailable",
-      "Could not rename the restaurant. Try again.",
+      "Could not update the restaurant. Try again.",
       503
     );
   }

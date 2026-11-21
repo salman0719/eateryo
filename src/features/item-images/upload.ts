@@ -60,7 +60,11 @@ export async function uploadItemImage(
   try {
     uploaded = await uploadFiles("menuItemImage", {
       files,
-      onUploadProgress: ({ progress }) => options.onProgress?.(Math.round(progress)),
+      // `totalProgress` covers every prepared copy (display + thumb); `progress`
+      // is per-file and can exceed 100 because XHR counts multipart framing
+      // bytes on top of the file size, so clamp the value the UI prints.
+      onUploadProgress: ({ totalProgress }) =>
+        options.onProgress?.(Math.min(100, Math.max(0, Math.round(totalProgress)))),
     });
   } catch (error) {
     throw mapItemImageUploadError(error);
