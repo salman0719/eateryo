@@ -6,7 +6,11 @@ import { eq } from "drizzle-orm";
 import { getPaymentAccount } from "@/features/payments/accounts";
 import { getStripeSecret, retrieveCheckoutSession } from "@/features/payments/provider";
 import { fallbackCopy, resolveCheckout } from "@/features/payments/resolver";
-import { consumeOrderRateLimit, getOrderByTrackingToken } from "@/features/orders/repo";
+import {
+  consumeOrderRateLimit,
+  getOrderByTrackingToken,
+  isAwaitingExpired,
+} from "@/features/orders/repo";
 import { getDb } from "@/lib/db";
 import { order as orderTable } from "@/lib/db/schema";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -91,6 +95,49 @@ export async function POST(request: Request, { params }: RouteParams) {
     const rows = await db.select().from(orderTable).where(eq(orderTable.id, orderId)).limit(1);
     const row = rows[0];
     if (!row) return errorResponse("not_found", "That order link is no longer valid.", 404);
+
+    // Expired pay link: sweep it here so the receipt reads honest even if
+    // no staff board has polled since the TTL lapsed. The copy below is
+    // the whole story — no pay button renders on an expired ticket.
+    if (
+      row.status === "new" &&
+      row.paymentProvider === "stripe" &&
+      (row.paymentStatus === "unpaid" ||
+        row.paymentStatus === "pending" ||
+        row.paymentStatus === "failed") &&
+      isAwaitingExpired(row.createdAt, now)
+    ) {
+      await db
+        .update(orderTable)
+        .set({ status: "cancelled", updatedAt: now })
+        .where(eq(orderTable.id, row.id));
+      const expired = NextResponse.json({
+        paymentStatus: row.paymentStatus,
+        paymentProvider: row.paymentProvider,
+        checkout: {
+          mode: "at_venue",
+          reason: "expired",
+          copy: "This payment link expired after 30 minutes — place a new order or pay at the counter.",
+        },
+        live: null,
+      });
+      expired.headers.set("Cache-Control", "no-store");
+      return expired;
+    }
+    if (row.status === "cancelled") {
+      const gone = NextResponse.json({
+        paymentStatus: row.paymentStatus,
+        paymentProvider: row.paymentProvider,
+        checkout: {
+          mode: "at_venue",
+          reason: "expired",
+          copy: "This order was cleared — place a new order or pay at the counter.",
+        },
+        live: null,
+      });
+      gone.headers.set("Cache-Control", "no-store");
+      return gone;
+    }
 
     const paymentAccount = await getPaymentAccount(db, row.restaurantId);
     const decision = resolveCheckout({

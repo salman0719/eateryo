@@ -16,7 +16,11 @@ import {
   retrieveCheckoutSession,
 } from "@/features/payments/provider";
 import { fallbackCopy, resolveCheckout } from "@/features/payments/resolver";
-import { consumeOrderRateLimit, getOrderByTrackingToken } from "@/features/orders/repo";
+import {
+  consumeOrderRateLimit,
+  getOrderByTrackingToken,
+  isAwaitingExpired,
+} from "@/features/orders/repo";
 import { getDb } from "@/lib/db";
 import {
   order as orderTable,
@@ -109,8 +113,31 @@ export async function POST(request: Request, { params }: RouteParams) {
     const orderRows = await db.select().from(orderTable).where(eq(orderTable.id, orderId)).limit(1);
     const row = orderRows[0];
     if (!row) return errorResponse("not_found", "That order link is no longer valid.", 404);
+    if (row.status === "cancelled") {
+      return errorResponse("not_found", "That order is no longer active.", 404);
+    }
     if (row.paymentStatus === "paid" || row.paymentStatus === "refunded") {
       return errorResponse("already_paid", "This order is already paid.", 409);
+    }
+    // The pay link lives until the 30-minute expiry: an unpaid card ticket
+    // older than that is swept to `cancelled` here too (the board poll
+    // sweeps the rest), so a stale receipt cannot mint a fresh session.
+    if (
+      row.paymentProvider === "stripe" &&
+      (row.paymentStatus === "unpaid" ||
+        row.paymentStatus === "pending" ||
+        row.paymentStatus === "failed") &&
+      isAwaitingExpired(row.createdAt, now)
+    ) {
+      await db
+        .update(orderTable)
+        .set({ status: "cancelled", updatedAt: now })
+        .where(eq(orderTable.id, row.id));
+      return errorResponse(
+        "order_expired",
+        "This payment link expired after 30 minutes — place a new order or pay at the counter.",
+        410
+      );
     }
 
     const paymentAccount = await getPaymentAccount(db, row.restaurantId);

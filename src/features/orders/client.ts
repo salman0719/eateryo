@@ -75,6 +75,8 @@ function mapErrorCode(code: string, status: number): SyncErrorCode {
     case "order_stale":
     case "already_paid":
       return "conflict";
+    case "order_expired":
+      return "invalid";
     case "pay_unavailable":
     case "no_session":
       return "invalid";

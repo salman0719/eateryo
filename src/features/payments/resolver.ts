@@ -26,7 +26,8 @@ export type PayReason =
   | "currency_unknown"
   | "currency_unsupported"
   | "unpriced_lines"
-  | "amount_too_small";
+  | "amount_too_small"
+  | "expired";
 
 export interface CheckoutAccount {
   /** Cached verdict: active | pending | restricted | unavailable. */
@@ -114,5 +115,7 @@ export function fallbackCopy(reason: PayReason): string {
       return "One item has no price — pay at the counter and the café will sort it.";
     case "amount_too_small":
       return "This total is too small for a card — pay at the counter.";
+    case "expired":
+      return "This payment link expired after 30 minutes — place a new order or pay at the counter.";
   }
 }

@@ -819,10 +819,30 @@ export async function countOrdersForStaff(
 }
 
 /**
+ * Abandoned-card policy: an unpaid card ticket lives 30 minutes. Past that
+ * the pay link is dead and the next board poll sweeps it to `cancelled`
+ * (the row is kept — nothing is deleted). Staff may clear one manually
+ * after 5 minutes; the diner can still pay until either happens.
+ */
+export const AWAITING_PAYMENT_TTL_MS = 30 * 60 * 1000;
+export const AWAITING_CLEAR_AFTER_MS = 5 * 60 * 1000;
+
+/** True once the diner's pay link has lapsed (creation clock, not payment). */
+export function isAwaitingExpired(createdAt: Date, now: Date = new Date()): boolean {
+  return now.getTime() - createdAt.getTime() >= AWAITING_PAYMENT_TTL_MS;
+}
+
+/** True once staff may clear the ticket by hand (5 minutes old). */
+export function isAwaitingClearable(createdAt: Date, now: Date = new Date()): boolean {
+  return now.getTime() - createdAt.getTime() >= AWAITING_CLEAR_AFTER_MS;
+}
+
+/**
  * Tickets the kitchen board hides (Option A): card orders not yet paid.
  * The slim strip above the Kanban reads this — paid/refunded rows never
- * appear here because the board already shows them. Capped at 50, newest
- * first; cash-only cafés simply get an empty list.
+ * appear here because the board already shows them, and cancelled rows
+ * never appear because the ticket is dead (swept or staff-cleared). Capped
+ * at 50, newest first; cash-only cafés simply get an empty list.
  */
 export async function listAwaitingPaymentForStaff(
   db: TenancyDb,
@@ -847,6 +867,7 @@ export async function listAwaitingPaymentForStaff(
   const conditions = [
     eq(restaurantMembership.userId, userId),
     eq(orderTable.paymentProvider, "stripe"),
+    eq(orderTable.status, "new"),
     inArray(orderTable.paymentStatus, ["unpaid", "pending", "failed"]),
     ...(query.restaurantId ? [eq(orderTable.restaurantId, query.restaurantId)] : []),
   ];
@@ -866,6 +887,48 @@ export async function listAwaitingPaymentForStaff(
     orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [], options)),
     serverTime: iso(serverTime),
   };
+}
+
+/**
+ * Expiry sweep for abandoned card tickets. Runs on the board poll (the
+ * staff GET calls this best-effort before listing): every `new` card order
+ * older than the TTL that never paid flips to `cancelled`, so the pill
+ * cannot fill with stale carts. The row is kept as the audit copy — the
+ * diner's pay link simply stops working. Returns the swept count.
+ */
+export async function expireStaleAwaitingPaymentsForStaff(
+  db: TenancyDb,
+  userId: string,
+  query: { restaurantId: string },
+  now: Date = new Date()
+): Promise<{ expired: number }> {
+  const membership = await db
+    .select({ id: restaurantMembership.id })
+    .from(restaurantMembership)
+    .where(
+      and(
+        eq(restaurantMembership.userId, userId),
+        eq(restaurantMembership.restaurantId, query.restaurantId)
+      )
+    );
+  if (membership.length === 0) {
+    throw new OrderRepoError("not_found", "That restaurant does not exist.");
+  }
+  const cutoff = new Date(now.getTime() - AWAITING_PAYMENT_TTL_MS);
+  const swept = await db
+    .update(orderTable)
+    .set({ status: "cancelled", updatedAt: now })
+    .where(
+      and(
+        eq(orderTable.restaurantId, query.restaurantId),
+        eq(orderTable.paymentProvider, "stripe"),
+        eq(orderTable.status, "new"),
+        inArray(orderTable.paymentStatus, ["unpaid", "pending", "failed"]),
+        lt(orderTable.createdAt, cutoff)
+      )
+    )
+    .returning({ id: orderTable.id });
+  return { expired: swept.length };
 }
 
 /** One order for a member of its restaurant (owner or staff), or null. */
