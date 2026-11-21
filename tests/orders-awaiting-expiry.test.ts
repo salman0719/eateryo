@@ -5,6 +5,10 @@ import { GET as getBoard } from "@/app/api/orders/route";
 import { POST as postCheckout } from "@/app/api/orders/[orderId]/checkout/route";
 import { POST as postPayment } from "@/app/api/orders/[orderId]/payment/route";
 import {
+  AWAITING_CLEAR_AFTER_MS,
+  AWAITING_PAYMENT_TTL_MS,
+  awaitingClearAfterMs,
+  awaitingPaymentTtlMs,
   createOrderTrackingToken,
   expireStaleAwaitingPaymentsForStaff,
   isAwaitingClearable,
@@ -184,6 +188,61 @@ describe("expireStaleAwaitingPaymentsForStaff", () => {
     await expect(
       expireStaleAwaitingPaymentsForStaff(holder.db!, outsiderId, { restaurantId }, new Date())
     ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("test-only TTL override", () => {
+  it("defaults to the production windows when nothing is set", () => {
+    expect(awaitingPaymentTtlMs({})).toBe(AWAITING_PAYMENT_TTL_MS);
+    expect(awaitingClearAfterMs({})).toBe(AWAITING_CLEAR_AFTER_MS);
+  });
+
+  it("honors the override outside production", () => {
+    const env = {
+      NODE_ENV: "test",
+      EATERYO_AWAITING_TTL_MS: "120000",
+      EATERYO_AWAITING_CLEAR_AFTER_MS: "30000",
+    };
+    expect(awaitingPaymentTtlMs(env)).toBe(120_000);
+    expect(awaitingClearAfterMs(env)).toBe(30_000);
+  });
+
+  it("ignores the override in production", () => {
+    const env = {
+      NODE_ENV: "production",
+      EATERYO_AWAITING_TTL_MS: "1000",
+      EATERYO_AWAITING_CLEAR_AFTER_MS: "1000",
+    };
+    expect(awaitingPaymentTtlMs(env)).toBe(AWAITING_PAYMENT_TTL_MS);
+    expect(awaitingClearAfterMs(env)).toBe(AWAITING_CLEAR_AFTER_MS);
+  });
+
+  it("falls back on blank or non-positive values", () => {
+    for (const raw of ["", "0", "-5000", "soon", "12.5"]) {
+      expect(awaitingPaymentTtlMs({ EATERYO_AWAITING_TTL_MS: raw })).toBe(AWAITING_PAYMENT_TTL_MS);
+    }
+  });
+
+  it("sweeps on the overridden clock end to end", async () => {
+    const key = "EATERYO_AWAITING_TTL_MS";
+    const previous = process.env[key];
+    process.env[key] = "120000";
+    try {
+      const young = await insertAwaitingCardOrder({ ageMin: 1 });
+      const old = await insertAwaitingCardOrder({ ageMin: 3 });
+      const result = await expireStaleAwaitingPaymentsForStaff(
+        holder.db!,
+        ownerId,
+        { restaurantId },
+        new Date()
+      );
+      expect(result.expired).toBe(1);
+      expect(await rowStatus(old)).toMatchObject({ status: "cancelled" });
+      expect(await rowStatus(young)).toMatchObject({ status: "new" });
+    } finally {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    }
   });
 });
 
