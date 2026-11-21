@@ -8,11 +8,19 @@
 import { z } from "zod";
 
 import { membershipAccessSchema, SyncError, type SyncErrorCode } from "@/features/menus/sync";
+import { brandAssetImageSchema, type BrandAssetImage } from "@/features/brand-assets/schema";
 
 /** All we need to pick a move target or show a restaurant name. */
 const restaurantOptionSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
+  /**
+   * Brand assets; absent (not just null) in stubbed or older responses, so
+   * optional like `access` below rather than defaulted. Readers treat a
+   * missing slot the same as null.
+   */
+  logo: brandAssetImageSchema.nullable().optional(),
+  cover: brandAssetImageSchema.nullable().optional(),
   role: z.enum(["owner", "staff"]),
   /**
    * The server's capability answer for this membership. Optional so an older
@@ -228,6 +236,26 @@ export async function renameRestaurant(id: string, name: string): Promise<Restau
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
+    },
+    (payload) => restaurantEnvelope.parse(payload).restaurant
+  );
+}
+
+/**
+ * Owner-only logo/cover write. A key present with null clears that slot;
+ * an absent key leaves it alone. Returns the updated restaurant (same
+ * envelope as rename), so callers can file it with `addRestaurant`.
+ */
+export async function updateBrandAssets(
+  id: string,
+  assets: { logo?: BrandAssetImage | null; cover?: BrandAssetImage | null }
+): Promise<RestaurantOption> {
+  return requestJson(
+    `/api/restaurants/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(assets),
     },
     (payload) => restaurantEnvelope.parse(payload).restaurant
   );

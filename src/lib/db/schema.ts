@@ -11,6 +11,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
+
 /**
  * Canonical server DB schema (Drizzle, Postgres/Neon).
  *
@@ -126,6 +128,14 @@ export const restaurant = pgTable(
      */
     orderAlertsEnabled: boolean("order_alerts_enabled").notNull().default(true),
     orderAlertEmail: text("order_alert_email"),
+    /**
+     * Brand assets (Settings step): logo + cover photo, the same stored
+     * shape as a dish photo. Null until the owner uploads one; removal
+     * clears the reference while the file stays on the host, because a
+     * published page may still serve the old one.
+     */
+    logo: jsonb("logo").$type<BrandAssetImage | null>(),
+    cover: jsonb("cover").$type<BrandAssetImage | null>(),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
