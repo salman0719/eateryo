@@ -141,8 +141,16 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
    ~10px from the 340px-wide screen. `overscroll-behavior: contain` is
    unconditional, so a scroll that reaches the preview's edge never drags the
    page behind it — the real mobile annoyance here. */
+/* A phone screen never pans sideways: the bleed children cancel the shell
+   padding exactly in CSS pixels, but device-pixel rounding can leave a
+   sub-pixel excess, and with overflow-y auto the x-axis computes to auto,
+   so that excess became a sideways scroll inside the phone. Clip it
+   instead; the pill row keeps its own sideways scroll. Sticky top and the
+   vertical scroll are unaffected: only the x-axis is clipped. */
 .phone-scroll {
   overscroll-behavior: contain;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -179,6 +187,20 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
 
   .phone-scroll::-webkit-scrollbar-thumb:hover {
     background-color: color-mix(in srgb, var(--color-line-500) 75%, transparent);
+  }
+}
+
+/* Touch and emulated-mobile pointers get no in-phone scrollbar box at all:
+   real phones draw overlay scrollbars that take no layout space, and the
+   12px classic box is what kept the bleed short of the frame right edge.
+   Desktop keeps the slim pill above. */
+@media (pointer: coarse) {
+  .phone-scroll {
+    scrollbar-width: none;
+  }
+
+  .phone-scroll::-webkit-scrollbar {
+    display: none;
   }
 }
 
