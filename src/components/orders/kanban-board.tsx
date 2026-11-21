@@ -32,6 +32,12 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 import { OrderLineOptions } from "@/components/order/option-groups";
 import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
+import {
+  normalizePaymentStatus,
+  paymentStatusLabel,
+  paymentStatusTone,
+  shouldShowPaymentChip,
+} from "@/features/payments/status-view";
 
 // Ghost lifecycle: fully laid out, then a height dissolve so removal doesn't pop.
 const GHOST_VISIBLE_MS = 8500;
@@ -199,6 +205,9 @@ function OrderTicket({
   onAdvance,
   onCancel,
   onDelete,
+  onCheckPayment,
+  checkingId,
+  checkNote,
 }: {
   order: Order;
   busy: boolean;
@@ -206,6 +215,9 @@ function OrderTicket({
   onAdvance: (order: Order, target: OrderStatus) => void;
   onCancel: (order: Order) => void;
   onDelete?: (order: Order) => void;
+  onCheckPayment?: (order: Order) => void;
+  checkingId?: string | null;
+  checkNote?: { orderId: string; text: string } | null;
 }) {
   const total = orderTotal(order.lines);
   const next = nextOrderStatus(order.status);
@@ -229,6 +241,17 @@ function OrderTicket({
         <StatusChip tone={STATUS_TONES[order.status]} size="sm">
           {orderStatusLabel(order.status)}
         </StatusChip>
+        {shouldShowPaymentChip({
+          paymentStatus: order.paymentStatus,
+          paymentProvider: order.paymentProvider,
+        }) && (
+          <StatusChip
+            size="sm"
+            tone={paymentStatusTone(normalizePaymentStatus(order.paymentStatus))}
+          >
+            {paymentStatusLabel(normalizePaymentStatus(order.paymentStatus))}
+          </StatusChip>
+        )}
         {highlighted && (
           <span className="rounded-full bg-accent-700 px-2 py-0.5 text-[11px] font-bold text-on-accent">
             Just moved
@@ -295,6 +318,18 @@ function OrderTicket({
             Cancel
           </button>
         )}
+        {onCheckPayment &&
+          (normalizePaymentStatus(order.paymentStatus) === "pending" ||
+            normalizePaymentStatus(order.paymentStatus) === "failed") && (
+            <button
+              type="button"
+              disabled={busy || checkingId === order.id}
+              onClick={() => onCheckPayment(order)}
+              className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:opacity-50"
+            >
+              {checkingId === order.id ? "Checking…" : "Check payment"}
+            </button>
+          )}
         {onDelete && (
           <button
             type="button"
@@ -306,6 +341,9 @@ function OrderTicket({
           </button>
         )}
       </div>
+      {checkNote && checkNote.orderId === order.id && (
+        <p className="mt-1.5 text-xs text-ink-600">{checkNote.text}</p>
+      )}
     </article>
   );
 }
@@ -316,6 +354,9 @@ export function KanbanBoard({
   onAdvance,
   onCancel,
   onDelete,
+  onCheckPayment,
+  checkingId,
+  checkNote,
   window,
   onWindowChange,
 }: {
@@ -324,6 +365,9 @@ export function KanbanBoard({
   onAdvance: (order: Order, target: OrderStatus) => void;
   onCancel: (order: Order) => void;
   onDelete?: (order: Order) => void;
+  onCheckPayment?: (order: Order) => void;
+  checkingId?: string | null;
+  checkNote?: { orderId: string; text: string } | null;
   /**
    * Controlled history window (the server board owns it so a change
    * refetches from SQL). Omitted, the board owns its own window state —
@@ -500,6 +544,9 @@ export function KanbanBoard({
                             busy={true}
                             onAdvance={() => {}}
                             onCancel={() => {}}
+                            onCheckPayment={onCheckPayment}
+                            checkingId={checkingId}
+                            checkNote={checkNote}
                           />
                         </div>
                         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -523,6 +570,9 @@ export function KanbanBoard({
                     onAdvance={handleAdvance}
                     onCancel={handleCancel}
                     onDelete={onDelete}
+                    onCheckPayment={onCheckPayment}
+                    checkingId={checkingId}
+                    checkNote={checkNote}
                   />
                 );
               });

@@ -22,7 +22,7 @@ import { useState } from "react";
 import { orderCode, type Order, type OrderStatus } from "@/features/orders/schema";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { setOrderStatus } from "@/features/orders/client";
+import { checkOrderPayment, setOrderStatus } from "@/features/orders/client";
 import { useOrderMonitor } from "@/features/orders/monitor";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
@@ -111,6 +111,8 @@ export function ServerOrdersBoard() {
   } = useOrderMonitor();
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [checkNote, setCheckNote] = useState<{ orderId: string; text: string } | null>(null);
 
   async function move(order: Order, target: OrderStatus) {
     if (busyId) return;
@@ -141,6 +143,36 @@ export function ServerOrdersBoard() {
     });
     if (!ok) return;
     void move(order, "cancelled");
+  }
+
+  /** Missed-webhook reconciliation: read the session off the café's account. */
+  async function checkPayment(order: Order) {
+    if (checkingId) return;
+    setCheckingId(order.id);
+    setCheckNote(null);
+    setError(null);
+    try {
+      const result = await checkOrderPayment(order.id);
+      if (result.reconciled) {
+        refresh();
+        setCheckNote({ orderId: order.id, text: "Payment confirmed — the board now shows Paid." });
+      } else {
+        setCheckNote({
+          orderId: order.id,
+          text: "Stripe shows no payment yet — the confirmation may still arrive. Try again in a minute.",
+        });
+      }
+    } catch (checkError) {
+      setCheckNote({
+        orderId: order.id,
+        text:
+          checkError instanceof SyncError
+            ? checkError.message
+            : "Could not reach Stripe. Try again.",
+      });
+    } finally {
+      setCheckingId(null);
+    }
   }
 
   const openCount = orders.filter((order) => order.status === "new").length;
@@ -241,6 +273,9 @@ export function ServerOrdersBoard() {
             busyId={busyId}
             onAdvance={(order, target) => void move(order, target)}
             onCancel={(order) => void cancel(order)}
+            onCheckPayment={(order) => void checkPayment(order)}
+            checkingId={checkingId}
+            checkNote={checkNote}
             window={historyWindow}
             onWindowChange={setHistoryWindow}
           />

@@ -49,6 +49,7 @@ describe("isSessionReusable", () => {
           paymentStatus: "unpaid",
           paymentIntentId: null,
           expiresAt: now + 60,
+          metadataOrderId: "order_1",
         },
         now
       )
@@ -63,6 +64,7 @@ describe("isSessionReusable", () => {
       paymentStatus: "unpaid",
       paymentIntentId: null,
       expiresAt: now + 60,
+      metadataOrderId: "order_1",
     };
     expect(isSessionReusable({ ...base, status: "complete" }, now)).toBe(false);
     expect(isSessionReusable({ ...base, expiresAt: now - 1 }, now)).toBe(false);

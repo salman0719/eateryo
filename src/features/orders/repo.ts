@@ -197,6 +197,8 @@ function toOrder(
     status: row.status,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
+    paymentStatus: row.paymentStatus,
+    paymentProvider: row.paymentProvider,
   });
   if (!parsed.success) {
     // A stored row that no longer matches the canonical schema is a server
