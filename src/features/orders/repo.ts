@@ -827,14 +827,58 @@ export async function countOrdersForStaff(
 export const AWAITING_PAYMENT_TTL_MS = 30 * 60 * 1000;
 export const AWAITING_CLEAR_AFTER_MS = 5 * 60 * 1000;
 
+/**
+ * Test-only TTL override. `EATERYO_AWAITING_TTL_MS` /
+ * `EATERYO_AWAITING_CLEAR_AFTER_MS` shorten the windows so a manual run can
+ * watch the sweep and the staff Clear without waiting out the real clocks
+ * (e.g. `EATERYO_AWAITING_TTL_MS=120000` sweeps 2-minute-old tickets).
+ * Honored everywhere EXCEPT production — a set value there is ignored on
+ * purpose, so a stray variable can never kill live tickets early. Pass an
+ * explicit `env` only in tests; routes and jobs use the default.
+ */
+/** The only variables the TTL override reads — tests pass fakes of this. */
+export interface AwaitingTtlEnv {
+  NODE_ENV?: string;
+  EATERYO_AWAITING_TTL_MS?: string;
+  EATERYO_AWAITING_CLEAR_AFTER_MS?: string;
+}
+
+export function awaitingPaymentTtlMs(env: AwaitingTtlEnv = process.env): number {
+  return resolveOverrideMs("EATERYO_AWAITING_TTL_MS", AWAITING_PAYMENT_TTL_MS, env);
+}
+
+export function awaitingClearAfterMs(env: AwaitingTtlEnv = process.env): number {
+  return resolveOverrideMs("EATERYO_AWAITING_CLEAR_AFTER_MS", AWAITING_CLEAR_AFTER_MS, env);
+}
+
+function resolveOverrideMs(
+  name: keyof AwaitingTtlEnv,
+  fallback: number,
+  env: AwaitingTtlEnv
+): number {
+  if (env.NODE_ENV === "production") return fallback;
+  const raw = env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const ms = Number(raw);
+  return Number.isInteger(ms) && ms > 0 ? ms : fallback;
+}
+
 /** True once the diner's pay link has lapsed (creation clock, not payment). */
-export function isAwaitingExpired(createdAt: Date, now: Date = new Date()): boolean {
-  return now.getTime() - createdAt.getTime() >= AWAITING_PAYMENT_TTL_MS;
+export function isAwaitingExpired(
+  createdAt: Date,
+  now: Date = new Date(),
+  ttlMs: number = awaitingPaymentTtlMs()
+): boolean {
+  return now.getTime() - createdAt.getTime() >= ttlMs;
 }
 
 /** True once staff may clear the ticket by hand (5 minutes old). */
-export function isAwaitingClearable(createdAt: Date, now: Date = new Date()): boolean {
-  return now.getTime() - createdAt.getTime() >= AWAITING_CLEAR_AFTER_MS;
+export function isAwaitingClearable(
+  createdAt: Date,
+  now: Date = new Date(),
+  clearAfterMs: number = awaitingClearAfterMs()
+): boolean {
+  return now.getTime() - createdAt.getTime() >= clearAfterMs;
 }
 
 /**
@@ -914,7 +958,7 @@ export async function expireStaleAwaitingPaymentsForStaff(
   if (membership.length === 0) {
     throw new OrderRepoError("not_found", "That restaurant does not exist.");
   }
-  const cutoff = new Date(now.getTime() - AWAITING_PAYMENT_TTL_MS);
+  const cutoff = new Date(now.getTime() - awaitingPaymentTtlMs());
   const swept = await db
     .update(orderTable)
     .set({ status: "cancelled", updatedAt: now })
