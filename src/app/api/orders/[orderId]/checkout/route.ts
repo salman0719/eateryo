@@ -119,11 +119,14 @@ export async function POST(request: Request, { params }: RouteParams) {
     if (row.paymentStatus === "paid" || row.paymentStatus === "refunded") {
       return errorResponse("already_paid", "This order is already paid.", 409);
     }
-    // The pay link lives until the 30-minute expiry: an unpaid card ticket
-    // older than that is swept to `cancelled` here too (the board poll
-    // sweeps the rest), so a stale receipt cannot mint a fresh session.
+    // The pay link lives until the 30-minute expiry — but only sessionless
+    // tickets are swept here. One naming a Stripe session is owned by the
+    // webhook (expiry) and `payment-check` (missed paid events): cancelling
+    // it blind could kill a paid order, so a stale receipt with a session
+    // falls through to the reuse check below instead.
     if (
       row.paymentProvider === "stripe" &&
+      !row.paymentReference &&
       (row.paymentStatus === "unpaid" ||
         row.paymentStatus === "pending" ||
         row.paymentStatus === "failed") &&

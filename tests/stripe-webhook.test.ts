@@ -425,6 +425,59 @@ describe("POST /api/stripe/webhook", () => {
     expect((await res2.json()).outcome).toBe("ignored");
   });
 
+  it("cancels a live unpaid ticket on checkout.session.expired and keeps the row", async () => {
+    const restaurantId = await setupCafe(holder.db!, "a@cafe.test", "Café A", "acct_cafe_a");
+    await placeUnpaidOrder(holder.db!, "order-exp-1", restaurantId);
+    const raw = JSON.stringify({
+      id: "evt_exp_1",
+      object: "event",
+      type: "checkout.session.expired",
+      account: "acct_cafe_a",
+      data: {
+        object: {
+          id: "cs_test_exp",
+          object: "checkout.session",
+          metadata: { orderId: "order-exp-1" },
+        },
+      },
+    });
+    const res = await stripeWebhook(signedRequest(raw));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ outcome: "applied", orderId: "order-exp-1" });
+    const row = (
+      await holder.db!.select().from(orderTable).where(eq(orderTable.id, "order-exp-1"))
+    )[0]!;
+    expect(row.status).toBe("cancelled");
+    expect(row.paymentStatus).toBe("unpaid");
+  });
+
+  it("never lets an expiry cancel a paid order", async () => {
+    const restaurantId = await setupCafe(holder.db!, "a@cafe.test", "Café A", "acct_cafe_a");
+    await placeUnpaidOrder(holder.db!, "order-exp-paid-1", restaurantId);
+    await stripeWebhook(signedRequest(sessionPayload("cs_test_exp_paid", "order-exp-paid-1")));
+    const raw = JSON.stringify({
+      id: "evt_exp_paid_1",
+      object: "event",
+      type: "checkout.session.expired",
+      account: "acct_cafe_a",
+      data: {
+        object: {
+          id: "cs_test_exp_paid",
+          object: "checkout.session",
+          metadata: { orderId: "order-exp-paid-1" },
+        },
+      },
+    });
+    const res = await stripeWebhook(signedRequest(raw));
+    expect(res.status).toBe(200);
+    expect((await res.json()).outcome).toBe("ignored");
+    const row = (
+      await holder.db!.select().from(orderTable).where(eq(orderTable.id, "order-exp-paid-1"))
+    )[0]!;
+    expect(row.status).toBe("new");
+    expect(row.paymentStatus).toBe("paid");
+  });
+
   it("refuses an oversized payload before parsing it", async () => {
     const big = JSON.stringify({ id: "evt_big", padding: "x".repeat(70 * 1024) });
     const res = await stripeWebhook(signedRequest(big));

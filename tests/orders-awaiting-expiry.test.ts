@@ -23,9 +23,10 @@ import type { TestDb } from "./helpers/pg-test-db";
 /**
  * Abandoned-card policy: an unpaid card ticket lives 30 minutes, staff may
  * clear it after 5, and the pay link dies on either. These pin the pure
- * boundaries, the sweep's aim (only stale unpaid card tickets, kept as
- * `cancelled`), and the expired pay-link answers on both diner routes —
- * plus that the sweep rides the board poll.
+ * boundaries, the DB-only sweep's aim (only stale *sessionless* card
+ * tickets, kept as `cancelled` — anything naming a session belongs to the
+ * webhook), and the expired pay-link answers on both diner routes — plus
+ * that the sweep rides the board poll.
  */
 
 const holder: { db: TestDb | null; userId: string | null } = {
@@ -178,88 +179,55 @@ describe("expireStaleAwaitingPaymentsForStaff", () => {
     expect(awaiting.orders.map((order) => order.id)).toEqual([fresh]);
   });
 
-  it("accepts a stale ticket Stripe confirms as paid and cancels a truly abandoned one", async () => {
-    const paidLate = await insertAwaitingCardOrder({
+  it("leaves stale tickets that name a session for the webhook — never cancels blind", async () => {
+    const withSession = await insertAwaitingCardOrder({
       ageMin: 45,
       paymentStatus: "pending",
-      paymentReference: "cs_test_paid",
+      paymentReference: "cs_test_open",
     });
-    const abandoned = await insertAwaitingCardOrder({
-      ageMin: 45,
-      paymentReference: "cs_test_unpaid",
-    });
+    const abandoned = await insertAwaitingCardOrder({ ageMin: 45 });
 
     const result = await expireStaleAwaitingPaymentsForStaff(
       holder.db!,
       ownerId,
       { restaurantId },
-      new Date(),
-      async (_orderId, sessionId) =>
-        sessionId === "cs_test_paid"
-          ? { paid: true, intent: "pi_test_paid" }
-          : { paid: false, intent: null }
+      new Date()
     );
-    expect(result).toMatchObject({ expired: 1, accepted: 1, deferred: 0 });
+    expect(result).toMatchObject({ expired: 1, deferred: 1 });
 
-    // The paid ticket is accepted: still a live kitchen ticket, now paid.
-    expect(await rowStatus(paidLate)).toMatchObject({
+    // The session ticket stays live: `checkout.session.expired` owns its
+    // expiry and `payment-check` owns a missed paid event. Cancelling it
+    // here could kill a paid order.
+    expect(await rowStatus(withSession)).toMatchObject({
       status: "new",
-      paymentStatus: "paid",
+      paymentStatus: "pending",
     });
-    const acceptedRows = await holder
-      .db!.select({
-        paymentIntentId: orderTable.paymentIntentId,
-        paidAt: orderTable.paidAt,
-      })
-      .from(orderTable)
-      .where(eq(orderTable.id, paidLate));
-    expect(acceptedRows[0].paymentIntentId).toBe("pi_test_paid");
-    expect(acceptedRows[0].paidAt).toBeInstanceOf(Date);
-    // The truly abandoned one is still cancelled with its state kept.
+    // The truly abandoned one (no session ever minted) is cancelled with
+    // its state kept.
     expect(await rowStatus(abandoned)).toMatchObject({
       status: "cancelled",
       paymentStatus: "unpaid",
     });
   });
 
-  it("leaves tickets Stripe cannot be asked about for the next poll", async () => {
-    const unreadable = await insertAwaitingCardOrder({
-      ageMin: 45,
-      paymentStatus: "pending",
-      paymentReference: "cs_test_boom",
-    });
-    const unconfigured = await insertAwaitingCardOrder({
+  it("needs no Stripe configuration: only sessionless age matters", async () => {
+    const stale = await insertAwaitingCardOrder({ ageMin: 45 });
+    const staleSession = await insertAwaitingCardOrder({
       ageMin: 45,
       paymentReference: "cs_test_live",
     });
 
-    // A Stripe read failure defers — never cancels blind.
-    const throwing = await expireStaleAwaitingPaymentsForStaff(
-      holder.db!,
-      ownerId,
-      { restaurantId },
-      new Date(),
-      async () => {
-        throw new Error("stripe down");
-      }
-    );
-    expect(throwing).toMatchObject({ expired: 0, accepted: 0, deferred: 2 });
-    expect(await rowStatus(unreadable)).toMatchObject({
-      status: "new",
-      paymentStatus: "pending",
-    });
-
-    // No injected verifier and no linked account in this DB: the live read
-    // has nothing to ask, so it defers instead of cancelling blind.
-    const live = await expireStaleAwaitingPaymentsForStaff(
+    // No linked account in this DB and no secret: the DB-only sweep does
+    // not care — it sweeps the sessionless ticket and defers the other.
+    const result = await expireStaleAwaitingPaymentsForStaff(
       holder.db!,
       ownerId,
       { restaurantId },
       new Date()
     );
-    expect(live).toMatchObject({ expired: 0, accepted: 0, deferred: 2 });
-    expect(await rowStatus(unreadable)).toMatchObject({ status: "new" });
-    expect(await rowStatus(unconfigured)).toMatchObject({ status: "new" });
+    expect(result).toMatchObject({ expired: 1, deferred: 1 });
+    expect(await rowStatus(stale)).toMatchObject({ status: "cancelled" });
+    expect(await rowStatus(staleSession)).toMatchObject({ status: "new" });
   });
 
   it("sweeps nothing fresh and refuses another tenant", async () => {

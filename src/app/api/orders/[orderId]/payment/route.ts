@@ -96,12 +96,16 @@ export async function POST(request: Request, { params }: RouteParams) {
     const row = rows[0];
     if (!row) return errorResponse("not_found", "That order link is no longer valid.", 404);
 
-    // Expired pay link: sweep it here so the receipt reads honest even if
-    // no staff board has polled since the TTL lapsed. The copy below is
-    // the whole story — no pay button renders on an expired ticket.
+    // Expired pay link — sessionless tickets only, swept here so the
+    // receipt reads honest even if no staff board has polled since the TTL
+    // lapsed. A ticket naming a session is never cancelled blind: the
+    // webhook owns its expiry and `payment-check` owns its paid state.
+    // The copy below is the whole story — no pay button renders on an
+    // expired ticket.
     if (
       row.status === "new" &&
       row.paymentProvider === "stripe" &&
+      !row.paymentReference &&
       (row.paymentStatus === "unpaid" ||
         row.paymentStatus === "pending" ||
         row.paymentStatus === "failed") &&
