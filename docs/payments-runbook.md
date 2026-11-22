@@ -12,15 +12,16 @@ touches a live key until the preview matrix is green.
    - `new` + `unpaid`/`pending`/`failed` + `payment_provider = 'stripe'`:
      the ticket is hidden from the kitchen board (Option A) and sits in the
      awaiting-payment pill.
-   - `cancelled` + `unpaid`: the 30-minute sweep killed the pay link
-     after Stripe confirmed the session unpaid (or no session was ever
-     minted), or staff Cleared it. The row is the audit copy — nothing is
-     deleted.
-   - The sweep asks Stripe before it cancels: a stale ticket whose session
-     is paid is accepted (stays `new`, flips to `paid`), never cancelled —
-     a missed webhook or an outage cannot kill a paid order. A ticket
-     Stripe cannot be reached about is left in the pill for the next poll,
-     not cancelled blind.
+   - `cancelled` + `unpaid`: the pay link died — the board poll swept a
+     sessionless ticket past 30 minutes, `checkout.session.expired` fired
+     for a ticket that named a session, or staff Cleared it. The row is
+     the audit copy — nothing is deleted.
+   - The board sweep is DB-only and never touches Stripe: it cancels only
+     stale tickets that never minted a session (nothing could have been
+     paid). A ticket naming a session is never cancelled by the poll — a
+     missed webhook or an outage must not kill a possibly-paid order.
+     Paid-then-missed is reconciled by `payment-check` (staff pill or the
+     board's once-per-snapshot auto-check).
 2. Look the session up on the **café's account**, not the platform:
    retrieve `cs_…` with the `Stripe-Account: acct_…` header and check
    `metadata.orderId` matches the order id. A session without our order id

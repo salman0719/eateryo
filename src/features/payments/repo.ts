@@ -209,6 +209,65 @@ async function applySessionFailed(
   return { outcome: "applied", orderId, paymentStatus: updated.paymentStatus as PaymentStatus };
 }
 
+/**
+ * Session expiry is the source of truth for abandoning a card ticket that
+ * names a session: Stripe's own clock on the Checkout Session (30 minutes
+ * from mint) kills it, never the board poll. Only a still-live `new`
+ * ticket in an unpaid state is cancelled — a paid, refunded, or already
+ * cancelled row is left alone, and the row is kept as the audit copy.
+ */
+async function applySessionExpired(
+  db: TenancyDb,
+  event: StripeWebhookEvent,
+  object: Record<string, unknown>,
+  now: Date
+): Promise<WebhookResult> {
+  if (asString(object["object"]) !== "checkout.session") {
+    return { outcome: "ignored", reason: "not_a_checkout_session" };
+  }
+  const metadata = asRecord(object["metadata"]);
+  const orderId = metadata ? asString(metadata["orderId"]) : null;
+  if (!orderId) return { outcome: "ignored", reason: "missing_order_metadata" };
+  const accountId = event.account ?? null;
+  if (!accountId) return { outcome: "ignored", reason: "missing_event_account" };
+
+  const paymentAccount = await findPaymentAccount(db, accountId);
+  if (!paymentAccount) return { outcome: "ignored", reason: "unknown_connected_account" };
+  const order = await findOrder(db, orderId);
+  if (!order) return { outcome: "ignored", reason: "unknown_order" };
+  if (order.restaurantId !== paymentAccount.restaurantId) {
+    return { outcome: "ignored", reason: "account_order_mismatch" };
+  }
+  if (order.status !== "new") {
+    return { outcome: "ignored", reason: "order_not_live", orderId };
+  }
+  if (!isPaymentStatus(order.paymentStatus)) {
+    return { outcome: "ignored", reason: "unreadable_payment_status" };
+  }
+  if (order.paymentStatus === "paid" || order.paymentStatus === "refunded") {
+    return {
+      outcome: "ignored",
+      reason: "transition_not_allowed",
+      orderId,
+      paymentStatus: order.paymentStatus,
+    };
+  }
+  if (
+    order.paymentStatus !== "unpaid" &&
+    order.paymentStatus !== "pending" &&
+    order.paymentStatus !== "failed"
+  ) {
+    return { outcome: "ignored", reason: "transition_not_allowed", orderId };
+  }
+  const updated = await db
+    .update(orderTable)
+    .set({ status: "cancelled", updatedAt: now })
+    .where(eq(orderTable.id, order.id))
+    .returning({ id: orderTable.id });
+  if (updated.length === 0) return { outcome: "ignored", reason: "order_not_live", orderId };
+  return { outcome: "applied", orderId, paymentStatus: order.paymentStatus };
+}
+
 async function applyChargeRefunded(
   db: TenancyDb,
   event: StripeWebhookEvent,
@@ -331,6 +390,8 @@ export async function applyStripeWebhookEvent(
       return applySessionPaid(db, event, object, now);
     case "checkout.session.async_payment_failed":
       return applySessionFailed(db, event, object, now);
+    case "checkout.session.expired":
+      return applySessionExpired(db, event, object, now);
     case "charge.refunded":
       return applyChargeRefunded(db, event, object, now);
     case "account.updated":

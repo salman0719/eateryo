@@ -262,11 +262,12 @@ export async function GET(request: Request) {
   const cursor = url.searchParams.get("cursor");
 
   try {
-    // Abandoned-card sweep rides the board poll: every poll first retires
-    // card tickets past the 30-minute TTL — verifying each named Stripe
-    // session first, so a paid order is accepted, never cancelled
-    // (best-effort — a sweep failure must never fail the board), then the
-    // list reads clean.
+    // Abandoned-card sweep rides the board poll, DB-only: every poll first
+    // retires sessionless card tickets past the 30-minute TTL (nothing
+    // could have been paid, so no Stripe read is needed). Tickets naming a
+    // session are owned by the webhook — never cancelled here — so the
+    // poll stays a cheap query. Best-effort: a sweep failure must never
+    // fail the board.
     if (restaurantId) {
       try {
         await expireStaleAwaitingPaymentsForStaff(getDb(), userId, { restaurantId });

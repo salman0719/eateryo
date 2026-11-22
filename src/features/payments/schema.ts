@@ -59,6 +59,7 @@ const PAYMENT_EVENT_TYPES = [
   "checkout.session.completed",
   "checkout.session.async_payment_succeeded",
   "checkout.session.async_payment_failed",
+  "checkout.session.expired",
   "charge.refunded",
   "account.updated",
 ] as const;
