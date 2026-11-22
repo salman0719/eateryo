@@ -27,7 +27,7 @@ import {
   orderLine as orderLineTable,
   restaurant as restaurantTable,
 } from "@/lib/db/schema";
-import { rejectCrossOrigin } from "@/lib/http/origin";
+import { preferredReturnOrigin, rejectCrossOrigin } from "@/lib/http/origin";
 import { reportError } from "@/lib/observability/alerts";
 import { requestIdFrom } from "@/lib/observability/log";
 
@@ -228,7 +228,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       }
     }
 
-    const origin = new URL(request.url).origin;
+    // The diner's page (Origin header) names the redirect target, not the
+    // server-perceived URL — a phone tap must mint phone-openable links.
+    const origin = preferredReturnOrigin(request);
     const urls = buildReturnUrls({
       origin,
       restaurantSlug,

@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 // Imported statically: a dynamic import inside the test body counted its module
 // graph against the 5s test timeout and went flaky under full-suite load.
 import { POST as placeOrderRoute } from "../src/app/api/orders/route";
-import { isSameOriginRequest, rejectCrossOrigin } from "../src/lib/http/origin";
+import {
+  isSameOriginRequest,
+  preferredReturnOrigin,
+  rejectCrossOrigin,
+} from "../src/lib/http/origin";
 
 function request(headers: Record<string, string>): Request {
   return new Request("https://eateryo.example/api/orders", { method: "POST", headers });
@@ -63,6 +67,47 @@ describe("isSameOriginRequest", () => {
     expect(
       isSameOriginRequest(request({ host: "t.example", "sec-fetch-site": "cross-site" }))
     ).toBe(false);
+  });
+});
+
+describe("preferredReturnOrigin", () => {
+  const checkoutUrl = "http://internal:3000/api/orders/o1/checkout";
+  function checkoutRequest(headers: Record<string, string>): Request {
+    return new Request(checkoutUrl, { method: "POST", headers });
+  }
+
+  it("prefers the diner's Origin over the server-perceived URL", () => {
+    expect(
+      preferredReturnOrigin(
+        checkoutRequest({
+          host: "internal:3000",
+          "x-forwarded-host": "cafe.public",
+          origin: "https://cafe.public",
+        })
+      )
+    ).toBe("https://cafe.public");
+  });
+
+  it("falls back to the request URL when no Origin is declared", () => {
+    expect(preferredReturnOrigin(checkoutRequest({ host: "internal:3000" }))).toBe(
+      "http://internal:3000"
+    );
+  });
+
+  it("falls back on a hostile, opaque, or non-http(s) Origin", () => {
+    const headers = { host: "internal:3000" };
+    expect(
+      preferredReturnOrigin(checkoutRequest({ ...headers, origin: "https://evil.example" }))
+    ).toBe("http://internal:3000");
+    expect(preferredReturnOrigin(checkoutRequest({ ...headers, origin: "null" }))).toBe(
+      "http://internal:3000"
+    );
+    expect(preferredReturnOrigin(checkoutRequest({ ...headers, origin: "not a url" }))).toBe(
+      "http://internal:3000"
+    );
+    expect(
+      preferredReturnOrigin(checkoutRequest({ ...headers, origin: "file:///etc/passwd" }))
+    ).toBe("http://internal:3000");
   });
 });
 
