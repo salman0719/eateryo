@@ -263,8 +263,10 @@ export async function GET(request: Request) {
 
   try {
     // Abandoned-card sweep rides the board poll: every poll first retires
-    // unpaid card tickets past the 30-minute TTL (best-effort — a sweep
-    // failure must never fail the board), then the list reads clean.
+    // card tickets past the 30-minute TTL — verifying each named Stripe
+    // session first, so a paid order is accepted, never cancelled
+    // (best-effort — a sweep failure must never fail the board), then the
+    // list reads clean.
     if (restaurantId) {
       try {
         await expireStaleAwaitingPaymentsForStaff(getDb(), userId, { restaurantId });

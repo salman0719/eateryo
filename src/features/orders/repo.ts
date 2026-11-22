@@ -25,7 +25,9 @@ import { getRestaurantBySlug } from "@/features/tables/repo";
 import { menuDocumentSchema, type MenuDocument, type MenuItem } from "@/features/menu/schema";
 
 import { getPaymentAccount } from "@/features/payments/accounts";
+import { getStripeSecret, retrieveCheckoutSession } from "@/features/payments/provider";
 import { resolveCheckout } from "@/features/payments/resolver";
+import { canTransitionPaymentStatus } from "@/features/payments/schema";
 import {
   canTransitionOrderStatus,
   orderSchema,
@@ -820,9 +822,13 @@ export async function countOrdersForStaff(
 
 /**
  * Abandoned-card policy: an unpaid card ticket lives 30 minutes. Past that
- * the pay link is dead and the next board poll sweeps it to `cancelled`
- * (the row is kept — nothing is deleted). Staff may clear one manually
- * after 5 minutes; the diner can still pay until either happens.
+ * the pay link is dead and the next board poll sweeps it — but a ticket
+ * that names a Stripe session is asked about first, and a session Stripe
+ * confirms as paid is accepted, never cancelled (a missed webhook or an
+ * outage must not kill a paid order). Tickets Stripe cannot be asked
+ * about wait for the next poll. The row is always kept — nothing is
+ * deleted. Staff may clear one manually after 5 minutes; the diner can
+ * still pay until either happens.
  */
 export const AWAITING_PAYMENT_TTL_MS = 30 * 60 * 1000;
 export const AWAITING_CLEAR_AFTER_MS = 5 * 60 * 1000;
@@ -934,18 +940,45 @@ export async function listAwaitingPaymentForStaff(
 }
 
 /**
+ * What the sweep learned about one stale card ticket that names a Stripe
+ * session: `paid` (with the intent to record) means accept it, anything
+ * else means it really was abandoned. `null` means Stripe could not be
+ * asked — never a reason to cancel.
+ */
+export interface SweepSessionRead {
+  paid: boolean;
+  intent: string | null;
+}
+
+/**
+ * Ask Stripe about one stale session. `null` (or a throw) means
+ * "unverifiable" — the ticket is left for the next poll, never cancelled
+ * blind. Tests inject a fake; the sweep defaults to the live read.
+ */
+export type SweepSessionVerify = (
+  orderId: string,
+  sessionId: string
+) => Promise<SweepSessionRead | null>;
+
+/**
  * Expiry sweep for abandoned card tickets. Runs on the board poll (the
- * staff GET calls this best-effort before listing): every `new` card order
- * older than the TTL that never paid flips to `cancelled`, so the pill
- * cannot fill with stale carts. The row is kept as the audit copy — the
- * diner's pay link simply stops working. Returns the swept count.
+ * staff GET calls this best-effort before listing). Every `new` card order
+ * older than the TTL is re-checked first: when its Checkout Session names
+ * this order and Stripe says paid, the ticket is accepted (stays `new`,
+ * flips to `paid`) instead of cancelled — a missed webhook or a server
+ * outage must never kill a paid order. Only a session Stripe confirms as
+ * unpaid flips to `cancelled`, so the pill cannot fill with stale carts.
+ * Tickets Stripe cannot be asked about (no session, no secret, a read
+ * failure) are left untouched for the next poll. The row is always kept
+ * as the audit copy — the diner's pay link simply stops working.
  */
 export async function expireStaleAwaitingPaymentsForStaff(
   db: TenancyDb,
   userId: string,
   query: { restaurantId: string },
-  now: Date = new Date()
-): Promise<{ expired: number }> {
+  now: Date = new Date(),
+  verify?: SweepSessionVerify
+): Promise<{ expired: number; accepted: number; deferred: number }> {
   const membership = await db
     .select({ id: restaurantMembership.id })
     .from(restaurantMembership)
@@ -959,9 +992,13 @@ export async function expireStaleAwaitingPaymentsForStaff(
     throw new OrderRepoError("not_found", "That restaurant does not exist.");
   }
   const cutoff = new Date(now.getTime() - awaitingPaymentTtlMs());
-  const swept = await db
-    .update(orderTable)
-    .set({ status: "cancelled", updatedAt: now })
+  const candidates = await db
+    .select({
+      id: orderTable.id,
+      paymentStatus: orderTable.paymentStatus,
+      paymentReference: orderTable.paymentReference,
+    })
+    .from(orderTable)
     .where(
       and(
         eq(orderTable.restaurantId, query.restaurantId),
@@ -970,9 +1007,94 @@ export async function expireStaleAwaitingPaymentsForStaff(
         inArray(orderTable.paymentStatus, ["unpaid", "pending", "failed"]),
         lt(orderTable.createdAt, cutoff)
       )
-    )
-    .returning({ id: orderTable.id });
-  return { expired: swept.length };
+    );
+  const check =
+    verify ?? ((orderId, sessionId) => readSessionPaid(db, query.restaurantId, orderId, sessionId));
+  const toCancel: string[] = [];
+  let accepted = 0;
+  let deferred = 0;
+  for (const candidate of candidates) {
+    // No session was ever minted — nothing could have been paid.
+    if (!candidate.paymentReference) {
+      toCancel.push(candidate.id);
+      continue;
+    }
+    let read: SweepSessionRead | null;
+    try {
+      read = await check(candidate.id, candidate.paymentReference);
+    } catch {
+      read = null;
+    }
+    if (!read) {
+      // Stripe unreachable (or unconfigured): leave the ticket for the
+      // next poll rather than cancelling a possibly-paid order.
+      deferred += 1;
+      continue;
+    }
+    if (!read.paid) {
+      toCancel.push(candidate.id);
+      continue;
+    }
+    // Paid at Stripe: accept it. The select constrains these three states,
+    // but the row type says string — the inline disjunction narrows to a
+    // real PaymentStatus for the guard. A paid ticket the guard refuses is
+    // already past this point (paid/refunded) and is left alone, never
+    // cancelled: losing money is the one outcome the sweep must not cause.
+    if (
+      (candidate.paymentStatus === "unpaid" ||
+        candidate.paymentStatus === "pending" ||
+        candidate.paymentStatus === "failed") &&
+      canTransitionPaymentStatus(candidate.paymentStatus, "paid")
+    ) {
+      await db
+        .update(orderTable)
+        .set({
+          paymentStatus: "paid",
+          paymentProvider: "stripe",
+          paymentIntentId: read.intent,
+          paidAt: now,
+          updatedAt: now,
+        })
+        .where(eq(orderTable.id, candidate.id));
+      accepted += 1;
+    } else {
+      deferred += 1;
+    }
+  }
+  let expired = 0;
+  if (toCancel.length > 0) {
+    const swept = await db
+      .update(orderTable)
+      .set({ status: "cancelled", updatedAt: now })
+      .where(and(eq(orderTable.restaurantId, query.restaurantId), inArray(orderTable.id, toCancel)))
+      .returning({ id: orderTable.id });
+    expired = swept.length;
+  }
+  return { expired, accepted, deferred };
+}
+
+/**
+ * The sweep's default Stripe read: the session on the café's own account,
+ * accepted only when its metadata names this order. `null` whenever there
+ * is nothing to ask (no linked account, no secret, wrong order) — the
+ * caller treats all of those as "leave it", never as "unpaid".
+ */
+async function readSessionPaid(
+  db: TenancyDb,
+  restaurantId: string,
+  orderId: string,
+  sessionId: string
+): Promise<SweepSessionRead | null> {
+  const paymentAccount = await getPaymentAccount(db, restaurantId);
+  const secret = getStripeSecret();
+  if (!paymentAccount?.externalAccountId || !secret) return null;
+  const session = await retrieveCheckoutSession(
+    secret,
+    paymentAccount.externalAccountId,
+    sessionId
+  );
+  if (session.metadataOrderId !== orderId) return null;
+  return { paid: session.paymentStatus === "paid", intent: session.paymentIntentId };
 }
 
 /** One order for a member of its restaurant (owner or staff), or null. */
