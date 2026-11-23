@@ -6,6 +6,7 @@ import { AccountDangerZone, AccountExportCard } from "@/components/launch/data-c
 import { CommitInput } from "@/components/menu-editor/fields";
 import { BrandCard } from "@/components/settings/brand-card";
 import { OrderAlertsCard } from "@/components/settings/order-alerts";
+import { PaymentsCard } from "@/components/settings/payments-card";
 import { TeamActivity } from "@/components/settings/team-activity";
 import { UsagePanel } from "@/components/settings/usage-panel";
 import { GuidanceCard } from "@/components/ui/guidance-card";
@@ -224,6 +225,13 @@ export function RestaurantSettings() {
 
           <OrderAlertsCard
             key={`alerts-${selected.id}`}
+            restaurantId={selected.id}
+            restaurantName={selected.name}
+            canManage={canManageSettings}
+          />
+
+          <PaymentsCard
+            key={`payments-${selected.id}`}
             restaurantId={selected.id}
             restaurantName={selected.name}
             canManage={canManageSettings}
