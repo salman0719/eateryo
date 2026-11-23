@@ -22,7 +22,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // The boot scripts below set data-session / data-sidebar on <html>
+      // before hydration. React must accept the DOM value instead of
+      // flagging a mismatch — a root mismatch leaves streamed Suspense
+      // boundaries stuck on their fallback.
+      suppressHydrationWarning
+    >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {/* Before the shell paints: a saved sidebar choice must not flash the
             other width, and a returning account must not watch the signed-in
