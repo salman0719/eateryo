@@ -40,8 +40,18 @@ export interface AccountStatusRead {
   requirementCodes: string[];
 }
 
-/** Which secret the server may use in this environment. */
-export function stripeSecretFor(env: { STRIPE_SECRET_KEY?: string; NODE_ENV?: string }): {
+/** Which secret the server may use in this environment.
+ *
+ * Production is read from `VERCEL_ENV` when present: Vercel injects
+ * `NODE_ENV=production` on preview deployments too, so `NODE_ENV` alone
+ * cannot tell preview from production and would reject test keys on
+ * preview. Outside Vercel `VERCEL_ENV` is unset and `NODE_ENV` applies.
+ */
+export function stripeSecretFor(env: {
+  STRIPE_SECRET_KEY?: string;
+  NODE_ENV?: string;
+  VERCEL_ENV?: string;
+}): {
   secret: string | null;
   error: string | null;
 } {
@@ -50,10 +60,11 @@ export function stripeSecretFor(env: { STRIPE_SECRET_KEY?: string; NODE_ENV?: st
   const isLive = secret.startsWith("sk_live_");
   const isTest = secret.startsWith("sk_test_") || secret.startsWith("rk_test_");
   if (!isLive && !isTest) return { secret: null, error: "unrecognized" };
-  if (isLive && env.NODE_ENV !== "production") {
+  const isProduction = (env.VERCEL_ENV ?? env.NODE_ENV) === "production";
+  if (isLive && !isProduction) {
     return { secret: null, error: "live_key_outside_production" };
   }
-  if (!isLive && env.NODE_ENV === "production") {
+  if (!isLive && isProduction) {
     return { secret: null, error: "test_key_in_production" };
   }
   return { secret, error: null };
@@ -64,6 +75,7 @@ export function getStripeSecret(): string | null {
   const { secret } = stripeSecretFor({
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     NODE_ENV: process.env.NODE_ENV,
+    VERCEL_ENV: process.env.VERCEL_ENV,
   });
   return secret;
 }
