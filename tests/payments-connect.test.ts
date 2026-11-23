@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createCoreAccount } from "@/features/payments/provider";
+import { createCoreAccount, stripeSecretFor } from "@/features/payments/provider";
 
 /**
  * Connect route regression (2026-11-21): Accounts v2 is JSON-only.
@@ -70,5 +70,49 @@ describe("createCoreAccount (Accounts v2 JSON)", () => {
     await expect(createCoreAccount("sk_test_123", {}, { fetchImpl: failing })).rejects.toThrow(
       "stripe_account_create_failed:415"
     );
+  });
+});
+
+describe("stripeSecretFor (Vercel preview has NODE_ENV=production)", () => {
+  it("accepts a test key on a Vercel preview even though NODE_ENV is production", () => {
+    expect(
+      stripeSecretFor({
+        STRIPE_SECRET_KEY: "sk_test_123",
+        NODE_ENV: "production",
+        VERCEL_ENV: "preview",
+      })
+    ).toEqual({ secret: "sk_test_123", error: null });
+  });
+
+  it("still rejects a test key in real production", () => {
+    expect(
+      stripeSecretFor({
+        STRIPE_SECRET_KEY: "sk_test_123",
+        NODE_ENV: "production",
+        VERCEL_ENV: "production",
+      }).error
+    ).toBe("test_key_in_production");
+  });
+
+  it("keeps the NODE_ENV fallback where VERCEL_ENV is unset", () => {
+    expect(
+      stripeSecretFor({ STRIPE_SECRET_KEY: "sk_test_123", NODE_ENV: "production" }).error
+    ).toBe("test_key_in_production");
+    expect(
+      stripeSecretFor({
+        STRIPE_SECRET_KEY: "sk_live_123",
+        NODE_ENV: "development",
+      }).error
+    ).toBe("live_key_outside_production");
+  });
+
+  it("rejects a live key on preview", () => {
+    expect(
+      stripeSecretFor({
+        STRIPE_SECRET_KEY: "sk_live_123",
+        NODE_ENV: "production",
+        VERCEL_ENV: "preview",
+      }).error
+    ).toBe("live_key_outside_production");
   });
 });
