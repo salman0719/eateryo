@@ -26,7 +26,8 @@ CREATE TABLE "stripe_event" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "order" ADD COLUMN "payment_status" text NOT NULL;--> statement-breakpoint
+ALTER TABLE "order" ADD COLUMN "payment_status" text DEFAULT 'unpaid' NOT NULL;--> statement-breakpoint
+ALTER TABLE "order" ALTER COLUMN "payment_status" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "order" ADD COLUMN "payment_provider" text;--> statement-breakpoint
 ALTER TABLE "order" ADD COLUMN "payment_reference" text;--> statement-breakpoint
 ALTER TABLE "order" ADD COLUMN "payment_intent_id" text;--> statement-breakpoint
