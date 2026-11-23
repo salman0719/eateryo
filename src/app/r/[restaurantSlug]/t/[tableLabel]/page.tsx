@@ -1,6 +1,7 @@
 import { Suspense, cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 
 import { OrderShell, OrderSkeleton } from "@/components/order/order-menu";
 import { TableLanding as TableLandingScreen } from "@/components/order/table-landing";
@@ -34,6 +35,9 @@ export async function generateMetadata({
   params: Promise<{ restaurantSlug: string; tableLabel: string }>;
 }): Promise<Metadata> {
   const { restaurantSlug, tableLabel } = await params;
+  // Time-dependent (menu open hours are judged at `now`): opt out of
+  // prerendering so `new Date()` below is evaluated per request.
+  await connection();
   const landing = await loadLanding(restaurantSlug);
   const label = normalizeTableLabel(decodeURIComponent(tableLabel));
   if (!landing) {
@@ -89,6 +93,8 @@ async function TableLandingContent({
   const payParam = typeof query.pay === "string" ? query.pay : null;
   const returnPay: "success" | "cancelled" | null =
     payParam === "success" || payParam === "cancelled" ? payParam : null;
+  // Same per-request requirement as generateMetadata above.
+  await connection();
   const sessionParam = typeof query.session_id === "string" ? query.session_id.trim() : "";
   const returnSessionId =
     returnPay === "success" && sessionParam.length >= 8 && sessionParam.length <= 200
