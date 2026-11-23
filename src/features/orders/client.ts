@@ -29,6 +29,12 @@ const boardEnvelope = z.object({
   orders: z.array(orderSchema),
   serverTime: z.string().min(1),
   nextCursor: z.string().min(1).nullable().optional(),
+  // The awaiting-payment pill rides the board poll: hidden card tickets
+  // arrive in the same response, so the strip needs no second request.
+  awaiting: z.object({
+    orders: z.array(orderSchema),
+    serverTime: z.string().min(1),
+  }),
 });
 
 const countsEnvelope = z.object({
@@ -73,7 +79,13 @@ function mapErrorCode(code: string, status: number): SyncErrorCode {
     case "menu_not_live":
       return "not_found";
     case "order_stale":
+    case "already_paid":
       return "conflict";
+    case "order_expired":
+      return "invalid";
+    case "pay_unavailable":
+    case "no_session":
+      return "invalid";
     case "rate_limited":
       return "rate_limited";
     case "invalid_body":
@@ -179,6 +191,8 @@ export async function fetchTrackedOrder(
  * (`from`/`to` narrow the window in SQL, `cursor` continues the page);
  * with `since`, every order changed after that server timestamp (status
  * edits included). `nextCursor` is null on the last page and on `since`.
+ * Every response also carries the awaiting-payment snapshot, so the strip
+ * above the Kanban follows the same poll instead of fetching on its own.
  */
 export async function fetchStaffOrders(
   options: {
@@ -189,7 +203,12 @@ export async function fetchStaffOrders(
     to?: string | null;
     cursor?: string | null;
   } = {}
-): Promise<{ orders: Order[]; serverTime: string; nextCursor: string | null }> {
+): Promise<{
+  orders: Order[];
+  serverTime: string;
+  nextCursor: string | null;
+  awaiting: { orders: Order[]; serverTime: string };
+}> {
   const params = new URLSearchParams();
   if (options.since) params.set("since", options.since);
   if (options.restaurantId) params.set("restaurantId", options.restaurantId);
@@ -204,6 +223,7 @@ export async function fetchStaffOrders(
       orders: parsed.orders,
       serverTime: parsed.serverTime,
       nextCursor: parsed.nextCursor ?? null,
+      awaiting: parsed.awaiting,
     };
   });
 }
@@ -222,6 +242,84 @@ export async function fetchStaffOrderCounts(options: {
   if (options.to) params.set("to", options.to);
   return requestJson(`/api/orders/counts?${params.toString()}`, undefined, (payload) =>
     countsEnvelope.parse(payload)
+  );
+}
+
+const checkoutEnvelope = z.object({
+  url: z.string().min(1),
+  sessionId: z.string().min(1),
+  reused: z.boolean(),
+});
+
+const paymentEnvelope = z.object({
+  paymentStatus: z.string().nullable(),
+  paymentProvider: z.string().nullable(),
+  checkout: z.object({
+    mode: z.enum(["online", "at_venue"]),
+    reason: z.string().min(1),
+    copy: z.string().min(1),
+  }),
+  live: z.object({ paid: z.boolean(), state: z.string().min(1) }).nullable(),
+});
+
+const paymentCheckEnvelope = z.object({
+  paymentStatus: z.string().nullable(),
+  reconciled: z.boolean(),
+});
+
+export interface CheckoutStart {
+  url: string;
+  sessionId: string;
+  reused: boolean;
+}
+
+export interface OrderPaymentRead {
+  paymentStatus: string | null;
+  paymentProvider: string | null;
+  checkout: { mode: "online" | "at_venue"; reason: string; copy: string };
+  live: { paid: boolean; state: string } | null;
+}
+
+/**
+ * Start (or resume) card payment for a diner order. The tracking token is
+ * the only proof — anonymous by design. Returns the hosted Checkout URL;
+ * the caller leaves the page for it (`window.location.href = url`).
+ */
+export async function startCheckout(
+  orderId: string,
+  trackingToken: string
+): Promise<CheckoutStart> {
+  return requestJson(
+    `/api/orders/${encodeURIComponent(orderId)}/checkout`,
+    jsonInit("POST", { trackingToken }),
+    (payload) => checkoutEnvelope.parse(payload)
+  );
+}
+
+/** What the receipt needs: stored payment state plus the checkout decision. */
+export async function fetchOrderPayment(
+  orderId: string,
+  trackingToken: string,
+  sessionId?: string | null
+): Promise<OrderPaymentRead> {
+  return requestJson(
+    `/api/orders/${encodeURIComponent(orderId)}/payment`,
+    jsonInit("POST", sessionId ? { trackingToken, sessionId } : { trackingToken }),
+    (payload) => paymentEnvelope.parse(payload)
+  );
+}
+
+/**
+ * Staff reconciliation for the missed-webhook case. Reads the session off
+ * the café's account and applies the paid transition when Stripe says so.
+ */
+export async function checkOrderPayment(
+  orderId: string
+): Promise<{ paymentStatus: string | null; reconciled: boolean }> {
+  return requestJson(
+    `/api/orders/${encodeURIComponent(orderId)}/payment-check`,
+    jsonInit("POST", {}),
+    (payload) => paymentCheckEnvelope.parse(payload)
   );
 }
 

@@ -60,3 +60,32 @@ export function crossOriginResponse(): NextResponse {
 export function rejectCrossOrigin(request: Request): NextResponse | null {
   return isSameOriginRequest(request) ? null : crossOriginResponse();
 }
+
+/**
+ * The origin Stripe return URLs are minted against.
+ *
+ * The browser that taps pay declares its page in `Origin`, and it is the
+ * only party that can follow the redirect — so a declared, well-formed
+ * same-host origin wins over the server-perceived `request.url`. That URL
+ * is only the fallback (curl and server-to-server posts carry no Origin),
+ * because behind a proxy or on a dev LAN it names the machine, not the
+ * diner's page: a phone tap once minted `http://localhost:3100/…` links
+ * the phone could never open. A declared origin that fails this module's
+ * own host check, or that is not http(s), falls back too — so the helper
+ * stays safe on routes that don't run the guard above.
+ */
+export function preferredReturnOrigin(request: Request): string {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      const url = new URL(origin);
+      const sameHost = requestHosts(request).includes(url.host.toLowerCase());
+      if (sameHost && (url.protocol === "http:" || url.protocol === "https:")) {
+        return url.origin;
+      }
+    } catch {
+      // Unparseable Origin: fall through to the request URL below.
+    }
+  }
+  return new URL(request.url).origin;
+}
