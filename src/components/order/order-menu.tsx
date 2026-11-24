@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "@/components/ui/brand";
-import { PlusIcon } from "@/components/ui/icons";
+import { PlateIcon, PlusIcon } from "@/components/ui/icons";
 import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
@@ -31,9 +31,7 @@ import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
 import { itemImageCopy } from "@/features/item-images/ref";
-import { ClampedDescription } from "./clamped-description";
 import { CustomizeSheet } from "./customize-sheet";
-import { MenuItemPhoto } from "./menu-item-photo";
 import { toggleOptionSelection } from "./option-groups";
 
 /**
@@ -534,9 +532,11 @@ export function OrderMenuSection({
     setOptionError((current) => ({ ...current, [item.id]: null }));
     setCustomizingId(null);
   }
-  /** One photo in the list earns every row a thumb: photo rows keep their
-      image while the rest hold an initial tile, so the text stays aligned. */
-  const showPlaceholders = category.items.some((candidate) => itemImageCopy(candidate.image));
+  /** One photo in the category keeps every card's media slot: photo cards
+      show their image while photo-less ones show the pattern tile, so the
+      rail keeps a steady shape. A category with no photos at all goes
+      text-first instead — no empty media boxes. */
+  const hasPhoto = category.items.some((candidate) => itemImageCopy(candidate.image));
   const customizing =
     customizingId === null
       ? null
@@ -571,52 +571,101 @@ export function OrderMenuSection({
       className="diner-menu-section overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
     >
       <CategoryHeading category={category} />
-      <ul className="divide-y divide-line-100">
-        {category.items.map((item) => {
-          const soldOut = item.available === false;
-          // One chip per diet: an older document (or a CSV import) can hold the
-          // same label twice, which used to mean duplicate keys and two
-          // identical chips on the diner's screen.
-          const dietaryLabels = dedupeDietaryLabels(item.dietaryLabels);
-          const variantName = variantChoice[item.id] ?? item.variants[0]?.name ?? null;
-          const variant = variantName
-            ? item.variants.find((candidate) => candidate.name === variantName)
-            : null;
-          const price = variant ? variant.price : item.price;
-          const picks = optionChoice[item.id] ?? [];
-          const livePrice = priceWithOptions(price, item, picks);
-          // The button always starts a NEW add at the shown price — it never
-          // reports cart contents. Counts live in the cart (sticky bar, side
-          // panel, sheet) alone, so reopening a row or the sheet cannot read
-          // as a lost order, and plain and customizable dishes label alike.
-          // Unpriced keeps the bare label: nothing is invented. The price
-          // stays in the content flow; the button itself is a bare plus.
-          const addAccessibilityLabel =
-            livePrice === null
-              ? `Add ${item.name}`
-              : `Add ${item.name} · ${formatPreviewPrice(livePrice, null, currency)}`;
-          const tick = flash[item.id] ?? 0;
-          return (
-            <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
-              <div className="flex items-center gap-3">
-                <MenuItemPhoto item={item} showPlaceholder={showPlaceholders} />
-                <div className="min-w-0 flex-1">
+      {/* Dish carousel (prototype): a snapping row of photo cards through the
+          shared `ScrollArrowStrip`, so edge arrows, keyboard and no-bar
+          scrolling all behave like the category rails. The next card peeks
+          in so the row reads as swipeable; ~1.6 cards fit at once. */}
+      <div className="px-5 py-3">
+        <ScrollArrowStrip
+          as="ul"
+          label={`${category.name} dishes`}
+          trackClassName="snap-x snap-mandatory items-stretch gap-3 py-0.5"
+        >
+          {category.items.map((item) => {
+            const soldOut = item.available === false;
+            // One chip per diet: an older document (or a CSV import) can hold the
+            // same label twice, which used to mean duplicate keys and two
+            // identical chips on the diner's screen.
+            const dietaryLabels = dedupeDietaryLabels(item.dietaryLabels);
+            const variantName = variantChoice[item.id] ?? item.variants[0]?.name ?? null;
+            const variant = variantName
+              ? item.variants.find((candidate) => candidate.name === variantName)
+              : null;
+            const price = variant ? variant.price : item.price;
+            const picks = optionChoice[item.id] ?? [];
+            const livePrice = priceWithOptions(price, item, picks);
+            // The button always starts a NEW add at the shown price — it never
+            // reports cart contents. Counts live in the cart (sticky bar, side
+            // panel, sheet) alone, so reopening a card or the sheet cannot read
+            // as a lost order, and plain and customizable dishes label alike.
+            // Unpriced keeps the bare label: nothing is invented.
+            const addAccessibilityLabel =
+              livePrice === null
+                ? `Add ${item.name}`
+                : `Add ${item.name} · ${formatPreviewPrice(livePrice, null, currency)}`;
+            const tick = flash[item.id] ?? 0;
+            const photo = itemImageCopy(item.image);
+            // Pattern tile for a photo-less dish in a photographed category;
+            // text-first (no media at all) when the category has no photos.
+            const textFirst = !photo && !hasPhoto;
+            return (
+              <li
+                key={item.id}
+                className={`flex w-[200px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-line-200 bg-surface-base ${soldOut ? "opacity-60" : ""}`}
+              >
+                {!textFirst && (
+                  <div
+                    className={`grid h-28 place-items-center overflow-hidden bg-surface-100 ${photo ? "" : "dish-photo-fallback"}`}
+                    // The dot texture is the `line` role token used as a
+                    // pattern wash — no new colour, just the token drawn as
+                    // dots because Tailwind has no dotted-background utility.
+                    style={
+                      photo
+                        ? undefined
+                        : {
+                            backgroundImage:
+                              "radial-gradient(circle, var(--color-line-200) 1px, transparent 1.3px)",
+                            backgroundSize: "10px 10px",
+                          }
+                    }
+                  >
+                    {photo ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- dish photo served straight from the CDN at its stored size; the optimizer must never touch it
+                      <img
+                        src={photo.url}
+                        alt=""
+                        width={photo.width}
+                        height={photo.height}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <PlateIcon size={34} className="text-ink-400" />
+                    )}
+                  </div>
+                )}
+                <div
+                  className={`flex flex-1 flex-col gap-1 p-3 ${textFirst ? "dish-text-first min-h-[198px] justify-center" : ""}`}
+                >
                   <p className="flex items-center gap-2 font-medium text-ink-900">
-                    <span>{item.name}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
+                      {item.name}
+                    </span>
                     {soldOut && (
                       <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
                         Sold out
                       </span>
                     )}
                   </p>
-                  {/* Clamped to two lines with a "More" control: a long
-                      description must not push the add control away from its dish (009). */}
                   {item.description && (
-                    <ClampedDescription text={item.description} name={item.name} />
+                    <p className="truncate text-xs text-ink-600" title={item.description}>
+                      {item.description}
+                    </p>
                   )}
                   {item.options.length > 0 && <CustomizableHint item={item} />}
                   {dietaryLabels.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1">
                       {dietaryLabels.map((label) => (
                         <span
                           key={label}
@@ -627,68 +676,66 @@ export function OrderMenuSection({
                       ))}
                     </div>
                   )}
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {item.variants.length > 0 && (
+                    <label className="mt-1 inline-block max-w-full text-xs text-ink-600">
+                      <span className="sr-only">Size for {item.name}</span>
+                      <select
+                        value={variant?.name ?? ""}
+                        onChange={(event) => onVariantChange(item.id, event.target.value)}
+                        className="max-w-full rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                      >
+                        {item.variants.map((option) => (
+                          <option key={option.name} value={option.name}>
+                            {option.name}
+                            {option.price !== null
+                              ? ` — ${formatPreviewPrice(option.price, null, currency)}`
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                     <p className="text-sm font-semibold tabular-nums text-ink-900">
                       {formatPreviewPrice(livePrice, null, currency)}
                     </p>
-                    {item.variants.length > 0 && (
-                      <label className="inline-block text-xs text-ink-600">
-                        <span className="sr-only">Size for {item.name}</span>
-                        <select
-                          value={variant?.name ?? ""}
-                          onChange={(event) => onVariantChange(item.id, event.target.value)}
-                          className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                    <span className="relative inline-flex flex-none items-center">
+                      {tick > 0 && (
+                        <span
+                          key={tick}
+                          aria-hidden="true"
+                          className="added-flash absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
                         >
-                          {item.variants.map((option) => (
-                            <option key={option.name} value={option.name}>
-                              {option.name}
-                              {option.price !== null
-                                ? ` — ${formatPreviewPrice(option.price, null, currency)}`
-                                : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
+                          Added ✓
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={soldOut}
+                        aria-label={addAccessibilityLabel}
+                        onClick={() => {
+                          // Plain dishes add straight from the card. Customizable
+                          // ones open the sheet: the picking and the Add-gate live
+                          // there now, not in the menu list.
+                          if (item.options.length === 0) {
+                            onAdd(item, picks);
+                            bumpFlash(item.id);
+                            return;
+                          }
+                          setCustomizingId(item.id);
+                        }}
+                        className="grid h-8 w-8 place-items-center rounded-full bg-accent-700 text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                      >
+                        <PlusIcon size={16} />
+                      </button>
+                    </span>
                   </div>
                 </div>
-                {/* Add lives in its own right-hand column, vertically centred,
-                    so text, price and the size picker never shift it. */}
-                <span className="relative inline-flex flex-none items-center self-stretch">
-                  {tick > 0 && (
-                    <span
-                      key={tick}
-                      aria-hidden="true"
-                      className="added-flash absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
-                    >
-                      Added ✓
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    disabled={soldOut}
-                    aria-label={addAccessibilityLabel}
-                    onClick={() => {
-                      // Plain dishes add straight from the row. Customizable
-                      // ones open the sheet: the picking and the Add-gate live
-                      // there now, not in the menu list.
-                      if (item.options.length === 0) {
-                        onAdd(item, picks);
-                        bumpFlash(item.id);
-                        return;
-                      }
-                      setCustomizingId(item.id);
-                    }}
-                    className="grid h-8 w-8 place-items-center rounded-full bg-accent-700 text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                  >
-                    <PlusIcon size={16} />
-                  </button>
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+              </li>
+            );
+          })}
+        </ScrollArrowStrip>
+      </div>
       {customizing && (
         <CustomizeSheet
           item={customizing}
