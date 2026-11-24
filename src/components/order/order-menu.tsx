@@ -646,7 +646,7 @@ export function OrderMenuSection({
                   </div>
                 )}
                 <div
-                  className={`flex flex-1 flex-col gap-1 p-3 ${textFirst ? "dish-text-first min-h-[198px] justify-center" : ""}`}
+                  className={`flex flex-1 flex-col gap-1 p-3 ${textFirst ? "dish-text-first" : ""}`}
                 >
                   <p className="flex items-center gap-2 font-medium text-ink-900">
                     <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
