@@ -389,6 +389,51 @@ function CustomizableHint({ item }: { item: MenuItem }) {
 }
 
 /**
+ * CSS-only expandable dish description (no JS state): short text renders
+ * plain, long text shows two lines with an inline More… toggle pinned to
+ * the end of the second line, over the fade. Open removes the cap and
+ * swaps the toggle to Less. The ~90-char cutover is a width heuristic for
+ * the 200px card at text-xs (≈30 chars/line → 3 lines), not a true row
+ * count — CSS cannot measure overflow, so a narrow screen can wrap a
+ * "short" text past 3 lines.
+ *
+ * Why a capped box + overlay instead of `line-clamp-2` with the toggle
+ * inside the flow: a filled second line pushes the toggle onto a third
+ * line that the clamp clips away, leaving only the clamp's own "…"
+ * (exactly what TABRABANE SPECIAL showed). The capped box has no
+ * ellipsis of its own, so the overlay toggle is the only indicator.
+ */
+function DishDescription({ name, description }: { name: string; description: string }) {
+  if (description.length <= 90) {
+    return <p className="text-xs leading-relaxed text-ink-600">{description}</p>;
+  }
+  return (
+    <details className="group text-xs leading-relaxed text-ink-600">
+      <summary
+        aria-label={`Description for ${name}`}
+        className="relative cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+      >
+        <span className="block max-h-[3.25em] overflow-hidden group-open:max-h-none">
+          {description}
+        </span>
+        <span
+          aria-hidden="true"
+          className="absolute right-0 bottom-0 bg-gradient-to-l from-surface-base to-transparent pr-0.5 pl-8 font-semibold text-accent-700 underline underline-offset-2 group-open:static group-open:bg-none group-open:p-0"
+        >
+          {/* Solid-backed gap: the fade alone lets the text run right up
+              against the toggle ("Cheese,More…"), so the toggle carries
+              its own surface backdrop with a leading pad. Open, Less drops
+              back to plain inline text. A tight line can still push the
+              whole toggle onto its own row — allowed. */}
+          <span className="bg-surface-base pl-2 group-open:hidden">More…</span>
+          <span className="hidden group-open:inline"> Less</span>
+        </span>
+      </summary>
+    </details>
+  );
+}
+
+/**
  * Step 13 of the redesign: the category heading on the diner page
  * (SPEC §5.4, treatment C).
  *
@@ -712,9 +757,7 @@ export function OrderMenuSection({
                       )}
                     </p>
                     {item.description && (
-                      <p className="truncate text-xs text-ink-600" title={item.description}>
-                        {item.description}
-                      </p>
+                      <DishDescription name={item.name} description={item.description} />
                     )}
                     {item.options.length > 0 && <CustomizableHint item={item} />}
                     {dietaryLabels.length > 0 && (
