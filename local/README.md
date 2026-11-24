@@ -57,7 +57,8 @@ do not rely on it existing on another machine.
 | `prototype/diner-ordering-lab/` | diner page themes, mobile category navigation and dish layouts |
 | `research/`                     | research reports, including `research/staff-access/`           |
 | `samples/`                      | menu images and manual test samples                            |
-| `scratch/`                      | throwaway experiments and repro files                          |
+| `scratch/` | throwaway experiments and repro files |
+| `stripe-payments/` | Stripe preview acceptance matrix (`acceptance.html`) |
 | `study/`                        | UI study captures                                              |
 | `theme-studio/`                 | local theme tooling and backups                                |
 | `tmp/`                          | disposable files                                               |
