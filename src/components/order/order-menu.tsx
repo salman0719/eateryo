@@ -537,6 +537,12 @@ export function OrderMenuSection({
       rail keeps a steady shape. A category with no photos at all goes
       text-first instead — no empty media boxes. */
   const hasPhoto = category.items.some((candidate) => itemImageCopy(candidate.image));
+  /** One roomy dish makes the whole category roomy: a mixed rail would pair
+      tall stacked cards with short railed ones, so the category picks one
+      shape and every card keeps it. Plain-only categories stay railed. */
+  const roomyCategory = category.items.some(
+    (candidate) => candidate.description || candidate.variants.length > 0
+  );
   const customizing =
     customizingId === null
       ? null
@@ -608,14 +614,62 @@ export function OrderMenuSection({
             // Pattern tile for a photo-less dish in a photographed category;
             // text-first (no media at all) when the category has no photos.
             const textFirst = !photo && !hasPhoto;
+            // The category picked this card's shape: roomy when any dish needs
+            // the width, railed when every dish is plain.
+            const roomy = roomyCategory;
+            // The Add control lives in one place so the two layouts cannot drift.
+            const addControl = (
+              <span className="relative inline-flex flex-none items-center">
+                {tick > 0 && (
+                  <span
+                    key={tick}
+                    aria-hidden="true"
+                    // Centred on the button and parked to its left: a pop above
+                    // the button sticks out past the card's top edge, where the
+                    // carousel track (overflow-x-auto forces a clipped
+                    // overflow-y) cuts it off — worst on short text-first
+                    // cards like name-and-price-only dishes. Centred vertically
+                    // it stays inside the card's height, and extending left it
+                    // hangs over the card's own interior, so neither the card
+                    // edge nor the viewport can clip it, even on end cards.
+                    className="added-flash absolute top-1/2 right-10 -translate-y-1/2 rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow pointer-events-none z-10"
+                  >
+                    Added ✓
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={soldOut}
+                  aria-label={addAccessibilityLabel}
+                  onClick={() => {
+                    // Plain dishes add straight from the card. Customizable
+                    // ones open the sheet: the picking and the Add-gate live
+                    // there now, not in the menu list.
+                    if (item.options.length === 0) {
+                      onAdd(item, picks);
+                      bumpFlash(item.id);
+                      return;
+                    }
+                    setCustomizingId(item.id);
+                  }}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-accent-700 text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  <PlusIcon size={16} />
+                </button>
+              </span>
+            );
             return (
               <li
                 key={item.id}
-                className={`flex w-[200px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-line-200 bg-surface-base ${soldOut ? "opacity-60" : ""}`}
+                // No overflow clip on the card itself: the Added pop sits above
+                // the rail button and is wider than it, so a clip here would
+                // cut it off at the card's edge. The media slot below carries
+                // its own clip for the rounded top corners instead.
+                className={`flex w-[200px] shrink-0 snap-start flex-col rounded-xl border border-line-200 bg-surface-base ${soldOut ? "opacity-60" : ""}`}
               >
                 {!textFirst && (
                   <div
-                    className={`grid h-28 place-items-center overflow-hidden bg-surface-100 ${photo ? "" : "dish-photo-fallback"}`}
+                    className={`grid h-28 place-items-center overflow-hidden rounded-t-[11px] bg-surface-100 ${photo ? "" : "dish-photo-fallback"}`}
                     // The dot texture is the `line` role token used as a
                     // pattern wash — no new colour, just the token drawn as
                     // dots because Tailwind has no dotted-background utility.
@@ -645,91 +699,69 @@ export function OrderMenuSection({
                     )}
                   </div>
                 )}
-                <div
-                  className={`flex flex-1 flex-col gap-1 p-3 ${textFirst ? "dish-text-first" : ""}`}
-                >
-                  <p className="flex items-center gap-2 font-medium text-ink-900">
-                    <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
-                      {item.name}
-                    </span>
-                    {soldOut && (
-                      <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
-                        Sold out
+                <div className={`flex flex-1 gap-2 p-2.5 ${textFirst ? "dish-text-first" : ""}`}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="flex items-center gap-2 font-medium text-ink-900">
+                      <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
+                        {item.name}
                       </span>
-                    )}
-                  </p>
-                  {item.description && (
-                    <p className="truncate text-xs text-ink-600" title={item.description}>
-                      {item.description}
-                    </p>
-                  )}
-                  {item.options.length > 0 && <CustomizableHint item={item} />}
-                  {dietaryLabels.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {dietaryLabels.map((label) => (
-                        <span
-                          key={label}
-                          className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
-                        >
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {item.variants.length > 0 && (
-                    <label className="mt-1 inline-block max-w-full text-xs text-ink-600">
-                      <span className="sr-only">Size for {item.name}</span>
-                      <select
-                        value={variant?.name ?? ""}
-                        onChange={(event) => onVariantChange(item.id, event.target.value)}
-                        className="max-w-full rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                      >
-                        {item.variants.map((option) => (
-                          <option key={option.name} value={option.name}>
-                            {option.name}
-                            {option.price !== null
-                              ? ` — ${formatPreviewPrice(option.price, null, currency)}`
-                              : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <div className="mt-auto flex items-center justify-between gap-2 pt-2">
-                    <p className="text-sm font-semibold tabular-nums text-ink-900">
-                      {formatPreviewPrice(livePrice, null, currency)}
-                    </p>
-                    <span className="relative inline-flex flex-none items-center">
-                      {tick > 0 && (
-                        <span
-                          key={tick}
-                          aria-hidden="true"
-                          className="added-flash absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
-                        >
-                          Added ✓
+                      {soldOut && (
+                        <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
+                          Sold out
                         </span>
                       )}
-                      <button
-                        type="button"
-                        disabled={soldOut}
-                        aria-label={addAccessibilityLabel}
-                        onClick={() => {
-                          // Plain dishes add straight from the card. Customizable
-                          // ones open the sheet: the picking and the Add-gate live
-                          // there now, not in the menu list.
-                          if (item.options.length === 0) {
-                            onAdd(item, picks);
-                            bumpFlash(item.id);
-                            return;
-                          }
-                          setCustomizingId(item.id);
-                        }}
-                        className="grid h-8 w-8 place-items-center rounded-full bg-accent-700 text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
-                      >
-                        <PlusIcon size={16} />
-                      </button>
-                    </span>
+                    </p>
+                    {item.description && (
+                      <p className="truncate text-xs text-ink-600" title={item.description}>
+                        {item.description}
+                      </p>
+                    )}
+                    {item.options.length > 0 && <CustomizableHint item={item} />}
+                    {dietaryLabels.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {dietaryLabels.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {item.variants.length > 0 && (
+                      <label className="mt-1 inline-block max-w-full text-xs text-ink-600">
+                        <span className="sr-only">Size for {item.name}</span>
+                        <select
+                          value={variant?.name ?? ""}
+                          onChange={(event) => onVariantChange(item.id, event.target.value)}
+                          className="max-w-full rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                        >
+                          {item.variants.map((option) => (
+                            <option key={option.name} value={option.name}>
+                              {option.name}
+                              {option.price !== null
+                                ? ` — ${formatPreviewPrice(option.price, null, currency)}`
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {roomy ? (
+                      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                        <p className="text-sm font-semibold tabular-nums text-ink-900">
+                          {formatPreviewPrice(livePrice, null, currency)}
+                        </p>
+                        {addControl}
+                      </div>
+                    ) : (
+                      <p className="mt-auto pt-1 text-sm font-semibold tabular-nums text-ink-900">
+                        {formatPreviewPrice(livePrice, null, currency)}
+                      </p>
+                    )}
                   </div>
+                  {!roomy && <div className="flex flex-none items-center">{addControl}</div>}
                 </div>
               </li>
             );
