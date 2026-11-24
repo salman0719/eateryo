@@ -167,6 +167,15 @@ export function ChecklistIcon(props: IconProps) {
   );
 }
 
+/** Add: a plus for the diner menu's add-to-order control. */
+export function PlusIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M12 5.5v13M5.5 12h13" />
+    </Glyph>
+  );
+}
+
 /** More: three dots for the phone's overflow sheet. */
 export function MoreIcon(props: IconProps) {
   return (

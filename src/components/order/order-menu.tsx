@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "@/components/ui/brand";
+import { PlusIcon } from "@/components/ui/icons";
 import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
@@ -58,7 +59,7 @@ export function OrderSkeleton({ label }: { label: string }) {
               <Skeleton className="h-4 w-2/5" />
               <Skeleton className="mt-2 h-3 w-3/5" />
             </div>
-            <Skeleton className="h-9 w-20 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full" />
           </div>
         ))}
       </div>
@@ -588,13 +589,16 @@ export function OrderMenuSection({
           // reports cart contents. Counts live in the cart (sticky bar, side
           // panel, sheet) alone, so reopening a row or the sheet cannot read
           // as a lost order, and plain and customizable dishes label alike.
-          // Unpriced keeps the bare label: nothing is invented.
-          const addLabel =
-            livePrice === null ? "Add" : `Add · ${formatPreviewPrice(livePrice, null, currency)}`;
+          // Unpriced keeps the bare label: nothing is invented. The price
+          // stays in the content flow; the button itself is a bare plus.
+          const addAccessibilityLabel =
+            livePrice === null
+              ? `Add ${item.name}`
+              : `Add ${item.name} · ${formatPreviewPrice(livePrice, null, currency)}`;
           const tick = flash[item.id] ?? 0;
           return (
             <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
                 <MenuItemPhoto item={item} showPlaceholder={showPlaceholders} />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 font-medium text-ink-900">
@@ -606,7 +610,7 @@ export function OrderMenuSection({
                     )}
                   </p>
                   {/* Clamped to two lines with a "More" control: a long
-                      description must not push Add away from its dish (009). */}
+                      description must not push the add control away from its dish (009). */}
                   {item.description && (
                     <ClampedDescription text={item.description} name={item.name} />
                   )}
@@ -623,42 +627,39 @@ export function OrderMenuSection({
                       ))}
                     </div>
                   )}
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold tabular-nums text-ink-900">
+                      {formatPreviewPrice(livePrice, null, currency)}
+                    </p>
+                    {item.variants.length > 0 && (
+                      <label className="inline-block text-xs text-ink-600">
+                        <span className="sr-only">Size for {item.name}</span>
+                        <select
+                          value={variant?.name ?? ""}
+                          onChange={(event) => onVariantChange(item.id, event.target.value)}
+                          className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                        >
+                          {item.variants.map((option) => (
+                            <option key={option.name} value={option.name}>
+                              {option.name}
+                              {option.price !== null
+                                ? ` — ${formatPreviewPrice(option.price, null, currency)}`
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
                 </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
-                  {formatPreviewPrice(livePrice, null, currency)}
-                </p>
-              </div>
-
-              {/* Right-aligned control cluster: the size picker (when the
-                  dish has variants) sits beside Add rather than under it, and
-                  both hug the row's right edge so the text column keeps its
-                  full width. */}
-              <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                {item.variants.length > 0 && (
-                  <label className="text-xs text-ink-600">
-                    <span className="sr-only">Size for {item.name}</span>
-                    <select
-                      value={variant?.name ?? ""}
-                      onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                    >
-                      {item.variants.map((option) => (
-                        <option key={option.name} value={option.name}>
-                          {option.name}
-                          {option.price !== null
-                            ? ` — ${formatPreviewPrice(option.price, null, currency)}`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                <span className="relative inline-flex">
+                {/* Add lives in its own right-hand column, vertically centred,
+                    so text, price and the size picker never shift it. */}
+                <span className="relative inline-flex flex-none items-center self-stretch">
                   {tick > 0 && (
                     <span
                       key={tick}
                       aria-hidden="true"
-                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
+                      className="added-flash absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
                     >
                       Added ✓
                     </span>
@@ -666,6 +667,7 @@ export function OrderMenuSection({
                   <button
                     type="button"
                     disabled={soldOut}
+                    aria-label={addAccessibilityLabel}
                     onClick={() => {
                       // Plain dishes add straight from the row. Customizable
                       // ones open the sheet: the picking and the Add-gate live
@@ -677,9 +679,9 @@ export function OrderMenuSection({
                       }
                       setCustomizingId(item.id);
                     }}
-                    className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="grid h-8 w-8 place-items-center rounded-full bg-accent-700 text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
                   >
-                    {addLabel}
+                    <PlusIcon size={16} />
                   </button>
                 </span>
               </div>

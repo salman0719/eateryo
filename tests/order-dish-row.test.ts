@@ -21,14 +21,14 @@ function section(category: MenuCategory): string {
 }
 
 /**
- * The row's controls sit on the right edge, as one cluster: a dish with sizes
- * shows the picker first and Add beside it, not stacked under the dish name.
- * Pinned because "Align Add to the right" is a layout decision the CSS could
- * quietly lose (a stray `justify-start`, a wrapped row) without any test
- * noticing.
+ * The row's add control sits in its own right-hand column, vertically centred:
+ * a dish with sizes keeps the picker in the content flow and the circular
+ * plus isolated on the edge, so text, price and the picker never shift it.
+ * Pinned because right-edge alignment is a layout decision the CSS could
+ * quietly lose without any test noticing.
  */
 describe("diner dish row controls", () => {
-  it("right-aligns the size picker and Add, picker first", () => {
+  it("isolates the plus in its own column, picker in the content flow", () => {
     const doc = createSampleMenuDocument();
     const category = doc.categories.find((candidate) =>
       candidate.items.some((item) => item.variants.length > 0)
@@ -36,10 +36,12 @@ describe("diner dish row controls", () => {
     expect(category).toBeDefined();
 
     const html = section(category!);
-    expect(html).toContain("mt-2 flex flex-wrap items-center justify-end gap-2");
+    expect(html).toContain("relative inline-flex flex-none items-center self-stretch");
+    expect(html).toContain("grid h-8 w-8 place-items-center rounded-full bg-accent-700");
+    expect(html).toContain('aria-label="Add ');
 
     const picker = html.indexOf("<select");
-    const add = html.indexOf("rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold");
+    const add = html.indexOf('aria-label="Add ');
     expect(picker).toBeGreaterThan(-1);
     expect(add).toBeGreaterThan(picker);
   });
