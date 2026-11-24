@@ -818,7 +818,7 @@ export function StickyCartBar({
   if (contained) {
     return (
       <div
-        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
+        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-line-300 bg-surface-base px-4 pt-3 shadow-[0_-8px_24px_rgb(0_0_0/0.12)]"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {inner}
@@ -830,7 +830,7 @@ export function StickyCartBar({
     <>
       <div aria-hidden="true" className="h-16" />
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line-300 bg-surface-base px-4 pt-3 shadow-[0_-8px_24px_rgb(0_0_0/0.12)]"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-full max-w-4xl">{inner}</div>
