@@ -1,0 +1,1 @@
+ALTER TABLE "restaurant" ADD COLUMN "diner_theme" jsonb;

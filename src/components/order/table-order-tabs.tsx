@@ -36,6 +36,7 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
+import { useDinerThemeVars } from "./diner-theme";
 import {
   CategoryRail,
   DinerSearchField,
@@ -116,6 +117,9 @@ export function TableOrderTabs({
   const viewOrderButton = useRef<HTMLButtonElement | null>(null);
   /** Wide screens keep the order in its own column; phones raise the sheet. */
   const wide = useWideLayout();
+  // The tooltip portals to `document.body` — outside the theme div — so it
+  // re-applies the same vars. No-op inside a themed `PhoneFrame`.
+  const themeVars = useDinerThemeVars();
 
   const searching = query.trim().length > 0;
 
@@ -597,6 +601,7 @@ export function TableOrderTabs({
             role="status"
             className="pointer-events-none fixed z-50"
             style={{
+              ...themeVars,
               left: closedInfo.x,
               top: closedInfo.y,
               transform: closedInfo.above ? "translate(-50%, -100%)" : "translateX(-50%)",
