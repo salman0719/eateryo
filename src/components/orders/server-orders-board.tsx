@@ -17,33 +17,25 @@
  * adopts the server's version rather than overwriting.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import {
-  nextOrderStatus,
-  orderCode,
-  orderStatusLabel,
-  orderTotal,
-  type Order,
-  type OrderStatus,
-} from "@/features/orders/schema";
+import { orderCode, orderTotal, type Order, type OrderStatus } from "@/features/orders/schema";
+import { formatElapsed } from "@/features/orders/board-filters";
 import { GuidanceCard } from "@/components/ui/guidance-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { setOrderStatus } from "@/features/orders/client";
+import { StatusChip } from "@/components/ui/status-chip";
+import { checkOrderPayment, setOrderStatus } from "@/features/orders/client";
 import { useOrderMonitor } from "@/features/orders/monitor";
+import {
+  normalizePaymentStatus,
+  paymentStatusLabel,
+  paymentStatusTone,
+} from "@/features/payments/status-view";
+import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { SyncError } from "@/features/menus/sync";
 import { formatTableLabel } from "@/features/orders/table-links";
-import { formatPreviewPrice } from "@/features/menu/preview-utils";
-import { OrderLineOptions } from "@/components/order/option-groups";
 import { useConfirm } from "@/components/ui/confirm-dialog";
-import { StatusChip, type StatusTone } from "@/components/ui/status-chip";
-
-const STATUS_TONES: Record<OrderStatus, StatusTone> = {
-  new: "warning",
-  preparing: "info",
-  served: "success",
-  cancelled: "neutral",
-};
+import { KanbanBoard } from "@/components/orders/kanban-board";
 
 /**
  * Loading placeholder shared by both boards: pulsing ticket cards in the
@@ -80,6 +72,15 @@ function formatTime(iso: string): string {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Staff may clear an abandoned ticket by hand once it is 5 minutes old. */
+const CLEAR_AFTER_MS = 5 * 60 * 1000;
+
+function canClearAwaiting(order: Order): boolean {
+  const created = new Date(order.createdAt).getTime();
+  if (Number.isNaN(created)) return false;
+  return Date.now() - created >= CLEAR_AFTER_MS;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof SyncError) {
     switch (error.code) {
@@ -104,6 +105,9 @@ export function ServerOrdersBoard() {
   // badge and toasts); the board only guards its own optimistic writes.
   const {
     orders,
+    // The strip reads the monitor's snapshot: it appears, heals, and
+    // disappears on the 5-second poll with no request of its own.
+    awaitingOrders,
     phase,
     connection,
     lastSyncedAt,
@@ -114,6 +118,12 @@ export function ServerOrdersBoard() {
     notificationsAvailable,
     notificationPermission,
     requestNotifications,
+    historyWindow,
+    setHistoryWindow,
+    counts,
+    hasMore,
+    loadingMore,
+    loadMore,
     refresh,
     applyOptimistic,
     resolveOptimistic,
@@ -121,6 +131,40 @@ export function ServerOrdersBoard() {
   } = useOrderMonitor();
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [checkNote, setCheckNote] = useState<{ orderId: string; text: string } | null>(null);
+  // Collapsed by default: the strip costs one small pill until staff
+  // expand it — no wasted rows when card tickets are waiting.
+  const [awaitingOpen, setAwaitingOpen] = useState(false);
+  // Lazy auto-reconcile: each pending/failed ticket is checked once per
+  // snapshot — a missed webhook then heals itself without staff clicking.
+  // The next poll already carries the fresh snapshot, so a quiet pass
+  // needs no refresh at all.
+  const autoTriedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const candidates = awaitingOrders
+      .filter(
+        (order) =>
+          (order.paymentStatus === "pending" || order.paymentStatus === "failed") &&
+          !autoTriedRef.current.has(order.id)
+      )
+      .slice(0, 10);
+    if (candidates.length === 0) return;
+    for (const order of candidates) autoTriedRef.current.add(order.id);
+    void (async () => {
+      let anyPaid = false;
+      for (const order of candidates) {
+        try {
+          const result = await checkOrderPayment(order.id);
+          if (result.reconciled) anyPaid = true;
+        } catch {
+          // Manual "Check payment" remains; auto never nags.
+        }
+      }
+      if (anyPaid) refresh();
+    })();
+  }, [awaitingOrders, refresh]);
 
   async function move(order: Order, target: OrderStatus) {
     if (busyId) return;
@@ -153,6 +197,63 @@ export function ServerOrdersBoard() {
     void move(order, "cancelled");
   }
 
+  /** Staff clear: an abandoned card ticket (5+ minutes old) is cancelled by
+      hand — the row stays in the DB as `cancelled`, the pay link dies. */
+  async function clearAwaiting(order: Order) {
+    if (busyId) return;
+    const ok = await confirm({
+      message: `Clear #${orderCode(order.id)} for ${formatTableLabel(order.tableLabel)}? The diner's pay link stops working. Kept as cancelled.`,
+      confirmLabel: "Clear order",
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusyId(order.id);
+    setError(null);
+    try {
+      await setOrderStatus(order.id, "cancelled", order.updatedAt);
+      refresh();
+    } catch (clearError) {
+      if (clearError instanceof SyncError && clearError.code === "conflict") {
+        setError("That order changed elsewhere — showing the latest version.");
+        refresh();
+      } else {
+        setError(errorMessage(clearError));
+      }
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /** Missed-webhook reconciliation: read the session off the café's account. */
+  async function checkPayment(order: Order) {
+    if (checkingId) return;
+    setCheckingId(order.id);
+    setCheckNote(null);
+    setError(null);
+    try {
+      const result = await checkOrderPayment(order.id);
+      if (result.reconciled) {
+        refresh();
+        setCheckNote({ orderId: order.id, text: "Payment confirmed — the board now shows Paid." });
+      } else {
+        setCheckNote({
+          orderId: order.id,
+          text: "Stripe shows no payment yet — the confirmation may still arrive. Try again in a minute.",
+        });
+      }
+    } catch (checkError) {
+      setCheckNote({
+        orderId: order.id,
+        text:
+          checkError instanceof SyncError
+            ? checkError.message
+            : "Could not reach Stripe. Try again.",
+      });
+    } finally {
+      setCheckingId(null);
+    }
+  }
+
   const openCount = orders.filter((order) => order.status === "new").length;
   const activeCount = orders.filter(
     (order) => order.status === "new" || order.status === "preparing"
@@ -164,9 +265,9 @@ export function ServerOrdersBoard() {
         <div>
           <h2 className="text-xl font-bold text-ink-900">Orders</h2>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-600">
-            {orders.length === 0
+            {orders.length === 0 && !counts
               ? "Orders placed from public table links appear here."
-              : `${activeCount} active · ${openCount} new`}
+              : `${counts ? `${counts.total.toLocaleString()} in ${historyWindow === "24h" ? "the last 24h" : "all time"} · ` : ""}${activeCount} active · ${openCount} new`}
             <ConnectionPill connection={connection} lastSyncedAt={lastSyncedAt} />
           </p>
         </div>
@@ -224,6 +325,77 @@ export function ServerOrdersBoard() {
         </p>
       )}
 
+      {/* Compact pill above the Kanban: hidden card tickets stay one tap
+          away. Paid arrivals land on the board through the poll. */}
+      {awaitingOrders.length > 0 && (
+        <section aria-label={`Awaiting payment (${awaitingOrders.length})`}>
+          <button
+            type="button"
+            onClick={() => setAwaitingOpen((open) => !open)}
+            aria-expanded={awaitingOpen}
+            className="inline-flex items-center gap-2 rounded-full border border-line-200 bg-surface-base px-3 py-1 text-xs font-semibold text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900"
+          >
+            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-warning-600" />
+            {awaitingOrders.length} awaiting payment
+            <span aria-hidden="true" className="text-ink-400">
+              {awaitingOpen ? "▾" : "▸"}
+            </span>
+          </button>
+          {awaitingOpen && (
+            <div className="mt-2 rounded-2xl border border-line-200 bg-surface-base p-3">
+              <p className="text-[11px] text-ink-500">
+                Cards stay off the board until Stripe confirms — paid tickets appear below.
+              </p>
+              <ul className="mt-1 divide-y divide-line-100">
+                {awaitingOrders.map((order) => {
+                  const total = orderTotal(order.lines);
+                  const badge = normalizePaymentStatus(order.paymentStatus);
+                  return (
+                    <li
+                      key={order.id}
+                      className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm"
+                    >
+                      <span className="font-bold text-ink-900">#{orderCode(order.id)}</span>
+                      <span className="text-ink-700">{formatTableLabel(order.tableLabel)}</span>
+                      <span className="text-xs text-ink-500">
+                        {formatElapsed(order.createdAt)} ·{" "}
+                        {total === null
+                          ? "no price"
+                          : formatPreviewPrice(total, null, order.currency)}
+                      </span>
+                      <StatusChip size="sm" tone={paymentStatusTone(badge)}>
+                        {paymentStatusLabel(badge)}
+                      </StatusChip>
+                      <button
+                        type="button"
+                        disabled={checkingId === order.id}
+                        onClick={() => void checkPayment(order)}
+                        className="ml-auto rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:opacity-50"
+                      >
+                        {checkingId === order.id ? "Checking…" : "Check payment"}
+                      </button>
+                      {canClearAwaiting(order) && (
+                        <button
+                          type="button"
+                          disabled={busyId === order.id}
+                          onClick={() => void clearAwaiting(order)}
+                          title="Cancel this unpaid ticket — the pay link stops working. Kept as cancelled."
+                          className="rounded-full border border-line-300 px-3 py-1 text-xs font-medium text-ink-600 transition-colors hover:border-danger-300 hover:text-danger-800 disabled:opacity-50"
+                        >
+                          {busyId === order.id ? "Clearing…" : "Clear"}
+                        </button>
+                      )}
+                      {checkNote && checkNote.orderId === order.id && (
+                        <span className="basis-full text-xs text-ink-600">{checkNote.text}</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
       {(error ?? pollError) && (
         <p
           role="alert"
@@ -245,96 +417,34 @@ export function ServerOrdersBoard() {
           action={{ href: "/tables", label: "Go to Tables" }}
         />
       ) : (
-        <ul className="space-y-3">
-          {orders.map((order) => {
-            const total = orderTotal(order.lines);
-            const next = nextOrderStatus(order.status);
-            const canAdvance = next !== order.status;
-            return (
-              <li
-                key={order.id}
-                className="rounded-2xl border border-line-200 bg-surface-base p-4"
-                aria-busy={busyId === order.id}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-lg font-bold text-ink-900">
-                        {formatTableLabel(order.tableLabel)}
-                      </p>
-                      <StatusChip tone={STATUS_TONES[order.status]}>
-                        {orderStatusLabel(order.status)}
-                      </StatusChip>
-                      <span className="text-xs font-medium text-ink-500">
-                        #{orderCode(order.id)} · {formatTime(order.createdAt)}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 text-xs text-ink-500">{order.menuTitle}</p>
-                  </div>
-                  <p className="text-sm font-semibold tabular-nums text-ink-900">
-                    {formatPreviewPrice(total, null, order.currency)}
-                  </p>
-                </div>
-
-                <ul className="mt-3 space-y-1 border-t border-line-100 pt-3">
-                  {order.lines.map((line, index) => (
-                    <li
-                      key={`${line.menuItemId}-${line.variantName ?? "base"}-${index}`}
-                      className="flex items-baseline justify-between gap-3 text-sm text-ink-700"
-                    >
-                      <span className="min-w-0">
-                        <span className="font-medium text-ink-900">{line.quantity}×</span>{" "}
-                        {line.name}
-                        {line.variantName && (
-                          <span className="ml-1 text-xs text-ink-500">{line.variantName}</span>
-                        )}
-                        <OrderLineOptions options={line.options} currency={order.currency} />
-                      </span>
-                      <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                        {line.unitPrice === null
-                          ? "no price"
-                          : formatPreviewPrice(
-                              line.unitPrice * line.quantity,
-                              null,
-                              order.currency
-                            )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {order.note && (
-                  <p className="mt-2 rounded-xl bg-warning-50 px-3 py-2 text-xs text-warning-900">
-                    Note: {order.note}
-                  </p>
-                )}
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {canAdvance && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => void move(order, next)}
-                      className="rounded-full bg-accent-700 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 disabled:opacity-50"
-                    >
-                      Mark {orderStatusLabel(next).toLowerCase()}
-                    </button>
-                  )}
-                  {order.status !== "cancelled" && order.status !== "served" && (
-                    <button
-                      type="button"
-                      disabled={busyId === order.id}
-                      onClick={() => cancel(order)}
-                      className="rounded-full border border-line-300 px-3.5 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-danger-700 hover:text-danger-800 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <KanbanBoard
+            orders={orders}
+            busyId={busyId}
+            onAdvance={(order, target) => void move(order, target)}
+            onCancel={(order) => void cancel(order)}
+            onCheckPayment={(order) => void checkPayment(order)}
+            checkingId={checkingId}
+            checkNote={checkNote}
+            window={historyWindow}
+            onWindowChange={setHistoryWindow}
+          />
+          {hasMore ? (
+            <button
+              type="button"
+              onClick={() => loadMore()}
+              disabled={loadingMore}
+              className="mx-auto rounded-full border border-line-300 px-5 py-2 text-sm font-medium text-ink-700 transition-colors hover:border-accent-700 hover:text-accent-900 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading older orders…" : "Show older orders"}
+            </button>
+          ) : null}
+          {!hasMore && counts !== null && counts.total > orders.length ? (
+            <p className="text-center text-xs text-ink-500">
+              New orders arrived while paging — press Refresh to reconcile.
+            </p>
+          ) : null}
+        </>
       )}
       {dialog}
     </div>

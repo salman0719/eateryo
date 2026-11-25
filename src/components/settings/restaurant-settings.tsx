@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 
 import { AccountDangerZone, AccountExportCard } from "@/components/launch/data-controls";
 import { CommitInput } from "@/components/menu-editor/fields";
+import { BrandCard } from "@/components/settings/brand-card";
 import { OrderAlertsCard } from "@/components/settings/order-alerts";
+import { PaymentsCard } from "@/components/settings/payments-card";
 import { TeamActivity } from "@/components/settings/team-activity";
 import { UsagePanel } from "@/components/settings/usage-panel";
 import { GuidanceCard } from "@/components/ui/guidance-card";
@@ -53,6 +55,10 @@ export function RestaurantSettings() {
   const selected = active ? { id: active.restaurantId, name: active.name } : null;
   const restaurants = workspace.restaurants;
   const allRestaurants = restaurants ?? [];
+  // The full option carries the brand assets; the switcher entry is id + name only.
+  const selectedOption = selected
+    ? (allRestaurants.find((option) => option.id === selected.id) ?? null)
+    : null;
   const loadFailed = workspace.failedFor !== null;
   const signedIn = workspace.signedIn;
   const sessionPending = workspace.sessionPending;
@@ -188,6 +194,16 @@ export function RestaurantSettings() {
             </div>
           </div>
 
+          {(canManageSettings || selectedOption?.logo || selectedOption?.cover) &&
+            selectedOption && (
+              <BrandCard
+                key={`brand-${selected.id}`}
+                restaurant={selectedOption}
+                canManage={canManageSettings}
+                onChanged={(updated) => workspace.addRestaurant(updated)}
+              />
+            )}
+
           {canReadTeam && (
             <>
               <TeamCard
@@ -209,6 +225,13 @@ export function RestaurantSettings() {
 
           <OrderAlertsCard
             key={`alerts-${selected.id}`}
+            restaurantId={selected.id}
+            restaurantName={selected.name}
+            canManage={canManageSettings}
+          />
+
+          <PaymentsCard
+            key={`payments-${selected.id}`}
             restaurantId={selected.id}
             restaurantName={selected.name}
             canManage={canManageSettings}

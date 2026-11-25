@@ -11,6 +11,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
+
 /**
  * Canonical server DB schema (Drizzle, Postgres/Neon).
  *
@@ -126,6 +128,14 @@ export const restaurant = pgTable(
      */
     orderAlertsEnabled: boolean("order_alerts_enabled").notNull().default(true),
     orderAlertEmail: text("order_alert_email"),
+    /**
+     * Brand assets (Settings step): logo + cover photo, the same stored
+     * shape as a dish photo. Null until the owner uploads one; removal
+     * clears the reference while the file stays on the host, because a
+     * published page may still serve the old one.
+     */
+    logo: jsonb("logo").$type<BrandAssetImage | null>(),
+    cover: jsonb("cover").$type<BrandAssetImage | null>(),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -404,6 +414,27 @@ export const order = pgTable(
       .$defaultFn(() => "new" as const),
     /** Server-computed cents; null when any line is unpriced. */
     totalCents: integer("total_cents"),
+    /**
+     * Card-payment state for the order (Commit 2 — café Stripe payments).
+     * Independent of the kitchen `status`: a ticket is workable whether it
+     * is unpaid, paid, or failed. Only forward transitions are written
+     * (`src/features/payments/schema.ts`); `paid` leaves only via `refunded`.
+     */
+    paymentStatus: text("payment_status", {
+      enum: ["unpaid", "pending", "paid", "failed", "refunded"],
+    })
+      .notNull()
+      .$defaultFn(() => "unpaid" as const),
+    /** Which provider took the payment (`stripe`); null while unpaid. */
+    paymentProvider: text("payment_provider"),
+    /** The Checkout Session id (`cs_…`) — one open session is reused per order. */
+    paymentReference: text("payment_reference"),
+    /** The PaymentIntent id (`pi_…`) — what refunds pair against. */
+    paymentIntentId: text("payment_intent_id"),
+    /** Display-only card label (`Visa •••• 4242`). No PAN, expiry, or CVC. */
+    paymentMethodLabel: text("payment_method_label"),
+    /** When the payment completed, server clock. */
+    paidAt: timestamp("paid_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt().$onUpdateFn(() => new Date()),
   },
@@ -616,6 +647,76 @@ export const assistantUsage = pgTable(
   })
 );
 
+/**
+ * A café's own card-payment connection (Commit 2 — café Stripe payments).
+ *
+ * One row per (restaurant, provider); v1 holds `stripe` only. `mode` is the
+ * café's choice (`online` vs pay-at-the-counter `at_venue`, the default);
+ * `livemode` is Stripe's own flag (test vs live account) — two different
+ * things that a single `mode` column would confuse. `requirementCodes`
+ * stores Stripe's requirement **codes** only, never the KYC values.
+ */
+export const restaurantPaymentAccount = pgTable(
+  "restaurant_payment_account",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    restaurantId: text("restaurant_id")
+      .notNull()
+      .references(() => restaurant.id, { onDelete: "cascade" }),
+    provider: text("provider", { enum: ["stripe"] })
+      .notNull()
+      .$defaultFn(() => "stripe" as const),
+    mode: text("mode", { enum: ["online", "at_venue"] })
+      .notNull()
+      .$defaultFn(() => "at_venue" as const),
+    /** Stripe's test/live flag for this connected account. */
+    livemode: boolean("livemode").notNull().default(false),
+    /** The `acct_…` id on the provider. */
+    externalAccountId: text("external_account_id").notNull(),
+    /** Cached capability verdict: active / pending / restricted / unavailable. */
+    status: text("status", { enum: ["pending", "active", "restricted", "unavailable"] })
+      .notNull()
+      .$defaultFn(() => "pending" as const),
+    chargesEnabled: boolean("charges_enabled").notNull().default(false),
+    payoutsEnabled: boolean("payouts_enabled").notNull().default(false),
+    detailsSubmitted: boolean("details_submitted").notNull().default(false),
+    country: text("country"),
+    defaultCurrency: text("default_currency"),
+    /** Stripe requirement codes only (e.g. `individual.verification.document`). */
+    requirementCodes: text("requirement_codes").array().notNull().default([]),
+    /** When the account was first linked. */
+    connectedAt: timestamp("connected_at"),
+    /** When Stripe's status was last read (webhook or manual check). */
+    statusCheckedAt: timestamp("status_checked_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt().$onUpdateFn(() => new Date()),
+  },
+  (t) => ({
+    restaurantProviderUnique: uniqueIndex(
+      "restaurant_payment_account_restaurant_provider_unique"
+    ).on(t.restaurantId, t.provider),
+    externalAccountUnique: uniqueIndex("restaurant_payment_account_external_account_unique").on(
+      t.externalAccountId
+    ),
+  })
+);
+
+/**
+ * Stripe webhook replay guard (Commit 2). `id` is the event id (`evt_…`), so
+ * a redelivered event is a no-op insert. `accountId` is the connected
+ * account the event arrived for (pair authorisation); `orderId` the order it
+ * was applied to, when any. Rows cascade with the order.
+ */
+export const stripeEvent = pgTable("stripe_event", {
+  id: text("id").primaryKey(),
+  type: text("type").notNull(),
+  accountId: text("account_id"),
+  orderId: text("order_id").references(() => order.id, { onDelete: "cascade" }),
+  receivedAt: createdAt(),
+});
+
 /** Everything the Drizzle adapter and app code share. */
 export const schema = {
   user,
@@ -635,6 +736,8 @@ export const schema = {
   orderTracking,
   orderRateLimit,
   orderEmailLog,
+  restaurantPaymentAccount,
+  stripeEvent,
   extractionUsage,
   assistantUsage,
 };

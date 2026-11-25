@@ -141,8 +141,16 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
    ~10px from the 340px-wide screen. `overscroll-behavior: contain` is
    unconditional, so a scroll that reaches the preview's edge never drags the
    page behind it — the real mobile annoyance here. */
+/* A phone screen never pans sideways: the bleed children cancel the shell
+   padding exactly in CSS pixels, but device-pixel rounding can leave a
+   sub-pixel excess, and with overflow-y auto the x-axis computes to auto,
+   so that excess became a sideways scroll inside the phone. Clip it
+   instead; the pill row keeps its own sideways scroll. Sticky top and the
+   vertical scroll are unaffected: only the x-axis is clipped. */
 .phone-scroll {
   overscroll-behavior: contain;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -180,6 +188,61 @@ below 12px on phones (print keeps its 10px QR captions — this is screen-only).
   .phone-scroll::-webkit-scrollbar-thumb:hover {
     background-color: color-mix(in srgb, var(--color-line-500) 75%, transparent);
   }
+}
+
+/* Touch and emulated-mobile pointers get no in-phone scrollbar box at all:
+   real phones draw overlay scrollbars that take no layout space, and the
+   12px classic box is what kept the bleed short of the frame right edge.
+   Desktop keeps the slim pill above. */
+@media (pointer: coarse) {
+  .phone-scroll {
+    scrollbar-width: none;
+  }
+
+  .phone-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Phone-frame diner preview (src/components/ui/phone-frame.tsx).
+
+   The frame is a phone at every viewport width, but Tailwind's `sm:`
+   variants answer the viewport, not the frame: on a desktop window the
+   framed cover, list and sections would flip to the wide-screen inset
+   cards while a real phone shows them edge to edge. These overrides pin
+   the framed copies to the below-`sm` phone treatment, so the preview
+   reads exactly like the table page on mobile. Unlayered, so they win
+   over the layered `sm:` utilities at every width. */
+.phone-scroll .diner-cover-bleed {
+  margin-top: -1.5rem;
+  margin-left: -1rem;
+  margin-right: -1rem;
+  border-radius: 0;
+  border-top-width: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+}
+
+.phone-scroll .diner-category-sections {
+  margin-left: -1rem;
+  margin-right: -1rem;
+  gap: 0;
+  border-top-width: 1px;
+  border-bottom-width: 1px;
+  border-left-width: 0;
+  border-right-width: 0;
+  background-color: var(--color-surface-base);
+}
+
+.phone-scroll .diner-category-sections > :not([hidden]) ~ :not([hidden]) {
+  border-top-width: 8px;
+  border-bottom-width: 0;
+  border-color: var(--color-surface-100);
+}
+
+.phone-scroll .diner-menu-section {
+  border-radius: 0;
+  border-width: 0;
 }
 
 /* The preview's order sheet rises from the phone screen's bottom edge. */

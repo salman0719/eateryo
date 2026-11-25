@@ -30,7 +30,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { fetchStaffOrders } from "./client";
+import { fetchStaffOrderCounts, fetchStaffOrders } from "./client";
+import { BOARD_WINDOW_MS, type BoardWindow } from "./board-filters";
 import {
   detectNewOrders,
   mergeBoardOrders,
@@ -56,6 +57,11 @@ export type MonitorConnection = "idle" | "connecting" | "live" | "reconnecting";
 
 interface MonitorValue {
   orders: Order[];
+  /**
+   * Card tickets the board hides until paid, riding the same poll — the
+   * strip above the Kanban reads this, never a second request.
+   */
+  awaitingOrders: Order[];
   phase: "loading" | "ready" | "error";
   connection: MonitorConnection;
   lastSyncedAt: string | null;
@@ -71,6 +77,19 @@ interface MonitorValue {
   notificationsAvailable: boolean;
   notificationPermission: NotificationPermission | "unsupported";
   requestNotifications: () => Promise<void>;
+  /**
+   * History scope: `24h` pages the last day from the server, `all` pages
+   * everything. The window filters in SQL; the board never downloads what
+   * it hides.
+   */
+  historyWindow: BoardWindow;
+  setHistoryWindow: (window: BoardWindow) => void;
+  /** Server-side `COUNT(*) GROUP BY status` over the window — null until read. */
+  counts: { counts: Record<OrderStatus, number>; total: number } | null;
+  /** An older page exists beyond what the board holds. */
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadMore: () => void;
   /**
    * The board is open: unseen markers advance and toasts clear. The chime
    * still plays on arrival — only the toast and system notification depend
@@ -133,12 +152,20 @@ export function OrderMonitorProvider({
   children: ReactNode;
 }) {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [awaitingOrders, setAwaitingOrders] = useState<Order[]>([]);
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [connection, setConnection] = useState<MonitorConnection>("idle");
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
   const [seenAt, setSeenAt] = useState<string | null>(null);
   const [toasts, setToasts] = useState<OrderToast[]>([]);
+  const [historyWindow, setHistoryWindowState] = useState<BoardWindow>("24h");
+  const [counts, setCounts] = useState<{
+    counts: Record<OrderStatus, number>;
+    total: number;
+  } | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [soundOn, setSoundOnState] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<
     NotificationPermission | "unsupported"
@@ -146,6 +173,10 @@ export function OrderMonitorProvider({
   const [hasArrived, setHasArrived] = useState(false);
 
   const sinceRef = useRef<string | null>(null);
+  const windowRef = useRef<BoardWindow>(historyWindow);
+  const nextCursorRef = useRef<string | null>(null);
+  const pageScopeRef = useRef<{ cafeId: string; from: string | null } | null>(null);
+  const loadingMoreRef = useRef(false);
   const seenAtRef = useRef<string | null>(null);
   const viewingRef = useRef(false);
   const guardedRef = useRef<Set<string>>(new Set());
@@ -165,6 +196,7 @@ export function OrderMonitorProvider({
   if (monitorFor !== monitorKey) {
     setMonitorFor(monitorKey);
     setOrders([]);
+    setAwaitingOrders([]);
     setPhase("loading");
     setConnection("idle");
     setLastSyncedAt(null);
@@ -172,7 +204,17 @@ export function OrderMonitorProvider({
     setSeenAt(null);
     setToasts([]);
     setHasArrived(false);
+    setHistoryWindowState("24h");
+    setCounts(null);
+    setHasMore(false);
+    setLoadingMore(false);
   }
+
+  // Polling reads the window through this ref so the poll callback keeps a
+  // stable identity while the effect restarts on window changes.
+  useEffect(() => {
+    windowRef.current = historyWindow;
+  }, [historyWindow]);
 
   // Persisted preferences restore once, off the effect body (a macrotask, so
   // the first paint still matches the server render exactly): sound defaults
@@ -222,20 +264,42 @@ export function OrderMonitorProvider({
     async (initial: boolean, cafeId: string) => {
       // Always one café: the server would otherwise answer with every
       // membership's tickets, which is a union the shell never acts in.
+      // The window filters in SQL, so a 24h board never downloads older
+      // tickets just to hide them client-side.
+      const from =
+        initial && windowRef.current === "24h"
+          ? new Date(Date.now() - BOARD_WINDOW_MS).toISOString()
+          : null;
       const result = await fetchStaffOrders({
         restaurantId: cafeId,
         since: initial ? null : sinceRef.current,
+        from,
         limit: 100,
       });
       sinceRef.current = result.serverTime;
       if (initial) {
         // The first load is context, not news: nothing badges or toasts.
         setOrders(result.orders);
+        setAwaitingOrders(result.awaiting.orders);
+        nextCursorRef.current = result.nextCursor;
+        pageScopeRef.current = { cafeId, from };
+        setHasMore(result.nextCursor !== null);
         seenAtRef.current = result.serverTime;
         setSeenAt(result.serverTime);
+        // Totals ride along with the first page; a counts failure must not
+        // fail the poll, so the board still renders without its header total.
+        try {
+          const totals = await fetchStaffOrderCounts({ restaurantId: cafeId, from });
+          setCounts({ counts: totals.counts, total: totals.total });
+        } catch {
+          setCounts(null);
+        }
       } else {
         const arrivals = detectNewOrders(result.orders, seenAtRef.current);
         setOrders((current) => mergeBoardOrders(current, result.orders, guardedRef.current));
+        // A full snapshot every poll: paid tickets vanish from the strip
+        // the moment the board adopts them, with no second request.
+        setAwaitingOrders(result.awaiting.orders);
         if (arrivals.length > 0) {
           setHasArrived(true);
           // Sound follows the toggle, not the screen: a board left open on a
@@ -293,6 +357,7 @@ export function OrderMonitorProvider({
       // not a loading one. Deferred so the effect body never sets state.
       const settle = setTimeout(() => {
         setOrders([]);
+        setAwaitingOrders([]);
         setPhase("ready");
         setConnection("idle");
         setLastSyncedAt(null);
@@ -339,7 +404,9 @@ export function OrderMonitorProvider({
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
     };
-  }, [userId, restaurantId, pending, poll]);
+    // `historyWindow` restarts polling from a fresh cursor: the next tick
+    // takes the initial path with the new window's `from`.
+  }, [userId, restaurantId, pending, poll, historyWindow]);
 
   useEffect(
     () => () => {
@@ -384,7 +451,52 @@ export function OrderMonitorProvider({
     // Never refresh the union: with no café to act in there is nothing to read.
     if (!restaurantId) return;
     void poll(false, restaurantId).catch(() => undefined);
+    const from =
+      windowRef.current === "24h" ? new Date(Date.now() - BOARD_WINDOW_MS).toISOString() : null;
+    void fetchStaffOrderCounts({ restaurantId, from })
+      .then((totals) => setCounts({ counts: totals.counts, total: totals.total }))
+      .catch(() => undefined);
   }, [poll, restaurantId]);
+
+  const setHistoryWindow = useCallback((window: BoardWindow) => {
+    if (windowRef.current === window) return;
+    windowRef.current = window;
+    setHistoryWindowState(window);
+    // The restarted effect's first tick takes the initial path from here.
+    sinceRef.current = null;
+    nextCursorRef.current = null;
+    pageScopeRef.current = null;
+    setOrders([]);
+    setCounts(null);
+    setHasMore(false);
+    setLoadingMore(false);
+    loadingMoreRef.current = false;
+    setPhase("loading");
+  }, []);
+
+  const loadMore = useCallback(() => {
+    const scope = pageScopeRef.current;
+    const cursor = nextCursorRef.current;
+    if (!scope || !cursor || loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    void fetchStaffOrders({
+      restaurantId: scope.cafeId,
+      from: scope.from,
+      cursor,
+      limit: 100,
+    })
+      .then((result) => {
+        nextCursorRef.current = result.nextCursor;
+        setHasMore(result.nextCursor !== null);
+        setOrders((current) => mergeBoardOrders(current, result.orders, guardedRef.current));
+      })
+      .catch((loadError: unknown) => setPollError(pollErrorMessage(loadError)))
+      .finally(() => {
+        loadingMoreRef.current = false;
+        setLoadingMore(false);
+      });
+  }, []);
 
   const applyOptimistic = useCallback((orderId: string, status: OrderStatus) => {
     guardedRef.current.add(orderId);
@@ -405,15 +517,22 @@ export function OrderMonitorProvider({
 
   const newCount = useMemo(
     () =>
-      orders.filter(
-        (order) => order.status === "new" && (seenAt === null || order.createdAt > seenAt)
-      ).length,
+      orders.filter((order) => {
+        if (order.status !== "new" || seenAt === null) return order.status === "new";
+        if (order.createdAt > seenAt) return true;
+        return (
+          order.paymentProvider === "stripe" &&
+          order.paymentStatus === "paid" &&
+          order.updatedAt > seenAt
+        );
+      }).length,
     [orders, seenAt]
   );
 
   const value = useMemo<MonitorValue>(
     () => ({
       orders,
+      awaitingOrders,
       phase,
       connection,
       lastSyncedAt,
@@ -426,6 +545,12 @@ export function OrderMonitorProvider({
       notificationsAvailable,
       notificationPermission,
       requestNotifications,
+      historyWindow,
+      setHistoryWindow,
+      counts,
+      hasMore,
+      loadingMore,
+      loadMore,
       setViewingBoard,
       refresh,
       applyOptimistic,
@@ -435,6 +560,7 @@ export function OrderMonitorProvider({
     }),
     [
       orders,
+      awaitingOrders,
       phase,
       connection,
       lastSyncedAt,
@@ -447,6 +573,12 @@ export function OrderMonitorProvider({
       notificationsAvailable,
       notificationPermission,
       requestNotifications,
+      historyWindow,
+      setHistoryWindow,
+      counts,
+      hasMore,
+      loadingMore,
+      loadMore,
       setViewingBoard,
       refresh,
       applyOptimistic,

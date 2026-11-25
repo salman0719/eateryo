@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { PageImage } from "@/components/upload/image-preview";
 import type {
+  NewDishDraft,
   PreviewMenu,
   ReviewItemLocation,
   ReviewResolution,
@@ -11,9 +12,12 @@ import type {
 import { extractedMenuToDocument } from "@/features/menu/convert";
 import {
   acceptItemUnpriced,
+  addItem,
   confirmItemReviewed,
+  deleteItem,
   hasAnyPrice,
   isItemFlagged,
+  moveItemToCategory,
   updateItem,
 } from "@/features/menu/menu-utils";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
@@ -253,7 +257,19 @@ export function useCapture(options: CaptureOptions) {
     options.revealResult();
   }
 
-  function handleExtract() {
+  /**
+   * Read the selected pages. A read that already produced this draft is not
+   * repeated implicitly: pressing again replaces the draft (and any review
+   * edits) and spends another AI call, so it asks first.
+   */
+  async function handleExtract() {
+    if (phase === "extracting") return;
+    if (extracted !== null || resultDoc !== null) {
+      const ok = await options.confirmDiscard(
+        "Extract again? This replaces the current draft and any review edits, and spends another AI call."
+      );
+      if (!ok) return;
+    }
     void extractFiles(pages.map((page) => page.file));
   }
 
@@ -459,6 +475,118 @@ export function useCapture(options: CaptureOptions) {
     void persistResultDoc(next);
   }
 
+  /** Rename a dish in place. The name is the fix; the AI's uncertainty
+   * about it (reviewNotes) stays until the owner confirms separately. */
+  function handleRenameResultItem(loc: ReviewItemLocation, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item || item.name === trimmed) return;
+    const next = updateItem(doc, category.id, item.id, { name: trimmed });
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Edit a dish's description in place. Blank clears it (null = not
+   * shown); notes stay until the owner confirms separately. */
+  function handleUpdateResultDescription(loc: ReviewItemLocation, description: string | null) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item || item.description === description) return;
+    const next = updateItem(doc, category.id, item.id, { description });
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Replace a dish's size rows in place. Sizes carry their own prices,
+   * so adding the first one clears a misread single root price to null
+   * with it (per-size pricing has a null root by design). Removing the
+   * last size re-flags the price honestly; notes stay until confirmed. */
+  function handleUpdateResultVariants(
+    loc: ReviewItemLocation,
+    variants: { name: string; price: number | null }[]
+  ) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item) return;
+    const cleaned = variants
+      .map((variant) => ({ name: variant.name.trim(), price: variant.price }))
+      .filter((variant) => variant.name !== "");
+    const next = updateItem(
+      doc,
+      category.id,
+      item.id,
+      item.variants.length === 0 && cleaned.length > 0
+        ? { variants: cleaned, price: null }
+        : { variants: cleaned }
+    );
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Move a dish to another category in place. Lands at the end; the
+   * review card closes because every index path re-keys. */
+  function handleMoveResultItem(loc: ReviewItemLocation, toCategoryIndex: number) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const target = doc.categories[toCategoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item || !target || target.id === category.id) return;
+    const next = moveItemToCategory(doc, category.id, target.id, item.id);
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Delete a dish from the draft in place. The shell confirms before
+   * this fires; a published revision may still serve the old dish until
+   * the next publish. */
+  function handleDeleteResultItem(loc: ReviewItemLocation) {
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    if (!doc) return;
+    const category = doc.categories[loc.categoryIndex];
+    const item = category?.items[loc.itemIndex];
+    if (!category || !item) return;
+    const next = deleteItem(doc, category.id, item.id);
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
+  /** Add a dish the AI missed with the same fix-it-here fields as a row
+   * card. Lands at the end of the category — priced as entered, or unpriced
+   * and review-noted when the price stays blank. */
+  function handleAddResultItem(categoryIndex: number, draft: NewDishDraft) {
+    const trimmed = draft.name.trim();
+    if (!trimmed) return;
+    const doc = source === "demo" ? demoDoc : resultDoc;
+    const category = doc?.categories[categoryIndex];
+    if (!doc || !category) return;
+    const description = draft.description?.trim() ? draft.description.trim() : null;
+    const variants = draft.variants
+      .map((variant) => ({ name: variant.name.trim(), price: variant.price }))
+      .filter((variant) => variant.name !== "");
+    const price = variants.length > 0 ? null : draft.price;
+    const next = addItem(doc, category.id, {
+      name: trimmed,
+      description,
+      price,
+      variants,
+      reviewNotes:
+        price === null && variants.every((variant) => variant.price === null)
+          ? ["Added by hand — check the price."]
+          : [],
+    });
+    patchResultDoc(next);
+    void persistResultDoc(next);
+  }
+
   /** Q2: the result title is an editable field, never a naming gate.
    * Commits persist to the draft like price fixes; blank is ignored. */
   function handleRenameResultTitle(title: string) {
@@ -566,6 +694,12 @@ export function useCapture(options: CaptureOptions) {
     handleResolveResultItem,
     handleUpdateResultPrice,
     handleResolveAllResultItems,
+    handleRenameResultItem,
+    handleUpdateResultDescription,
+    handleUpdateResultVariants,
+    handleMoveResultItem,
+    handleDeleteResultItem,
+    handleAddResultItem,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,

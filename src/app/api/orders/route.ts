@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   consumeOrderRateLimit,
   createOrderTrackingToken,
+  expireStaleAwaitingPaymentsForStaff,
+  listAwaitingPaymentForStaff,
   listOrdersForStaff,
   OrderRepoError,
   placeOrderFromSlug,
@@ -255,14 +257,42 @@ export async function GET(request: Request) {
   const since = url.searchParams.get("since");
   const restaurantId = url.searchParams.get("restaurantId");
   const limitParam = Number(url.searchParams.get("limit") ?? "");
+  const from = url.searchParams.get("from");
+  const to = url.searchParams.get("to");
+  const cursor = url.searchParams.get("cursor");
 
   try {
+    // Abandoned-card sweep rides the board poll, DB-only: every poll first
+    // retires sessionless card tickets past the 30-minute TTL (nothing
+    // could have been paid, so no Stripe read is needed). Tickets naming a
+    // session are owned by the webhook — never cancelled here — so the
+    // poll stays a cheap query. Best-effort: a sweep failure must never
+    // fail the board.
+    if (restaurantId) {
+      try {
+        await expireStaleAwaitingPaymentsForStaff(getDb(), userId, { restaurantId });
+      } catch {
+        // The list below is still the truth.
+      }
+    }
     const result = await listOrdersForStaff(getDb(), userId, {
       since,
       restaurantId,
       limit: Number.isFinite(limitParam) && limitParam > 0 ? limitParam : undefined,
+      from,
+      to,
+      cursor,
     });
-    const response = NextResponse.json(result);
+    // The awaiting-payment pill rides this same poll — the board makes no
+    // second request. A snapshot failure must never fail the board, so the
+    // strip simply renders empty until the next poll heals it.
+    let awaiting: { orders: typeof result.orders; serverTime: string };
+    try {
+      awaiting = await listAwaitingPaymentForStaff(getDb(), userId, { restaurantId });
+    } catch {
+      awaiting = { orders: [], serverTime: result.serverTime };
+    }
+    const response = NextResponse.json({ ...result, awaiting });
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {

@@ -367,6 +367,7 @@ describe("orders repo", () => {
     expect(await listOrdersForStaff(db, ownerB)).toEqual({
       orders: [],
       serverTime: expect.any(String),
+      nextCursor: null,
     });
     expect(await getOrderForStaff(db, ownerB, placed.id)).toBeNull();
     await expect(

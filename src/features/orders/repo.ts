@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import {
   menu as menuTable,
@@ -24,6 +24,8 @@ import { getPublishedMenuByPath, type PublishedMenuPage } from "@/features/publi
 import { getRestaurantBySlug } from "@/features/tables/repo";
 import { menuDocumentSchema, type MenuDocument, type MenuItem } from "@/features/menu/schema";
 
+import { getPaymentAccount } from "@/features/payments/accounts";
+import { resolveCheckout } from "@/features/payments/resolver";
 import {
   canTransitionOrderStatus,
   orderSchema,
@@ -130,6 +132,33 @@ export interface StaffOrderQuery {
   /** Restrict to one restaurant (must be one the caller belongs to). */
   restaurantId?: string | null;
   limit?: number;
+  /**
+   * Board window: only orders created at/after this ISO timestamp. Pushed
+   * into SQL so a 24h board never serializes history it hides.
+   */
+  from?: string | null;
+  /** Board window end: only orders created at/before this ISO timestamp. */
+  to?: string | null;
+  /**
+   * Keyset cursor for history pages: `<createdAt>|<id>` of the previous
+   * page's last order (from `nextCursor`). Newest-first, id breaks ties.
+   */
+  cursor?: string | null;
+}
+
+/** Opaque page cursor: the previous page's last row, newest-first. */
+function parseBoardCursor(cursor: string): { createdAt: Date; id: string } {
+  const separator = cursor.lastIndexOf("|");
+  const createdAt = separator < 0 ? null : new Date(cursor.slice(0, separator));
+  const id = separator < 0 ? "" : cursor.slice(separator + 1);
+  if (!createdAt || Number.isNaN(createdAt.getTime()) || !id) {
+    throw new OrderRepoError("invalid", "cursor must be a nextCursor from this board.");
+  }
+  return { createdAt, id };
+}
+
+function boardCursorFor(row: { createdAt: Date; id: string }): string {
+  return `${row.createdAt.toISOString()}|${row.id}`;
 }
 
 type OrderRow = typeof orderTable.$inferSelect;
@@ -170,6 +199,8 @@ function toOrder(
     status: row.status,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
+    paymentStatus: row.paymentStatus,
+    paymentProvider: row.paymentProvider,
   });
   if (!parsed.success) {
     // A stored row that no longer matches the canonical schema is a server
@@ -407,6 +438,38 @@ async function insertLinesWithOptions(
  * snapshot* (the menu the diner saw), so a client cannot invent a name, a
  * price, a total, or an add-on. Unpriced lines make the total `null`.
  */
+/**
+ * Option A (hide-until-paid): when the café takes cards online for this
+ * ticket, the row is marked `payment_provider = 'stripe'` at creation so
+ * the staff board can hide it until the webhook marks it paid. Counter
+ * tickets keep a null provider and show immediately. Fail-closed: any
+ * lookup failure behaves like pay-at-the-counter (the kitchen sees it).
+ */
+async function onlinePaymentIntent(
+  db: TenancyDb,
+  restaurantId: string,
+  currency: string | null,
+  totalCents: number | null
+): Promise<boolean> {
+  try {
+    const account = await getPaymentAccount(db, restaurantId);
+    const decision = resolveCheckout({
+      mode: account?.mode ?? "at_venue",
+      account: account
+        ? {
+            status: account.status,
+            chargesEnabled: account.chargesEnabled,
+            currency,
+          }
+        : null,
+      order: { currency, totalCents },
+    });
+    return decision.mode === "online";
+  } catch {
+    return false;
+  }
+}
+
 export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput): Promise<Order> {
   const page = await getPublishedMenuByPath(db, input.restaurantSlug, input.slug);
   if (!page) {
@@ -434,6 +497,7 @@ export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput):
     : lines.reduce((sum, line) => sum + (line.unitPriceCents ?? 0) * line.quantity, 0);
 
   const now = input.now ?? new Date();
+  const needsCard = await onlinePaymentIntent(db, page.restaurantId, doc.currency, totalCents);
   const inserted = await db
     .insert(orderTable)
     .values({
@@ -445,6 +509,7 @@ export async function placeOrderFromSlug(db: TenancyDb, input: PlaceOrderInput):
       note,
       status: "new",
       totalCents,
+      ...(needsCard ? { paymentProvider: "stripe" } : {}),
       createdAt: now,
       updatedAt: now,
     })
@@ -535,6 +600,8 @@ export async function placeTableOrder(db: TenancyDb, input: PlaceTableOrderInput
     if (title && !titles.includes(title)) titles.push(title);
   }
 
+  const ticketCurrency = orderCurrency([...pages.values()].map((page) => page.doc));
+  const needsCard = await onlinePaymentIntent(db, restaurant.id, ticketCurrency, totalCents);
   const inserted = await db
     .insert(orderTable)
     .values({
@@ -542,10 +609,11 @@ export async function placeTableOrder(db: TenancyDb, input: PlaceTableOrderInput
       menuId: null,
       menuTitle: titles.length > 0 ? titles.join(" + ") : restaurant.name,
       tableLabel,
-      currency: orderCurrency([...pages.values()].map((page) => page.doc)),
+      currency: ticketCurrency,
       note,
       status: "new",
       totalCents,
+      ...(needsCard ? { paymentProvider: "stripe" } : {}),
       createdAt: now,
       updatedAt: now,
     })
@@ -574,19 +642,35 @@ function orderCurrency(docs: MenuDocument[]): string | null {
 }
 
 /**
- * Board query (owner or staff). Without `since` it returns the newest orders;
- * with it, everything changed after that timestamp (ascending) so status
- * edits reach other devices too, not just new orders.
+ * Board query (owner or staff). Without `since` it returns one newest-first
+ * history page: the `from`/`to` window filters in SQL (so a 24h board never
+ * serializes older tickets), and `cursor` pages by keyset
+ * (`createdAt`, `id`) with `nextCursor` for the next page — null when the
+ * page is the last one. With `since`, everything changed after that
+ * timestamp (ascending) so status edits reach other devices too, not just
+ * new orders; windowing and paging do not apply to that live path.
  */
 export async function listOrdersForStaff(
   db: TenancyDb,
   userId: string,
   query: StaffOrderQuery = {}
-): Promise<{ orders: Order[]; serverTime: string }> {
+): Promise<{ orders: Order[]; serverTime: string; nextCursor: string | null }> {
   const limit = Math.min(Math.max(query.limit ?? 100, 1), 200);
   const since = query.since ? new Date(query.since) : null;
   if (query.since && Number.isNaN(since?.getTime())) {
     throw new OrderRepoError("invalid", "since must be an ISO 8601 timestamp.");
+  }
+  const from = query.from ? new Date(query.from) : null;
+  if (query.from && Number.isNaN(from?.getTime())) {
+    throw new OrderRepoError("invalid", "from must be an ISO 8601 timestamp.");
+  }
+  const to = query.to ? new Date(query.to) : null;
+  if (query.to && Number.isNaN(to?.getTime())) {
+    throw new OrderRepoError("invalid", "to must be an ISO 8601 timestamp.");
+  }
+  const cursor = query.cursor ? parseBoardCursor(query.cursor) : null;
+  if (query.cursor && since) {
+    throw new OrderRepoError("invalid", "cursor and since cannot be combined.");
   }
   if (query.restaurantId) {
     const membership = await db
@@ -607,18 +691,244 @@ export async function listOrdersForStaff(
   // this, so a row committed mid-query cannot fall between the two windows.
   const serverTime = new Date();
 
+  // Option A (hide-until-paid): a card ticket stays off the kitchen board
+  // until the webhook marks it paid (or refunded). Counter tickets (null
+  // provider) always show. Direct reads (`getOrderForStaff`) still return
+  // hidden rows so a payment can be reconciled by id. `ne` alone is not
+  // enough: `null <> 'stripe'` is null in SQL, so null-provider rows need
+  // the explicit `isNull` arm.
+  const kitchenVisible = or(
+    isNull(orderTable.paymentProvider),
+    ne(orderTable.paymentProvider, "stripe"),
+    eq(orderTable.paymentStatus, "paid"),
+    eq(orderTable.paymentStatus, "refunded")
+  );
   const conditions = [eq(restaurantMembership.userId, userId)];
+  if (kitchenVisible) conditions.push(kitchenVisible);
   if (query.restaurantId) conditions.push(eq(orderTable.restaurantId, query.restaurantId));
-  if (since) conditions.push(gt(orderTable.updatedAt, since));
+  if (since) {
+    conditions.push(gt(orderTable.updatedAt, since));
+  } else {
+    if (from) conditions.push(gte(orderTable.createdAt, from));
+    if (to) conditions.push(lte(orderTable.createdAt, to));
+    if (cursor) {
+      // Newest-first keyset: strictly older than the previous page's last row.
+      const older = or(
+        lt(orderTable.createdAt, cursor.createdAt),
+        and(eq(orderTable.createdAt, cursor.createdAt), lt(orderTable.id, cursor.id))
+      );
+      if (older) conditions.push(older);
+    }
+  }
 
   const rows = await db
     .select({ order: orderTable })
     .from(orderTable)
     .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, orderTable.restaurantId))
     .where(and(...conditions))
-    .orderBy(since ? asc(orderTable.updatedAt) : desc(orderTable.createdAt))
-    .limit(limit);
+    .orderBy(
+      ...(since ? [asc(orderTable.updatedAt)] : [desc(orderTable.createdAt), desc(orderTable.id)])
+    )
+    // One extra row decides `nextCursor` without a second round trip.
+    .limit(since ? limit : limit + 1);
 
+  const page = since ? rows : rows.slice(0, limit);
+  const orderRows = page.map((entry) => entry.order);
+  const { lines, options } = await linesWithOptions(
+    db,
+    orderRows.map((row) => row.id)
+  );
+  const last = orderRows[orderRows.length - 1];
+  return {
+    orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [], options)),
+    serverTime: iso(serverTime),
+    nextCursor: !since && rows.length > limit && last ? boardCursorFor(last) : null,
+  };
+}
+
+export type OrderStatusCounts = Record<OrderStatus, number>;
+
+const EMPTY_STATUS_COUNTS: OrderStatusCounts = {
+  new: 0,
+  preparing: 0,
+  served: 0,
+  cancelled: 0,
+};
+
+/**
+ * Board counts (owner or staff): one `COUNT(*) GROUP BY status` over the
+ * same scope and window as the history pages, so the header can show "1,503
+ * total" without materializing a single ticket. Lines are never read here.
+ */
+export async function countOrdersForStaff(
+  db: TenancyDb,
+  userId: string,
+  query: { restaurantId?: string | null; from?: string | null; to?: string | null } = {}
+): Promise<{ counts: OrderStatusCounts; total: number; serverTime: string }> {
+  if (!query.restaurantId) {
+    throw new OrderRepoError("invalid", "restaurantId is required for counts.");
+  }
+  const from = query.from ? new Date(query.from) : null;
+  if (query.from && Number.isNaN(from?.getTime())) {
+    throw new OrderRepoError("invalid", "from must be an ISO 8601 timestamp.");
+  }
+  const to = query.to ? new Date(query.to) : null;
+  if (query.to && Number.isNaN(to?.getTime())) {
+    throw new OrderRepoError("invalid", "to must be an ISO 8601 timestamp.");
+  }
+  const membership = await db
+    .select({ id: restaurantMembership.id })
+    .from(restaurantMembership)
+    .where(
+      and(
+        eq(restaurantMembership.userId, userId),
+        eq(restaurantMembership.restaurantId, query.restaurantId)
+      )
+    );
+  if (membership.length === 0) {
+    throw new OrderRepoError("not_found", "That restaurant does not exist.");
+  }
+
+  const serverTime = new Date();
+  const hideUnpaidCard = or(
+    isNull(orderTable.paymentProvider),
+    ne(orderTable.paymentProvider, "stripe"),
+    eq(orderTable.paymentStatus, "paid"),
+    eq(orderTable.paymentStatus, "refunded")
+  );
+  const conditions = [
+    eq(orderTable.restaurantId, query.restaurantId),
+    // Same hide-until-paid rule as the board list, so the header total
+    // never counts tickets the board hides.
+    ...(hideUnpaidCard ? [hideUnpaidCard] : []),
+    ...(from ? [gte(orderTable.createdAt, from)] : []),
+    ...(to ? [lte(orderTable.createdAt, to)] : []),
+  ];
+  const rows = await db
+    .select({ status: orderTable.status, count: sql<number>`count(*)::int` })
+    .from(orderTable)
+    .where(and(...conditions))
+    .groupBy(orderTable.status);
+  const counts: OrderStatusCounts = { ...EMPTY_STATUS_COUNTS };
+  for (const row of rows) counts[row.status] = row.count;
+  return {
+    counts,
+    total: counts.new + counts.preparing + counts.served + counts.cancelled,
+    serverTime: iso(serverTime),
+  };
+}
+
+/**
+ * Abandoned-card policy: an unpaid card ticket lives 30 minutes. Past that
+ * the pay link is dead — but who declares it dead depends on the ticket.
+ * A ticket that never minted a session dies on the next board poll (the
+ * DB-only sweep: nothing could have been paid, so it is safe). A ticket
+ * that names a Stripe session dies on Stripe's own clock instead:
+ * `checkout.session.expired` cancels it, and the poll sweep never touches
+ * it — a missed webhook or an outage must not kill a possibly-paid order.
+ * A paid order whose webhook was missed is reconciled by the staff
+ * `payment-check`. The row is always kept — nothing is deleted. Staff may
+ * clear one manually after 5 minutes; the diner can still pay until either
+ * happens.
+ */
+export const AWAITING_PAYMENT_TTL_MS = 30 * 60 * 1000;
+export const AWAITING_CLEAR_AFTER_MS = 5 * 60 * 1000;
+
+/**
+ * Test-only TTL override. `EATERYO_AWAITING_TTL_MS` /
+ * `EATERYO_AWAITING_CLEAR_AFTER_MS` shorten the windows so a manual run can
+ * watch the sweep and the staff Clear without waiting out the real clocks
+ * (e.g. `EATERYO_AWAITING_TTL_MS=120000` sweeps 2-minute-old tickets).
+ * Honored everywhere EXCEPT production — a set value there is ignored on
+ * purpose, so a stray variable can never kill live tickets early. Pass an
+ * explicit `env` only in tests; routes and jobs use the default.
+ */
+/** The only variables the TTL override reads — tests pass fakes of this. */
+export interface AwaitingTtlEnv {
+  NODE_ENV?: string;
+  EATERYO_AWAITING_TTL_MS?: string;
+  EATERYO_AWAITING_CLEAR_AFTER_MS?: string;
+}
+
+export function awaitingPaymentTtlMs(env: AwaitingTtlEnv = process.env): number {
+  return resolveOverrideMs("EATERYO_AWAITING_TTL_MS", AWAITING_PAYMENT_TTL_MS, env);
+}
+
+export function awaitingClearAfterMs(env: AwaitingTtlEnv = process.env): number {
+  return resolveOverrideMs("EATERYO_AWAITING_CLEAR_AFTER_MS", AWAITING_CLEAR_AFTER_MS, env);
+}
+
+function resolveOverrideMs(
+  name: keyof AwaitingTtlEnv,
+  fallback: number,
+  env: AwaitingTtlEnv
+): number {
+  if (env.NODE_ENV === "production") return fallback;
+  const raw = env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const ms = Number(raw);
+  return Number.isInteger(ms) && ms > 0 ? ms : fallback;
+}
+
+/** True once the diner's pay link has lapsed (creation clock, not payment). */
+export function isAwaitingExpired(
+  createdAt: Date,
+  now: Date = new Date(),
+  ttlMs: number = awaitingPaymentTtlMs()
+): boolean {
+  return now.getTime() - createdAt.getTime() >= ttlMs;
+}
+
+/** True once staff may clear the ticket by hand (5 minutes old). */
+export function isAwaitingClearable(
+  createdAt: Date,
+  now: Date = new Date(),
+  clearAfterMs: number = awaitingClearAfterMs()
+): boolean {
+  return now.getTime() - createdAt.getTime() >= clearAfterMs;
+}
+
+/**
+ * Tickets the kitchen board hides (Option A): card orders not yet paid.
+ * The slim strip above the Kanban reads this — paid/refunded rows never
+ * appear here because the board already shows them, and cancelled rows
+ * never appear because the ticket is dead (swept or staff-cleared). Capped
+ * at 50, newest first; cash-only cafés simply get an empty list.
+ */
+export async function listAwaitingPaymentForStaff(
+  db: TenancyDb,
+  userId: string,
+  query: { restaurantId?: string | null } = {}
+): Promise<{ orders: Order[]; serverTime: string }> {
+  if (query.restaurantId) {
+    const membership = await db
+      .select({ id: restaurantMembership.id })
+      .from(restaurantMembership)
+      .where(
+        and(
+          eq(restaurantMembership.userId, userId),
+          eq(restaurantMembership.restaurantId, query.restaurantId)
+        )
+      );
+    if (membership.length === 0) {
+      throw new OrderRepoError("not_found", "That restaurant does not exist.");
+    }
+  }
+  const serverTime = new Date();
+  const conditions = [
+    eq(restaurantMembership.userId, userId),
+    eq(orderTable.paymentProvider, "stripe"),
+    eq(orderTable.status, "new"),
+    inArray(orderTable.paymentStatus, ["unpaid", "pending", "failed"]),
+    ...(query.restaurantId ? [eq(orderTable.restaurantId, query.restaurantId)] : []),
+  ];
+  const rows = await db
+    .select({ order: orderTable })
+    .from(orderTable)
+    .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, orderTable.restaurantId))
+    .where(and(...conditions))
+    .orderBy(desc(orderTable.createdAt), desc(orderTable.id))
+    .limit(50);
   const orderRows = rows.map((entry) => entry.order);
   const { lines, options } = await linesWithOptions(
     db,
@@ -628,6 +938,78 @@ export async function listOrdersForStaff(
     orders: orderRows.map((row) => toOrder(row, lines.get(row.id) ?? [], options)),
     serverTime: iso(serverTime),
   };
+}
+
+/**
+ * Expiry sweep for abandoned card tickets. DB-only by design: it runs on
+ * the board poll (the staff GET calls this best-effort before listing),
+ * so it must never touch the network — no Stripe read, no per-ticket
+ * latency on the poll. Only tickets that never minted a Checkout Session
+ * (`paymentReference IS NULL`, so nothing could have been paid) past the
+ * 30-minute TTL are cancelled here. Tickets that name a session belong to
+ * their owner: `checkout.session.expired` cancels the truly abandoned ones
+ * on Stripe's own clock, and the staff `payment-check` reconciles a paid
+ * order whose webhook was missed. The row is always kept as the audit
+ * copy — the diner's pay link simply stops working.
+ */
+export async function expireStaleAwaitingPaymentsForStaff(
+  db: TenancyDb,
+  userId: string,
+  query: { restaurantId: string },
+  now: Date = new Date()
+): Promise<{ expired: number; deferred: number }> {
+  const membership = await db
+    .select({ id: restaurantMembership.id })
+    .from(restaurantMembership)
+    .where(
+      and(
+        eq(restaurantMembership.userId, userId),
+        eq(restaurantMembership.restaurantId, query.restaurantId)
+      )
+    );
+  if (membership.length === 0) {
+    throw new OrderRepoError("not_found", "That restaurant does not exist.");
+  }
+  const cutoff = new Date(now.getTime() - awaitingPaymentTtlMs());
+  const candidates = await db
+    .select({
+      id: orderTable.id,
+      paymentReference: orderTable.paymentReference,
+    })
+    .from(orderTable)
+    .where(
+      and(
+        eq(orderTable.restaurantId, query.restaurantId),
+        eq(orderTable.paymentProvider, "stripe"),
+        eq(orderTable.status, "new"),
+        inArray(orderTable.paymentStatus, ["unpaid", "pending", "failed"]),
+        lt(orderTable.createdAt, cutoff)
+      )
+    );
+  // Split on the session, never on Stripe: a ticket without one cannot
+  // have been paid, so it is safe to sweep. Anything naming a session is
+  // deferred — cancelling it blind could kill a paid order whose webhook
+  // was missed, and that is the one outcome the sweep must not cause.
+  const toCancel = candidates.filter((candidate) => !candidate.paymentReference);
+  const deferred = candidates.length - toCancel.length;
+  let expired = 0;
+  if (toCancel.length > 0) {
+    const swept = await db
+      .update(orderTable)
+      .set({ status: "cancelled", updatedAt: now })
+      .where(
+        and(
+          eq(orderTable.restaurantId, query.restaurantId),
+          inArray(
+            orderTable.id,
+            toCancel.map((candidate) => candidate.id)
+          )
+        )
+      )
+      .returning({ id: orderTable.id });
+    expired = swept.length;
+  }
+  return { expired, deferred };
 }
 
 /** One order for a member of its restaurant (owner or staff), or null. */
@@ -675,19 +1057,34 @@ export async function updateOrderStatusForStaff(
   if (current.status === status) return current;
 
   const now = new Date();
-  const conditions = [eq(orderTable.id, orderId)];
   if (expectedUpdatedAt) {
     const expected = new Date(expectedUpdatedAt);
     if (Number.isNaN(expected.getTime())) {
       throw new OrderRepoError("invalid", "expectedUpdatedAt must be an ISO 8601 timestamp.");
     }
-    conditions.push(eq(orderTable.updatedAt, expected));
+    // Stale check in JS, not SQL: `updated_at` is `timestamp without tz`
+    // (wall time) while the wire is a UTC ISO string, so any SQL cast
+    // (`::timestamp` vs `::timestamptz`) depends on the DB session TimeZone
+    // and 409s forever on some hosts (Sydney wall vs UTC wire differed by
+    // 11h). JS Dates are absolute instants on both sides, and the pg driver
+    // already truncates stored microseconds to ms — so getTime() compares
+    // exactly what the board saw.
+    if (new Date(current.updatedAt).getTime() !== expected.getTime()) {
+      throw new OrderRepoError(
+        "stale",
+        "This order was changed elsewhere since you last saw it.",
+        current
+      );
+    }
   }
 
+  // Guard the write on the status read above: a concurrent status move
+  // 409s instead of silently winning, while a payment-only touch (webhook
+  // marking paid, same status) never blocks the kitchen's Start/Serve.
   const updated = await db
     .update(orderTable)
     .set({ status, updatedAt: now })
-    .where(and(...conditions))
+    .where(and(eq(orderTable.id, orderId), eq(orderTable.status, current.status)))
     .returning();
 
   if (updated.length === 0) {

@@ -60,9 +60,11 @@ export default function TermsPage() {
 
         <Section title="Orders are requests, not sales">
           <p>
-            A table order is a request your staff can accept, serve, or cancel. {SITE_NAME} does not
-            process payments, does not take a commission, and is not part of the contract between
-            you and your guest. Money changes hands exactly as it did before.
+            A table order is a request your staff can accept, serve, or cancel. {SITE_NAME} itself
+            charges nothing and takes no commission, and is not part of the contract between you and
+            your guest. When you turn on card payment, the guest pays you through Stripe on your own
+            Stripe account — the money never passes through us, and refunds are handled by you in
+            your Stripe dashboard.
           </p>
         </Section>
 

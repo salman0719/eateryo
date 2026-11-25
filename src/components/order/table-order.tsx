@@ -34,6 +34,7 @@ import { getMenu, StorageError } from "@/features/menu/storage";
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 
 import {
+  CategorySections,
   OrderMenuSection as MenuSection,
   OrderShell as Shell,
   OrderSkeleton,
@@ -296,18 +297,20 @@ export function TableOrder({ menuId, tableLabel }: TableOrderProps) {
             )}
           </div>
 
-          {menu.categories.map((category) => (
-            <MenuSection
-              key={category.id}
-              category={category}
-              currency={menu.currency}
-              variantChoice={variantChoice}
-              onVariantChange={(itemId, name) =>
-                setVariantChoice((current) => ({ ...current, [itemId]: name }))
-              }
-              onAdd={addItem}
-            />
-          ))}
+          <CategorySections>
+            {menu.categories.map((category) => (
+              <MenuSection
+                key={category.id}
+                category={category}
+                currency={menu.currency}
+                variantChoice={variantChoice}
+                onVariantChange={(itemId, name) =>
+                  setVariantChoice((current) => ({ ...current, [itemId]: name }))
+                }
+                onAdd={addItem}
+              />
+            ))}
+          </CategorySections>
         </div>
 
         {wide && (
