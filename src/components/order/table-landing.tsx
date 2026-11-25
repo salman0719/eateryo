@@ -16,11 +16,9 @@
 import { useEffect, useState } from "react";
 
 import type { BrandAssetImage } from "@/features/brand-assets/schema";
-import type { DinerTheme } from "@/features/diner-theme/schema";
-import { DinerThemeProvider } from "./diner-theme";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
-import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
+import { DinerCoverHeader, DinerSplash } from "./order-menu";
 import { OrderPaySection } from "./order-pay-section";
 import { OrderReceived } from "./order-received";
 import { OrderTracker } from "./order-tracker";
@@ -32,7 +30,6 @@ export interface TableLandingProps {
   /** Brand assets; the header falls back to gradient + initial without. */
   restaurantLogo?: BrandAssetImage | null;
   restaurantCover?: BrandAssetImage | null;
-  restaurantTheme?: DinerTheme;
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
@@ -49,20 +46,14 @@ export interface TableLandingProps {
 }
 
 /**
- * Every diner screen — ordering, loading, invalid-link, and the order
- * confirmation — sits under one `DinerThemeProvider`, so the theme is a
- * property of the visit, not of one section. Portalled sheets re-apply the
- * same vars from context (see `diner-theme.tsx`).
+ * The ordering flow inside the table landing: the resolving/placed/error
+ * states and the cover + menu tabs. The route renders this under one
+ * `DinerThemeProvider` — the identity row arrives before the menus stream
+ * in — so the theme is a property of the visit, not of one section, and
+ * the first paint is already themed. Portalled sheets re-apply the same
+ * vars from context (see `diner-theme.tsx`).
  */
-export function TableLanding(props: TableLandingProps) {
-  return (
-    <DinerThemeProvider theme={props.restaurantTheme ?? null} className="min-h-screen">
-      <TableLandingInner {...props} />
-    </DinerThemeProvider>
-  );
-}
-
-function TableLandingInner({
+export function TableLandingBody({
   restaurantName,
   restaurantSlug,
   restaurantLogo = null,
@@ -104,11 +95,7 @@ function TableLandingInner({
   }, [resumeToken]);
 
   if (resolving) {
-    return (
-      <OrderShell bare>
-        <OrderSkeleton label="Finding your order…" />
-      </OrderShell>
-    );
+    return <DinerSplash label="Finding your order…" />;
   }
 
   if (placed) {
@@ -120,42 +107,38 @@ function TableLandingInner({
       placed.order.paymentStatus !== "paid" &&
       placed.order.paymentStatus !== "refunded";
     return (
-      <OrderShell bare>
-        <OrderReceived
-          order={placed.order}
+      <OrderReceived
+        order={placed.order}
+        restaurantName={restaurantName}
+        footnote={
+          needsCard
+            ? "Complete payment below — the kitchen starts your order once payment goes through."
+            : "The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+        }
+        onOrderAgain={() => setPlaced(null)}
+      >
+        <OrderPaySection
+          orderId={placed.order.id}
+          trackingToken={placed.tracking?.token ?? null}
+          returnPay={returnPay}
+          sessionId={returnSessionId}
+        />
+        <OrderTracker
+          orderId={placed.order.id}
+          token={placed.tracking?.token ?? null}
+          initialOrder={placed.order}
           restaurantName={restaurantName}
-          footnote={
-            needsCard
-              ? "Complete payment below — the kitchen starts your order once payment goes through."
-              : "The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
-          }
-          onOrderAgain={() => setPlaced(null)}
-        >
-          <OrderPaySection
-            orderId={placed.order.id}
-            trackingToken={placed.tracking?.token ?? null}
-            returnPay={returnPay}
-            sessionId={returnSessionId}
-          />
-          <OrderTracker
-            orderId={placed.order.id}
-            token={placed.tracking?.token ?? null}
-            initialOrder={placed.order}
-            restaurantName={restaurantName}
-          />
-        </OrderReceived>
-      </OrderShell>
+        />
+      </OrderReceived>
     );
   }
 
   if (resumeError) {
     return (
-      <OrderShell bare>
-        <div className={`${frame} p-8 text-center`}>
-          <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
-          <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
-        </div>
-      </OrderShell>
+      <div className={`${frame} p-8 text-center`}>
+        <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
+      </div>
     );
   }
 
@@ -163,13 +146,14 @@ function TableLandingInner({
   // When nothing is served, the empty-state card below the tabs says so
   // where the opening hours already live, not in the header.
   return (
-    <OrderShell bare>
+    <>
       <DinerCoverHeader
         restaurantName={restaurantName}
         tableLabel={tableLabel}
         logo={restaurantLogo}
         cover={restaurantCover}
         bleed
+        eagerMedia
       />
 
       <TableOrderTabs
@@ -187,6 +171,6 @@ function TableLandingInner({
           }
         }}
       />
-    </OrderShell>
+    </>
   );
 }
