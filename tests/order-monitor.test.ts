@@ -119,17 +119,24 @@ describe("fetchStaffOrders", () => {
       vi.fn(async (input: RequestInfo | URL) => {
         calls.push(String(input));
         return new Response(
-          JSON.stringify({ orders: [], serverTime: "2026-10-24T10:00:00.000Z" }),
+          JSON.stringify({
+            orders: [],
+            serverTime: "2026-10-24T10:00:00.000Z",
+            awaiting: { orders: [], serverTime: "2026-10-24T10:00:00.000Z" },
+          }),
           { status: 200, headers: { "content-type": "application/json" } }
         );
       })
     );
+    let result;
     try {
-      await fetchStaffOrders({ restaurantId: "cafe-staff", limit: 100 });
+      result = await fetchStaffOrders({ restaurantId: "cafe-staff", limit: 100 });
     } finally {
       vi.unstubAllGlobals();
     }
     expect(calls).toEqual(["/api/orders?restaurantId=cafe-staff&limit=100"]);
+    // The pill rides the poll: hidden card tickets arrive in the same body.
+    expect(result.awaiting).toEqual({ orders: [], serverTime: "2026-10-24T10:00:00.000Z" });
   });
 });
 

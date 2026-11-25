@@ -34,8 +34,16 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  // LAN two-device pass: the phone loads dev chunks from this host, which
+  // Next treats as cross-origin without an entry here (dev only).
+  allowedDevOrigins: ["192.168.1.107"],
   cacheComponents: true,
   partialPrefetching: true,
+  // `next upgrade --agent=security` records its intent here so a later run can
+  // see this app asks for security-only patch upgrades.
+  experimental: {
+    agentUpgrade: "security",
+  },
   // Do not advertise the framework on every response.
   poweredByHeader: false,
   turbopack: {

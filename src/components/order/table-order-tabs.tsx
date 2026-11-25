@@ -8,9 +8,10 @@
  * shared cart. One "Send order" posts a combined ticket — each line remembers
  * its menu, and the server re-prices every line from the right snapshot.
  *
- * Menu presentation reuses `OrderMenuSection` (the same list both the local
- * and single-menu server flows render), and search reuses the editor's
- * `searchMenu` matching so filtering behaves identically everywhere.
+ * Menu presentation reuses the shared diner pieces (`DinerCoverHeader` lives
+ * on the landing, `DinerSearchField`, `CategoryRail` + scroll-spy and
+ * `OrderMenuSection` here), and search reuses the editor's `searchMenu`
+ * matching so filtering behaves identically to the owner preview.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,7 +36,16 @@ import { formatTableLabel } from "@/features/orders/table-links";
 
 import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { OrderCartPanel, useWideLayout } from "./order-cart";
-import { OrderMenuSection, StickyCartBar, formatOrderTotal } from "./order-menu";
+import {
+  CategoryRail,
+  DinerSearchField,
+  CategorySections,
+  OrderMenuSection,
+  StickyCartBar,
+  formatOrderTotal,
+  scrollToCategory,
+  useScrollSpyCategory,
+} from "./order-menu";
 import { OrderSheet } from "./order-sheet";
 
 /** One open menu on the table landing (serializable for the client). */
@@ -187,6 +197,28 @@ export function TableOrderTabs({
 
   const visibleCount = filtered.reduce((sum, entry) => sum + entry.result.matchCount, 0);
 
+  /**
+   * The sticky category rail: one anchor per visible section. On the All
+   * tab with several menus the pill names its menu (`Lunch · Starters`),
+   * so two menus with the same category stay distinguishable; scoped to
+   * one menu the pill is just the category. Search-aware, like the list.
+   */
+  const railCategories = useMemo(() => {
+    const scoped = filtered.length > 1;
+    return filtered.flatMap(({ menu, result }) =>
+      result.categories.map((match) => ({
+        id: `menu-${menu.menuId}-category-${match.category.id}`,
+        label: scoped ? `${menuLabel(menu)} · ${match.category.name}` : match.category.name,
+      }))
+    );
+  }, [filtered]);
+  const activeCategory = useScrollSpyCategory(railCategories.map((entry) => entry.id));
+  const searchResultText = searching
+    ? visibleCount === 0
+      ? `No dishes match “${query.trim()}”.`
+      : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`
+    : null;
+
   const total = orderTotal(lines);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
   const showMenuBadges = menus.length > 1;
@@ -201,6 +233,11 @@ export function TableOrderTabs({
    */
   const singleMenu = menus.length + closedMenus.length <= 1;
   const onlyClosedMenu = singleMenu && menus.length === 0 ? (closedMenus[0] ?? null) : null;
+  /**
+   * One open menu and nothing else: there are no tabs to sit in a card,
+   * so the search stands alone instead of inside the tab panel's frame.
+   */
+  const bareSearch = singleMenu && menus.length > 0;
 
   function choiceKey(menuId: string, itemId: string): string {
     return `${menuId}:${itemId}`;
@@ -364,80 +401,87 @@ export function TableOrderTabs({
     <div className="flex min-w-0 flex-col gap-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <nav aria-label={singleMenu ? "Search the menu" : "Menus"} className={`${frame} p-3`}>
-            {!singleMenu && (
-              <ScrollArrowStrip label="Menus">
-                {menus.length > 0 && (
-                  <TabButton
-                    active={activeTab === ALL_TAB}
-                    onClick={() => {
-                      hideClosedInfo();
-                      setActiveTab(ALL_TAB);
-                    }}
-                    label="All"
-                  />
-                )}
-                {menus.map((menu) => (
-                  <TabButton
-                    key={menu.menuId}
-                    active={activeTab === menu.menuId}
-                    onClick={() => {
-                      hideClosedInfo();
-                      setActiveTab(menu.menuId);
-                    }}
-                    label={menuLabel(menu)}
-                  />
-                ))}
-                {closedMenus.map((menu) => (
-                  <ClosedTabButton
-                    key={menu.menuId}
-                    menu={menu}
-                    show={closedInfo?.menuId === menu.menuId}
-                    onShow={(anchor) => showClosedInfo(menu, anchor)}
-                    onHide={hideClosedInfo}
-                  />
-                ))}
-              </ScrollArrowStrip>
-            )}
-            {onlyClosedMenu ? (
-              <div>
-                <p className="text-sm font-semibold text-ink-900">
-                  {menuLabel(onlyClosedMenu)} is closed right now
-                </p>
-                <p className="mt-1 text-sm leading-6 text-ink-600">
-                  Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
-                </p>
-              </div>
-            ) : menus.length > 0 ? (
-              <>
-                <label className={!singleMenu ? "mt-2 block" : "block"}>
-                  <span className="sr-only">Search dishes</span>
-                  <input
-                    type="search"
+          {bareSearch ? (
+            <nav aria-label="Search the menu">
+              <DinerSearchField
+                id="table-dish-search"
+                value={query}
+                onChange={setQuery}
+                resultText={searchResultText}
+              />
+            </nav>
+          ) : (
+            <nav aria-label={singleMenu ? "Search the menu" : "Menus"}>
+              {!singleMenu && (
+                <ScrollArrowStrip label="Menus">
+                  {menus.length > 0 && (
+                    <TabButton
+                      active={activeTab === ALL_TAB}
+                      onClick={() => {
+                        hideClosedInfo();
+                        setActiveTab(ALL_TAB);
+                      }}
+                      label="All"
+                    />
+                  )}
+                  {menus.map((menu) => (
+                    <TabButton
+                      key={menu.menuId}
+                      active={activeTab === menu.menuId}
+                      onClick={() => {
+                        hideClosedInfo();
+                        setActiveTab(menu.menuId);
+                      }}
+                      label={menuLabel(menu)}
+                    />
+                  ))}
+                  {closedMenus.map((menu) => (
+                    <ClosedTabButton
+                      key={menu.menuId}
+                      menu={menu}
+                      show={closedInfo?.menuId === menu.menuId}
+                      onShow={(anchor) => showClosedInfo(menu, anchor)}
+                      onHide={hideClosedInfo}
+                    />
+                  ))}
+                </ScrollArrowStrip>
+              )}
+              {onlyClosedMenu ? (
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">
+                    {menuLabel(onlyClosedMenu)} is closed right now
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-ink-600">
+                    Open {formatAvailability(onlyClosedMenu.availability).join("; ")}.
+                  </p>
+                </div>
+              ) : menus.length > 0 ? (
+                <div className={!singleMenu ? "mt-2" : undefined}>
+                  <DinerSearchField
+                    id="table-dish-search-panel"
                     value={query}
-                    onChange={(event) => setQuery(event.target.value)}
+                    onChange={setQuery}
                     placeholder={
                       singleMenu
                         ? "Search dishes…"
                         : `Search across ${activeTab === ALL_TAB ? "all menus" : "this menu"}…`
                     }
-                    className="w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+                    resultText={searchResultText}
                   />
-                </label>
-                {searching && (
-                  <p className="mt-2 text-xs text-ink-500" role="status">
-                    {visibleCount === 0
-                      ? `No dishes match “${query.trim()}”.`
-                      : `${visibleCount} ${visibleCount === 1 ? "dish" : "dishes"} match “${query.trim()}”.`}
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="mt-2 text-xs text-ink-500">
-                Nothing to order at the moment — tap a menu to see when it opens.
-              </p>
-            )}
-          </nav>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-ink-500">
+                  Nothing to order at the moment — tap a menu to see when it opens.
+                </p>
+              )}
+            </nav>
+          )}
+
+          <CategoryRail
+            categories={railCategories}
+            activeId={activeCategory}
+            onSelect={scrollToCategory}
+          />
 
           {menus.length === 0 ? (
             <div className={`${frame} p-8 text-center`}>
@@ -466,21 +510,28 @@ export function TableOrderTabs({
                       {menuLabel(menu)}
                     </h2>
                   )}
-                  {result.categories.map((match: SearchMatch) => (
-                    <OrderMenuSection
-                      key={`${menu.menuId}:${match.category.id}`}
-                      category={{ ...match.category, items: match.items }}
-                      currency={menu.doc.currency}
-                      variantChoice={scopedVariantChoice(menu.menuId, match.items)}
-                      onVariantChange={(itemId, name) =>
-                        setVariantChoice((current) => ({
-                          ...current,
-                          [choiceKey(menu.menuId, itemId)]: name,
-                        }))
-                      }
-                      onAdd={(item, picks) => addItem(menu, item, picks)}
-                    />
-                  ))}
+                  <CategorySections>
+                    {result.categories.map((match: SearchMatch) => (
+                      <div
+                        key={`${menu.menuId}:${match.category.id}`}
+                        id={`menu-${menu.menuId}-category-${match.category.id}`}
+                        className="scroll-mt-20"
+                      >
+                        <OrderMenuSection
+                          category={{ ...match.category, items: match.items }}
+                          currency={menu.doc.currency}
+                          variantChoice={scopedVariantChoice(menu.menuId, match.items)}
+                          onVariantChange={(itemId, name) =>
+                            setVariantChoice((current) => ({
+                              ...current,
+                              [choiceKey(menu.menuId, itemId)]: name,
+                            }))
+                          }
+                          onAdd={(item, picks) => addItem(menu, item, picks)}
+                        />
+                      </div>
+                    ))}
+                  </CategorySections>
                 </div>
               )
             )
@@ -586,10 +637,10 @@ function TabButton({
       type="button"
       aria-current={active ? "true" : undefined}
       onClick={onClick}
-      className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+      className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
         active
-          ? "bg-surface-900 text-on-accent"
-          : "border border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
+          ? "border-accent-700 bg-accent-700 text-on-accent shadow-sm"
+          : "border-line-300 text-ink-700 hover:border-accent-700 hover:text-accent-900"
       }`}
     >
       {label}

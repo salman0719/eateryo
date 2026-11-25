@@ -69,6 +69,7 @@ import {
 
 import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
+import { PreviewBrandBar } from "./preview-brand-bar";
 
 import { AvailabilityPanel } from "./availability-panel";
 import { CommitInput } from "./fields";
@@ -141,6 +142,17 @@ interface MenuEditorProps {
   onRetryAccountCheck?: () => void;
   /** The café's name, shown on the diner preview when the account knows it. */
   restaurantName?: string | null;
+  /** Brand assets, shown on the diner preview when the account knows them. */
+  restaurantLogo?: import("@/features/brand-assets/schema").BrandAssetImage | null;
+  restaurantCover?: import("@/features/brand-assets/schema").BrandAssetImage | null;
+  /**
+   * The café these assets belong to. Present when the menu lives in an
+   * account café; absent for a browser-only menu, which has no café to
+   * brand — the preview then shows no Change buttons.
+   */
+  restaurantId?: string | null;
+  /** Files the server's answer after a preview upload, so the header updates. */
+  onBrandChanged?: (updated: import("@/features/tenancy/client").RestaurantOption) => void;
   /** Open the publish wizard for a browser-only menu (R1). */
   onStartPublish?: () => void;
   /**
@@ -172,6 +184,10 @@ export function MenuEditor({
   canManage = true,
   onServer = false,
   restaurantName = null,
+  restaurantLogo = null,
+  restaurantCover = null,
+  restaurantId = null,
+  onBrandChanged,
   accountCheckFailed = false,
   onRetryAccountCheck,
   onStartPublish,
@@ -741,7 +757,16 @@ export function MenuEditor({
               : ""
           }`}
         >
-          <div className="order-2 min-w-0 lg:order-none">
+          <div className="order-2 flex min-w-0 flex-col gap-3 lg:order-none">
+            {/*
+            Preview brand entry points: signed-in menus live in a café, so
+            the bar shows whenever the editor runs in account mode; a
+            browser-only menu has no café to brand. Staff see the header
+            without the Change buttons (canManage is false for them).
+            */}
+            {syncMode === "account" && canManage && restaurantId && onBrandChanged && (
+              <PreviewBrandBar restaurantId={restaurantId} onBrandChanged={onBrandChanged} />
+            )}
             <PhoneFrame
               label="What a table card opens"
               heightClass={
@@ -756,6 +781,8 @@ export function MenuEditor({
               <OrderPagePreview
                 doc={doc}
                 restaurantName={restaurantName}
+                restaurantLogo={restaurantLogo}
+                restaurantCover={restaurantCover}
                 draftAheadOfLive={needsPublish}
               />
             </PhoneFrame>
@@ -1052,11 +1079,23 @@ export function MenuEditor({
             />
           )}
           {doc.categories.length === 0 ? (
+            // A menu started from scratch has no categories, so the strip above
+            // (which carries "+ Category") is not rendered yet: the first
+            // category is added here, where the empty canvas is, instead of
+            // pointing at a control that isn't on the screen.
             <div className="rounded-2xl border border-dashed border-line-200 bg-surface-base p-8 text-center">
               <p className="font-medium text-ink-900">No categories yet</p>
-              <p className="mt-1 text-sm text-ink-600">
-                Add a category above, then add items to it.
+              <p className="mx-auto mt-1 max-w-sm text-sm text-ink-600">
+                A category is the group a menu is read in — “Coffee”, “Mains”, “Desserts”. Add the
+                first one, then add dishes to it.
               </p>
+              <button
+                type="button"
+                onClick={handleAddCategory}
+                className="mt-4 rounded-full bg-accent-700 px-4 py-1.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+              >
+                + Add category
+              </button>
             </div>
           ) : isFiltering ? (
             <div className="flex flex-col gap-2">

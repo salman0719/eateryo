@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { createMenuForUser } from "@/features/menus/repo";
 import { publishMenuForUser, unpublishMenuForUser } from "@/features/publishing/repo";
-import { createRestaurant } from "@/features/tenancy/repo";
+import { createRestaurant, setRestaurantBrandAssetsForOwner } from "@/features/tenancy/repo";
 import {
   ensureRestaurantSlugForUser,
   getRestaurantBySlug,
@@ -156,6 +156,32 @@ describe("table landing repo", () => {
       expect(landing?.menus[0]).toMatchObject({
         menuSlug: expect.any(String),
         title: "Lunch",
+      });
+    });
+
+    it("carries the restaurant logo and cover for the diner header", async () => {
+      await publishOpenMenu("menu-brand-1", "Lunch");
+      await setRestaurantSlugForUser(db, ownerA, restaurantA, "cafe-a");
+      await setRestaurantBrandAssetsForOwner(db, ownerA, restaurantA, {
+        logo: {
+          url: "https://cdn.test/logo-display.webp",
+          key: "logo-key",
+          width: 512,
+          height: 512,
+          thumb: null,
+        },
+        cover: {
+          url: "https://cdn.test/cover-display.webp",
+          key: "cover-key",
+          width: 1600,
+          height: 900,
+          thumb: null,
+        },
+      });
+      const landing = await listOpenMenusForRestaurantSlug(db, "cafe-a", MON_NOON);
+      expect(landing?.restaurantLogo).toMatchObject({ url: "https://cdn.test/logo-display.webp" });
+      expect(landing?.restaurantCover).toMatchObject({
+        url: "https://cdn.test/cover-display.webp",
       });
     });
 

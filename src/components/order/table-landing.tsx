@@ -15,10 +15,11 @@
 
 import { useEffect, useState } from "react";
 
-import { formatTableLabel } from "@/features/orders/table-links";
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
-import { OrderShell, OrderSkeleton } from "./order-menu";
+import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
+import { OrderPaySection } from "./order-pay-section";
 import { OrderReceived } from "./order-received";
 import { OrderTracker } from "./order-tracker";
 import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "./table-order-tabs";
@@ -26,6 +27,9 @@ import { TableOrderTabs, type ClosedTableOrderMenu, type TableOrderMenu } from "
 export interface TableLandingProps {
   restaurantName: string;
   restaurantSlug: string;
+  /** Brand assets; the header falls back to gradient + initial without. */
+  restaurantLogo?: BrandAssetImage | null;
+  restaurantCover?: BrandAssetImage | null;
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
@@ -36,26 +40,22 @@ export interface TableLandingProps {
    * would flash and vanish once the confirmation arrives.
    */
   resumeToken: string | null;
-}
-
-/** What the heading says about this visit, in the diner's terms. */
-function landingSummary(menus: TableOrderMenu[], closedMenus: ClosedTableOrderMenu[]): string {
-  if (menus.length === 0) {
-    return closedMenus.length === 1
-      ? "Nothing is being served right now — opening hours are below."
-      : "Nothing is being served right now — tap a menu to see when it opens.";
-  }
-  if (menus.length === 1) return "Here’s what’s on — tap a dish to add it.";
-  return `${menus.length} menus are open — browse the tabs or search them all at once.`;
+  /** Stripe return state (`?pay=success&session_id=…`), also server-read. */
+  returnPay: "success" | "cancelled" | null;
+  returnSessionId: string | null;
 }
 
 export function TableLanding({
   restaurantName,
   restaurantSlug,
+  restaurantLogo = null,
+  restaurantCover = null,
   tableLabel,
   menus,
   closedMenus,
   resumeToken,
+  returnPay,
+  returnSessionId,
 }: TableLandingProps) {
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [resolving, setResolving] = useState(resumeToken !== null);
@@ -88,21 +88,38 @@ export function TableLanding({
 
   if (resolving) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <OrderShell bare>
         <OrderSkeleton label="Finding your order…" />
       </OrderShell>
     );
   }
 
   if (placed) {
+    // Option A (hide-until-paid): a card ticket stays off the kitchen board
+    // until payment completes, so the footnote must not promise the kitchen
+    // already has it. Counter tickets keep the old promise.
+    const needsCard =
+      placed.order.paymentProvider === "stripe" &&
+      placed.order.paymentStatus !== "paid" &&
+      placed.order.paymentStatus !== "refunded";
     return (
-      <OrderShell tableLabel={placed.order.tableLabel}>
+      <OrderShell bare>
         <OrderReceived
           order={placed.order}
           restaurantName={restaurantName}
-          footnote="The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+          footnote={
+            needsCard
+              ? "Complete payment below — the kitchen starts your order once payment goes through."
+              : "The kitchen sees this on their board right away. The total is confirmed when your order is prepared."
+          }
           onOrderAgain={() => setPlaced(null)}
         >
+          <OrderPaySection
+            orderId={placed.order.id}
+            trackingToken={placed.tracking?.token ?? null}
+            returnPay={returnPay}
+            sessionId={returnSessionId}
+          />
           <OrderTracker
             orderId={placed.order.id}
             token={placed.tracking?.token ?? null}
@@ -116,7 +133,7 @@ export function TableLanding({
 
   if (resumeError) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <OrderShell bare>
         <div className={`${frame} p-8 text-center`}>
           <p className="text-lg font-semibold text-ink-900">This order link is no longer valid</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-ink-600">{resumeError}</p>
@@ -125,15 +142,18 @@ export function TableLanding({
     );
   }
 
+  // The cover names the restaurant and the table only — no helper copy.
+  // When nothing is served, the empty-state card below the tabs says so
+  // where the opening hours already live, not in the header.
   return (
-    <OrderShell tableLabel={tableLabel}>
-      <div className={`${frame} p-5`}>
-        <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
-          {restaurantName} · {formatTableLabel(tableLabel)}
-        </p>
-        <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
-        <p className="mt-1 text-sm text-ink-600">{landingSummary(menus, closedMenus)}</p>
-      </div>
+    <OrderShell bare>
+      <DinerCoverHeader
+        restaurantName={restaurantName}
+        tableLabel={tableLabel}
+        logo={restaurantLogo}
+        cover={restaurantCover}
+        bleed
+      />
 
       <TableOrderTabs
         restaurantName={restaurantName}

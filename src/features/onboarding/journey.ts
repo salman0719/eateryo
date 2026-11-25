@@ -1,23 +1,29 @@
 /**
  * The one onboarding journey, shared by every screen that shows progress.
  *
- * Capture owns the first three stops (upload the photo, extract the draft,
- * review what the AI read) and the publish wizard is the fourth. It is
- * deliberately one fixed list: publishing is a stop, not a second journey,
- * and signing in is never a stop of its own. Sign-in only happens inside
- * Publish, and only when the account is missing, so the tracker never
+ * Three stops. Capture owns the first two — getting the pages read (photo and
+ * extraction are one step: the read is an action inside it, not a place to
+ * return to and start again) and reviewing what the AI read — and the publish
+ * wizard is the third and last.
+ *
+ * It is deliberately one fixed list: publishing is a stop, not a second
+ * journey, and signing in is never a stop of its own. Sign-in only happens
+ * inside Publish, and only when the account is missing, so the tracker never
  * changes length between owners — a step indicator whose count depends on
  * who is looking is exactly what step indicators are worst at.
  *
  * The CTA that leaves the review screen says "Publish" because that is the
  * stop it opens; there is no separate "get your link" errand in between.
  */
-export const JOURNEY_STEPS = ["Upload", "Extract", "Review", "Publish"] as const;
+export const JOURNEY_STEPS = ["Upload & extract", "Review", "Publish"] as const;
 
 export type JourneyStep = (typeof JOURNEY_STEPS)[number];
 
 /** Index of the publish wizard, so the shell and the wizard never disagree. */
 export const PUBLISH_STEP_INDEX = JOURNEY_STEPS.length - 1;
+
+/** Index of the review stop — capture's second and last screen. */
+export const REVIEW_STEP_INDEX = 1;
 
 export type JourneyStepStatus = "done" | "current" | "upcoming";
 

@@ -1,9 +1,10 @@
 /**
  * Shared diner-facing pieces of the table ordering screen: the page frame,
- * the add-to-order menu list, and total formatting. Used by both the local
- * (`/order`, IndexedDB) and server (`/r/<restaurant>/m/<menu>/order`,
- * published snapshot) flows so a diner sees the same menu whichever path
- * the café uses.
+ * the cover header, the search field, the category rail + scroll-spy, the
+ * add-to-order menu list, and total formatting. Used by the live table
+ * landing (`/r/<restaurant>/t/<table>`) and the owner preview
+ * (`OrderPagePreview`, a draft single menu with ordering off) so a diner
+ * sees the same menu whichever path the café uses.
  *
  * Deliberately free of editing chrome and of any storage import: the server
  * page must not pull IndexedDB code into its bundle just to render a menu.
@@ -14,9 +15,13 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { BrandLockup } from "@/components/ui/brand";
+import { PlateIcon, PlusIcon } from "@/components/ui/icons";
+import { ScrollArrowStrip } from "@/components/ui/scroll-arrow-strip";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MenuCategory, MenuItem, MenuItemImage } from "@/features/menu/schema";
 import { dedupeDietaryLabels } from "@/features/menu/dietary-labels";
+import { brandAssetCopy } from "@/features/brand-assets/ref";
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import {
   priceWithOptions,
   validateOptionSelections,
@@ -25,9 +30,8 @@ import {
 import { formatPreviewPrice } from "@/features/menu/preview-utils";
 import { formatTableLabel } from "@/features/orders/table-links";
 
-import { ClampedDescription } from "./clamped-description";
+import { itemImageCopy } from "@/features/item-images/ref";
 import { CustomizeSheet } from "./customize-sheet";
-import { MenuItemPhoto } from "./menu-item-photo";
 import { toggleOptionSelection } from "./option-groups";
 
 /**
@@ -53,7 +57,7 @@ export function OrderSkeleton({ label }: { label: string }) {
               <Skeleton className="h-4 w-2/5" />
               <Skeleton className="mt-2 h-3 w-3/5" />
             </div>
-            <Skeleton className="h-9 w-20 rounded-full" />
+            <Skeleton className="h-8 w-8 rounded-full" />
           </div>
         ))}
       </div>
@@ -63,24 +67,309 @@ export function OrderSkeleton({ label }: { label: string }) {
 
 export function OrderShell({
   tableLabel,
+  bare = false,
   children,
 }: {
   tableLabel?: string;
+  /**
+   * Diner pages hide the frame header (brand lockup + table pill): the
+   * cover header below already names the restaurant and the table, so the
+   * shell's row would repeat the table and add a second brand.
+   */
+  bare?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col gap-4 px-4 py-6">
-      <header className="flex items-center justify-between gap-3">
-        <BrandLockup tagline="Order from your table" />
-        {tableLabel && (
-          <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
-            {formatTableLabel(tableLabel)}
-          </span>
-        )}
-      </header>
+      {!bare && (
+        <header className="flex items-center justify-between gap-3">
+          <BrandLockup tagline="Order from your table" />
+          {tableLabel && (
+            <span className="rounded-full border border-warning-300 bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-900">
+              {formatTableLabel(tableLabel)}
+            </span>
+          )}
+        </header>
+      )}
       {children}
     </div>
   );
+}
+
+/**
+ * Prototype A identity header for the diner pages: a slim cover band, an
+ * overlapping logo tile, the restaurant name, and one sub-line (the menu
+ * title on a single-menu page, the table summary on the landing page).
+ *
+ * Without brand assets the band is a gradient drawn from the `accent` role
+ * tokens via `var(--color-accent-*)`, and the tile is the name's initial: a
+ * theme change repaints it with no code change. A cover photo replaces the
+ * band's background only, a logo replaces the tile only. The name always
+ * sits below the band — never on it — so any photo stays legible without a
+ * scrim. The table sits top-right of the band as a filled pill; `OrderShell`
+ * already carries it in non-bare mode.
+ */
+export function DinerCoverHeader({
+  restaurantName,
+  tableLabel,
+  subline,
+  logo = null,
+  cover = null,
+  bleed = false,
+}: {
+  restaurantName: string;
+  /** The diner's table: a filled pill top-right of the cover band. */
+  tableLabel?: string;
+  /** One quiet line under the name: the menu title on a single-menu page. */
+  subline?: string;
+  /** The restaurant's logo: a 56px tile when set, the initial otherwise. */
+  logo?: BrandAssetImage | null;
+  /** The restaurant's cover photo: the band background when set. */
+  cover?: BrandAssetImage | null;
+  /**
+   * On a phone the cover is the page's own top edge: the band reaches the
+   * viewport top and both sides with no page padding, and the card framing
+   * comes back from `sm` up. The negative margins cancel `OrderShell`'s
+   * `px-4 py-6`, which is where the inset came from. The owner preview
+   * bleeds the same way inside its phone frame, so it reads edge to edge
+   * like the table page; its notice sits below the cover to keep the top
+   * edge clear.
+   */
+  bleed?: boolean;
+}) {
+  const initial = restaurantName.trim().charAt(0).toUpperCase() || "?";
+  // A failed photo falls back to the gradient band / initial tile — never a
+  // broken icon. The band loads the display copy (up to ~896px wide at 2x);
+  // the 56px tile takes the thumb when one was uploaded.
+  const [coverFailed, setCoverFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
+  const coverCopy = !coverFailed && cover ? cover : null;
+  const logoCopy = !logoFailed ? brandAssetCopy(logo) : null;
+  return (
+    <div
+      className={
+        bleed
+          ? "diner-cover-bleed -mx-4 -mt-6 overflow-hidden border-b border-line-200 bg-surface-base sm:mx-0 sm:mt-0 sm:rounded-2xl sm:border"
+          : "overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+      }
+    >
+      <div
+        aria-hidden={tableLabel ? undefined : "true"}
+        className="relative h-24"
+        style={
+          coverCopy
+            ? undefined
+            : {
+                backgroundImage:
+                  "linear-gradient(120deg, var(--color-accent-800), var(--color-accent-600) 55%, var(--color-accent-800))",
+              }
+        }
+      >
+        {coverCopy && (
+          // eslint-disable-next-line @next/next/no-img-element -- cover served straight from the CDN at its stored size; the optimizer must never touch it
+          <img
+            src={coverCopy.url}
+            alt=""
+            width={coverCopy.width}
+            height={coverCopy.height}
+            loading="lazy"
+            decoding="async"
+            onError={() => setCoverFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+        {tableLabel && (
+          <span className="absolute top-3 right-3 rounded-full bg-surface-base px-3 py-1 text-xs font-semibold text-ink-900">
+            {formatTableLabel(tableLabel)}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3 px-5 pb-4">
+        {logoCopy ? (
+          // eslint-disable-next-line @next/next/no-img-element -- logo served straight from the CDN at its stored size; the optimizer must never touch it
+          <img
+            src={logoCopy.url}
+            alt=""
+            width={logoCopy.width}
+            height={logoCopy.height}
+            loading="lazy"
+            decoding="async"
+            onError={() => setLogoFailed(true)}
+            className="relative z-10 -mt-7 h-14 w-14 shrink-0 rounded-2xl border-2 border-surface-base bg-surface-base object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+          >
+            {initial}
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg leading-snug font-bold text-ink-900">{restaurantName}</h1>
+          {subline && <p className="truncate text-sm text-ink-600">{subline}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The search field every diner ordering surface shares: the same input,
+ * the same placeholder, the same match-count line. `resultText` is the
+ * already-counted line (null hides it), so single- and multi-menu callers
+ * count differently but read identically.
+ */
+export function DinerSearchField({
+  value,
+  onChange,
+  placeholder = "Search dishes…",
+  resultText,
+  id = "diner-dish-search",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  /** The counted line under the input; null renders no line. */
+  resultText: string | null;
+  id?: string;
+}) {
+  return (
+    <>
+      <label className="block" htmlFor={id}>
+        <span className="sr-only">Search dishes</span>
+        <input
+          id={id}
+          type="search"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+        />
+      </label>
+      {resultText !== null && (
+        <p className="mt-2 text-xs text-ink-500" role="status">
+          {resultText}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Jump to a category section, honouring reduced motion. */
+export function scrollToCategory(id: string) {
+  document.getElementById(id)?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
+/**
+ * Prototype A category rail: the sticky pill row above the dishes.
+ * `ScrollArrowStrip` owns the sideways scroll; this owns which pill reads
+ * active. Active follows the viewport (see `useScrollSpyCategory`); a tap
+ * jumps to that category's section.
+ */
+export function CategoryRail({
+  categories,
+  activeId,
+  onSelect,
+}: {
+  categories: { id: string; label: string }[];
+  activeId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const railRef = useRef<HTMLDivElement>(null);
+  // Scrolling the dishes moves the active pill; keep that pill in view so the
+  // rail mirrors the section without the diner chasing it. The strip is what
+  // scrolls, never the page: `scrollIntoView` walks every scrollable ancestor,
+  // so where the rail starts below the fold — the embedded preview in capture's
+  // review and publish stops — it dragged the whole page down to the pill row.
+  useEffect(() => {
+    if (!activeId) return;
+    const track = railRef.current?.querySelector<HTMLElement>('[role="region"], nav[aria-label]');
+    const pill = track?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!track || !pill) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const trackBox = track.getBoundingClientRect();
+    const pillBox = pill.getBoundingClientRect();
+    // Centre by measurement, not `offsetLeft`: a pill's offset parent is not
+    // the track, so its offsets live in a different frame.
+    track.scrollTo({
+      left:
+        track.scrollLeft + (pillBox.left - trackBox.left) - (trackBox.width - pillBox.width) / 2,
+      behavior: reduce ? "auto" : "smooth",
+    });
+  }, [activeId]);
+  if (categories.length === 0) return null;
+  return (
+    <div
+      ref={railRef}
+      className="sticky top-0 z-20 -mx-4 -mt-3 border-b border-line-200 bg-surface-50/95 px-4 py-2 backdrop-blur"
+    >
+      <ScrollArrowStrip label="Menu categories">
+        {categories.map((category) => {
+          const active = category.id === activeId;
+          return (
+            <button
+              key={category.id}
+              type="button"
+              aria-current={active ? "true" : undefined}
+              onClick={() => onSelect(category.id)}
+              className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors ${
+                active
+                  ? "border-accent-700 bg-accent-700 text-on-accent shadow-sm"
+                  : "border-line-300 bg-surface-base text-ink-700 hover:border-accent-700 hover:text-accent-900"
+              }`}
+            >
+              {category.label}
+            </button>
+          );
+        })}
+      </ScrollArrowStrip>
+    </div>
+  );
+}
+
+/**
+ * Scroll-spy for the category rail: the id of the category nearest the top
+ * of the viewport. The band sits below the sticky rail and above the fold's
+ * bottom, so the pill changes as the diner moves through the menu, not after.
+ * When nothing intersects (fast fling between sections) the last answer
+ * stands instead of flickering to null.
+ */
+export function useScrollSpyCategory(ids: string[]): string | null {
+  const key = ids.join("|");
+  const [active, setActive] = useState<string | null>(() => ids[0] ?? null);
+  // The list is stable per document; when it does change, reset the pill
+  // with a render-time adjustment (the endorsed pattern), not an effect,
+  // so there is no cascading update.
+  const [watched, setWatched] = useState(key);
+  if (watched !== key) {
+    setWatched(key);
+    const list = key.split("|").filter(Boolean);
+    setActive((current) => (current && list.includes(current) ? current : (list[0] ?? null)));
+  }
+  useEffect(() => {
+    const list = key.split("|").filter(Boolean);
+    if (list.length === 0) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length === 0) return;
+        visible.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        const top = visible[0];
+        if (top && top.target.id) setActive(top.target.id);
+      },
+      { rootMargin: "-25% 0px -65% 0px" }
+    );
+    for (const id of list) {
+      const node = document.getElementById(id);
+      if (node) observer.observe(node);
+    }
+    return () => observer.disconnect();
+  }, [key]);
+  return active;
 }
 
 /**
@@ -96,6 +385,51 @@ function CustomizableHint({ item }: { item: MenuItem }) {
         ? `Requires ${required.map((group) => group.name).join(", ")}`
         : "Add-ons available"}
     </p>
+  );
+}
+
+/**
+ * CSS-only expandable dish description (no JS state): short text renders
+ * plain, long text shows two lines with an inline More… toggle pinned to
+ * the end of the second line, over the fade. Open removes the cap and
+ * swaps the toggle to Less. The ~90-char cutover is a width heuristic for
+ * the 200px card at text-xs (≈30 chars/line → 3 lines), not a true row
+ * count — CSS cannot measure overflow, so a narrow screen can wrap a
+ * "short" text past 3 lines.
+ *
+ * Why a capped box + overlay instead of `line-clamp-2` with the toggle
+ * inside the flow: a filled second line pushes the toggle onto a third
+ * line that the clamp clips away, leaving only the clamp's own "…"
+ * (exactly what TABRABANE SPECIAL showed). The capped box has no
+ * ellipsis of its own, so the overlay toggle is the only indicator.
+ */
+function DishDescription({ name, description }: { name: string; description: string }) {
+  if (description.length <= 90) {
+    return <p className="text-xs leading-relaxed text-ink-600">{description}</p>;
+  }
+  return (
+    <details className="group text-xs leading-relaxed text-ink-600">
+      <summary
+        aria-label={`Description for ${name}`}
+        className="relative cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+      >
+        <span className="block max-h-[3.25em] overflow-hidden group-open:max-h-none">
+          {description}
+        </span>
+        <span
+          aria-hidden="true"
+          className="absolute right-0 bottom-0 bg-gradient-to-l from-surface-base to-transparent pr-0.5 pl-8 font-semibold text-accent-700 underline underline-offset-2 group-open:static group-open:bg-none group-open:p-0"
+        >
+          {/* Solid-backed gap: the fade alone lets the text run right up
+              against the toggle ("Cheese,More…"), so the toggle carries
+              its own surface backdrop with a leading pad. Open, Less drops
+              back to plain inline text. A tight line can still push the
+              whole toggle onto its own row — allowed. */}
+          <span className="bg-surface-base pl-2 group-open:hidden">More…</span>
+          <span className="hidden group-open:inline"> Less</span>
+        </span>
+      </summary>
+    </details>
   );
 }
 
@@ -137,7 +471,7 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
           {/* White reads on any owner photo; no theme role can name "light
               text over an arbitrary photo", so the raw utility stays on
               this bespoke banner with this comment (AGENTS.md). */}
-          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-lg font-bold text-white">
+          <h2 className="absolute inset-x-0 bottom-0 truncate px-5 pb-2 text-xl font-bold text-white">
             {category.name}
           </h2>
         </div>
@@ -152,6 +486,25 @@ function CategoryHeading({ category }: { category: MenuCategory }) {
         </p>
       ) : null}
     </>
+  );
+}
+
+/**
+ * The category list. On a phone it runs edge to edge — no page padding, no
+ * rounded cards — and the categories are separated by a short bare gutter
+ * rather than a hairline, so a category that opens on a photo is visibly a
+ * new one even though the photo itself has no card edge. The width above
+ * `sm` keeps the inset, rounded cards the desktop page was designed around.
+ *
+ * The negative margin cancels `OrderShell`'s `px-4`; the sections themselves
+ * give up their borders and radius below `sm` (see `OrderMenuSection`), so
+ * the gutters here are the only separation between categories.
+ */
+export function CategorySections({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="diner-category-sections -mx-4 flex min-w-0 flex-col divide-y-8 divide-surface-100 border-y border-line-200 bg-surface-base sm:mx-0 sm:gap-4 sm:divide-y-0 sm:border-0 sm:bg-transparent">
+      {children}
+    </div>
   );
 }
 
@@ -224,6 +577,17 @@ export function OrderMenuSection({
     setOptionError((current) => ({ ...current, [item.id]: null }));
     setCustomizingId(null);
   }
+  /** One photo in the category keeps every card's media slot: photo cards
+      show their image while photo-less ones show the pattern tile, so the
+      rail keeps a steady shape. A category with no photos at all goes
+      text-first instead — no empty media boxes. */
+  const hasPhoto = category.items.some((candidate) => itemImageCopy(candidate.image));
+  /** One roomy dish makes the whole category roomy: a mixed rail would pair
+      tall stacked cards with short railed ones, so the category picks one
+      shape and every card keeps it. Plain-only categories stay railed. */
+  const roomyCategory = category.items.some(
+    (candidate) => candidate.description || candidate.variants.length > 0
+  );
   const customizing =
     customizingId === null
       ? null
@@ -253,122 +617,206 @@ export function OrderMenuSection({
   return (
     <section
       aria-label={category.name}
-      className="overflow-hidden rounded-2xl border border-line-200 bg-surface-base"
+      // A phone gets the category edge to edge (see `CategorySections`); the
+      // inset card is the wide-screen treatment.
+      className="diner-menu-section overflow-hidden bg-surface-base sm:rounded-2xl sm:border sm:border-line-200"
     >
       <CategoryHeading category={category} />
-      <ul className="divide-y divide-line-100">
-        {category.items.map((item) => {
-          const soldOut = item.available === false;
-          // One chip per diet: an older document (or a CSV import) can hold the
-          // same label twice, which used to mean duplicate keys and two
-          // identical chips on the diner's screen.
-          const dietaryLabels = dedupeDietaryLabels(item.dietaryLabels);
-          const variantName = variantChoice[item.id] ?? item.variants[0]?.name ?? null;
-          const variant = variantName
-            ? item.variants.find((candidate) => candidate.name === variantName)
-            : null;
-          const price = variant ? variant.price : item.price;
-          const picks = optionChoice[item.id] ?? [];
-          const livePrice = priceWithOptions(price, item, picks);
-          // The button always starts a NEW add at the shown price — it never
-          // reports cart contents. Counts live in the cart (sticky bar, side
-          // panel, sheet) alone, so reopening a row or the sheet cannot read
-          // as a lost order, and plain and customizable dishes label alike.
-          // Unpriced keeps the bare label: nothing is invented.
-          const addLabel =
-            livePrice === null ? "Add" : `Add · ${formatPreviewPrice(livePrice, null, currency)}`;
-          const tick = flash[item.id] ?? 0;
-          return (
-            <li key={item.id} className={`px-5 py-3.5 ${soldOut ? "opacity-60" : ""}`}>
-              <div className="flex items-start justify-between gap-3">
-                <MenuItemPhoto item={item} />
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 font-medium text-ink-900">
-                    <span>{item.name}</span>
-                    {soldOut && (
-                      <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
-                        Sold out
-                      </span>
-                    )}
-                  </p>
-                  {/* Clamped to two lines with a "More" control: a long
-                      description must not push Add away from its dish (009). */}
-                  {item.description && (
-                    <ClampedDescription text={item.description} name={item.name} />
-                  )}
-                  {item.options.length > 0 && <CustomizableHint item={item} />}
-                  {dietaryLabels.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {dietaryLabels.map((label) => (
-                        <span
-                          key={label}
-                          className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
-                        >
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-ink-900">
-                  {formatPreviewPrice(livePrice, null, currency)}
-                </p>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {item.variants.length > 0 && (
-                  <label className="text-xs text-ink-600">
-                    <span className="sr-only">Size for {item.name}</span>
-                    <select
-                      value={variant?.name ?? ""}
-                      onChange={(event) => onVariantChange(item.id, event.target.value)}
-                      className="rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                    >
-                      {item.variants.map((option) => (
-                        <option key={option.name} value={option.name}>
-                          {option.name}
-                          {option.price !== null
-                            ? ` — ${formatPreviewPrice(option.price, null, currency)}`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                )}
-                <span className="relative inline-flex">
-                  {tick > 0 && (
-                    <span
-                      key={tick}
-                      aria-hidden="true"
-                      className="added-flash absolute -top-7 left-1/2 -translate-x-1/2 rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow"
-                    >
-                      Added ✓
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    disabled={soldOut}
-                    onClick={() => {
-                      // Plain dishes add straight from the row. Customizable
-                      // ones open the sheet: the picking and the Add-gate live
-                      // there now, not in the menu list.
-                      if (item.options.length === 0) {
-                        onAdd(item, picks);
-                        bumpFlash(item.id);
-                        return;
-                      }
-                      setCustomizingId(item.id);
-                    }}
-                    className="rounded-full bg-surface-900 px-3.5 py-1.5 text-xs font-semibold text-on-accent transition-all hover:bg-surface-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+      {/* Dish carousel (prototype): a snapping row of photo cards through the
+          shared `ScrollArrowStrip`, so edge arrows, keyboard and no-bar
+          scrolling all behave like the category rails. The next card peeks
+          in so the row reads as swipeable; ~1.6 cards fit at once. */}
+      <div className="px-5 py-3">
+        <ScrollArrowStrip
+          as="ul"
+          label={`${category.name} dishes`}
+          trackClassName="snap-x snap-mandatory items-stretch gap-3 py-0.5"
+        >
+          {category.items.map((item) => {
+            const soldOut = item.available === false;
+            // One chip per diet: an older document (or a CSV import) can hold the
+            // same label twice, which used to mean duplicate keys and two
+            // identical chips on the diner's screen.
+            const dietaryLabels = dedupeDietaryLabels(item.dietaryLabels);
+            const variantName = variantChoice[item.id] ?? item.variants[0]?.name ?? null;
+            const variant = variantName
+              ? item.variants.find((candidate) => candidate.name === variantName)
+              : null;
+            const price = variant ? variant.price : item.price;
+            const picks = optionChoice[item.id] ?? [];
+            const livePrice = priceWithOptions(price, item, picks);
+            // The button always starts a NEW add at the shown price — it never
+            // reports cart contents. Counts live in the cart (sticky bar, side
+            // panel, sheet) alone, so reopening a card or the sheet cannot read
+            // as a lost order, and plain and customizable dishes label alike.
+            // Unpriced keeps the bare label: nothing is invented.
+            const addAccessibilityLabel =
+              livePrice === null
+                ? `Add ${item.name}`
+                : `Add ${item.name} · ${formatPreviewPrice(livePrice, null, currency)}`;
+            const tick = flash[item.id] ?? 0;
+            const photo = itemImageCopy(item.image);
+            // Pattern tile for a photo-less dish in a photographed category;
+            // text-first (no media at all) when the category has no photos.
+            const textFirst = !photo && !hasPhoto;
+            // The category picked this card's shape: roomy when any dish needs
+            // the width, railed when every dish is plain.
+            const roomy = roomyCategory;
+            // The Add control lives in one place so the two layouts cannot drift.
+            const addControl = (
+              <span className="relative inline-flex flex-none items-center">
+                {tick > 0 && (
+                  <span
+                    key={tick}
+                    aria-hidden="true"
+                    // Centred on the button and parked to its left: a pop above
+                    // the button sticks out past the card's top edge, where the
+                    // carousel track (overflow-x-auto forces a clipped
+                    // overflow-y) cuts it off — worst on short text-first
+                    // cards like name-and-price-only dishes. Centred vertically
+                    // it stays inside the card's height, and extending left it
+                    // hangs over the card's own interior, so neither the card
+                    // edge nor the viewport can clip it, even on end cards.
+                    className="added-flash absolute top-1/2 right-10 -translate-y-1/2 rounded-full bg-accent-800 px-2.5 py-0.5 text-[11px] font-bold whitespace-nowrap text-on-accent shadow pointer-events-none z-10"
                   >
-                    {addLabel}
-                  </button>
-                </span>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                    Added ✓
+                  </span>
+                )}
+                <button
+                  type="button"
+                  disabled={soldOut}
+                  aria-label={addAccessibilityLabel}
+                  onClick={() => {
+                    // Plain dishes add straight from the card. Customizable
+                    // ones open the sheet: the picking and the Add-gate live
+                    // there now, not in the menu list.
+                    if (item.options.length === 0) {
+                      onAdd(item, picks);
+                      bumpFlash(item.id);
+                      return;
+                    }
+                    setCustomizingId(item.id);
+                  }}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-accent-700 text-on-accent transition-all hover:bg-accent-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
+                >
+                  <PlusIcon size={16} />
+                </button>
+              </span>
+            );
+            return (
+              <li
+                key={item.id}
+                // No overflow clip on the card itself: the Added pop sits above
+                // the rail button and is wider than it, so a clip here would
+                // cut it off at the card's edge. The media slot below carries
+                // its own clip for the rounded top corners instead.
+                className={`flex w-[200px] shrink-0 snap-start flex-col rounded-xl border border-line-200 bg-surface-base ${soldOut ? "opacity-60" : ""}`}
+              >
+                {!textFirst && (
+                  <div
+                    className={`grid h-28 place-items-center overflow-hidden rounded-t-[11px] bg-surface-100 ${photo ? "" : "dish-photo-fallback"}`}
+                    // The dot texture is the `line` role token used as a
+                    // pattern wash — no new colour, just the token drawn as
+                    // dots because Tailwind has no dotted-background utility.
+                    style={
+                      photo
+                        ? undefined
+                        : {
+                            backgroundImage:
+                              "radial-gradient(circle, var(--color-line-200) 1px, transparent 1.3px)",
+                            backgroundSize: "10px 10px",
+                          }
+                    }
+                  >
+                    {photo ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- dish photo served straight from the CDN at its stored size; the optimizer must never touch it
+                      <img
+                        src={photo.url}
+                        alt=""
+                        width={photo.width}
+                        height={photo.height}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <PlateIcon size={34} className="text-ink-400" />
+                    )}
+                  </div>
+                )}
+                <div className={`flex flex-1 gap-2 p-2.5 ${textFirst ? "dish-text-first" : ""}`}>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <p className="flex items-center gap-2 font-medium text-ink-900">
+                      <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug">
+                        {item.name}
+                      </span>
+                      {soldOut && (
+                        <span className="shrink-0 rounded-full bg-surface-200 px-2 py-0.5 text-[11px] font-semibold text-ink-600">
+                          Sold out
+                        </span>
+                      )}
+                    </p>
+                    {item.description && (
+                      <DishDescription name={item.name} description={item.description} />
+                    )}
+                    {item.options.length > 0 && <CustomizableHint item={item} />}
+                    {dietaryLabels.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {dietaryLabels.map((label) => (
+                          <span
+                            key={label}
+                            className="rounded-full bg-surface-100 px-2 py-0.5 text-[11px] font-medium text-ink-700"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Size + price foot: bottom-anchored together so the
+                        size picker is the last thing before the pricing/add
+                        row and every card in the rail lines up, however long
+                        the description, hint or diet chips above run. */}
+                    <div className="mt-auto flex flex-col gap-1 pt-1">
+                      {item.variants.length > 0 && (
+                        <label className="inline-block max-w-full text-xs text-ink-600">
+                          <span className="sr-only">Size for {item.name}</span>
+                          <select
+                            value={variant?.name ?? ""}
+                            onChange={(event) => onVariantChange(item.id, event.target.value)}
+                            className="max-w-full rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                          >
+                            {item.variants.map((option) => (
+                              <option key={option.name} value={option.name}>
+                                {option.name}
+                                {option.price !== null
+                                  ? ` — ${formatPreviewPrice(option.price, null, currency)}`
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {roomy ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold tabular-nums text-ink-900">
+                            {formatPreviewPrice(livePrice, null, currency)}
+                          </p>
+                          {addControl}
+                        </div>
+                      ) : (
+                        <p className="text-sm font-semibold tabular-nums text-ink-900">
+                          {formatPreviewPrice(livePrice, null, currency)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {!roomy && <div className="flex flex-none items-center">{addControl}</div>}
+                </div>
+              </li>
+            );
+          })}
+        </ScrollArrowStrip>
+      </div>
       {customizing && (
         <CustomizeSheet
           item={customizing}
@@ -451,7 +899,7 @@ export function StickyCartBar({
   if (contained) {
     return (
       <div
-        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
+        className="sticky bottom-0 z-10 -mx-4 -mb-6 mt-auto border-t border-line-300 bg-surface-base px-4 pt-3 shadow-[0_-8px_24px_rgb(0_0_0/0.12)]"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {inner}
@@ -463,7 +911,7 @@ export function StickyCartBar({
     <>
       <div aria-hidden="true" className="h-16" />
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-line-200 bg-surface-base/95 px-4 pt-3 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line-300 bg-surface-base px-4 pt-3 shadow-[0_-8px_24px_rgb(0_0_0/0.12)]"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto w-full max-w-4xl">{inner}</div>

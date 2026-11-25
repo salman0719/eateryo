@@ -5,7 +5,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { SessionLoader } from "./session-loader";
 import { ShellFrame } from "./shell-frame";
 import { AssistantPage } from "@/components/pages/assistant-page";
-import { CapturePage } from "@/components/pages/capture-page";
+import { CapturePage, type CaptureView } from "@/components/pages/capture-page";
 import { MenusPage } from "@/components/pages/menus-page";
 import { OrdersPage } from "@/components/pages/orders-page";
 import { SettingsPage } from "@/components/pages/settings-page";
@@ -95,14 +95,6 @@ import {
   forgetPendingNewMenu,
   isPendingNewMenu,
 } from "@/features/menus/routed-doc";
-
-type Phase = "upload" | "ready" | "extracting" | "done";
-
-function stepIndex(phase: Phase, hasResult: boolean): number {
-  if (hasResult || phase === "done") return 2;
-  if (phase === "ready" || phase === "extracting") return 1;
-  return 0;
-}
 
 /**
  * The app's shell — what every `(app)/` route file renders, and the last place
@@ -258,6 +250,22 @@ export function AppShell() {
     onServerRevision,
   });
 
+  /**
+   * Which capture stop is on screen. Client state, not a route: capture is
+   * one address, and the two stops are views of one piece of work. Entering
+   * review is driven by the extraction finishing (through `revealResult`),
+   * and going back is the rail — never a fresh read.
+   */
+  const [captureView, setCaptureView] = useState<CaptureView>("capture");
+
+  /**
+   * The saved draft the publish stop works on. Set by the first press of
+   * Publish and cleared with the capture, so the stop is mounted here instead
+   * of being a route: publishing finishes the journey on the screen it was
+   * walked on. The routed publish screen remains for the magic link.
+   */
+  const [publishDraft, setPublishDraft] = useState<MenuDocument | null>(null);
+
   // The capture document — pages, extraction, the result under review and its
   // draft. It ends where the menu begins; this screen keeps the menu.
   const {
@@ -285,6 +293,12 @@ export function AppShell() {
     handleResolveResultItem,
     handleUpdateResultPrice,
     handleResolveAllResultItems,
+    handleRenameResultItem,
+    handleUpdateResultDescription,
+    handleUpdateResultVariants,
+    handleMoveResultItem,
+    handleDeleteResultItem,
+    handleAddResultItem,
     handleRenameResultTitle,
     resumeDraft,
     documentForSave,
@@ -294,7 +308,8 @@ export function AppShell() {
     ensureServerTarget,
     cacheServerDraft,
     pruneSignedOutOthers,
-    revealResult: scrollToResult,
+    // The review stop scrolls itself to the top of the page when it opens.
+    revealResult: () => setCaptureView("review"),
     reportError: reportLibraryError,
   });
   /**
@@ -638,8 +653,16 @@ export function AppShell() {
     const doc = await resumeDraft(menuId);
     if (!doc) return;
     setResumeDismissed(true);
+    // A resumed draft is a result, and the result lives on the review stop.
+    setCaptureView("review");
     navigate({ screen: "capture" });
-    scrollToResult();
+  }
+
+  /** Start over: the result is gone, so the screen returns to the photos. */
+  function handleClearCapture() {
+    clearCapture();
+    setPublishDraft(null);
+    setCaptureView("capture");
   }
 
   async function handleEditResult() {
@@ -650,20 +673,51 @@ export function AppShell() {
     }
   }
 
-  /** From the extraction result: save the draft, then open the publish wizard.
-   * The marker lets that screen continue the four-stop journey; a menu opened
-   * straight from the library gets a plain heading instead of a false "3 done". */
+  /**
+   * From the review stop: save the draft, then show the publish stop here.
+   * No navigation — capture's third stop is the wizard, so the URL stays put.
+   * The saved id is also the marker the routed screen (the magic link's
+   * landing) reads to continue the same three-stop journey.
+   */
   async function handleStartPublish() {
     try {
       const saved = await saveResultAndOpen(false);
       rememberPublishJourney(saved.id);
-      navigate({ screen: "editor", menuId: saved.id, mode: "publish" });
+      setPublishDraft(saved);
+      setCaptureView("publish");
     } catch (error) {
       showOpenError(error);
     }
   }
 
-  const activeStep = stepIndex(phase, result !== null);
+  /**
+   * The publish stop, built once and mounted twice: inside capture (third stop,
+   * under the rail, no tracker of its own) and on the routed publish screen a
+   * magic link returns to (its own page, so it carries the tracker).
+   */
+  function publishWizardStop(
+    doc: MenuDocument,
+    options: { onBack: () => void; backLabel: string; showJourney: boolean }
+  ) {
+    return (
+      <PublishWizard
+        key={doc.id}
+        doc={doc}
+        signedIn={signedIn}
+        sessionPending={sessionPending}
+        accountKey={accountKey}
+        ownedRestaurants={ownedRestaurantsForAccount}
+        restaurantsLoading={restaurantsLoading}
+        onPublished={handleWizardPublished}
+        onBack={options.onBack}
+        onOpenTables={() => navigate({ screen: "tables" })}
+        onOpenEditor={() => navigate({ screen: "editor", menuId: doc.id, mode: "edit" })}
+        showJourney={options.showJourney}
+        backLabel={options.backLabel}
+      />
+    );
+  }
+
   const assistantPending = sessionPending || (signedIn && featureFlagsLoading);
 
   // Sign-out is a privacy boundary: stamped rows belong to their owner and
@@ -1424,21 +1478,11 @@ export function AppShell() {
                 </p>
               )}
               {editorMode === "publish" && activeMenuCanPublish ? (
-                <PublishWizard
-                  key={routedDoc.id}
-                  doc={routedDoc}
-                  signedIn={signedIn}
-                  sessionPending={sessionPending}
-                  accountKey={accountKey}
-                  ownedRestaurants={ownedRestaurantsForAccount}
-                  restaurantsLoading={restaurantsLoading}
-                  onPublished={handleWizardPublished}
-                  onBack={() => navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" })}
-                  onOpenTables={() => navigate({ screen: "tables" })}
-                  onOpenEditor={() =>
-                    navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" })
-                  }
-                />
+                publishWizardStop(routedDoc, {
+                  onBack: () => navigate({ screen: "editor", menuId: routedDoc.id, mode: "edit" }),
+                  backLabel: "← Back to editing",
+                  showJourney: true,
+                })
               ) : (
                 <MenuEditor
                   doc={routedDoc}
@@ -1456,9 +1500,21 @@ export function AppShell() {
                   onRetryAccountCheck={retryAccountCheck}
                   restaurantName={
                     ownedRestaurantsForAccount.find(
-                      (restaurant) => restaurant.id === activePublication?.restaurantId
+                      (restaurant) => restaurant.id === activeRestaurantId
                     )?.name ?? null
                   }
+                  restaurantLogo={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activeRestaurantId
+                    )?.logo ?? null
+                  }
+                  restaurantCover={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activeRestaurantId
+                    )?.cover ?? null
+                  }
+                  restaurantId={activeRestaurantId}
+                  onBrandChanged={(updated) => workspace.addRestaurant(updated)}
                   onStartPublish={() =>
                     navigate({ screen: "editor", menuId: routedDoc.id, mode: "publish" })
                   }
@@ -1502,7 +1558,8 @@ export function AppShell() {
         <CapturePage
           signedIn={signedIn}
           sessionPending={sessionPending}
-          step={activeStep}
+          view={captureView}
+          onViewChange={setCaptureView}
           phase={phase}
           pages={pages}
           fileError={fileError}
@@ -1524,14 +1581,40 @@ export function AppShell() {
           draftSave={draftSave}
           draftOnServer={resultDoc ? serverIds.has(resultDoc.id) : false}
           initialReviewCount={initialReviewCount}
-          onClear={clearCapture}
+          onClear={handleClearCapture}
           onEdit={() => void handleEditResult()}
           onResolveItem={handleResolveResultItem}
           onResolveAll={handleResolveAllResultItems}
           onUpdatePrice={handleUpdateResultPrice}
+          onRenameItem={handleRenameResultItem}
+          onUpdateDescription={handleUpdateResultDescription}
+          onUpdateVariants={handleUpdateResultVariants}
+          onMoveItem={handleMoveResultItem}
+          onDeleteItem={(loc) => {
+            void (async () => {
+              const category = resultDoc?.categories[loc.categoryIndex];
+              const name = category?.items[loc.itemIndex]?.name ?? "this dish";
+              const ok = await confirm({
+                message: `Delete “${name}” from the draft? A published revision may still show it until you republish.`,
+                confirmLabel: "Delete",
+                destructive: true,
+              });
+              if (ok) handleDeleteResultItem(loc);
+            })();
+          }}
+          onAddItem={(categoryIndex, draft) => void handleAddResultItem(categoryIndex, draft)}
           onRenameTitle={handleRenameResultTitle}
           onPublish={
             source === "demo" || draftSave === "saved" ? () => void handleStartPublish() : undefined
+          }
+          publishSlot={
+            publishDraft
+              ? publishWizardStop(publishDraft, {
+                  onBack: () => setCaptureView("review"),
+                  backLabel: "← Back to review",
+                  showJourney: false,
+                })
+              : null
           }
         />
       )}

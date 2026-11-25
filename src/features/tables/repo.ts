@@ -7,6 +7,7 @@ import {
   restaurant,
   restaurantMembership,
 } from "@/lib/db/schema";
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
 import { accessFromMembership, can, getMembershipAccess } from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
@@ -73,6 +74,9 @@ export interface TableLanding {
   restaurantId: string;
   restaurantName: string;
   restaurantSlug: string;
+  /** Brand assets for the cover header; null when the owner set none. */
+  restaurantLogo: BrandAssetImage | null;
+  restaurantCover: BrandAssetImage | null;
   /** Live menus whose windows cover `now` — the only orderable ones. */
   menus: OpenMenuEntry[];
   /** Live menus whose windows do *not* cover `now`, for display only. */
@@ -304,15 +308,33 @@ async function restaurantSlugTakenByAnother(
 export async function getRestaurantBySlug(
   db: TenancyDb,
   slug: string
-): Promise<{ id: string; name: string; slug: string } | null> {
+): Promise<{
+  id: string;
+  name: string;
+  slug: string;
+  logo: BrandAssetImage | null;
+  cover: BrandAssetImage | null;
+} | null> {
   if (!isSlug(slug)) return null;
   const rows = await db
-    .select({ id: restaurant.id, name: restaurant.name, slug: restaurant.slug })
+    .select({
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      logo: restaurant.logo,
+      cover: restaurant.cover,
+    })
     .from(restaurant)
     .where(eq(restaurant.slug, slug));
   const row = rows[0];
   if (!row || !row.slug) return null;
-  return { id: row.id, name: row.name, slug: row.slug };
+  return {
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    logo: row.logo,
+    cover: row.cover,
+  };
 }
 
 /**
@@ -389,6 +411,8 @@ export async function listOpenMenusForRestaurantSlug(
     restaurantId: found.id,
     restaurantName: found.name,
     restaurantSlug: found.slug,
+    restaurantLogo: found.logo,
+    restaurantCover: found.cover,
     menus,
     closedMenus,
   };

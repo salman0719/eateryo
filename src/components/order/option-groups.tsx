@@ -85,18 +85,22 @@ export function OrderLineOptions({
 }) {
   if (options.length === 0) return null;
   return (
-    <span className="mt-0.5 block text-xs font-normal text-ink-500">
+    <span className="mt-0.5 block text-xs font-normal break-words text-ink-500">
       {options.map((option, index) => {
         const delta = formatPriceDelta(option.priceDelta);
-        const text = delta
-          ? `${option.choiceName} ${delta}${currency ? ` ${currency}` : ""}`
-          : option.choiceName;
-        // One pick never breaks across lines: the number and its currency
-        // stay together, and wrapping happens at the commas between picks.
+        // Long choice names wrap; only the amount and its currency stay
+        // together, so a line with several extras never pushes past the cart.
         return (
-          <span key={`${option.groupName}-${option.choiceName}`} className="whitespace-nowrap">
+          <span key={`${option.groupName}-${option.choiceName}`}>
             {index > 0 ? ", " : null}
-            {text}
+            {option.choiceName}
+            {delta ? (
+              <span className="whitespace-nowrap">
+                {" "}
+                {delta}
+                {currency ? ` ${currency}` : ""}
+              </span>
+            ) : null}
           </span>
         );
       })}

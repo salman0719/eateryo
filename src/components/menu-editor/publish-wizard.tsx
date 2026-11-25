@@ -85,15 +85,23 @@ interface PublishWizardProps {
   onBack: () => void;
   onOpenTables: () => void;
   onOpenEditor: () => void;
+  /** False inside capture, where the rail above is already the journey. */
+  showJourney?: boolean;
+  /** Where back goes depends on the host screen, so it is named there. */
+  backLabel?: string;
 }
 
 /**
- * The publish stop — the fourth step of onboarding, and the R1 publish wizard.
+ * The publish stop — the third and last step of onboarding, and the R1 publish
+ * wizard.
  *
- * Reached from the review screen, it continues the one four-stop journey
- * (Upload · Extract · Review · Publish) rather than starting a second one; a
- * menu opened straight from My menus has no journey marker, so it gets a
- * plain heading instead of a tracker it did not just walk.
+ * Capture mounts it as the stop after review, under the same rail, so pressing
+ * Publish finishes the journey on the screen it was walked on. Its own URL
+ * (`/menus/:id/publish`) still renders it, because that is where the magic
+ * link returns a signed-out owner; there it carries its own tracker, while in
+ * capture the rail already does (`showJourney`). A menu opened straight from
+ * My menus has no journey marker, so it gets a plain heading instead of a
+ * tracker it did not just walk.
  *
  * The draft is already saved in IndexedDB, so signing in is a gate inside this
  * stop, not a way out of it: the emailed link returns to this exact URL and
@@ -116,10 +124,12 @@ export function PublishWizard({
   onBack,
   onOpenTables,
   onOpenEditor,
+  showJourney = true,
+  backLabel = "← Back to editing",
 }: PublishWizardProps) {
   const fallback = useMemo(() => defaultWizardState(doc), [doc]);
   const [form, setForm] = useState<PublishWizardState>(() => loadWizardState(doc.id, fallback));
-  /** Opened from the review screen, so the four-stop journey continues here. */
+  /** Opened from the review screen, so the three-stop journey continues here. */
   const [continuesJourney] = useState(() => hasPublishJourney(doc.id));
   // A link requested earlier restores its panel after reloads and returns.
   const initialLinkSent = useMemo(() => loadWizardLinkSent(doc.id), [doc.id]);
@@ -220,6 +230,8 @@ export function PublishWizard({
       submitResult?.restaurant.name ??
       ownedRestaurants.find((restaurant) => restaurant.id === published.restaurantId)?.name ??
       null;
+    const successBrand =
+      ownedRestaurants.find((restaurant) => restaurant.id === published.restaurantId) ?? null;
 
     return (
       <div className="flex w-full flex-col gap-5">
@@ -244,7 +256,7 @@ export function PublishWizard({
             onClick={onBack}
             className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
-            ← Back to editing
+            {backLabel}
           </button>
         </div>
 
@@ -295,7 +307,12 @@ export function PublishWizard({
 
           <aside className="flex flex-col gap-2">
             <PhoneFrame label="Diner page at a table">
-              <OrderPagePreview doc={doc} restaurantName={restaurantName} />
+              <OrderPagePreview
+                doc={doc}
+                restaurantName={restaurantName}
+                restaurantLogo={successBrand?.logo ?? null}
+                restaurantCover={successBrand?.cover ?? null}
+              />
             </PhoneFrame>
             <p className="text-center text-xs text-ink-500">
               Ordering is off in this preview; a real table card turns it on.
@@ -330,12 +347,12 @@ export function PublishWizard({
             onClick={onBack}
             className="rounded-full border border-line-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition-colors hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700"
           >
-            ← Back to editing
+            {backLabel}
           </button>
         )}
       </div>
 
-      {continuesJourney && <JourneySteps current={PUBLISH_STEP_INDEX} />}
+      {showJourney && continuesJourney && <JourneySteps current={PUBLISH_STEP_INDEX} />}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <section className="flex flex-col gap-4 rounded-2xl border border-line-200 bg-surface-base p-5">
@@ -461,6 +478,18 @@ export function PublishWizard({
               doc={doc}
               restaurantName={
                 choice.kind === "existing" || choice.kind === "create" ? choice.name : null
+              }
+              restaurantLogo={
+                choice.kind === "existing"
+                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.logo ??
+                    null)
+                  : null
+              }
+              restaurantCover={
+                choice.kind === "existing"
+                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.cover ??
+                    null)
+                  : null
               }
             />
           </PhoneFrame>

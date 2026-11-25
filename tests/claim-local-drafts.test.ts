@@ -6,6 +6,7 @@ import {
   decideLocalDraftClaimSurface,
   decidePublishJourneyClaim,
   deriveClaimGate,
+  draftsForAutoImport,
   resolveAutoClaimTarget,
   resumeBannerReady,
 } from "@/features/menus/claim-local-drafts";
@@ -340,5 +341,29 @@ describe("resumeBannerReady", () => {
         accountMenusSettled: false,
       })
     ).toBe(false);
+  });
+});
+
+describe("draftsForAutoImport", () => {
+  const drafts = [{ id: "menu-journey" }, { id: "menu-other" }];
+
+  it("leaves the draft the magic link is returning to for the journey claim", () => {
+    // Both paths claiming it was how a brand-new account asked for (and got)
+    // two cafés: each read "no café yet" on the same frame.
+    expect(draftsForAutoImport(drafts, "menu-journey")).toEqual([{ id: "menu-other" }]);
+  });
+
+  it("takes every draft when no journey return is pending", () => {
+    expect(draftsForAutoImport(drafts, null)).toEqual(drafts);
+  });
+
+  it("leaves the generic import nothing when only the journey draft exists", () => {
+    expect(draftsForAutoImport([{ id: "menu-journey" }], "menu-journey")).toEqual([]);
+  });
+
+  it("keeps a journey-marked draft no route is returning to", () => {
+    // A magic link that never came back, or a later sign-in from the library:
+    // the journey claim cannot run, so the generic import must still take it.
+    expect(draftsForAutoImport(drafts, "menu-somewhere-else")).toEqual(drafts);
   });
 });

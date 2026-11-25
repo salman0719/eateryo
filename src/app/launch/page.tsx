@@ -53,6 +53,8 @@ export default function LaunchPage() {
         <p className="mt-3 max-w-2xl text-base text-ink-600">
           During the launch promotion, everything here is free: your public menu page, the QR table
           cards, and the live order board. There is no checkout, no card, and no plan to cancel.
+          (That is about what we charge — a café can still take card payment from its own diners
+          through its own Stripe account.)
         </p>
         <p className="mt-2 max-w-2xl text-sm text-ink-500">
           We will tell cafés already using it before anything about that ever changes.

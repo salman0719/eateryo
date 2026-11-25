@@ -52,6 +52,10 @@ export const orderLineSchema = z.object({
   menuTitle: z.string().min(1).nullable().default(null),
 });
 
+export const PAYMENT_BADGES = ["unpaid", "pending", "paid", "failed", "refunded"] as const;
+
+export type OrderPaymentStatus = (typeof PAYMENT_BADGES)[number];
+
 export const orderSchema = z.object({
   id: z.string().min(1),
   /**
@@ -69,6 +73,13 @@ export const orderSchema = z.object({
   status: orderStatusSchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  /**
+   * Card-payment state (Commit 3). Optional so payloads written before
+   * payments existed still parse; absent reads as `unpaid`. Independent of
+   * the kitchen `status` — a ticket stays workable in every payment state.
+   */
+  paymentStatus: z.enum(PAYMENT_BADGES).nullable().optional(),
+  paymentProvider: z.string().min(1).nullable().optional(),
 });
 
 export type OrderLine = z.infer<typeof orderLineSchema>;

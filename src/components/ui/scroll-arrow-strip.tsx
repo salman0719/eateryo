@@ -16,18 +16,22 @@ import { ChevronLeftIcon } from "@/components/ui/icons";
 export function ScrollArrowStrip({
   as = "div",
   label,
+  trackClassName,
   children,
 }: {
   /**
    * `nav` keeps the editor's categories landmark, `tablist` keeps the
-   * editor's Menu sections tablist, `div` for a row inside a landmark.
+   * editor's Menu sections tablist, `div` for a row inside a landmark,
+   * `ul` when the scrollable children are list items (dish cards).
    */
-  as?: "nav" | "div" | "tablist";
+  as?: "nav" | "div" | "tablist" | "ul";
   /** Accessible name for the scroll region. */
   label: string;
+  /** Override the track layout (gap, alignment, snap, padding). */
+  trackClassName?: string;
   children: ReactNode;
 }) {
-  const trackRef = useRef<HTMLDivElement | null>(null);
+  const trackRef = useRef<HTMLElement | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
 
@@ -71,7 +75,7 @@ export function ScrollArrowStrip({
   }
 
   const arrow =
-    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-line-300 bg-surface-base p-1.5 text-ink-700 shadow-sm transition-opacity hover:border-accent-700 hover:text-accent-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
+    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-surface-900 bg-surface-900 p-1.5 text-on-accent shadow-md transition-opacity hover:bg-surface-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
   // The tablist sits on the header rule: no vertical padding of its own, and
   // the track itself carries the -mb-px pull so the active tab's border
@@ -81,20 +85,46 @@ export function ScrollArrowStrip({
   // a negative margin in ordinary block layout always paints. Other rows keep
   // the breathing room and no pull.
   const trackClass =
-    "no-scrollbar flex items-center gap-1 overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700" +
-    (as === "tablist" ? " -mb-px" : " py-0.5");
+    "no-scrollbar flex overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 " +
+    (trackClassName ?? "items-center gap-1" + (as === "tablist" ? " -mb-px" : " py-0.5"));
 
   const track =
     as === "nav" ? (
-      <nav ref={trackRef} aria-label={label} tabIndex={0} className={trackClass}>
+      <nav
+        ref={trackRef as React.Ref<HTMLElement>}
+        aria-label={label}
+        tabIndex={0}
+        className={trackClass}
+      >
         {children}
       </nav>
     ) : as === "tablist" ? (
-      <div ref={trackRef} role="tablist" aria-label={label} tabIndex={0} className={trackClass}>
+      <div
+        ref={trackRef as React.Ref<HTMLDivElement>}
+        role="tablist"
+        aria-label={label}
+        tabIndex={0}
+        className={trackClass}
+      >
         {children}
       </div>
+    ) : as === "ul" ? (
+      <ul
+        ref={trackRef as React.Ref<HTMLUListElement>}
+        aria-label={label}
+        tabIndex={0}
+        className={trackClass}
+      >
+        {children}
+      </ul>
     ) : (
-      <div ref={trackRef} role="region" aria-label={label} tabIndex={0} className={trackClass}>
+      <div
+        ref={trackRef as React.Ref<HTMLDivElement>}
+        role="region"
+        aria-label={label}
+        tabIndex={0}
+        className={trackClass}
+      >
         {children}
       </div>
     );
