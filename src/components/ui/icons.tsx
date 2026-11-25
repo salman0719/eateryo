@@ -167,6 +167,30 @@ export function ChecklistIcon(props: IconProps) {
   );
 }
 
+/**
+ * Empty plate: a cloche dome for a dish without a photo on the diner menu.
+ * Marks a missing photo without inventing a monogram for the dish.
+ */
+export function PlateIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M4 17.5h16" />
+      <path d="M6.5 17.5a5.5 5.5 0 0 1 11 0" />
+      <path d="M12 11.5V10" />
+      <circle cx="12" cy="8.6" r="1" />
+    </Glyph>
+  );
+}
+
+/** Add: a plus for the diner menu's add-to-order control. */
+export function PlusIcon(props: IconProps) {
+  return (
+    <Glyph {...props}>
+      <path d="M12 5.5v13M5.5 12h13" />
+    </Glyph>
+  );
+}
+
 /** More: three dots for the phone's overflow sheet. */
 export function MoreIcon(props: IconProps) {
   return (
