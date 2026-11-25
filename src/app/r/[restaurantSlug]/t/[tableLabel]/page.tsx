@@ -150,6 +150,7 @@ async function TableLandingContent({
       restaurantSlug={landing.restaurantSlug}
       restaurantLogo={landing.restaurantLogo}
       restaurantCover={landing.restaurantCover}
+      restaurantTheme={landing.restaurantTheme}
       tableLabel={tableLabel}
       menus={landing.menus.map((menu) => ({
         menuId: menu.menuId,

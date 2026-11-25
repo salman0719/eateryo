@@ -24,6 +24,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { usePhoneScreenLayer } from "@/components/ui/phone-frame";
+import { useDinerThemeVars } from "./diner-theme";
 import type { OrderLine } from "@/features/orders/schema";
 
 import { OrderCartLines } from "./order-cart";
@@ -59,6 +60,7 @@ export function OrderSheet({
   returnFocusTo?: RefObject<HTMLButtonElement | null>;
 }) {
   const layer = usePhoneScreenLayer();
+  const themeVars = useDinerThemeVars();
   const panel = useRef<HTMLDivElement | null>(null);
   const itemCount = lines.reduce((sum, line) => sum + line.quantity, 0);
 
@@ -104,6 +106,7 @@ export function OrderSheet({
         tabIndex={-1}
         aria-hidden="true"
         onClick={onClose}
+        style={themeVars}
         className={`${placed} pointer-events-auto inset-0 cursor-default bg-surface-900/25`}
       />
       <div
@@ -115,7 +118,7 @@ export function OrderSheet({
         className={`sheet-up pointer-events-auto ${placed} inset-x-0 bottom-0 ${
           layer ? "z-10" : "z-50"
         } mx-auto flex max-h-[85%] w-full max-w-xl flex-col rounded-t-2xl border-t border-line-200 bg-surface-base shadow-[0_-10px_30px_rgba(28,25,23,0.18)] outline-none`}
-        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        style={{ ...themeVars, paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         <div className="flex items-start justify-between gap-3 px-4 pt-4">
           <div className="min-w-0">

@@ -203,7 +203,7 @@ export function OrderPaySection({
   if (phase.kind === "loading") {
     return (
       <div
-        className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left"
+        className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left"
         aria-busy="true"
       >
         <p className="text-sm text-ink-500">Checking card payment…</p>
@@ -213,7 +213,7 @@ export function OrderPaySection({
 
   if (phase.kind === "unavailable") {
     return (
-      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left">
         <p className="text-sm text-ink-600">{phase.copy}</p>
       </div>
     );
@@ -235,7 +235,7 @@ export function OrderPaySection({
   }
   if (stored === "refunded") {
     return (
-      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left">
         <p className="text-sm font-semibold text-ink-900">Payment refunded.</p>
         <p className="mt-1 text-xs text-ink-600">
           The café refunded this payment — it should return to your card within a few days.
@@ -248,7 +248,7 @@ export function OrderPaySection({
   // way back — a new order or the counter.
   if (read.checkout.reason === "expired") {
     return (
-      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left">
         <p className="text-sm font-semibold text-ink-900">This payment link has expired.</p>
         <p className="mt-1 text-sm text-ink-600">{read.checkout.copy}</p>
       </div>
@@ -258,7 +258,7 @@ export function OrderPaySection({
   // Counter-only café, unpriced order, tiny total: the resolver's sentence.
   if (read.checkout.mode !== "online") {
     return (
-      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+      <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left">
         <p className="text-sm text-ink-600">{read.checkout.copy}</p>
       </div>
     );
@@ -309,7 +309,7 @@ export function OrderPaySection({
       "Pay by card now to send your order to the kitchen — the money goes straight to the café. ";
 
   return (
-    <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+    <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left">
       <p className="text-sm text-ink-600">
         {lead}
         {failed || returnPay === "cancelled" ? "Try again, or pay at the counter." : ""}

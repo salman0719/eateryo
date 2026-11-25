@@ -74,8 +74,12 @@ export function ScrollArrowStrip({
     });
   }
 
+  // Accent fill, like the rail's own active pill: the one fill guaranteed to
+  // stand off the page wash in every preset (dark themes keep surface-900
+  // near-black, where the old fill disappeared into the page). `on-accent`
+  // pairs with it per preset, so the chevron stays legible everywhere.
   const arrow =
-    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-surface-900 bg-surface-900 p-1.5 text-on-accent shadow-md transition-opacity hover:bg-surface-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
+    "absolute top-1/2 z-10 -translate-y-1/2 rounded-full border border-accent-700 bg-accent-700 p-1.5 text-on-accent shadow-md transition-opacity hover:bg-accent-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700";
 
   // The tablist sits on the header rule: no vertical padding of its own, and
   // the track itself carries the -mb-px pull so the active tab's border
