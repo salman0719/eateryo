@@ -65,6 +65,38 @@ export function OrderSkeleton({ label }: { label: string }) {
   );
 }
 
+/**
+ * Minimal diner splash: the Eateryo lockup + waiting dots, like the
+ * signed-in `SessionLoader` but inline rather than fixed. Inside a
+ * `DinerThemeProvider` it picks up the preset's surface/accent tokens, so
+ * the same markup paints neutral first and themed after identity — no
+ * menu geometry, no restaurant copy, just the brand on the page wash.
+ */
+export function DinerSplash({ label }: { label: string }) {
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      // -my-6 cancels OrderShell's py-6 so the splash centers to the viewport.
+      // min-h-screen is the fallback for browsers without svh; 92svh stays
+      // stable (no URL-bar jitter) and never overflows — sits ~4% high.
+      className="-my-6 flex min-h-screen min-h-[92svh] flex-col items-center justify-center gap-6 py-16"
+    >
+      <BrandLockup />
+      <span aria-hidden="true" className="flex items-end gap-1.5">
+        {[0, 1, 2].map((dot) => (
+          <span
+            key={dot}
+            className="session-loader-dot h-1.5 w-1.5 rounded-full bg-accent-700"
+            style={{ animationDelay: `${dot * 160}ms` }}
+          />
+        ))}
+      </span>
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
+
 export function OrderShell({
   tableLabel,
   bare = false,
@@ -116,6 +148,7 @@ export function DinerCoverHeader({
   logo = null,
   cover = null,
   bleed = false,
+  eagerMedia = false,
 }: {
   restaurantName: string;
   /** The diner's table: a filled pill top-right of the cover band. */
@@ -126,6 +159,12 @@ export function DinerCoverHeader({
   logo?: BrandAssetImage | null;
   /** The restaurant's cover photo: the band background when set. */
   cover?: BrandAssetImage | null;
+  /**
+   * The diner page's own header: the band and tile are the LCP image, so
+   * they load eager at high priority instead of lazy. Everywhere else
+   * (owner preview, embedded surfaces) stays lazy.
+   */
+  eagerMedia?: boolean;
   /**
    * On a phone the cover is the page's own top edge: the band reaches the
    * viewport top and both sides with no page padding, and the card framing
@@ -172,7 +211,8 @@ export function DinerCoverHeader({
             alt=""
             width={coverCopy.width}
             height={coverCopy.height}
-            loading="lazy"
+            loading={eagerMedia ? "eager" : "lazy"}
+            fetchPriority={eagerMedia ? "high" : undefined}
             decoding="async"
             onError={() => setCoverFailed(true)}
             className="absolute inset-0 h-full w-full object-cover"
@@ -192,15 +232,16 @@ export function DinerCoverHeader({
             alt=""
             width={logoCopy.width}
             height={logoCopy.height}
-            loading="lazy"
+            loading={eagerMedia ? "eager" : "lazy"}
+            fetchPriority={eagerMedia ? "high" : undefined}
             decoding="async"
             onError={() => setLogoFailed(true)}
-            className="relative z-10 -mt-7 h-14 w-14 shrink-0 rounded-2xl border-2 border-surface-base bg-surface-base object-cover"
+            className="relative z-10 -mt-7 h-14 w-14 shrink-0 rounded-2xl border-2 border-surface-base bg-surface-base object-cover ring-2 ring-accent-700/25"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+            className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-white ring-2 ring-accent-700/25"
           >
             {initial}
           </span>
@@ -244,7 +285,7 @@ export function DinerSearchField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
         />
       </label>
       {resultText !== null && (

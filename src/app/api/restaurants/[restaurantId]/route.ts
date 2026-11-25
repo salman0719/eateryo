@@ -6,8 +6,10 @@ import {
   getRestaurantForUser,
   renameRestaurantForOwner,
   setRestaurantBrandAssetsForOwner,
+  setRestaurantDinerThemeForOwner,
 } from "@/features/tenancy/repo";
 import { brandAssetImageSchema } from "@/features/brand-assets/schema";
+import { dinerThemeSchema } from "@/features/diner-theme/schema";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -29,9 +31,14 @@ const updateBody = z
     name: z.string().trim().min(1, "Name is required.").max(120).optional(),
     logo: brandAssetImageSchema.nullable().optional(),
     cover: brandAssetImageSchema.nullable().optional(),
+    dinerTheme: dinerThemeSchema.optional(),
   })
   .refine(
-    (value) => value.name !== undefined || value.logo !== undefined || value.cover !== undefined,
+    (value) =>
+      value.name !== undefined ||
+      value.logo !== undefined ||
+      value.cover !== undefined ||
+      value.dinerTheme !== undefined,
     "Nothing to update."
   );
 
@@ -101,7 +108,7 @@ export async function PATCH(
 
   try {
     const db = getDb();
-    const { name, logo, cover } = parsed.data;
+    const { name, logo, cover, dinerTheme } = parsed.data;
     // When no rename is asked for, any member reads the row so a staff
     // writer still lands on the 403 branch below instead of a 404.
     let restaurant =
@@ -127,6 +134,20 @@ export async function PATCH(
           userId,
           restaurantId,
           "Only an owner can change this restaurant's brand."
+        );
+      }
+    }
+    if (dinerTheme !== undefined) {
+      try {
+        restaurant = await setRestaurantDinerThemeForOwner(db, userId, restaurantId, dinerTheme);
+      } catch {
+        return errorResponse("invalid_body", "Unknown diner theme.", 400);
+      }
+      if (!restaurant) {
+        return refusalResponse(
+          userId,
+          restaurantId,
+          "Only an owner can change this restaurant's diner look."
         );
       }
     }

@@ -8,6 +8,7 @@ import {
   restaurantMembership,
 } from "@/lib/db/schema";
 import type { BrandAssetImage } from "@/features/brand-assets/schema";
+import type { DinerTheme } from "@/features/diner-theme/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
 import { accessFromMembership, can, getMembershipAccess } from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
@@ -77,6 +78,7 @@ export interface TableLanding {
   /** Brand assets for the cover header; null when the owner set none. */
   restaurantLogo: BrandAssetImage | null;
   restaurantCover: BrandAssetImage | null;
+  restaurantTheme: DinerTheme;
   /** Live menus whose windows cover `now` — the only orderable ones. */
   menus: OpenMenuEntry[];
   /** Live menus whose windows do *not* cover `now`, for display only. */
@@ -314,6 +316,7 @@ export async function getRestaurantBySlug(
   slug: string;
   logo: BrandAssetImage | null;
   cover: BrandAssetImage | null;
+  dinerTheme: DinerTheme;
 } | null> {
   if (!isSlug(slug)) return null;
   const rows = await db
@@ -323,6 +326,7 @@ export async function getRestaurantBySlug(
       slug: restaurant.slug,
       logo: restaurant.logo,
       cover: restaurant.cover,
+      dinerTheme: restaurant.dinerTheme,
     })
     .from(restaurant)
     .where(eq(restaurant.slug, slug));
@@ -334,29 +338,26 @@ export async function getRestaurantBySlug(
     slug: row.slug,
     logo: row.logo,
     cover: row.cover,
+    dinerTheme: row.dinerTheme ?? null,
   };
 }
 
 /**
- * Public: the table landing for a restaurant slug — every *live* published
- * menu, split into those whose availability covers `now` (`menus`, the
- * orderable ones) and those it does not (`closedMenus`, display only),
+ * Public: a restaurant's live menus split into open now (`menus`, the
+ * orderable ones) and published-but-closed (`closedMenus`, display only),
  * judged in the restaurant's own zone (`restaurant.time_zone`, null = UTC)
  * so "9 to 5" means the café's 9 to 5 rather than UTC's; the `timeZone`
  * argument is only the fallback for a restaurant that has never saved
- * hours. Null when the slug names no restaurant (callers render a 404);
- * a known restaurant with nothing open returns empty lists so the page
- * can say so honestly.
+ * hours. Identity-free on purpose: the table page reads the cheap
+ * restaurant row first and streams this heavier query (full revision docs)
+ * after, so the first paint already carries the theme, name, and cover.
  */
-export async function listOpenMenusForRestaurantSlug(
+export async function listLandingMenus(
   db: TenancyDb,
-  restaurantSlug: string,
+  restaurantId: string,
   now: Date = new Date(),
   timeZone = "UTC"
-): Promise<TableLanding | null> {
-  const found = await getRestaurantBySlug(db, restaurantSlug);
-  if (!found) return null;
-
+): Promise<Pick<TableLanding, "menus" | "closedMenus">> {
   const rows = await db
     .select({
       menuId: menu.id,
@@ -373,7 +374,7 @@ export async function listOpenMenusForRestaurantSlug(
     .innerJoin(restaurant, eq(restaurant.id, publishedMenu.restaurantId))
     .where(
       and(
-        eq(publishedMenu.restaurantId, found.id),
+        eq(publishedMenu.restaurantId, restaurantId),
         isNotNull(publishedMenu.publishedAt),
         isNotNull(publishedMenu.liveRevisionId)
       )
@@ -407,12 +408,32 @@ export async function listOpenMenusForRestaurantSlug(
     });
   }
 
+  return { menus, closedMenus };
+}
+
+/**
+ * Public: the table landing for a restaurant slug — identity plus live
+ * menus, split into open now and published-but-closed (see
+ * `listLandingMenus`). Null when the slug names no restaurant (callers
+ * render a 404); a known restaurant with nothing open returns empty lists
+ * so the page can say so honestly.
+ */
+export async function listOpenMenusForRestaurantSlug(
+  db: TenancyDb,
+  restaurantSlug: string,
+  now: Date = new Date(),
+  timeZone = "UTC"
+): Promise<TableLanding | null> {
+  const found = await getRestaurantBySlug(db, restaurantSlug);
+  if (!found) return null;
+  const { menus, closedMenus } = await listLandingMenus(db, found.id, now, timeZone);
   return {
     restaurantId: found.id,
     restaurantName: found.name,
     restaurantSlug: found.slug,
     restaurantLogo: found.logo,
     restaurantCover: found.cover,
+    restaurantTheme: found.dinerTheme ?? null,
     menus,
     closedMenus,
   };

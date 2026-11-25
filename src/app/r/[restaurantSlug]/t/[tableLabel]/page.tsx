@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { OrderShell, OrderSkeleton } from "@/components/order/order-menu";
-import { TableLanding as TableLandingScreen } from "@/components/order/table-landing";
+import type { BrandAssetImage } from "@/features/brand-assets/schema";
+import { DinerThemeProvider } from "@/components/order/diner-theme";
+import { DinerSplash, OrderShell } from "@/components/order/order-menu";
+import { TableLandingBody } from "@/components/order/table-landing";
 import { isSlug } from "@/features/publishing/slug";
 import { normalizeTableLabel, formatTableLabel } from "@/features/orders/table-links";
-import { listOpenMenusForRestaurantSlug, type TableLanding } from "@/features/tables/repo";
+import { getRestaurantBySlug, listLandingMenus } from "@/features/tables/repo";
 import { getDb } from "@/lib/db";
 
 /**
@@ -24,9 +26,9 @@ import { getDb } from "@/lib/db";
  * an honest empty state instead of a dead page.
  */
 
-const loadLanding = cache(async (restaurantSlug: string): Promise<TableLanding | null> => {
+const loadIdentity = cache(async (restaurantSlug: string) => {
   if (!isSlug(restaurantSlug)) return null;
-  return listOpenMenusForRestaurantSlug(getDb(), restaurantSlug, new Date());
+  return getRestaurantBySlug(getDb(), restaurantSlug);
 });
 
 export async function generateMetadata({
@@ -35,12 +37,12 @@ export async function generateMetadata({
   params: Promise<{ restaurantSlug: string; tableLabel: string }>;
 }): Promise<Metadata> {
   const { restaurantSlug, tableLabel } = await params;
-  // Time-dependent (menu open hours are judged at `now`): opt out of
-  // prerendering so `new Date()` below is evaluated per request.
+  // The title names the restaurant only; the time-dependent open-hours
+  // judgement lives in the page content. Still per-request, like the page.
   await connection();
-  const landing = await loadLanding(restaurantSlug);
+  const identity = await loadIdentity(restaurantSlug);
   const label = normalizeTableLabel(decodeURIComponent(tableLabel));
-  if (!landing) {
+  if (!identity) {
     return {
       title: "Restaurant link isn’t live · Eateryo",
       robots: { index: false, follow: false },
@@ -48,8 +50,8 @@ export async function generateMetadata({
   }
   return {
     title: label
-      ? `${landing.restaurantName} · ${formatTableLabel(label)} · Eateryo`
-      : `${landing.restaurantName} · Eateryo`,
+      ? `${identity.name} · ${formatTableLabel(label)} · Eateryo`
+      : `${identity.name} · Eateryo`,
     robots: { index: false, follow: false },
   };
 }
@@ -68,10 +70,17 @@ export default function TableLandingPage({
   );
 }
 
+/**
+ * The static shell: fully prerenderable (no params, no data), so a direct
+ * QR visit paints instantly. Neutral brand splash — the Eateryo lockup on
+ * the shipped wash. The same splash repaints themed the moment the
+ * identity row answers (inside `DinerThemeProvider`), then menus stream
+ * in behind it.
+ */
 function LandingLoading() {
   return (
-    <OrderShell>
-      <OrderSkeleton label="Finding this table’s menus…" />
+    <OrderShell bare>
+      <DinerSplash label="Finding this table's menus…" />
     </OrderShell>
   );
 }
@@ -100,35 +109,91 @@ async function TableLandingContent({
     returnPay === "success" && sessionParam.length >= 8 && sessionParam.length <= 200
       ? sessionParam
       : null;
-  const landing = await loadLanding(restaurantSlug);
-  if (!landing) notFound();
+  const identity = await loadIdentity(restaurantSlug);
+  if (!identity) notFound();
 
   const tableLabel = normalizeTableLabel(decodeURIComponent(rawLabel));
   if (!tableLabel) {
     return (
-      <OrderShell>
-        <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
-          <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
-          <p className="mt-2 text-sm leading-6 text-ink-600">
-            A table link includes the table number, like{" "}
-            <code className="rounded bg-surface-100 px-1.5 py-0.5 text-xs">
-              /r/{landing.restaurantSlug}/t/3
-            </code>
-            . Ask staff for a fresh QR code.
-          </p>
-        </div>
-      </OrderShell>
+      <DinerThemeProvider theme={identity.dinerTheme} className="min-h-screen">
+        <OrderShell bare>
+          <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
+            <p className="text-lg font-semibold text-ink-900">This table link is incomplete</p>
+            <p className="mt-2 text-sm leading-6 text-ink-600">
+              A table link includes the table number, like{" "}
+              <code className="rounded bg-surface-100 px-1.5 py-0.5 text-xs">
+                /r/{identity.slug}/t/3
+              </code>
+              . Ask staff for a fresh QR code.
+            </p>
+          </div>
+        </OrderShell>
+      </DinerThemeProvider>
     );
   }
 
+  return (
+    <DinerThemeProvider theme={identity.dinerTheme} className="min-h-screen">
+      <OrderShell bare>
+        <Suspense
+          fallback={
+            resumeToken ? (
+              <DinerSplash label="Finding your order…" />
+            ) : (
+              <DinerSplash label="Loading this restaurant’s menus…" />
+            )
+          }
+        >
+          <LandingMenus
+            restaurantId={identity.id}
+            restaurantName={identity.name}
+            restaurantSlug={identity.slug}
+            restaurantLogo={identity.logo}
+            restaurantCover={identity.cover}
+            tableLabel={tableLabel}
+            resumeToken={resumeToken}
+            returnPay={returnPay}
+            returnSessionId={returnSessionId}
+          />
+        </Suspense>
+      </OrderShell>
+    </DinerThemeProvider>
+  );
+}
+
+async function LandingMenus({
+  restaurantId,
+  restaurantName,
+  restaurantSlug,
+  restaurantLogo,
+  restaurantCover,
+  tableLabel,
+  resumeToken,
+  returnPay,
+  returnSessionId,
+}: {
+  restaurantId: string;
+  restaurantName: string;
+  restaurantSlug: string;
+  restaurantLogo: BrandAssetImage | null;
+  restaurantCover: BrandAssetImage | null;
+  tableLabel: string;
+  resumeToken: string | null;
+  returnPay: "success" | "cancelled" | null;
+  returnSessionId: string | null;
+}) {
+  // Same per-request requirement as above: menu windows are judged at now.
+  await connection();
+  const { menus, closedMenus } = await listLandingMenus(getDb(), restaurantId, new Date());
+
   const frame = "rounded-2xl border border-line-200 bg-surface-base";
 
-  if (landing.menus.length === 0 && landing.closedMenus.length === 0) {
+  if (menus.length === 0 && closedMenus.length === 0) {
     return (
-      <OrderShell tableLabel={tableLabel}>
+      <>
         <div className={`${frame} p-5`}>
           <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
-            {landing.restaurantName} · {formatTableLabel(tableLabel)}
+            {restaurantName} · {formatTableLabel(tableLabel)}
           </p>
           <h1 className="mt-1 text-2xl font-bold text-ink-900">Order from your table</h1>
           <p className="mt-1 text-sm text-ink-600">Ask staff what’s being served right now.</p>
@@ -136,28 +201,28 @@ async function TableLandingContent({
         <div className={`${frame} p-8 text-center`}>
           <p className="text-lg font-semibold text-ink-900">Nothing being served right now</p>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-600">
-            {landing.restaurantName} has no menu open at the moment — the kitchen may be between
-            services. Ask staff what’s on, or try again a little later.
+            {restaurantName} has no menu open at the moment — the kitchen may be between services.
+            Ask staff what’s on, or try again a little later.
           </p>
         </div>
-      </OrderShell>
+      </>
     );
   }
 
   return (
-    <TableLandingScreen
-      restaurantName={landing.restaurantName}
-      restaurantSlug={landing.restaurantSlug}
-      restaurantLogo={landing.restaurantLogo}
-      restaurantCover={landing.restaurantCover}
+    <TableLandingBody
+      restaurantName={restaurantName}
+      restaurantSlug={restaurantSlug}
+      restaurantLogo={restaurantLogo}
+      restaurantCover={restaurantCover}
       tableLabel={tableLabel}
-      menus={landing.menus.map((menu) => ({
+      menus={menus.map((menu) => ({
         menuId: menu.menuId,
         menuSlug: menu.menuSlug,
         title: menu.title,
         doc: menu.doc,
       }))}
-      closedMenus={landing.closedMenus}
+      closedMenus={closedMenus}
       resumeToken={resumeToken}
       returnPay={returnPay}
       returnSessionId={returnSessionId}

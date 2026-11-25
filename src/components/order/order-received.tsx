@@ -48,7 +48,7 @@ export function OrderReceived({
 
   return (
     <div className="rounded-2xl border border-line-200 bg-surface-base p-8 text-center">
-      <p className="text-sm font-semibold tracking-wider text-success-800 uppercase">
+      <p className="text-sm font-semibold tracking-wider text-accent-700 uppercase">
         Order received
       </p>
       <p className="mt-3 text-2xl font-bold text-ink-900">#{orderCode(order.id)}</p>

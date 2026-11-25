@@ -127,7 +127,9 @@ export function OrderCartLines({
                 >
                   −
                 </button>
-                <span className="w-6 text-center text-sm tabular-nums">{line.quantity}</span>
+                <span className="w-6 text-center text-sm tabular-nums text-ink-900">
+                  {line.quantity}
+                </span>
                 <button
                   type="button"
                   aria-label={`Increase ${line.name}`}
@@ -160,7 +162,7 @@ export function OrderCartLines({
         rows={2}
         maxLength={280}
         placeholder="Allergies, no onions…"
-        className="mt-1 w-full rounded-xl border border-line-300 px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+        className="mt-1 w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
       />
     </>
   );
