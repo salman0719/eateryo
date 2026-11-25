@@ -772,37 +772,43 @@ export function OrderMenuSection({
                         ))}
                       </div>
                     )}
-                    {item.variants.length > 0 && (
-                      <label className="mt-1 inline-block max-w-full text-xs text-ink-600">
-                        <span className="sr-only">Size for {item.name}</span>
-                        <select
-                          value={variant?.name ?? ""}
-                          onChange={(event) => onVariantChange(item.id, event.target.value)}
-                          className="max-w-full rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
-                        >
-                          {item.variants.map((option) => (
-                            <option key={option.name} value={option.name}>
-                              {option.name}
-                              {option.price !== null
-                                ? ` — ${formatPreviewPrice(option.price, null, currency)}`
-                                : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {roomy ? (
-                      <div className="mt-auto flex items-center justify-between gap-2 pt-1">
+                    {/* Size + price foot: bottom-anchored together so the
+                        size picker is the last thing before the pricing/add
+                        row and every card in the rail lines up, however long
+                        the description, hint or diet chips above run. */}
+                    <div className="mt-auto flex flex-col gap-1 pt-1">
+                      {item.variants.length > 0 && (
+                        <label className="inline-block max-w-full text-xs text-ink-600">
+                          <span className="sr-only">Size for {item.name}</span>
+                          <select
+                            value={variant?.name ?? ""}
+                            onChange={(event) => onVariantChange(item.id, event.target.value)}
+                            className="max-w-full rounded-full border border-line-300 bg-surface-base px-3 py-1 text-xs text-ink-700 focus:border-accent-700 focus:outline-none"
+                          >
+                            {item.variants.map((option) => (
+                              <option key={option.name} value={option.name}>
+                                {option.name}
+                                {option.price !== null
+                                  ? ` — ${formatPreviewPrice(option.price, null, currency)}`
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                      {roomy ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold tabular-nums text-ink-900">
+                            {formatPreviewPrice(livePrice, null, currency)}
+                          </p>
+                          {addControl}
+                        </div>
+                      ) : (
                         <p className="text-sm font-semibold tabular-nums text-ink-900">
                           {formatPreviewPrice(livePrice, null, currency)}
                         </p>
-                        {addControl}
-                      </div>
-                    ) : (
-                      <p className="mt-auto pt-1 text-sm font-semibold tabular-nums text-ink-900">
-                        {formatPreviewPrice(livePrice, null, currency)}
-                      </p>
-                    )}
+                      )}
+                    </div>
                   </div>
                   {!roomy && <div className="flex flex-none items-center">{addControl}</div>}
                 </div>
