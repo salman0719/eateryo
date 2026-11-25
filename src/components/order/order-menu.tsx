@@ -195,12 +195,12 @@ export function DinerCoverHeader({
             loading="lazy"
             decoding="async"
             onError={() => setLogoFailed(true)}
-            className="relative z-10 -mt-7 h-14 w-14 shrink-0 rounded-2xl border-2 border-surface-base bg-surface-base object-cover"
+            className="relative z-10 -mt-7 h-14 w-14 shrink-0 rounded-2xl border-2 border-surface-base bg-surface-base object-cover ring-2 ring-accent-700/25"
           />
         ) : (
           <span
             aria-hidden="true"
-            className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-on-accent"
+            className="relative z-10 -mt-7 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border-2 border-surface-base bg-surface-900 text-xl font-bold text-white ring-2 ring-accent-700/25"
           >
             {initial}
           </span>
@@ -244,7 +244,7 @@ export function DinerSearchField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
+          className="w-full rounded-xl border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-700 focus:outline-none"
         />
       </label>
       {resultText !== null && (

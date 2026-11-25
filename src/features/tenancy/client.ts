@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { membershipAccessSchema, SyncError, type SyncErrorCode } from "@/features/menus/sync";
 import { brandAssetImageSchema, type BrandAssetImage } from "@/features/brand-assets/schema";
+import { dinerThemeSchema, type DinerTheme } from "@/features/diner-theme/schema";
 
 /** All we need to pick a move target or show a restaurant name. */
 const restaurantOptionSchema = z.object({
@@ -21,6 +22,8 @@ const restaurantOptionSchema = z.object({
    */
   logo: brandAssetImageSchema.nullable().optional(),
   cover: brandAssetImageSchema.nullable().optional(),
+  /** Diner page theme; absent in older responses, null = shipped look. */
+  dinerTheme: dinerThemeSchema.optional(),
   role: z.enum(["owner", "staff"]),
   /**
    * The server's capability answer for this membership. Optional so an older
@@ -256,6 +259,19 @@ export async function updateBrandAssets(
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(assets),
+    },
+    (payload) => restaurantEnvelope.parse(payload).restaurant
+  );
+}
+
+/** Owner-only diner theme write; null clears back to the shipped look. */
+export async function updateDinerTheme(id: string, theme: DinerTheme): Promise<RestaurantOption> {
+  return requestJson(
+    `/api/restaurants/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dinerTheme: theme }),
     },
     (payload) => restaurantEnvelope.parse(payload).restaurant
   );

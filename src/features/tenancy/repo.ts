@@ -4,6 +4,7 @@ import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { restaurant, restaurantMembership, user } from "@/lib/db/schema";
 import type { RestaurantRole, RestaurantWithRole } from "@/lib/db/schema";
 import type { BrandAssetImage } from "@/features/brand-assets/schema";
+import { dinerThemeSchema, type DinerTheme } from "@/features/diner-theme/schema";
 import { recordAuditEvent } from "./audit";
 import { accessFromMembership, can, getMembershipAccess, type MembershipAccess } from "./policy";
 
@@ -26,6 +27,7 @@ const restaurantColumns = {
   slug: restaurant.slug,
   logo: restaurant.logo,
   cover: restaurant.cover,
+  dinerTheme: restaurant.dinerTheme,
   createdAt: restaurant.createdAt,
   updatedAt: restaurant.updatedAt,
 } as const;
@@ -180,6 +182,29 @@ export async function setRestaurantBrandAssetsForOwner(
   const updated = await db
     .update(restaurant)
     .set(set)
+    .where(eq(restaurant.id, restaurantId))
+    .returning(restaurantColumns);
+  const row = updated[0];
+  return row ? { ...row, role: access.role, access } : null;
+}
+
+/**
+ * Owner-only diner theme write. Null clears back to the shipped Eucalyptus
+ * look. Returns null when the user isn't a member or isn't an owner.
+ */
+export async function setRestaurantDinerThemeForOwner(
+  db: TenancyDb,
+  userId: string,
+  restaurantId: string,
+  theme: DinerTheme
+): Promise<RestaurantWithAccess | null> {
+  const access = await getMembershipAccess(db, userId, restaurantId);
+  if (!can(access, "settings.manage")) return null;
+  const parsed = dinerThemeSchema.safeParse(theme);
+  if (!parsed.success) throw new Error("invalid diner theme");
+  const updated = await db
+    .update(restaurant)
+    .set({ dinerTheme: parsed.data })
     .where(eq(restaurant.id, restaurantId))
     .returning(restaurantColumns);
   const row = updated[0];

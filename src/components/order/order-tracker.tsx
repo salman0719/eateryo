@@ -64,7 +64,7 @@ export function OrderTracker({ orderId, token, initialOrder, restaurantName }: O
   }
 
   return (
-    <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-raised p-5 text-left">
+    <div className="mx-auto mt-5 max-w-md rounded-2xl border border-line-200 bg-surface-100 p-5 text-left">
       <div aria-live="polite" role="status" className="sr-only">
         {trackerCopy(order.status)}
       </div>

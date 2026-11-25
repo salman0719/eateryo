@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { BrandAssetImage } from "@/features/brand-assets/schema";
+import type { DinerTheme } from "@/features/diner-theme/schema";
 
 /**
  * Canonical server DB schema (Drizzle, Postgres/Neon).
@@ -136,6 +137,12 @@ export const restaurant = pgTable(
      */
     logo: jsonb("logo").$type<BrandAssetImage | null>(),
     cover: jsonb("cover").$type<BrandAssetImage | null>(),
+    /**
+     * Diner page theme (V1): a preset id, or null for the shipped
+     * Eucalyptus look. Scoped to the diner subtree at render time — never
+     * `:root` — so it re-skins the diner without touching the owner app.
+     */
+    dinerTheme: jsonb("diner_theme").$type<DinerTheme>(),
     createdBy: text("created_by")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

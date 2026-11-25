@@ -16,6 +16,8 @@
 import { useEffect, useState } from "react";
 
 import type { BrandAssetImage } from "@/features/brand-assets/schema";
+import type { DinerTheme } from "@/features/diner-theme/schema";
+import { DinerThemeProvider } from "./diner-theme";
 import { fetchTrackedOrder, type PlacedOrder } from "@/features/orders/client";
 
 import { DinerCoverHeader, OrderShell, OrderSkeleton } from "./order-menu";
@@ -30,6 +32,7 @@ export interface TableLandingProps {
   /** Brand assets; the header falls back to gradient + initial without. */
   restaurantLogo?: BrandAssetImage | null;
   restaurantCover?: BrandAssetImage | null;
+  restaurantTheme?: DinerTheme;
   tableLabel: string;
   menus: TableOrderMenu[];
   closedMenus: ClosedTableOrderMenu[];
@@ -45,7 +48,21 @@ export interface TableLandingProps {
   returnSessionId: string | null;
 }
 
-export function TableLanding({
+/**
+ * Every diner screen — ordering, loading, invalid-link, and the order
+ * confirmation — sits under one `DinerThemeProvider`, so the theme is a
+ * property of the visit, not of one section. Portalled sheets re-apply the
+ * same vars from context (see `diner-theme.tsx`).
+ */
+export function TableLanding(props: TableLandingProps) {
+  return (
+    <DinerThemeProvider theme={props.restaurantTheme ?? null} className="min-h-screen">
+      <TableLandingInner {...props} />
+    </DinerThemeProvider>
+  );
+}
+
+function TableLandingInner({
   restaurantName,
   restaurantSlug,
   restaurantLogo = null,
