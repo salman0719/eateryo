@@ -141,6 +141,13 @@
       "when": 1795246748782,
       "tag": "0019_aspiring_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795596903076,
+      "tag": "0020_bumpy_satana",
+      "breakpoints": true
     }
   ]
 }

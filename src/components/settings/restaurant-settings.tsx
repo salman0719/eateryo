@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AccountDangerZone, AccountExportCard } from "@/components/launch/data-controls";
 import { CommitInput } from "@/components/menu-editor/fields";
 import { BrandCard } from "@/components/settings/brand-card";
+import { DinerLookCard } from "@/components/settings/diner-look-card";
 import { OrderAlertsCard } from "@/components/settings/order-alerts";
 import { PaymentsCard } from "@/components/settings/payments-card";
 import { TeamActivity } from "@/components/settings/team-activity";
@@ -203,6 +204,15 @@ export function RestaurantSettings() {
                 onChanged={(updated) => workspace.addRestaurant(updated)}
               />
             )}
+
+          {(canManageSettings || selectedOption?.dinerTheme) && selectedOption && (
+            <DinerLookCard
+              key={`diner-look-${selected.id}`}
+              restaurant={selectedOption}
+              canManage={canManageSettings}
+              onChanged={(updated) => workspace.addRestaurant(updated)}
+            />
+          )}
 
           {canReadTeam && (
             <>

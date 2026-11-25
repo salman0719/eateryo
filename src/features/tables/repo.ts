@@ -8,6 +8,7 @@ import {
   restaurantMembership,
 } from "@/lib/db/schema";
 import type { BrandAssetImage } from "@/features/brand-assets/schema";
+import type { DinerTheme } from "@/features/diner-theme/schema";
 import type { TenancyDb } from "@/features/tenancy/repo";
 import { accessFromMembership, can, getMembershipAccess } from "@/features/tenancy/policy";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
@@ -77,6 +78,7 @@ export interface TableLanding {
   /** Brand assets for the cover header; null when the owner set none. */
   restaurantLogo: BrandAssetImage | null;
   restaurantCover: BrandAssetImage | null;
+  restaurantTheme: DinerTheme;
   /** Live menus whose windows cover `now` — the only orderable ones. */
   menus: OpenMenuEntry[];
   /** Live menus whose windows do *not* cover `now`, for display only. */
@@ -314,6 +316,7 @@ export async function getRestaurantBySlug(
   slug: string;
   logo: BrandAssetImage | null;
   cover: BrandAssetImage | null;
+  dinerTheme: DinerTheme;
 } | null> {
   if (!isSlug(slug)) return null;
   const rows = await db
@@ -323,6 +326,7 @@ export async function getRestaurantBySlug(
       slug: restaurant.slug,
       logo: restaurant.logo,
       cover: restaurant.cover,
+      dinerTheme: restaurant.dinerTheme,
     })
     .from(restaurant)
     .where(eq(restaurant.slug, slug));
@@ -334,6 +338,7 @@ export async function getRestaurantBySlug(
     slug: row.slug,
     logo: row.logo,
     cover: row.cover,
+    dinerTheme: row.dinerTheme ?? null,
   };
 }
 
@@ -413,6 +418,7 @@ export async function listOpenMenusForRestaurantSlug(
     restaurantSlug: found.slug,
     restaurantLogo: found.logo,
     restaurantCover: found.cover,
+    restaurantTheme: found.dinerTheme ?? null,
     menus,
     closedMenus,
   };
