@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or, sql, type SQLWrapper } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lt, or, sql, type SQLWrapper } from "drizzle-orm";
 
 import type { PlatformDb } from "@/lib/auth/platform-admin";
 import {
@@ -28,7 +28,7 @@ import {
   type AdminEventsPage,
   type AdminTimelineEntry,
 } from "./schema";
-import { deriveAccountStage, type AccountStage } from "./stage";
+import { ACCOUNT_STAGES, deriveAccountStage, type AccountStage } from "./stage";
 
 /**
  * Platform operations (B1) — server-only. Suspend and restore an account
@@ -771,5 +771,93 @@ export async function listPlatformEvents(
   return {
     events,
     nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* B3 reads: platform overview                                        */
+/* ------------------------------------------------------------------ */
+
+/** Accounts that signed up but never started, older than this, need a nudge. */
+const OVERVIEW_STALLED_DAYS = 7;
+const OVERVIEW_STALLED_LIMIT = 5;
+
+export interface PlatformOverviewTotals {
+  accounts: number;
+  suspended: number;
+  cafes: number;
+  liveMenus: number;
+  /** Orders placed in the last 7 days, platform-wide. */
+  orders7: number;
+}
+
+export interface StalledSignup {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
+export interface PlatformOverview {
+  totals: PlatformOverviewTotals;
+  /** One entry per stage, funnel order, zeros included — never sparse. */
+  funnel: { stage: AccountStage; count: number }[];
+  /** Signed up, no café after a week, oldest first (support-sized). */
+  stalledSignups: StalledSignup[];
+}
+
+/** The same stage decision as `deriveAccountStage`, as a SQL CASE. */
+const stageCaseSql = sql<AccountStage>`case when (${orderCountSql}) > 0 then 'ordering' when (${liveCountSql}) > 0 then 'published' when (${menuCountSql}) > 0 then 'menu' when (${cafeCountSql}) > 0 then 'cafe' else 'signed_up' end`;
+
+/**
+ * The overview screen in three constant queries (B3).
+ *
+ * Totals and the funnel derive from the tables the app already owns —
+ * no counters are stored, so nothing can drift. The funnel groups by
+ * the same stage decision the list renders per row, so the two can
+ * never disagree. Recent sign-ups, open suspensions and recent actions
+ * stay on the page queries (`listAccounts`, `listPlatformEvents`)
+ * instead of growing a second shape here.
+ */
+export async function getPlatformOverview(db: PlatformDb): Promise<PlatformOverview> {
+  const [totals] = await db
+    .select({
+      accounts: sql<number>`(select count(*)::int from "user")`,
+      suspended: sql<number>`(select count(*)::int from "account_suspension" where "account_suspension"."lifted_at" is null)`,
+      cafes: sql<number>`(select count(*)::int from "restaurant")`,
+      liveMenus: sql<number>`(select count(*)::int from "published_menu" where "published_menu"."published_at" is not null)`,
+      orders7: sql<number>`(select count(*)::int from "order" where "order"."created_at" > now() - interval '7 days')`,
+    })
+    .from(user)
+    .limit(1);
+
+  const funnelRows = await db
+    .select({ stage: stageCaseSql, count: sql<number>`count(*)::int` })
+    .from(user)
+    .groupBy(stageCaseSql);
+  const funnelCounts = new Map(funnelRows.map((row) => [row.stage, row.count]));
+  const funnel = ACCOUNT_STAGES.map((stage) => ({
+    stage,
+    count: funnelCounts.get(stage) ?? 0,
+  }));
+
+  const stalled = await db
+    .select({ id: user.id, name: user.name, email: user.email, createdAt: user.createdAt })
+    .from(user)
+    .where(
+      sql`not exists(select 1 from "restaurant_membership" where "restaurant_membership"."user_id" = "user"."id") and "user"."created_at" < now() - interval '${sql.raw(String(OVERVIEW_STALLED_DAYS))} days'`
+    )
+    .orderBy(asc(user.createdAt))
+    .limit(OVERVIEW_STALLED_LIMIT);
+
+  return {
+    totals: totals ?? { accounts: 0, suspended: 0, cafes: 0, liveMenus: 0, orders7: 0 },
+    funnel,
+    stalledSignups: stalled.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt.toISOString(),
+    })),
   };
 }

@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { eq } from "drizzle-orm";
+
 import { createSampleMenuDocument } from "@/features/menu/sample-menu";
 import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
 import { createMenuForUser } from "@/features/menus/repo";
@@ -12,12 +14,13 @@ import {
 import { ACCOUNT_STAGES, deriveAccountStage, stageIndex } from "@/features/platform/stage";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { createRestaurant } from "@/features/tenancy/repo";
-import { getAccountDetail, listPlatformEvents } from "@/features/platform/repo";
+import { getAccountDetail, getPlatformOverview, listPlatformEvents } from "@/features/platform/repo";
 import {
   order as orderTable,
   platformEvent as platformEventTable,
   restaurant as restaurantTable,
   session as sessionTable,
+  user as userTable,
 } from "@/lib/db/schema";
 import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 
@@ -425,5 +428,78 @@ describe("operator log", () => {
     const suspended = await listPlatformEvents(db, { action: "account.suspended" });
     expect(suspended.events.length).toBe(14);
     expect(suspended.events.every((event) => event.action === "account.suspended")).toBe(true);
+  });
+});
+
+describe("platform overview", () => {
+  let db: TestDb;
+  let actorId: string;
+
+  function menuDoc(id: string): MenuDocument {
+    return menuDocumentSchema.parse({ ...createSampleMenuDocument(), id });
+  }
+
+  beforeEach(async () => {
+    ({ db } = await createTestDb());
+    actorId = await seedUser(db, "overview-actor@cafe.test", "Actor");
+  }, 30_000);
+
+  it("totals the platform, funnels every account, and surfaces stalled sign-ups", async () => {
+    // Ordering: café + live menu + an order this week.
+    const orderedId = await seedUser(db, "overview-ordered@cafe.test", "Ordered");
+    const orderedCafe = await createRestaurant(db, orderedId, "Café Ordered");
+    await createMenuForUser(db, orderedId, orderedCafe.id, menuDoc("menu-ordered"));
+    await publishMenuForUser(db, orderedId, "menu-ordered");
+    await db
+      .insert(orderTable)
+      .values({ restaurantId: orderedCafe.id, menuTitle: "Lunch", tableLabel: "3" });
+
+    // Café but nothing else; suspended café; fresh bare sign-up.
+    const cafeId = await seedUser(db, "overview-cafe@cafe.test", "Cafe");
+    await createRestaurant(db, cafeId, "Café Quiet");
+    const stoppedId = await seedUser(db, "overview-stopped@cafe.test", "Stopped");
+    await createRestaurant(db, stoppedId, "Café Stopped");
+    await suspendAccount(db, {
+      targetUserId: stoppedId,
+      reason: "abuse_or_spam",
+      actorUserId: actorId,
+    });
+    await seedUser(db, "overview-fresh@cafe.test", "Fresh");
+
+    // Bare sign-up from eight days ago — the only stalled one.
+    const stalledId = await seedUser(db, "overview-stalled@cafe.test", "Stalled");
+    await db
+      .update(userTable)
+      .set({ createdAt: new Date(Date.now() - 8 * 24 * 3_600_1_000) })
+      .where(eq(userTable.id, stalledId));
+
+    const overview = await getPlatformOverview(db);
+
+    // Six accounts: actor, ordered, cafe, stopped, fresh, stalled.
+    expect(overview.totals).toEqual({
+      accounts: 6,
+      suspended: 1,
+      cafes: 3,
+      liveMenus: 1,
+      orders7: 1,
+    });
+
+    // Every account sits on exactly one funnel step, zeros included.
+    expect(overview.funnel.map((entry) => entry.stage)).toEqual([
+      "signed_up",
+      "cafe",
+      "menu",
+      "published",
+      "ordering",
+    ]);
+    expect(Object.fromEntries(overview.funnel.map((entry) => [entry.stage, entry.count]))).toEqual({
+      signed_up: 3,
+      cafe: 2,
+      menu: 0,
+      published: 0,
+      ordering: 1,
+    });
+
+    expect(overview.stalledSignups.map((row) => row.id)).toEqual([stalledId]);
   });
 });
