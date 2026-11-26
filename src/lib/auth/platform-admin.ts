@@ -1,7 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import { NextResponse } from "next/server";
 
+import { getDb } from "@/lib/db";
 import { platformAdmin, type PlatformAdminRole } from "@/lib/db/schema";
+
+import { getSessionUser } from "./session";
 
 /**
  * Platform operator identity (B0) — server-only, never imported from client
@@ -33,6 +37,48 @@ export async function getPlatformRole(
 /** True when the user holds an active `operator` grant (the V1 gate). */
 export async function isPlatformAdmin(db: PlatformDb, userId: string): Promise<boolean> {
   return (await getPlatformRole(db, userId)) === "operator";
+}
+
+function adminApiError(code: string, message: string, status: number): NextResponse {
+  const response = NextResponse.json({ error: { code, message } }, { status });
+  response.headers.set("Cache-Control", "no-store");
+  return response;
+}
+
+/**
+ * Server guard for admin API routes: the operator's user id, or a
+ * ready-to-return response. Signed-out gets 401 (app convention);
+ * signed-in non-operators and revoked operators get the plain 404 —
+ * never a reason; an unreachable DB gets 503.
+ */
+export async function requirePlatformAdminApi(): Promise<string | NextResponse> {
+  let account;
+  try {
+    account = await getSessionUser();
+  } catch {
+    return adminApiError(
+      "server_db_unavailable",
+      "Could not check operator access. Try again.",
+      503
+    );
+  }
+  if (!account) {
+    return adminApiError("unauthorized", "Sign in to continue.", 401);
+  }
+  let allowed = false;
+  try {
+    allowed = await isPlatformAdmin(getDb(), account.id);
+  } catch {
+    return adminApiError(
+      "server_db_unavailable",
+      "Could not check operator access. Try again.",
+      503
+    );
+  }
+  if (!allowed) {
+    return adminApiError("not_found", "Not found.", 404);
+  }
+  return account.id;
 }
 
 export interface GrantPlatformAdminInput {
