@@ -8,6 +8,7 @@ import {
   updateMenuForUser,
 } from "@/features/menus/repo";
 import { menuDocumentSchema } from "@/features/menu/schema";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -111,6 +112,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ menu
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const menu = await updateMenuForUser(
       getDb(),
       userId,
@@ -122,6 +124,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ menu
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof MenuRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not save the menu. Try again.", 503);
   }
@@ -138,10 +142,13 @@ export async function DELETE(
   if (userId instanceof NextResponse) return userId;
   const { menuId } = await params;
   try {
+    await assertAccountActive(getDb(), userId);
     const deleted = await deleteMenuForUser(getDb(), userId, menuId);
     if (!deleted) return errorResponse("not_found", "That menu does not exist.", 404);
     return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof MenuRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not delete the menu. Try again.", 503);
   }

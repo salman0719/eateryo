@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { OrderRepoError, updateOrderStatusForStaff } from "@/features/orders/repo";
 import { ORDER_STATUSES } from "@/features/orders/schema";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -77,6 +78,7 @@ export async function PATCH(
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const order = await updateOrderStatusForStaff(
       getDb(),
       userId,
@@ -88,6 +90,8 @@ export async function PATCH(
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof OrderRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not update the order. Try again.", 503);
   }

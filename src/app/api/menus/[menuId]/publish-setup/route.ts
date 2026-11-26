@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { PublicationRepoError } from "@/features/publishing/repo";
 import { publishMenuWithSetupForUser } from "@/features/publishing/setup";
 import { publishSetupBodySchema } from "@/features/publishing/setup-schema";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -80,11 +81,14 @@ export async function POST(request: Request, { params }: MenuParams) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const result = await publishMenuWithSetupForUser(getDb(), userId, menuId, parsed.data);
     const response = NextResponse.json(result);
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof PublicationRepoError) return mapRepoError(error);
     return errorResponse(
       "server_db_unavailable",
