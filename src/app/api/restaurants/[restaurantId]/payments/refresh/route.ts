@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getPaymentAccountForMember } from "@/features/payments/accounts";
 import { createAccountLink, getStripeSecret } from "@/features/payments/provider";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -43,6 +44,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return errorResponse("payments_not_configured", "Card payments are not configured yet.", 503);
 
   try {
+    await assertAccountActive(getDb(), userId);
     const member = await getRestaurantForUser(getDb(), userId, restaurantId);
     if (!member) return errorResponse("not_found", "That restaurant does not exist.", 404);
     if (member.role !== "owner") {
@@ -59,7 +61,9 @@ export async function POST(request: Request, { params }: RouteParams) {
       refreshUrl: `${origin}/settings?payments=refresh&restaurant=${encodeURIComponent(restaurantId)}`,
     });
     return noStore(NextResponse.json({ url, expiresAt }));
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse(
       "provider_unavailable",
       "Stripe could not refresh the link. Try again.",

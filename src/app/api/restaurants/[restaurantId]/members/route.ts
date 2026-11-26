@@ -4,6 +4,7 @@ import { z } from "zod";
 import { addMemberForOwner, listMembersForUser, TenancyRepoError } from "@/features/tenancy/repo";
 import { createInvitationForOwner, InvitationError } from "@/features/tenancy/invitations";
 import { emailInvitation, publicBaseUrl } from "@/features/tenancy/invite-mailer";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -119,6 +120,7 @@ export async function POST(
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const member = await addMemberForOwner(
       getDb(),
       userId,
@@ -128,6 +130,8 @@ export async function POST(
     );
     return NextResponse.json({ member }, { status: 201 });
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof TenancyRepoError && error.code !== "user_not_found") {
       return mapRepoError(error);
     }

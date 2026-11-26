@@ -10,6 +10,7 @@ import {
   getStripeSecret,
 } from "@/features/payments/provider";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -51,6 +52,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const member = await getRestaurantForUser(getDb(), userId, restaurantId);
     if (!member) return errorResponse("not_found", "That restaurant does not exist.", 404);
     if (member.role !== "owner") {
@@ -82,6 +84,8 @@ export async function POST(request: Request, { params }: RouteParams) {
     });
     return noStore(NextResponse.json({ url, expiresAt }));
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     const message = error instanceof Error ? error.message : "";
     if (message.startsWith("live_key_outside_production") || message.includes("stripe_")) {
       return errorResponse(

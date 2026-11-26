@@ -6,6 +6,7 @@ import {
   revokeInvitationForOwner,
 } from "@/features/tenancy/invitations";
 import { emailInvitation, publicBaseUrl } from "@/features/tenancy/invite-mailer";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -62,6 +63,7 @@ export async function POST(
   const { restaurantId, invitationId } = await params;
 
   try {
+    await assertAccountActive(getDb(), userId);
     const created = await resendInvitationForOwner(getDb(), userId, restaurantId, invitationId);
     try {
       await emailInvitation(created, publicBaseUrl(request));
@@ -76,6 +78,8 @@ export async function POST(
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof InvitationError) return mapInvitationError(error);
     return errorResponse(
       "server_db_unavailable",
@@ -97,9 +101,12 @@ export async function DELETE(
   const { restaurantId, invitationId } = await params;
 
   try {
+    await assertAccountActive(getDb(), userId);
     await revokeInvitationForOwner(getDb(), userId, restaurantId, invitationId);
     return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof InvitationError) return mapInvitationError(error);
     return errorResponse(
       "server_db_unavailable",

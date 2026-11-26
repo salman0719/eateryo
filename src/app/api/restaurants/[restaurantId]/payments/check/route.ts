@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getPaymentAccountForMember, syncPaymentAccountStatus } from "@/features/payments/accounts";
 import { getStripeSecret, retrieveAccountStatus } from "@/features/payments/provider";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -43,6 +44,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     return errorResponse("payments_not_configured", "Card payments are not configured yet.", 503);
 
   try {
+    await assertAccountActive(getDb(), userId);
     const member = await getRestaurantForUser(getDb(), userId, restaurantId);
     if (!member) return errorResponse("not_found", "That restaurant does not exist.", 404);
     if (member.role !== "owner") {
@@ -80,7 +82,9 @@ export async function POST(request: Request, { params }: RouteParams) {
         },
       })
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse("server_db_unavailable", "Could not check with Stripe.", 503);
   }
 }

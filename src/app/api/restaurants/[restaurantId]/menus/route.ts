@@ -6,6 +6,7 @@ import { createMenuForUser, listMenusForRestaurant, MenuRepoError } from "@/feat
 import { can } from "@/features/tenancy/policy";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
 import { workspacePayload } from "@/features/tenancy/workspace-server";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -120,6 +121,7 @@ export async function POST(
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const db = getDb();
     const workspace = await getRestaurantForUser(db, userId, restaurantId);
     if (!workspace) {
@@ -131,6 +133,8 @@ export async function POST(
     const menu = await createMenuForUser(db, userId, restaurantId, parsed.data.doc);
     return noStore(NextResponse.json({ menu }, { status: 201 }));
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof MenuRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not save the menu. Try again.", 503);
   }
