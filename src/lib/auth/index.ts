@@ -1,10 +1,14 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
 
 import { getDb } from "@/lib/db";
 import { schema } from "@/lib/db/schema";
+
+import { accountSuspendedMessage, openSuspension } from "./account-state";
+import type { PlatformDb } from "./platform-admin";
 
 import { sendMagicLinkEmail } from "./email";
 import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
@@ -19,8 +23,12 @@ const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
 type SendMagicLink = NonNullable<Parameters<typeof magicLink>[0]>["sendMagicLink"];
 
 export interface CreateAuthOptions {
-  /** Drizzle instance (Neon HTTP in the app, PGlite in tests). */
-  db: Parameters<typeof drizzleAdapter>[0];
+  /**
+   * Drizzle instance (Neon HTTP in the app, PGlite in tests). Typed as the
+   * pg base so auth-owned reads (e.g. the suspension gate) can use it;
+   * the adapter itself accepts anything.
+   */
+  db: PlatformDb;
   /** Override link delivery (tests capture links instead of sending). */
   sendMagicLink?: SendMagicLink;
   baseURL?: string;
@@ -45,6 +53,31 @@ export function createAuth(options: CreateAuthOptions) {
     session: {
       expiresIn: SESSION_EXPIRES_IN_SECONDS,
       updateAge: SESSION_UPDATE_AGE_SECONDS,
+    },
+    databaseHooks: {
+      session: {
+        create: {
+          /**
+           * Suspension sign-in gate (B1): an account with an open suspension
+           * mints no session. The copy is generic — the reason stays
+           * internal — and a DB we cannot reach fails closed (503) rather
+           * than minting a session a later read cannot vet.
+           */
+          before: async (session) => {
+            let suspended = false;
+            try {
+              suspended = (await openSuspension(options.db, session.userId)) !== null;
+            } catch {
+              throw new APIError("SERVICE_UNAVAILABLE", {
+                message: "Server sync is not available yet — keep working locally.",
+              });
+            }
+            if (suspended) {
+              throw new APIError("FORBIDDEN", { message: accountSuspendedMessage() });
+            }
+          },
+        },
+      },
     },
     plugins: [
       magicLink({
