@@ -1,6 +1,6 @@
 /**
- * Suspend / restore actions for one account (B3) — the only mutation in
- * the admin panel.
+ * Suspend / restore actions for one account (B3) — one of the admin
+ * panel's mutations, alongside the B4 force-reset and unlock actions.
  *
  * A client island on the server-rendered detail page: the dialog posts to
  * the existing suspension route (reason required, note ≤ 500, same guard

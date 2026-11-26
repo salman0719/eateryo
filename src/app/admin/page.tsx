@@ -9,13 +9,16 @@ import type { AccountStage } from "@/features/platform/stage";
 export const instant = false;
 
 /**
- * Admin overview (B3) — “is the platform healthy?” in one screen.
+ * Admin overview (B3, queue extended in B4) — “is the platform healthy?”
+ * in one screen.
  *
  * Server-rendered per request behind the layout guard: KPIs, the
  * five-step onboarding funnel, the needs-attention queue (open
- * suspensions + sign-ups stalled past a week), recent operator actions
- * and recent sign-ups. Nothing here edits anything; every row links
- * to the account or the log it came from.
+ * suspensions, live lockouts, outstanding forced resets + sign-ups
+ * stalled past a week), recent operator actions and recent sign-ups.
+ * This page reads only — suspend, restore, force-reset and unlock live
+ * on the account detail page; every row here links to the account or
+ * the log it came from.
  */
 
 const STAGE_LABELS: Record<AccountStage, string> = {
@@ -40,9 +43,11 @@ function accountName(name: string, email: string): string {
 
 export default async function AdminOverviewPage() {
   const db = getDb();
-  const [overview, suspended, signups, activity] = await Promise.all([
+  const [overview, suspended, locked, resetRequired, signups, activity] = await Promise.all([
     getPlatformOverview(db),
     listAccounts(db, { filter: "suspended" }),
+    listAccounts(db, { filter: "locked" }),
+    listAccounts(db, { filter: "reset_required" }),
     listAccounts(db, { sort: "newest" }),
     listPlatformEvents(db, {}),
   ]);
@@ -55,7 +60,11 @@ export default async function AdminOverviewPage() {
     { label: "Live menus", value: totals.liveMenus },
     { label: "Orders · 7 days", value: totals.orders7 },
   ];
-  const attentionCount = suspended.accounts.length + stalledSignups.length;
+  const attentionCount =
+    suspended.accounts.length +
+    locked.accounts.length +
+    resetRequired.accounts.length +
+    stalledSignups.length;
 
   return (
     <section className="flex flex-col gap-8">
@@ -109,7 +118,8 @@ export default async function AdminOverviewPage() {
         </h2>
         {attentionCount === 0 ? (
           <p className="mt-2 rounded-2xl border border-line-200 bg-surface-50 px-4 py-3 text-sm text-ink-600">
-            Nothing needs attention: no open suspensions, no sign-up stalled past a week.
+            Nothing needs attention: no open suspensions, no locked accounts, no forced resets, no
+            sign-up stalled past a week.
           </p>
         ) : (
           <ul className="mt-2 flex flex-col gap-2">
@@ -130,6 +140,46 @@ export default async function AdminOverviewPage() {
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-ink-500">
                   {account.suspendedAt ? shortDate(account.suspendedAt) : ""}
+                </span>
+              </li>
+            ))}
+            {locked.accounts.slice(0, 5).map((account) => (
+              <li
+                key={account.id}
+                className="flex items-baseline justify-between gap-4 rounded-2xl border border-line-200 bg-surface-50 px-4 py-3"
+              >
+                <span className="text-sm">
+                  <span className="font-semibold">Locked out</span>
+                  {" · "}
+                  <Link
+                    href={`/admin/accounts/${account.id}`}
+                    className="font-medium text-accent-800 underline"
+                  >
+                    {accountName(account.name, account.email)}
+                  </Link>
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-ink-500">
+                  {shortDate(account.createdAt)}
+                </span>
+              </li>
+            ))}
+            {resetRequired.accounts.slice(0, 5).map((account) => (
+              <li
+                key={account.id}
+                className="flex items-baseline justify-between gap-4 rounded-2xl border border-line-200 bg-surface-50 px-4 py-3"
+              >
+                <span className="text-sm">
+                  <span className="font-semibold">Reset required</span>
+                  {" · "}
+                  <Link
+                    href={`/admin/accounts/${account.id}`}
+                    className="font-medium text-accent-800 underline"
+                  >
+                    {accountName(account.name, account.email)}
+                  </Link>
+                </span>
+                <span className="shrink-0 text-xs tabular-nums text-ink-500">
+                  {shortDate(account.createdAt)}
                 </span>
               </li>
             ))}
