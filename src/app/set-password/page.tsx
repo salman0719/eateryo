@@ -7,9 +7,11 @@ import { getDb } from "@/lib/db";
 import { account } from "@/lib/db/schema";
 
 /**
- * Password set/change screen (P2) — reached after a verified link, never
- * linked from sign-in until P3. The session is the proof: anonymous
- * visitors go back to sign-in, and the route refuses them too.
+ * Password set/change screen (P2, verified in P3) — reached after a
+ * verified link, never linked from sign-in: the "no password yet" state is
+ * revealed only after verification, never as a sign-in oracle. The session
+ * is the proof: anonymous visitors go back to sign-in, and the route
+ * refuses them too.
  */
 
 // Session + credential reads are per request: never prerender (Next 16

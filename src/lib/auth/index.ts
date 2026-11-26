@@ -37,9 +37,9 @@ export interface CreateAuthOptions {
 }
 
 /**
- * Better Auth instance factory. Magic link stays the sign-in flow; password
- * credentials are stored from P2 (set after a verified link) but public
- * sign-up is disabled, so sign-in still never mints an account and diners
+ * Better Auth instance factory. Password sign-in verifies from P3 against
+ * the credentials stored from P2 (set after a verified link); public
+ * sign-up stays disabled, so sign-in never mints an account and diners
  * never authenticate (PHASE-2.md §3.6). Bearer API keys for the (parked)
  * B2B API are a separate plugin, deliberately not configured here yet.
  */
@@ -81,7 +81,7 @@ export function createAuth(options: CreateAuthOptions) {
       },
     },
     emailAndPassword: {
-      // Set-password stores the first credential (P2); sign-in follows (P3).
+      // Password verification runs from P3 against the P2-stored credential.
       // Public sign-up stays off: rising happens through the link flow only.
       enabled: true,
       disableSignUp: true,
