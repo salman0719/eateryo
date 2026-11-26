@@ -3,9 +3,9 @@
  *
  * Server-rendered per request behind the layout guard, straight from
  * `listPlatformEvents`: the action filter takes one of the recorded
- * base-four actions, pages are keyset-addressed so concurrent writes
- * hold no duplicates and no gaps. Reads are not logged — the log
- * records what changed, never who looked.
+ * actions (suspension, operator and B4 access families), pages are
+ * keyset-addressed so concurrent writes hold no duplicates and no gaps.
+ * Reads are not logged — the log records what changed, never who looked.
  */
 
 import Link from "next/link";
@@ -24,6 +24,8 @@ const ACTION_LABELS: Record<string, string> = {
   "account.restored": "Account restored",
   "operator.granted": "Operator granted",
   "operator.access_revoked": "Operator access revoked",
+  "password.reset": "Password reset forced",
+  "account.unlocked": "Sign-in unlocked",
 };
 
 function shortDate(iso: string): string {

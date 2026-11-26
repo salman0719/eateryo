@@ -1,20 +1,24 @@
 /**
- * Account detail (B3) — everything support needs to answer for one
- * account.
+ * Account detail (B3 shell, B4 Access card) — everything support needs
+ * to answer for one account.
  *
  * Server-rendered per request behind the layout guard, straight from
  * `getAccountDetail`: identity and stage, the suspension banner, the
- * Access card with the suspend/restore actions, then the evidence —
- * cafés and roles, menus with live state, extraction usage, orders,
- * sessions, timeline and the operator log. Unknown ids are the plain
- * 404; sessions carry no addresses, notes stay internal.
+ * Access card with the suspend/restore actions plus the B4 sign-in chip
+ * (password state, forced reset, lockout) with its two audited actions,
+ * then the evidence — cafés and roles, menus with live state, extraction
+ * usage, orders, sessions, timeline and the operator log. Unknown ids
+ * are the plain 404; sessions carry no addresses, notes stay internal,
+ * and no hash or token ever reaches this page.
  */
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AccessActions } from "@/components/platform/access-actions";
 import { SuspendActions } from "@/components/platform/suspend-dialog";
 import { getAccountDetail, PlatformRepoError } from "@/features/platform/repo";
+import type { AccessChip } from "@/features/platform/schema";
 import { getDb } from "@/lib/db";
 
 // Like the layout guard above: this page reads per request, never prerenders.
@@ -35,6 +39,25 @@ function shortDate(iso: string): string {
     ? "—"
     : at.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
+
+function shortDateTime(iso: string): string {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime())
+    ? "—"
+    : at.toLocaleString("en-GB", {
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+}
+
+const ACCESS_CHIPS: Record<AccessChip, { label: string; dot: string }> = {
+  locked: { label: "Locked out", dot: "bg-danger-500" },
+  reset_required: { label: "Reset required", dot: "bg-warning-500" },
+  no_password: { label: "No password yet", dot: "bg-ink-300" },
+  password_set: { label: "Password set", dot: "bg-success-500" },
+};
 
 function accountName(name: string, email: string): string {
   const trimmed = name.trim();
@@ -119,6 +142,45 @@ export default async function AdminAccountDetailPage({
           accountName={displayName}
           suspended={detail.suspension !== null}
         />
+        <div className="mt-4 border-t border-line-100 pt-4">
+          <p>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line-200 px-2 py-0.5 text-xs font-semibold text-ink-900">
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full ${ACCESS_CHIPS[detail.access.chip].dot}`}
+              />
+              {ACCESS_CHIPS[detail.access.chip].label}
+            </span>
+          </p>
+          <ul className="mt-2 flex flex-col gap-1 text-xs tabular-nums text-ink-600">
+            <li>
+              Sign-in methods: emailed link
+              {detail.access.passwordSetAt ? " · password" : " · no password yet"}
+            </li>
+            {detail.access.passwordSetAt ? (
+              <li>Password set {shortDate(detail.access.passwordSetAt)}</li>
+            ) : null}
+            {detail.access.resetRequired ? (
+              <li>
+                Reset forced{" "}
+                {detail.access.resetSentAt ? shortDate(detail.access.resetSentAt) : "—"} — the
+                emailed link ships with password sign-in.
+              </li>
+            ) : null}
+            {detail.access.locked && detail.access.lockedUntil ? (
+              <li>
+                Locked until {shortDateTime(detail.access.lockedUntil)} ·{" "}
+                {detail.access.failedAttempts} failed{" "}
+                {detail.access.failedAttempts === 1 ? "attempt" : "attempts"}
+              </li>
+            ) : null}
+          </ul>
+          <AccessActions
+            accountId={detail.account.id}
+            accountName={displayName}
+            chip={detail.access.chip}
+          />
+        </div>
       </Card>
 
       <Card title="Cafés & roles" sub="Memberships held by this account.">
