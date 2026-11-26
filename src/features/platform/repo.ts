@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull, lt, or, sql, type SQLWrapper } from "drizzl
 
 import type { PlatformDb } from "@/lib/auth/platform-admin";
 import {
+  accountAccessState,
   accountSuspension,
   menu,
   order,
@@ -43,7 +44,7 @@ import { ACCOUNT_STAGES, deriveAccountStage, type AccountStage } from "./stage";
  */
 
 export type PlatformRepoErrorCode =
-  "not_found" | "no_open_suspension" | "suspension_active" | "invalid_cursor";
+  "not_found" | "no_open_suspension" | "suspension_active" | "not_locked" | "invalid_cursor";
 
 export class PlatformRepoError extends Error {
   readonly code: PlatformRepoErrorCode;
@@ -1138,4 +1139,218 @@ export async function getCafeDetail(db: PlatformDb, cafeId: string): Promise<Caf
       })),
     },
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* B4 reads + actions: operator-visible sign-in state                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the operator panel shows about one account's sign-in (B4).
+ *
+ * Derived from `account_access_state`, which carries no hash and no
+ * token — least data by construction, so no admin query can leak
+ * password material. A missing row reads as "no password yet": the
+ * link-only cutover means most accounts have never set one, and that
+ * is a normal state, not a gap. `locked` compares `lockedUntil`
+ * against now, so an expired lockout stops reading as locked without
+ * a sweep.
+ */
+export interface AccountAccessState {
+  passwordSetAt: string | null;
+  resetRequired: boolean;
+  resetSentAt: string | null;
+  failedAttempts: number;
+  lockedUntil: string | null;
+  locked: boolean;
+}
+
+const DEFAULT_ACCESS_STATE: AccountAccessState = {
+  passwordSetAt: null,
+  resetRequired: false,
+  resetSentAt: null,
+  failedAttempts: 0,
+  lockedUntil: null,
+  locked: false,
+};
+
+/** The Access card's one chip: locked outranks reset, which outranks cutover. */
+export type AccessChip = "locked" | "reset_required" | "no_password" | "password_set";
+
+export function deriveAccessChip(state: AccountAccessState): AccessChip {
+  if (state.locked) return "locked";
+  if (state.resetRequired) return "reset_required";
+  if (state.passwordSetAt === null) return "no_password";
+  return "password_set";
+}
+
+function toAccessState(row: {
+  passwordSetAt: Date | string | null;
+  resetRequired: boolean;
+  resetSentAt: Date | string | null;
+  failedAttempts: number;
+  lockedUntil: Date | string | null;
+}): AccountAccessState {
+  const lockedUntil = toDate(row.lockedUntil)?.toISOString() ?? null;
+  return {
+    passwordSetAt: toDate(row.passwordSetAt)?.toISOString() ?? null,
+    resetRequired: row.resetRequired,
+    resetSentAt: toDate(row.resetSentAt)?.toISOString() ?? null,
+    failedAttempts: row.failedAttempts,
+    lockedUntil,
+    locked: lockedUntil !== null && new Date(lockedUntil).getTime() > Date.now(),
+  };
+}
+
+/**
+ * One account's sign-in state for the Access card. Throws `not_found`
+ * for an unknown id; a missing row reads as the cutover default.
+ */
+export async function getAccountAccessState(
+  db: PlatformDb,
+  targetUserId: string
+): Promise<AccountAccessState> {
+  const target = await accountById(db, targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const rows = await db
+    .select({
+      passwordSetAt: accountAccessState.passwordSetAt,
+      resetRequired: accountAccessState.resetRequired,
+      resetSentAt: accountAccessState.resetSentAt,
+      failedAttempts: accountAccessState.failedAttempts,
+      lockedUntil: accountAccessState.lockedUntil,
+    })
+    .from(accountAccessState)
+    .where(eq(accountAccessState.userId, targetUserId))
+    .limit(1);
+  const row = rows[0];
+  return row ? toAccessState(row) : { ...DEFAULT_ACCESS_STATE };
+}
+
+export interface ForcePasswordResetInput {
+  targetUserId: string;
+  /** Operator forcing the reset (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Force a password reset: the account must set a new password at next
+ * sign-in, and its live sessions die so an open tab cannot keep
+ * working — the same revocation suspension performs. Recorded as
+ * `password.reset`, atomically with the state row and the session
+ * deletes.
+ *
+ * The emailed 30-minute link ships with the password work (§11), not
+ * V1: `resetSentAt` stamps when the requirement was imposed, and the
+ * audit detail says the link follows, so no operator mistakes this
+ * for a sent email.
+ */
+export async function forcePasswordReset(
+  db: PlatformDb,
+  input: ForcePasswordResetInput
+): Promise<{ resetSentAt: string; sessionsRevoked: number }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const resetSentAt = new Date();
+
+  const build: Array<(db: WriteDb) => SQLWrapper> = [
+    (w) =>
+      w
+        .insert(accountAccessState)
+        .values({
+          userId: input.targetUserId,
+          resetRequired: true,
+          resetSentAt,
+        })
+        .onConflictDoUpdate({
+          target: accountAccessState.userId,
+          set: { resetRequired: true, resetSentAt },
+        }),
+    (w) =>
+      w.delete(session).where(eq(session.userId, input.targetUserId)).returning({ id: session.id }),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "password.reset",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: "Password reset forced · the emailed link ships with password sign-in.",
+      }),
+  ];
+
+  let sessionsRevoked = 0;
+  const results: unknown[] = hasBatch(db)
+    ? await db.batch(build.map((make) => make(db)))
+    : await db.transaction(async (tx) => {
+        const collected: unknown[] = [];
+        for (const make of build) collected.push(await make(tx));
+        return collected;
+      });
+  const deleted = results[1];
+  sessionsRevoked = Array.isArray(deleted) ? deleted.length : 0;
+  return { resetSentAt: resetSentAt.toISOString(), sessionsRevoked };
+}
+
+export interface UnlockAccountInput {
+  targetUserId: string;
+  /** Operator clearing the lockout (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Clear the 5-attempt/15-minute lockout: the counter and the
+ * `lockedUntil` instant reset together, recorded as
+ * `account.unlocked`, atomically. With nothing to clear — no row, no
+ * attempts, no live lock — it reports `not_locked` instead of writing
+ * a no-op event, so the log stays a record of real actions.
+ */
+export async function unlockAccount(
+  db: PlatformDb,
+  input: UnlockAccountInput
+): Promise<{ clearedAttempts: number }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const rows = await db
+    .select({
+      failedAttempts: accountAccessState.failedAttempts,
+      lockedUntil: accountAccessState.lockedUntil,
+    })
+    .from(accountAccessState)
+    .where(eq(accountAccessState.userId, input.targetUserId))
+    .limit(1);
+  const row = rows[0];
+  const locked =
+    row?.lockedUntil instanceof Date
+      ? row.lockedUntil.getTime() > Date.now()
+      : row?.lockedUntil != null && new Date(row.lockedUntil).getTime() > Date.now();
+  if (!row || (row.failedAttempts === 0 && !locked)) {
+    throw new PlatformRepoError("not_locked", "That account is not locked out.");
+  }
+
+  await runAtomically(db, [
+    (w) =>
+      w
+        .update(accountAccessState)
+        .set({ failedAttempts: 0, lockedUntil: null })
+        .where(eq(accountAccessState.userId, input.targetUserId)),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "account.unlocked",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: `Sign-in unlocked · cleared ${row.failedAttempts} failed attempt${row.failedAttempts === 1 ? "" : "s"}.`,
+      }),
+  ]);
+  return { clearedAttempts: row.failedAttempts };
 }
