@@ -43,10 +43,7 @@ import { deriveAccountStage, type AccountStage } from "./stage";
  */
 
 export type PlatformRepoErrorCode =
-  | "not_found"
-  | "no_open_suspension"
-  | "suspension_active"
-  | "invalid_cursor";
+  "not_found" | "no_open_suspension" | "suspension_active" | "invalid_cursor";
 
 export class PlatformRepoError extends Error {
   readonly code: PlatformRepoErrorCode;
@@ -400,7 +397,9 @@ export async function listAccounts(
     );
   }
   if (filter === "suspended") {
-    conditions.push(sql`exists(select 1 from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null)`);
+    conditions.push(
+      sql`exists(select 1 from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null)`
+    );
   } else if (filter === "taking_orders") {
     conditions.push(sql`(${orderCountSql} > 0)`);
   } else if (filter === "not_onboarded") {
@@ -409,12 +408,12 @@ export async function listAccounts(
 
   if (sort === "newest" && cursor) {
     const at = cursorDate(cursor.key);
-    conditions.push(or(lt(user.createdAt, at), and(eq(user.createdAt, at), lt(user.id, cursor.id)))!);
+    conditions.push(
+      or(lt(user.createdAt, at), and(eq(user.createdAt, at), lt(user.id, cursor.id)))!
+    );
   } else if (sort === "active" && cursor) {
     const at = cursorDate(cursor.key);
-    conditions.push(
-      or(lt(activeKeySql, at), and(eq(activeKeySql, at), lt(user.id, cursor.id)))!
-    );
+    conditions.push(or(lt(activeKeySql, at), and(eq(activeKeySql, at), lt(user.id, cursor.id)))!);
   } else if (sort === "orders" && cursor) {
     const { count, at } = ordersCursorKey(cursor.key);
     conditions.push(
@@ -769,5 +768,8 @@ export async function listPlatformEvents(
   }));
   if (rows.length <= ADMIN_EVENTS_PAGE_SIZE) return { events };
   const last = page[page.length - 1]!;
-  return { events, nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }) };
+  return {
+    events,
+    nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }),
+  };
 }

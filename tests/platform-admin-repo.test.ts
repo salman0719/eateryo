@@ -32,44 +32,44 @@ import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 
 describe("account stage derivation", () => {
   it("reads signed-up when every count is zero", () => {
-    expect(
-      deriveAccountStage({ cafeCount: 0, menuCount: 0, liveCount: 0, orderCount: 0 })
-    ).toBe("signed_up");
+    expect(deriveAccountStage({ cafeCount: 0, menuCount: 0, liveCount: 0, orderCount: 0 })).toBe(
+      "signed_up"
+    );
   });
 
   it("reads cafe when only the café exists", () => {
-    expect(
-      deriveAccountStage({ cafeCount: 1, menuCount: 0, liveCount: 0, orderCount: 0 })
-    ).toBe("cafe");
+    expect(deriveAccountStage({ cafeCount: 1, menuCount: 0, liveCount: 0, orderCount: 0 })).toBe(
+      "cafe"
+    );
   });
 
   it("reads menu when a draft exists but nothing is live", () => {
-    expect(
-      deriveAccountStage({ cafeCount: 1, menuCount: 2, liveCount: 0, orderCount: 0 })
-    ).toBe("menu");
+    expect(deriveAccountStage({ cafeCount: 1, menuCount: 2, liveCount: 0, orderCount: 0 })).toBe(
+      "menu"
+    );
   });
 
   it("reads published when a live pointer exists", () => {
-    expect(
-      deriveAccountStage({ cafeCount: 1, menuCount: 2, liveCount: 1, orderCount: 0 })
-    ).toBe("published");
+    expect(deriveAccountStage({ cafeCount: 1, menuCount: 2, liveCount: 1, orderCount: 0 })).toBe(
+      "published"
+    );
   });
 
   it("reads ordering once a first order exists", () => {
-    expect(
-      deriveAccountStage({ cafeCount: 1, menuCount: 2, liveCount: 1, orderCount: 3 })
-    ).toBe("ordering");
+    expect(deriveAccountStage({ cafeCount: 1, menuCount: 2, liveCount: 1, orderCount: 3 })).toBe(
+      "ordering"
+    );
   });
 
   it("prefers the furthest proven step when counts disagree", () => {
     // An order against a café whose menu was since deleted still proves
     // the account reached ordering — history is not unwound.
-    expect(
-      deriveAccountStage({ cafeCount: 1, menuCount: 0, liveCount: 0, orderCount: 1 })
-    ).toBe("ordering");
-    expect(
-      deriveAccountStage({ cafeCount: 0, menuCount: 2, liveCount: 0, orderCount: 0 })
-    ).toBe("menu");
+    expect(deriveAccountStage({ cafeCount: 1, menuCount: 0, liveCount: 0, orderCount: 1 })).toBe(
+      "ordering"
+    );
+    expect(deriveAccountStage({ cafeCount: 0, menuCount: 2, liveCount: 0, orderCount: 0 })).toBe(
+      "menu"
+    );
   });
 
   it("rejects counts that cannot come from the query", () => {
@@ -97,9 +97,7 @@ describe("admin read query contracts", () => {
   });
 
   it("trims the search text and rejects unknown filters", () => {
-    expect(adminAccountsQuerySchema.parse({ q: "  erin@cafe.test  " }).q).toBe(
-      "erin@cafe.test"
-    );
+    expect(adminAccountsQuerySchema.parse({ q: "  erin@cafe.test  " }).q).toBe("erin@cafe.test");
     expect(adminAccountsQuerySchema.safeParse({ filter: "everyone" }).success).toBe(false);
     expect(adminAccountsQuerySchema.safeParse({ sort: "oldest" }).success).toBe(false);
   });
@@ -234,12 +232,15 @@ describe("accounts list query", () => {
     expect(taking.accounts.map((row) => row.email)).toEqual(["list-filter-ordered@cafe.test"]);
     const fresh = await listAccounts(db, { filter: "not_onboarded" });
     expect(fresh.accounts.map((row) => row.email).sort()).toEqual(
-      ["list-actor@cafe.test", "list-filter-bare@cafe.test", "list-filter-draft@cafe.test", "list-filter-stopped@cafe.test"].sort()
+      [
+        "list-actor@cafe.test",
+        "list-filter-bare@cafe.test",
+        "list-filter-draft@cafe.test",
+        "list-filter-stopped@cafe.test",
+      ].sort()
     );
     const stopped = await listAccounts(db, { filter: "suspended" });
-    expect(stopped.accounts.map((row) => row.email)).toEqual([
-      "list-filter-stopped@cafe.test",
-    ]);
+    expect(stopped.accounts.map((row) => row.email)).toEqual(["list-filter-stopped@cafe.test"]);
   });
 
   it("sorts by recent activity and 7-day volume", async () => {
@@ -282,9 +283,9 @@ describe("accounts list query", () => {
   });
 
   it("rejects a cursor that is not a date", async () => {
-    await expect(listAccounts(db, { cursor: { key: "not-a-date", id: "x" } })).rejects.toBeInstanceOf(
-      PlatformRepoError
-    );
+    await expect(
+      listAccounts(db, { cursor: { key: "not-a-date", id: "x" } })
+    ).rejects.toBeInstanceOf(PlatformRepoError);
     await expect(
       listAccounts(db, { sort: "orders", cursor: { key: "bogus", id: "x" } })
     ).rejects.toMatchObject({ code: "invalid_cursor" });
@@ -334,7 +335,11 @@ describe("account detail", () => {
     expect(detail.menus).toHaveLength(1);
     expect(detail.menus[0]).toMatchObject({ cafeId: detail.cafes[0]!.id, live: true });
     expect(detail.menus[0]?.slug).not.toBeNull();
-    expect(detail.usage).toEqual({ requests: 0, cap: expect.any(Number), remaining: expect.any(Number) });
+    expect(detail.usage).toEqual({
+      requests: 0,
+      cap: expect.any(Number),
+      remaining: expect.any(Number),
+    });
     expect(detail.orders.total).toBe(1);
     expect(detail.orders.last7).toBe(1);
     expect(detail.orders.lastOrderAt).not.toBeNull();

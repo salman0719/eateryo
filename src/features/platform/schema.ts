@@ -67,12 +67,7 @@ export function decodeAdminCursor(raw: string | null | undefined): AdminCursor |
   }
 }
 
-const searchQuery = z
-  .string()
-  .trim()
-  .min(1)
-  .max(120)
-  .optional();
+const searchQuery = z.string().trim().min(1).max(120).optional();
 
 /** GET /api/admin/accounts query: every field optional, defaults below. */
 export const adminAccountsQuerySchema = z.object({
