@@ -861,3 +861,281 @@ export async function getPlatformOverview(db: PlatformDb): Promise<PlatformOverv
     })),
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* B3 reads: cafes, platform-wide and read-only                        */
+/* ------------------------------------------------------------------ */
+
+/** One page holds 25 cafes; the query fetches one extra to detect next. */
+const ADMIN_CAFES_PAGE_SIZE = 25;
+
+const CAFE_RECENT_ORDERS = 10;
+
+/**
+ * Correlated scalars pinned to the outer cafe row, same table-qualified
+ * style as the accounts list above.
+ */
+const cafeMemberCountSql = sql<number>`(select count(*)::int from "restaurant_membership" where "restaurant_membership"."restaurant_id" = "restaurant"."id")`;
+
+const cafeMenuCountSql = sql<number>`(select count(*)::int from "menu" where "menu"."restaurant_id" = "restaurant"."id")`;
+
+const cafeLiveCountSql = sql<number>`(select count(*)::int from "published_menu" where "published_menu"."restaurant_id" = "restaurant"."id" and "published_menu"."published_at" is not null)`;
+
+const cafeOrders7Sql = sql<number>`(select count(*)::int from "order" where "order"."restaurant_id" = "restaurant"."id" and "order"."created_at" > now() - interval '7 days')`;
+
+const cafeOrderCountSql = sql<number>`(select count(*)::int from "order" where "order"."restaurant_id" = "restaurant"."id")`;
+
+const cafeOwnerSuspendedSql = sql<boolean>`exists(select 1 from "restaurant_membership" join "account_suspension" on "account_suspension"."user_id" = "restaurant_membership"."user_id" where "restaurant_membership"."restaurant_id" = "restaurant"."id" and "restaurant_membership"."role" = 'owner' and "account_suspension"."lifted_at" is null)`;
+
+export type CafeLiveFilter = "all" | "live" | "draft";
+
+export interface ListCafesInput {
+  q?: string;
+  live?: CafeLiveFilter;
+  cursor?: AdminCursor | null;
+}
+
+export interface CafeSummary {
+  id: string;
+  name: string;
+  slug: string | null;
+  createdAt: string;
+  memberCount: number;
+  menuCount: number;
+  liveCount: number;
+  orders7: number;
+  ownerSuspended: boolean;
+}
+
+export interface ListCafesResult {
+  cafes: CafeSummary[];
+  nextCursor?: string;
+}
+
+/**
+ * One 25-row page of every cafe, newest first with keyset pagination.
+ * Operator scope is the guard, not the query: operators see all tenants.
+ * Search matches name or slug; the live filter splits cafes with a live
+ * menu from pure drafts (zero menus count as draft).
+ */
+export async function listCafes(
+  db: PlatformDb,
+  input: ListCafesInput = {}
+): Promise<ListCafesResult> {
+  const live = input.live ?? "all";
+  const cursor = input.cursor ?? null;
+  const conditions: SQLWrapper[] = [];
+
+  const trimmed = input.q?.trim();
+  if (trimmed) {
+    const pattern = likePattern(trimmed);
+    conditions.push(
+      sql`(${restaurant.name} ilike ${pattern} escape '\\' or ${restaurant.slug} ilike ${pattern} escape '\\')`
+    );
+  }
+  if (live === "live") {
+    conditions.push(sql`(${cafeLiveCountSql} > 0)`);
+  } else if (live === "draft") {
+    conditions.push(sql`(${cafeLiveCountSql} = 0)`);
+  }
+  if (cursor) {
+    const at = cursorDate(cursor.key);
+    conditions.push(
+      or(
+        lt(restaurant.createdAt, at),
+        and(eq(restaurant.createdAt, at), lt(restaurant.id, cursor.id))
+      )!
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      createdAt: restaurant.createdAt,
+      memberCount: cafeMemberCountSql,
+      menuCount: cafeMenuCountSql,
+      liveCount: cafeLiveCountSql,
+      orders7: cafeOrders7Sql,
+      ownerSuspended: cafeOwnerSuspendedSql,
+    })
+    .from(restaurant)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(restaurant.createdAt), desc(restaurant.id))
+    .limit(ADMIN_CAFES_PAGE_SIZE + 1);
+
+  const page = rows.slice(0, ADMIN_CAFES_PAGE_SIZE);
+  const cafes: CafeSummary[] = page.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    createdAt: row.createdAt.toISOString(),
+    memberCount: row.memberCount,
+    menuCount: row.menuCount,
+    liveCount: row.liveCount,
+    orders7: row.orders7,
+    ownerSuspended: row.ownerSuspended,
+  }));
+  if (rows.length <= ADMIN_CAFES_PAGE_SIZE) return { cafes };
+  const last = page[page.length - 1]!;
+  return {
+    cafes,
+    nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }),
+  };
+}
+
+export interface CafeMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  suspended: boolean;
+}
+
+export interface CafeMenu {
+  id: string;
+  title: string;
+  live: boolean;
+  slug: string | null;
+  updatedAt: string;
+}
+
+export interface CafeDetail {
+  cafe: { id: string; name: string; slug: string | null; createdAt: string };
+  ownerSuspended: boolean;
+  members: CafeMember[];
+  menus: CafeMenu[];
+  orders: {
+    total: number;
+    last7: number;
+    recent: Array<{
+      id: string;
+      tableLabel: string;
+      status: string;
+      totalCents: number | null;
+      createdAt: string;
+    }>;
+  };
+}
+
+/**
+ * One cafe with its team, menus and recent orders (B3).
+ *
+ * Read-only by construction: no update, no delete, no line items, no
+ * diner identities, no session material. Member suspension flags come
+ * from one `in (...)` lookup, not one query per member. Throws
+ * `not_found` for an unknown id.
+ */
+export async function getCafeDetail(db: PlatformDb, cafeId: string): Promise<CafeDetail> {
+  const header = await db
+    .select({
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      createdAt: restaurant.createdAt,
+      menuCount: cafeMenuCountSql,
+      liveCount: cafeLiveCountSql,
+      orderCount: cafeOrderCountSql,
+      orders7: cafeOrders7Sql,
+      ownerSuspended: cafeOwnerSuspendedSql,
+    })
+    .from(restaurant)
+    .where(eq(restaurant.id, cafeId))
+    .limit(1);
+  const row = header[0];
+  if (!row) {
+    throw new PlatformRepoError("not_found", "That cafe does not exist.");
+  }
+
+  const [members, menus, recentOrders] = await Promise.all([
+    db
+      .select({
+        userId: restaurantMembership.userId,
+        role: restaurantMembership.role,
+        createdAt: restaurantMembership.createdAt,
+        name: user.name,
+        email: user.email,
+      })
+      .from(restaurantMembership)
+      .innerJoin(user, eq(user.id, restaurantMembership.userId))
+      .where(eq(restaurantMembership.restaurantId, cafeId))
+      .orderBy(restaurantMembership.createdAt),
+    db
+      .select({
+        id: menu.id,
+        title: menu.title,
+        updatedAt: menu.updatedAt,
+        slug: publishedMenu.slug,
+        publishedAt: publishedMenu.publishedAt,
+      })
+      .from(menu)
+      .leftJoin(publishedMenu, eq(publishedMenu.menuId, menu.id))
+      .where(eq(menu.restaurantId, cafeId))
+      .orderBy(desc(menu.updatedAt)),
+    db
+      .select({
+        id: order.id,
+        tableLabel: order.tableLabel,
+        status: order.status,
+        totalCents: order.totalCents,
+        createdAt: order.createdAt,
+      })
+      .from(order)
+      .where(eq(order.restaurantId, cafeId))
+      .orderBy(desc(order.createdAt))
+      .limit(CAFE_RECENT_ORDERS),
+  ]);
+
+  const suspendedIds = new Set<string>();
+  if (members.length > 0) {
+    const open = await db
+      .select({ userId: accountSuspension.userId })
+      .from(accountSuspension)
+      .where(
+        and(
+          isNull(accountSuspension.liftedAt),
+          sql`${accountSuspension.userId} in (${sql.join(
+            members.map((m) => sql`${m.userId}`),
+            sql`, `
+          )})`
+        )
+      );
+    for (const entry of open) suspendedIds.add(entry.userId);
+  }
+
+  return {
+    cafe: {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: row.createdAt.toISOString(),
+    },
+    ownerSuspended: row.ownerSuspended,
+    members: members.map((m) => ({
+      userId: m.userId,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      suspended: suspendedIds.has(m.userId),
+    })),
+    menus: menus.map((m) => ({
+      id: m.id,
+      title: m.title,
+      live: m.publishedAt !== null,
+      slug: m.slug,
+      updatedAt: m.updatedAt.toISOString(),
+    })),
+    orders: {
+      total: row.orderCount,
+      last7: row.orders7,
+      recent: recentOrders.map((o) => ({
+        id: o.id,
+        tableLabel: o.tableLabel,
+        status: o.status,
+        totalCents: o.totalCents,
+        createdAt: o.createdAt.toISOString(),
+      })),
+    },
+  };
+}

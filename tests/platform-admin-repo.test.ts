@@ -16,7 +16,9 @@ import { publishMenuForUser } from "@/features/publishing/repo";
 import { createRestaurant } from "@/features/tenancy/repo";
 import {
   getAccountDetail,
+  getCafeDetail,
   getPlatformOverview,
+  listCafes,
   listPlatformEvents,
 } from "@/features/platform/repo";
 import {
@@ -505,5 +507,116 @@ describe("platform overview", () => {
     });
 
     expect(overview.stalledSignups.map((row) => row.id)).toEqual([stalledId]);
+  });
+});
+
+describe("cafes list and detail", () => {
+  let db: TestDb;
+  let actorId: string;
+
+  function menuDoc(id: string): MenuDocument {
+    return menuDocumentSchema.parse({ ...createSampleMenuDocument(), id });
+  }
+
+  beforeEach(async () => {
+    ({ db } = await createTestDb());
+    actorId = await seedUser(db, "cafes-actor@cafe.test", "Actor");
+  }, 30_000);
+
+  it("lists every cafe with counts, search and the live filter", async () => {
+    const liveOwner = await seedUser(db, "cafes-live@cafe.test", "Live Owner");
+    const liveCafe = await createRestaurant(db, liveOwner, "Café Live");
+    await createMenuForUser(db, liveOwner, liveCafe.id, menuDoc("menu-cafes-live"));
+    await publishMenuForUser(db, liveOwner, "menu-cafes-live");
+    await db
+      .insert(orderTable)
+      .values({ restaurantId: liveCafe.id, menuTitle: "Lunch", tableLabel: "3" });
+
+    const draftOwner = await seedUser(db, "cafes-draft@cafe.test", "Draft Owner");
+    const draftCafe = await createRestaurant(db, draftOwner, "Café Draft");
+    await createMenuForUser(db, draftOwner, draftCafe.id, menuDoc("menu-cafes-draft"));
+
+    const bareOwner = await seedUser(db, "cafes-bare@cafe.test", "Bare Owner");
+    await createRestaurant(db, bareOwner, "Café Bare");
+
+    const { cafes } = await listCafes(db, {});
+    expect(cafes).toHaveLength(3);
+    const byId = new Map(cafes.map((row) => [row.id, row]));
+    expect(byId.get(liveCafe.id)).toMatchObject({
+      menuCount: 1,
+      liveCount: 1,
+      orders7: 1,
+      ownerSuspended: false,
+    });
+    expect(byId.get(draftCafe.id)).toMatchObject({ menuCount: 1, liveCount: 0 });
+    // Newest first: the bare café was created last.
+    expect(cafes[0]?.name).toBe("Café Bare");
+
+    const searched = await listCafes(db, { q: "draft" });
+    expect(searched.cafes.map((row) => row.name)).toEqual(["Café Draft"]);
+
+    const live = await listCafes(db, { live: "live" });
+    expect(live.cafes.map((row) => row.name)).toEqual(["Café Live"]);
+    const drafts = await listCafes(db, { live: "draft" });
+    expect(drafts.cafes.map((row) => row.name).sort()).toEqual(["Café Bare", "Café Draft"]);
+  });
+
+  it("paginates 30 cafes without duplicates or gaps", async () => {
+    for (let n = 0; n < 30; n += 1) {
+      const owner = await seedUser(db, `cafes-page-${n}@cafe.test`, `Page ${n}`);
+      await createRestaurant(db, owner, `Café Page ${n}`);
+    }
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const result = await listCafes(db, cursor ? { cursor: decodeAdminCursor(cursor)! } : {});
+      seen.push(...result.cafes.map((row) => row.id));
+      cursor = result.nextCursor;
+      pages += 1;
+    } while (cursor);
+    expect(pages).toBe(2);
+    expect(seen.length).toBe(30);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  it("reads one cafe with team, menus and orders, flagging suspended owners", async () => {
+    const ownerId = await seedUser(db, "cafes-owner@cafe.test", "Owner");
+    const staffId = await seedUser(db, "cafes-staff@cafe.test", "Staff");
+    const cafe = await createRestaurant(db, ownerId, "Café Flagged");
+    const { addMemberForOwner } = await import("@/features/tenancy/repo");
+    await addMemberForOwner(db, ownerId, cafe.id, "cafes-staff@cafe.test", "staff");
+    await createMenuForUser(db, ownerId, cafe.id, menuDoc("menu-cafes-flagged"));
+    await publishMenuForUser(db, ownerId, "menu-cafes-flagged");
+    await db
+      .insert(orderTable)
+      .values({ restaurantId: cafe.id, menuTitle: "Lunch", tableLabel: "3" });
+    await suspendAccount(db, {
+      targetUserId: ownerId,
+      reason: "owner_request",
+      actorUserId: actorId,
+    });
+
+    const detail = await getCafeDetail(db, cafe.id);
+    expect(detail.cafe.name).toBe("Café Flagged");
+    expect(detail.ownerSuspended).toBe(true);
+    expect(detail.members).toHaveLength(2);
+    const byUser = new Map(detail.members.map((m) => [m.userId, m]));
+    expect(byUser.get(ownerId)).toMatchObject({ role: "owner", suspended: true });
+    expect(byUser.get(staffId)).toMatchObject({ role: "staff", suspended: false });
+    expect(detail.menus).toHaveLength(1);
+    expect(detail.menus[0]).toMatchObject({ live: true });
+    expect(detail.orders.total).toBe(1);
+    expect(detail.orders.last7).toBe(1);
+    expect(detail.orders.recent).toHaveLength(1);
+    // No line items, no diner identities, no session material on the shape.
+    expect(detail.orders.recent[0]).not.toHaveProperty("lines");
+    expect(detail).not.toHaveProperty("sessions");
+  });
+
+  it("throws not_found for an unknown cafe", async () => {
+    await expect(getCafeDetail(db, "no-such-cafe")).rejects.toMatchObject({
+      code: "not_found",
+    });
   });
 });
