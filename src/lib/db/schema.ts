@@ -19,7 +19,8 @@ import type { DinerTheme } from "@/features/diner-theme/schema";
  * Canonical server DB schema (Drizzle, Postgres/Neon).
  *
  * Two groups of tables:
- * 1. Better Auth core tables (`user`, `session`, `account`, `verification`).
+ * 1. Better Auth tables (`user`, `session`, `account`, `verification`, plus
+ *    the two-factor plugin's `twoFactor` and its `user.twoFactorEnabled`).
  *    Table/field names follow Better Auth's contract exactly so the Drizzle
  *    adapter (see `src/lib/auth/index.ts`) finds them without remapping.
  * 2. Tenancy tables for this product (`restaurant`, `restaurant_membership`).
@@ -40,6 +41,8 @@ export const user = pgTable("user", {
   email: text("email").notNull(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** Two-factor plugin flag (P1 storage only; enrolment ships in P6). */
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -101,6 +104,39 @@ export const verification = pgTable("verification", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+/**
+ * Better Auth `twoFactor` model (P1 — storage only, no behaviour).
+ *
+ * Shape confirmed against better-auth 1.7.10 (`two-factor/schema.ts`):
+ * table `two_factor`, secret + user id indexed, `backupCodes` one JSON
+ * string, `verified` defaulting true. The plugin returns none of the
+ * secret columns to callers (`returned: false`); the repo upholds the
+ * same rule by never selecting this table outside the auth library.
+ * Backup codes are JSON by default and encrypted only when the plugin is
+ * configured with `storeBackupCodes: "encrypted"` — a P6 runtime choice,
+ * recorded here so it is not missed.
+ */
+export const twoFactor = pgTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    secretIdx: index("two_factor_secret_idx").on(t.secret),
+    userIdx: index("two_factor_user_id_idx").on(t.userId),
+  })
+);
 
 /**
  * Platform operators (the admin panel's identity — B0).
@@ -884,6 +920,7 @@ export const schema = {
   session,
   account,
   verification,
+  twoFactor,
   platformAdmin,
   accountAccessState,
   restaurant,
