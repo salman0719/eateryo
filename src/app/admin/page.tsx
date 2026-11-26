@@ -158,9 +158,6 @@ export default async function AdminOverviewPage() {
                     {accountName(account.name, account.email)}
                   </Link>
                 </span>
-                <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {shortDate(account.createdAt)}
-                </span>
               </li>
             ))}
             {resetRequired.accounts.slice(0, 5).map((account) => (
@@ -177,9 +174,6 @@ export default async function AdminOverviewPage() {
                   >
                     {accountName(account.name, account.email)}
                   </Link>
-                </span>
-                <span className="shrink-0 text-xs tabular-nums text-ink-500">
-                  {shortDate(account.createdAt)}
                 </span>
               </li>
             ))}
