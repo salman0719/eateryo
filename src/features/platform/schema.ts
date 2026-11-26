@@ -22,12 +22,24 @@ export const ADMIN_ACCOUNTS_PAGE_SIZE = 25;
 /** Operator log page size (same over-fetch rule as the accounts list). */
 export const ADMIN_EVENTS_PAGE_SIZE = 25;
 
-/** Which accounts the list holds. Orthogonal to suspension except `all`. */
+/** The Access card's one chip: lockout outranks reset, which outranks cutover. */
+export const accessChipSchema = z.enum(["locked", "reset_required", "no_password", "password_set"]);
+
+export type AccessChip = z.infer<typeof accessChipSchema>;
+
+/**
+ * Which accounts the list holds. The stage filters are orthogonal to
+ * suspension except `all`; the sign-in filters read the B4 access
+ * state (no password yet, outstanding forced reset, live lockout).
+ */
 export const adminAccountFilterSchema = z.enum([
   "all",
   "taking_orders",
   "not_onboarded",
   "suspended",
+  "no_password",
+  "reset_required",
+  "locked",
 ]);
 
 export type AdminAccountFilter = z.infer<typeof adminAccountFilterSchema>;
@@ -96,6 +108,8 @@ export const adminAccountSummarySchema = z.object({
   /** Set while an open suspension exists. */
   suspendedAt: z.string().nullable(),
   stage: z.enum(ACCOUNT_STAGES),
+  /** B4 sign-in chip for the list's sign-in-state column. */
+  accessChip: accessChipSchema,
 });
 
 export type AdminAccountSummary = z.infer<typeof adminAccountSummarySchema>;
@@ -177,6 +191,19 @@ export const adminTimelineEntrySchema = z.object({
 
 export type AdminTimelineEntry = z.infer<typeof adminTimelineEntrySchema>;
 
+/** Operator-visible sign-in state: never a hash, never a token. */
+export const adminDetailAccessSchema = z.object({
+  passwordSetAt: z.string().nullable(),
+  resetRequired: z.boolean(),
+  resetSentAt: z.string().nullable(),
+  failedAttempts: z.number().int().nonnegative(),
+  lockedUntil: z.string().nullable(),
+  locked: z.boolean(),
+  chip: accessChipSchema,
+});
+
+export type AdminDetailAccess = z.infer<typeof adminDetailAccessSchema>;
+
 /** GET /api/admin/accounts/[id]: everything support needs, nothing more. */
 export const adminAccountDetailSchema = z.object({
   account: z.object({
@@ -186,6 +213,8 @@ export const adminAccountDetailSchema = z.object({
     createdAt: z.string(),
   }),
   stage: z.enum(ACCOUNT_STAGES),
+  /** B4 Access-card state: methods, reset, lockout — no password material. */
+  access: adminDetailAccessSchema,
   suspension: z
     .object({
       reason: z.string(),

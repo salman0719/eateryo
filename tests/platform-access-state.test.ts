@@ -1,10 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
   deriveAccessChip,
   forcePasswordReset,
   getAccountAccessState,
+  getAccountDetail,
+  listAccounts,
   unlockAccount,
 } from "@/features/platform/repo";
 import {
@@ -110,12 +112,90 @@ describe("access-state reads", () => {
       userId: target.id,
       passwordSetAt: new Date(),
       failedAttempts: 5,
-      lockedUntil: new Date(Date.now() - 60_000),
+      lockedUntil: sql`now() - interval '1 minute'`,
     });
     const state = await getAccountAccessState(db, target.id);
     expect(state.locked).toBe(false);
     expect(state.failedAttempts).toBe(5);
     expect(deriveAccessChip(state)).toBe("password_set");
+  });
+});
+
+describe("access state in list and detail", () => {
+  it("chips every row and filters by sign-in state", async () => {
+    const plain = await seedTarget("list-plain");
+    const set = await seedTarget("list-set");
+    await db.insert(accountAccessState).values({ userId: set.id, passwordSetAt: new Date() });
+    const reset = await seedTarget("list-reset");
+    await db.insert(accountAccessState).values({
+      userId: reset.id,
+      passwordSetAt: new Date(),
+      resetRequired: true,
+      resetSentAt: new Date(),
+    });
+    const locked = await seedTarget("list-locked");
+    await db.insert(accountAccessState).values({
+      userId: locked.id,
+      passwordSetAt: new Date(),
+      failedAttempts: 5,
+      lockedUntil: sql`now() + interval '10 minutes'`,
+    });
+
+    const page = await listAccounts(db, { q: "access-target-list-" });
+    expect(page.accounts).toHaveLength(4);
+    const chips = new Map(page.accounts.map((account) => [account.id, account.accessChip]));
+    expect(chips.get(plain.id)).toBe("no_password");
+    expect(chips.get(set.id)).toBe("password_set");
+    expect(chips.get(reset.id)).toBe("reset_required");
+    expect(chips.get(locked.id)).toBe("locked");
+
+    const onlyPlain = await listAccounts(db, {
+      q: "access-target-list-",
+      filter: "no_password",
+    });
+    expect(onlyPlain.accounts.map((account) => account.id)).toEqual([plain.id]);
+
+    const onlyReset = await listAccounts(db, {
+      q: "access-target-list-",
+      filter: "reset_required",
+    });
+    expect(onlyReset.accounts.map((account) => account.id)).toEqual([reset.id]);
+
+    const onlyLocked = await listAccounts(db, {
+      q: "access-target-list-",
+      filter: "locked",
+    });
+    expect(onlyLocked.accounts.map((account) => account.id)).toEqual([locked.id]);
+  });
+
+  it("carries the access block on the detail page with no password material", async () => {
+    const target = await seedTarget("detail-access");
+    await db.insert(accountAccessState).values({
+      userId: target.id,
+      passwordSetAt: new Date(),
+      failedAttempts: 5,
+      lockedUntil: sql`now() + interval '10 minutes'`,
+    });
+
+    const detail = await getAccountDetail(db, target.id);
+    expect(detail.access).toMatchObject({
+      resetRequired: false,
+      failedAttempts: 5,
+      locked: true,
+      chip: "locked",
+    });
+    expect(detail.access.passwordSetAt).toEqual(expect.any(String));
+    expect(detail.access.lockedUntil).toEqual(expect.any(String));
+    // The block carries state only: no hash, no token, nothing to steal.
+    expect(Object.keys(detail.access).sort()).toEqual([
+      "chip",
+      "failedAttempts",
+      "locked",
+      "lockedUntil",
+      "passwordSetAt",
+      "resetRequired",
+      "resetSentAt",
+    ]);
   });
 });
 

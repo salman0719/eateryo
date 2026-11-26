@@ -21,6 +21,7 @@ import {
   ADMIN_ACCOUNTS_PAGE_SIZE,
   ADMIN_EVENTS_PAGE_SIZE,
   encodeAdminCursor,
+  type AccessChip,
   type AdminAccountDetail,
   type AdminAccountFilter,
   type AdminAccountSort,
@@ -327,6 +328,13 @@ const lastOrderAtSql = sql<Date | null>`(select max("order"."created_at") from "
 
 const suspendedAtSql = sql<Date | null>`(select "account_suspension"."created_at" from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null limit 1)`;
 
+/**
+ * The list's per-row sign-in chip (B4): one CASE over the left-joined
+ * access row, so the page stays one round trip. A missing row reads as
+ * `no_password` — the link-only cutover default.
+ */
+const accessChipSql = sql<AccessChip>`case when (${accountAccessState.lockedUntil} > now()) then 'locked' when (${accountAccessState.resetRequired}) then 'reset_required' when (${accountAccessState.passwordSetAt} is null) then 'no_password' else 'password_set' end`;
+
 /** Never-ordered accounts sort as the epoch, so the key is never null. */
 const activeKeySql = sql<Date>`coalesce((${lastOrderAtSql}), '1970-01-01 00:00:00+00'::timestamptz)`;
 
@@ -405,6 +413,18 @@ export async function listAccounts(
     conditions.push(sql`(${orderCountSql} > 0)`);
   } else if (filter === "not_onboarded") {
     conditions.push(sql`(${orderCountSql} = 0)`);
+  } else if (filter === "no_password") {
+    conditions.push(
+      sql`not exists(select 1 from "account_access_state" where "account_access_state"."user_id" = "user"."id" and "account_access_state"."password_set_at" is not null)`
+    );
+  } else if (filter === "reset_required") {
+    conditions.push(
+      sql`exists(select 1 from "account_access_state" where "account_access_state"."user_id" = "user"."id" and "account_access_state"."reset_required")`
+    );
+  } else if (filter === "locked") {
+    conditions.push(
+      sql`exists(select 1 from "account_access_state" where "account_access_state"."user_id" = "user"."id" and "account_access_state"."locked_until" > now())`
+    );
   }
 
   if (sort === "newest" && cursor) {
@@ -446,8 +466,10 @@ export async function listAccounts(
       orderCount: orderCountSql,
       lastOrderAt: lastOrderAtSql,
       suspendedAt: suspendedAtSql,
+      accessChip: accessChipSql,
     })
     .from(user)
+    .leftJoin(accountAccessState, eq(accountAccessState.userId, user.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(...orderBy)
     .limit(ADMIN_ACCOUNTS_PAGE_SIZE + 1);
@@ -473,6 +495,7 @@ export async function listAccounts(
       suspended: toDate(row.suspendedAt) !== null,
       suspendedAt: toDate(row.suspendedAt)?.toISOString() ?? null,
       stage,
+      accessChip: row.accessChip,
     };
   });
 
@@ -530,7 +553,7 @@ export async function getAccountDetail(
     throw new PlatformRepoError("not_found", "That account does not exist.");
   }
 
-  const [suspensions, memberships, menus, recentOrders, sessions, events, usage] =
+  const [suspensions, memberships, menus, recentOrders, sessions, events, usage, accessRows] =
     await Promise.all([
       db
         .select({
@@ -607,9 +630,22 @@ export async function getAccountDetail(
         .orderBy(desc(platformEvent.createdAt))
         .limit(DETAIL_EVENTS),
       getMonthlyUsageSummary(db, targetUserId),
+      db
+        .select({
+          passwordSetAt: accountAccessState.passwordSetAt,
+          resetRequired: accountAccessState.resetRequired,
+          resetSentAt: accountAccessState.resetSentAt,
+          failedAttempts: accountAccessState.failedAttempts,
+          lockedUntil: accountAccessState.lockedUntil,
+          locked: sql<boolean>`coalesce(${accountAccessState.lockedUntil} > now(), false)`,
+        })
+        .from(accountAccessState)
+        .where(eq(accountAccessState.userId, targetUserId))
+        .limit(1),
     ]);
 
   const open = suspensions.find((entry) => entry.liftedAt === null) ?? null;
+  const accessState = accessRows[0] ? toAccessState(accessRows[0]) : { ...DEFAULT_ACCESS_STATE };
   const stage = deriveAccountStage({
     cafeCount: row.cafeCount,
     menuCount: row.menuCount,
@@ -669,6 +705,7 @@ export async function getAccountDetail(
       createdAt: row.createdAt.toISOString(),
     },
     stage,
+    access: { ...accessState, chip: deriveAccessChip(accessState) },
     suspension: open
       ? {
           reason: open.reason,
@@ -1174,9 +1211,6 @@ const DEFAULT_ACCESS_STATE: AccountAccessState = {
   locked: false,
 };
 
-/** The Access card's one chip: locked outranks reset, which outranks cutover. */
-export type AccessChip = "locked" | "reset_required" | "no_password" | "password_set";
-
 export function deriveAccessChip(state: AccountAccessState): AccessChip {
   if (state.locked) return "locked";
   if (state.resetRequired) return "reset_required";
@@ -1190,15 +1224,16 @@ function toAccessState(row: {
   resetSentAt: Date | string | null;
   failedAttempts: number;
   lockedUntil: Date | string | null;
+  /** Compared against `now()` in SQL, beside the stored instant. */
+  locked: boolean;
 }): AccountAccessState {
-  const lockedUntil = toDate(row.lockedUntil)?.toISOString() ?? null;
   return {
     passwordSetAt: toDate(row.passwordSetAt)?.toISOString() ?? null,
     resetRequired: row.resetRequired,
     resetSentAt: toDate(row.resetSentAt)?.toISOString() ?? null,
     failedAttempts: row.failedAttempts,
-    lockedUntil,
-    locked: lockedUntil !== null && new Date(lockedUntil).getTime() > Date.now(),
+    lockedUntil: toDate(row.lockedUntil)?.toISOString() ?? null,
+    locked: row.locked,
   };
 }
 
@@ -1221,6 +1256,7 @@ export async function getAccountAccessState(
       resetSentAt: accountAccessState.resetSentAt,
       failedAttempts: accountAccessState.failedAttempts,
       lockedUntil: accountAccessState.lockedUntil,
+      locked: sql<boolean>`coalesce(${accountAccessState.lockedUntil} > now(), false)`,
     })
     .from(accountAccessState)
     .where(eq(accountAccessState.userId, targetUserId))
@@ -1322,17 +1358,13 @@ export async function unlockAccount(
   const rows = await db
     .select({
       failedAttempts: accountAccessState.failedAttempts,
-      lockedUntil: accountAccessState.lockedUntil,
+      locked: sql<boolean>`coalesce(${accountAccessState.lockedUntil} > now(), false)`,
     })
     .from(accountAccessState)
     .where(eq(accountAccessState.userId, input.targetUserId))
     .limit(1);
   const row = rows[0];
-  const locked =
-    row?.lockedUntil instanceof Date
-      ? row.lockedUntil.getTime() > Date.now()
-      : row?.lockedUntil != null && new Date(row.lockedUntil).getTime() > Date.now();
-  if (!row || (row.failedAttempts === 0 && !locked)) {
+  if (!row || (row.failedAttempts === 0 && !row.locked)) {
     throw new PlatformRepoError("not_locked", "That account is not locked out.");
   }
 
