@@ -15,6 +15,10 @@ import { PLATFORM_EVENT_ACTIONS } from "@/lib/db/schema";
 import { listPlatformEvents } from "@/features/platform/repo";
 import { decodeAdminCursor } from "@/features/platform/schema";
 
+// Like the layout guard above: this page reads per request, never prerenders.
+// Without it a client-side navigation trips Next 16's blocking-prerender error.
+export const instant = false;
+
 const ACTION_LABELS: Record<string, string> = {
   "account.suspended": "Account suspended",
   "account.restored": "Account restored",

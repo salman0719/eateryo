@@ -17,6 +17,10 @@ import { SuspendActions } from "@/components/platform/suspend-dialog";
 import { getAccountDetail, PlatformRepoError } from "@/features/platform/repo";
 import { getDb } from "@/lib/db";
 
+// Like the layout guard above: this page reads per request, never prerenders.
+// Without it a client-side navigation trips Next 16's blocking-prerender error.
+export const instant = false;
+
 const STAGE_LABELS: Record<string, string> = {
   signed_up: "Signed up",
   cafe: "Café created",

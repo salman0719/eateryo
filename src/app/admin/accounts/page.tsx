@@ -14,6 +14,10 @@ import { listAccounts } from "@/features/platform/repo";
 import { decodeAdminCursor } from "@/features/platform/schema";
 import type { AdminAccountFilter, AdminAccountSort } from "@/features/platform/schema";
 
+// Like the layout guard above: this page reads per request, never prerenders.
+// Without it a client-side navigation trips Next 16's blocking-prerender error.
+export const instant = false;
+
 const FILTERS: { value: AdminAccountFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "taking_orders", label: "Taking orders" },

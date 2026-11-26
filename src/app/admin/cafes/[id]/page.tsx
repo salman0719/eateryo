@@ -14,6 +14,10 @@ import { notFound } from "next/navigation";
 import { getCafeDetail, PlatformRepoError } from "@/features/platform/repo";
 import { getDb } from "@/lib/db";
 
+// Like the layout guard above: this page reads per request, never prerenders.
+// Without it a client-side navigation trips Next 16's blocking-prerender error.
+export const instant = false;
+
 function shortDate(iso: string): string {
   const at = new Date(iso);
   return Number.isNaN(at.getTime())

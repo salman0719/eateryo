@@ -13,6 +13,10 @@ import { getDb } from "@/lib/db";
 import { listCafes, type CafeLiveFilter } from "@/features/platform/repo";
 import { decodeAdminCursor } from "@/features/platform/schema";
 
+// Like the layout guard above: this page reads per request, never prerenders.
+// Without it a client-side navigation trips Next 16's blocking-prerender error.
+export const instant = false;
+
 const LIVES: { value: CafeLiveFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "live", label: "Live" },

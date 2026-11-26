@@ -4,6 +4,10 @@ import { getDb } from "@/lib/db";
 import { getPlatformOverview, listAccounts, listPlatformEvents } from "@/features/platform/repo";
 import type { AccountStage } from "@/features/platform/stage";
 
+// Like the layout guard above: this page reads per request, never prerenders.
+// Without it a client-side navigation trips Next 16's blocking-prerender error.
+export const instant = false;
+
 /**
  * Admin overview (B3) — “is the platform healthy?” in one screen.
  *
