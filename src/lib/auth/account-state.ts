@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 
-import { accountSuspension } from "@/lib/db/schema";
+import { accountAccessState, accountSuspension } from "@/lib/db/schema";
 import { contactEmail } from "@/lib/site";
 
 import type { PlatformDb } from "./platform-admin";
@@ -56,6 +56,36 @@ export function accountSuspendedMessage(): string {
   return email
     ? `This account is suspended. Contact ${email} for help.`
     : "This account is suspended. Contact support for help.";
+}
+
+/**
+ * Stamp a freshly set password (P2): `passwordSetAt` records the cutover,
+ * an outstanding forced reset is satisfied, and the lockout counter resets
+ * with the new credential. Rows are created on demand, like the B4
+ * actions — a missing row still reads as "no password yet" until this runs.
+ */
+export async function markPasswordSet(db: PlatformDb, userId: string): Promise<void> {
+  const now = new Date();
+  await db
+    .insert(accountAccessState)
+    .values({
+      userId,
+      passwordSetAt: now,
+      resetRequired: false,
+      resetSentAt: null,
+      failedAttempts: 0,
+      lockedUntil: null,
+    })
+    .onConflictDoUpdate({
+      target: accountAccessState.userId,
+      set: {
+        passwordSetAt: now,
+        resetRequired: false,
+        resetSentAt: null,
+        failedAttempts: 0,
+        lockedUntil: null,
+      },
+    });
 }
 
 /**
