@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, type SQLWrapper } from "drizzle-orm";
 
 import type { PlatformDb } from "@/lib/auth/platform-admin";
 import {
@@ -6,7 +6,6 @@ import {
   platformEvent,
   session,
   user,
-  type PlatformEventAction,
   type SuspensionReason,
 } from "@/lib/db/schema";
 
@@ -38,6 +37,10 @@ export class PlatformRepoError extends Error {
  * The `insert`/`update`/`delete` surface shared by a Drizzle db and its
  * transaction — the only thing the atomic statements below are built on,
  * so the same builders run under `db.batch` and under `db.transaction`.
+ *
+ * Builders must return the query itself, never a promise: `db.batch`
+ * inspects the builders (it calls `_prepare` on each), so an async helper
+ * breaks the batch path while silently working under `db.transaction`.
  */
 type WriteDb = Pick<PlatformDb, "insert" | "update" | "delete">;
 
@@ -62,7 +65,7 @@ function hasBatch(db: PlatformDb): db is BatchCapableDb {
  */
 async function runAtomically(
   db: PlatformDb,
-  build: Array<(db: WriteDb) => unknown>
+  build: Array<(db: WriteDb) => SQLWrapper>
 ): Promise<void> {
   if (hasBatch(db)) {
     await db.batch(build.map((make) => make(db)));
@@ -95,27 +98,6 @@ async function accountById(db: PlatformDb, userId: string): Promise<AccountSnaps
     .where(eq(user.id, userId))
     .limit(1);
   return rows[0] ?? null;
-}
-
-async function recordPlatformEvent(
-  db: WriteDb,
-  input: {
-    action: PlatformEventAction;
-    actorUserId: string | null;
-    actorEmail: string | null;
-    targetUserId: string | null;
-    targetEmail: string | null;
-    detail: string | null;
-  }
-): Promise<void> {
-  await db.insert(platformEvent).values({
-    action: input.action,
-    actorUserId: input.actorUserId,
-    actorEmail: input.actorEmail,
-    targetUserId: input.targetUserId,
-    targetEmail: input.targetEmail,
-    detail: input.detail,
-  });
 }
 
 export interface SuspendInput {
@@ -164,7 +146,7 @@ export async function suspendAccount(db: PlatformDb, input: SuspendInput): Promi
   }
 
   const note = input.note ?? null;
-  const build: Array<(db: WriteDb) => unknown> = [
+  const build: Array<(db: WriteDb) => SQLWrapper> = [
     (w) =>
       w.insert(accountSuspension).values({
         userId: input.targetUserId,
@@ -175,7 +157,7 @@ export async function suspendAccount(db: PlatformDb, input: SuspendInput): Promi
     (w) =>
       w.delete(session).where(eq(session.userId, input.targetUserId)).returning({ id: session.id }),
     (w) =>
-      recordPlatformEvent(w, {
+      w.insert(platformEvent).values({
         action: "account.suspended",
         actorUserId: input.actorUserId,
         actorEmail: actor?.email ?? null,
@@ -275,7 +257,7 @@ export async function restoreAccount(
         .set({ liftedAt: new Date(), liftedBy: input.actorUserId, liftNote })
         .where(and(eq(accountSuspension.id, open[0]!.id), isNull(accountSuspension.liftedAt))),
     (w) =>
-      recordPlatformEvent(w, {
+      w.insert(platformEvent).values({
         action: "account.restored",
         actorUserId: input.actorUserId,
         actorEmail: actor?.email ?? null,
