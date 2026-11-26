@@ -2,9 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { POST as setPasswordRoute } from "@/app/api/account/password/route";
+import { suspendAccount } from "@/features/platform/repo";
 import { getAuth } from "@/lib/auth";
+import { accountSuspendedMessage } from "@/lib/auth/account-state";
 import { takeDevSignInLink } from "@/lib/auth/dev-sign-in";
-import { account, accountAccessState } from "@/lib/db/schema";
+import { account, accountAccessState, user } from "@/lib/db/schema";
 import { deriveAccessChip, getAccountAccessState } from "@/features/platform/repo";
 import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 
@@ -13,11 +15,13 @@ process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
 process.env.DEV_SIGN_IN_BYPASS ??= "1";
 
 /**
- * P2 — set a password after link verification (PGlite + real Better Auth
- * handlers, no external services). Public sign-up stays disabled, so the
- * email/password core can store credentials without ever minting an
- * account; the route tests below drive the full chain (verified link →
- * session cookie → set-password → stamped state).
+ * P2 + P3 — set a password after link verification, then verify it at
+ * sign-in (PGlite + real Better Auth handlers, no external services).
+ * Public sign-up stays disabled, so the email/password core can store
+ * credentials without ever minting an account; the route tests below drive
+ * the full chain (verified link → session cookie → set-password → stamped
+ * state), and the P3 block drives sign-in itself (one 401 for the three
+ * miss cases, no mint on miss, generic refusal while suspended).
  *
  * Only the guard identity and the DB handle are stubbed (the repo, the
  * hashing, and the route run for real); sessions are minted through the
@@ -276,5 +280,113 @@ describe("POST /api/account/password", () => {
     expect(state.failedAttempts).toBe(0);
     expect(state.locked).toBe(false);
     expect(deriveAccessChip(state)).toBe("password_set");
+  });
+});
+
+/**
+ * P3 — password verification at sign-in + cutover copy (same PGlite + real
+ * handlers). The three miss cases (unknown address, no password, wrong
+ * password) share one 401 and mint nothing; sign-in never creates an
+ * account; a suspended account keeps the generic refusal once the password
+ * is right, while a wrong password still reads as the ordinary mismatch.
+ */
+describe("POST /api/auth/sign-in/email", () => {
+  let db: TestDb;
+  let email: string;
+  let userId: string;
+  const password = "correct horse 9!";
+
+  function signInRequest(body: unknown): Request {
+    return new Request("http://localhost:3000/api/auth/sign-in/email", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function sessionCookies(response: Response): string[] {
+    return response.headers.getSetCookie().filter((c) => c.toLowerCase().includes("session"));
+  }
+
+  beforeAll(async () => {
+    db = holder.db as TestDb;
+    email = "p3-signer@cafe.test";
+    userId = await seedUser(db, email, "P3 Signer");
+    holder.user = { id: userId, email };
+    const cookie = await signInCookie(email);
+    const set = await setPasswordRoute(passwordRequest({ password, confirm: password }, cookie));
+    expect(set.status).toBe(200);
+    holder.user = null;
+  }, 30_000);
+
+  it("signs in with the right password and mints a session", async () => {
+    const response = await getAuth().handler(signInRequest({ email, password }));
+    expect(response.status).toBe(200);
+    expect(sessionCookies(response).length).toBeGreaterThan(0);
+    const payload = (await response.json()) as { user?: { email?: string } };
+    expect(payload.user?.email).toBe(email);
+  });
+
+  it("answers the three miss cases with one 401 and mints nothing", async () => {
+    const cases: Array<[string, unknown]> = [
+      ["unknown address", { email: "nobody@cafe.test", password }],
+      ["no password yet", { email: "p3-nopassword@cafe.test", password }],
+      ["wrong password", { email, password: "not the password" }],
+    ];
+    // The no-password address exists but never set one: still one sentence.
+    await seedUser(db, "p3-nopassword@cafe.test", "P3 No Password");
+    const usersBefore = (await db.select({ id: user.id }).from(user)).length;
+    for (const [label, body] of cases) {
+      const response = await getAuth().handler(signInRequest(body));
+      expect(response.status, label).toBe(401);
+      expect(sessionCookies(response), label).toHaveLength(0);
+      const payload = (await response.json()) as { code?: unknown; message?: unknown };
+      expect(payload.code, label).toBe("INVALID_EMAIL_OR_PASSWORD");
+      expect(typeof payload.message, label).toBe("string");
+      expect(JSON.stringify(payload), label).not.toMatch(
+        /select\s|insert\s|drizzle|pgtable|neon|stack/i
+      );
+    }
+    // Sign-in never creates an account, even for an unknown address.
+    const usersAfter = (await db.select({ id: user.id }).from(user)).length;
+    expect(usersAfter).toBe(usersBefore);
+  });
+
+  it("keeps the generic refusal for a suspended account with the right password", async () => {
+    const suspendedEmail = "p3-suspended@cafe.test";
+    const suspendedId = await seedUser(db, suspendedEmail, "P3 Suspended");
+    holder.user = { id: suspendedId, email: suspendedEmail };
+    const cookie = await signInCookie(suspendedEmail);
+    const set = await setPasswordRoute(passwordRequest({ password, confirm: password }, cookie));
+    expect(set.status).toBe(200);
+    holder.user = null;
+
+    await suspendAccount(db, {
+      targetUserId: suspendedId,
+      reason: "abuse_or_spam",
+      actorUserId: userId,
+    });
+
+    // Wrong password still reads as the ordinary mismatch — suspension is
+    // only revealed once the credentials are right.
+    const wrong = await getAuth().handler(
+      signInRequest({ email: suspendedEmail, password: "not the password" })
+    );
+    expect(wrong.status).toBe(401);
+    expect(sessionCookies(wrong)).toHaveLength(0);
+    expect((await wrong.json()) as { code?: string }).toMatchObject({
+      code: "INVALID_EMAIL_OR_PASSWORD",
+    });
+
+    const gated = await getAuth().handler(signInRequest({ email: suspendedEmail, password }));
+    expect(gated.status).toBe(403);
+    expect(sessionCookies(gated)).toHaveLength(0);
+    const payload = (await gated.json()) as { message?: string };
+    expect(payload.message).toBe(accountSuspendedMessage());
+    // The reason stays server-side: the copy names the state, never the cause.
+    expect(JSON.stringify(payload)).not.toContain("abuse_or_spam");
   });
 });
