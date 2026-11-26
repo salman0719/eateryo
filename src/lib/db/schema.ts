@@ -102,6 +102,44 @@ export const verification = pgTable("verification", {
 });
 
 /**
+ * Platform operators (the admin panel's identity — B0).
+ *
+ * One row per user; the panel reads this table per request, server-side,
+ * and it is never exposed to the browser (no Better Auth additional field).
+ * V1 enforces operator-only: `viewer` exists in the enum for the V2
+ * read-only support role, which nothing checks yet. Revocation sets
+ * `revokedAt` instead of deleting the row, so the grant history survives;
+ * it never touches the user's café memberships. The first operators are
+ * created by the CLI script (`npm run admin:platform`), which leaves
+ * `grantedBy` null for the bootstrap grant.
+ */
+export const platformAdmin = pgTable(
+  "platform_admin",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["operator", "viewer"] })
+      .notNull()
+      .$defaultFn(() => "operator" as const),
+    grantedBy: text("granted_by"),
+    grantedAt: timestamp("granted_at").notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt().$onUpdateFn(() => new Date()),
+  },
+  (t) => ({
+    userUnique: uniqueIndex("platform_admin_user_unique").on(t.userId),
+  })
+);
+
+/** Platform operator roles. V1 enforces `operator` only; `viewer` is V2. */
+export type PlatformAdminRole = "operator" | "viewer";
+
+/**
  * A restaurant (café) tenant. `slug` is the café's public `/r/<slug>`
  * address — the prefix of every table QR code and every published menu link
  * (`/r/<restaurant>/<menu>`) — claimed from the name when it is first
@@ -730,6 +768,7 @@ export const schema = {
   session,
   account,
   verification,
+  platformAdmin,
   restaurant,
   restaurantMembership,
   restaurantInvitation,
