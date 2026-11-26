@@ -200,6 +200,7 @@ export const PLATFORM_EVENT_ACTIONS = [
   "operator.access_revoked",
   "password.reset",
   "account.unlocked",
+  "two_factor.reset",
 ] as const;
 
 export type PlatformEventAction = (typeof PLATFORM_EVENT_ACTIONS)[number];

@@ -3,7 +3,7 @@
  *
  * Server-rendered per request behind the layout guard, straight from
  * `listPlatformEvents`: the action filter takes one of the recorded
- * actions (suspension, operator and B4 access families), pages are
+ * actions (suspension, operator, B4 access and B5 second-factor families), pages are
  * keyset-addressed so concurrent writes hold no duplicates and no gaps.
  * Reads are not logged — the log records what changed, never who looked.
  */
@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<string, string> = {
   "operator.access_revoked": "Operator access revoked",
   "password.reset": "Password reset forced",
   "account.unlocked": "Sign-in unlocked",
+  "two_factor.reset": "Second factor reset",
 };
 
 function shortDate(iso: string): string {
