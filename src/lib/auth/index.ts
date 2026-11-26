@@ -9,6 +9,7 @@ import { schema } from "@/lib/db/schema";
 
 import { accountSuspendedMessage, openSuspension } from "./account-state";
 import type { PlatformDb } from "./platform-admin";
+import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./passwords";
 
 import { sendMagicLinkEmail } from "./email";
 import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
@@ -36,11 +37,11 @@ export interface CreateAuthOptions {
 }
 
 /**
- * Better Auth instance factory. Magic link is the only human sign-in:
- * rising and signing in are the same one-time-link flow; diners and public
- * menu visitors never authenticate (PHASE-2.md §3.6). Bearer API keys for
- * the (parked) B2B API are a separate plugin, deliberately not configured
- * here yet.
+ * Better Auth instance factory. Magic link stays the sign-in flow; password
+ * credentials are stored from P2 (set after a verified link) but public
+ * sign-up is disabled, so sign-in still never mints an account and diners
+ * never authenticate (PHASE-2.md §3.6). Bearer API keys for the (parked)
+ * B2B API are a separate plugin, deliberately not configured here yet.
  */
 export function createAuth(options: CreateAuthOptions) {
   return betterAuth({
@@ -78,6 +79,14 @@ export function createAuth(options: CreateAuthOptions) {
           },
         },
       },
+    },
+    emailAndPassword: {
+      // Set-password stores the first credential (P2); sign-in follows (P3).
+      // Public sign-up stays off: rising happens through the link flow only.
+      enabled: true,
+      disableSignUp: true,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
+      maxPasswordLength: MAX_PASSWORD_LENGTH,
     },
     plugins: [
       magicLink({
