@@ -24,7 +24,7 @@ export function SignInScreen({
     <div className="flex flex-col gap-3">
       {mode === "password" ? (
         <>
-          <PasswordSignInForm callbackURL={callbackURL} />
+          <PasswordSignInForm callbackURL={callbackURL} onUseLink={() => setMode("link")} />
           <div className="flex items-center gap-3 text-xs text-ink-500" aria-hidden="true">
             <span className="h-px flex-1 bg-line-200" />
             <span>or</span>

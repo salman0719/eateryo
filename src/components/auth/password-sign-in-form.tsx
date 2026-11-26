@@ -14,13 +14,29 @@ import { authClient } from "@/lib/auth-client";
  * never says which accounts exist. A correct password on a suspended
  * account lands on `/suspended` through the shared generic copy; the
  * suspension reason never reaches this screen.
+ *
+ * P4 adds the pause: five failed attempts lock the account for 15 minutes,
+ * and the server answers 429 with the settled pause copy (minutes left, and
+ * the emailed link as the way through). The screen renders that copy
+ * verbatim — it is the server's sentence, not a second opinion — and offers
+ * the link door, which the counter never gates.
  */
-export function PasswordSignInForm({ callbackURL }: { callbackURL: string }) {
+export function PasswordSignInForm({
+  callbackURL,
+  onUseLink,
+}: {
+  callbackURL: string;
+  /** Switch to the emailed-link door (the escape hatch while paused). */
+  onUseLink: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [status, setStatus] = useState<
-    { kind: "idle" } | { kind: "signing-in" } | { kind: "error"; message: string }
+    | { kind: "idle" }
+    | { kind: "signing-in" }
+    | { kind: "error"; message: string }
+    | { kind: "locked"; message: string }
   >({ kind: "idle" });
   const router = useRouter();
   const emailId = useId();
@@ -43,6 +59,16 @@ export function PasswordSignInForm({ callbackURL }: { callbackURL: string }) {
     });
     if (error) {
       const statusCode = typeof error.status === "number" ? error.status : null;
+      if (statusCode === 429) {
+        setStatus({
+          kind: "locked",
+          message:
+            typeof error.message === "string" && error.message
+              ? error.message
+              : "Too many attempts. Sign-in for this account is paused for 15 minutes — wait, or email yourself a sign-in link instead.",
+        });
+        return;
+      }
       if (statusCode === 403) {
         router.push("/suspended");
         return;
@@ -66,6 +92,31 @@ export function PasswordSignInForm({ callbackURL }: { callbackURL: string }) {
 
   const inputClass =
     "w-full rounded-lg border border-line-300 bg-surface-base px-3 py-2 text-sm text-ink-900 placeholder:text-ink-500 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600";
+
+  if (status.kind === "locked") {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 text-sm text-warning-900">
+        <p role="alert" className="font-medium">
+          Too many attempts
+        </p>
+        <p>{status.message}</p>
+        <button
+          type="button"
+          onClick={onUseLink}
+          className="self-start rounded-lg border border-line-300 bg-surface-base px-4 py-2 text-sm font-semibold text-ink-800 transition-colors hover:bg-surface-100"
+        >
+          Email me a sign-in link instead
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatus({ kind: "idle" })}
+          className="self-start text-sm font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3" noValidate>
