@@ -4,10 +4,11 @@ import type { ReactNode } from "react";
 
 import { isPlatformAdmin } from "@/lib/auth/platform-admin";
 import { getSessionUser } from "@/lib/auth/session";
+import { AdminNav } from "@/components/platform/admin-nav";
 import { getDb } from "@/lib/db";
 
 /**
- * Platform admin shell (B0) — the operator-only gate.
+ * Platform admin shell (B0 gate, B3 chrome) — the operator-only gate.
  *
  * Signed-out visits redirect to sign-in with `next=/admin`; signed-in
  * non-operators (and revoked operators, and a DB we cannot reach) get the
@@ -17,8 +18,8 @@ import { getDb } from "@/lib/db";
  * per-request answer in the flight payload and operators hung on the
  * fallback in dev, so a guard streams nothing. The chrome is deliberately
  * its own: no café shell imports, so no workspace state leaks into the
- * panel. Real pages (overview, accounts, cafés, activity) arrive in B3;
- * until then the stub page below is all there is.
+ * panel. The §4 left column (overview, accounts, cafés, activity) is the
+ * nav; the pages themselves arrive one commit at a time in B3.
  */
 
 // A guard cannot stream: this subtree renders on demand, per request,
@@ -54,7 +55,12 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           <p className="text-xs text-ink-500">Operators only</p>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 lg:flex-row">
+        <div className="lg:w-60 lg:shrink-0">
+          <AdminNav />
+        </div>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }
