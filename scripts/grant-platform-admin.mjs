@@ -6,6 +6,8 @@
  * “make me admin” path. Talks to the same Neon database the app uses
  * (DATABASE_URL), with parameterised SQL only. Revocation keeps the row
  * with revoked_at set — the user's own café access is untouched.
+ * Every grant and revoke also writes the platform_event audit row (B1) —
+ * a grant without its event is a bug, not a partial success.
  *
  * Usage (DATABASE_URL is read from .env.local via the npm script):
  *   npm run admin:platform -- list
@@ -58,6 +60,17 @@ async function grantCommand(sql, rest) {
 
   const account = await findUserId(sql, email);
   if (!account) fail(`No account with email ${email}. They sign in (link-only) first.`, 1);
+  const granter = grantedBy ? await findUserId(sql, grantedBy) : null;
+  if (grantedBy && !granter) fail(`No account with email ${grantedBy}.`, 1);
+
+  async function recordGrantEvent(detail) {
+    await sql`
+      insert into platform_event
+        (id, action, actor_user_id, actor_email, target_user_id, target_email, detail)
+      values
+        (gen_random_uuid(), 'operator.granted', ${granter?.id ?? null}, ${grantedBy}, ${account.id}, ${email}, ${detail})
+    `;
+  }
 
   const existing = await sql`select revoked_at from platform_admin where user_id = ${account.id}`;
   if (existing.length === 0) {
@@ -65,6 +78,7 @@ async function grantCommand(sql, rest) {
       insert into platform_admin (id, user_id, role, granted_by)
       values (gen_random_uuid(), ${account.id}, 'operator', ${grantedBy})
     `;
+    await recordGrantEvent(grantedBy ? null : "CLI bootstrap grant");
     console.log(`Granted operator access to ${email}.`);
     return;
   }
@@ -74,6 +88,7 @@ async function grantCommand(sql, rest) {
       set revoked_at = null, role = 'operator', granted_by = ${grantedBy}
       where user_id = ${account.id}
     `;
+    await recordGrantEvent("Previous grant restored.");
     console.log(`Restored operator access for ${email}.`);
     return;
   }
@@ -94,6 +109,12 @@ async function revokeCommand(sql, rest) {
     returning user_id
   `;
   if (updated.length === 0) fail(`${email} holds no active operator grant.`, 1);
+  await sql`
+    insert into platform_event
+      (id, action, actor_user_id, actor_email, target_user_id, target_email, detail)
+    values
+      (gen_random_uuid(), 'operator.access_revoked', null, null, ${account.id}, ${email}, 'Revoked via CLI.')
+  `;
   console.log(`Revoked operator access for ${email}. Their cafés are untouched.`);
 }
 
