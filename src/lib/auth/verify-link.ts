@@ -77,6 +77,33 @@ export function sameOriginPath(location: string | null | undefined, origin: stri
   }
 }
 
+/**
+ * The server-side request the route walks the verification endpoint with.
+ * Pure so the mapping is unit-testable: the token and routing params cross
+ * over, both callbacks are same-origin-guarded, and the inbound
+ * `x-forwarded-for` rides along so the endpoint's IP bucket matches a
+ * direct hit. A `null` callback means absent (the endpoint falls back to
+ * its own default); `forwardedFor` copies verbatim — trusting or
+ * distrusting it is the endpoint's job, exactly as on a direct call.
+ */
+export function buildVerifyHandlerRequest(input: {
+  origin: string;
+  token: string;
+  callbackURL: string | null;
+  newUserCallbackURL: string | null;
+  forwardedFor: string | null;
+}): Request {
+  const verifyUrl = new URL("/api/auth/magic-link/verify", input.origin);
+  verifyUrl.searchParams.set("token", input.token);
+  verifyUrl.searchParams.set("callbackURL", safeCallbackURL(input.callbackURL));
+  if (input.newUserCallbackURL !== null) {
+    verifyUrl.searchParams.set("newUserCallbackURL", safeCallbackURL(input.newUserCallbackURL));
+  }
+  const headers = new Headers();
+  if (input.forwardedFor) headers.set("x-forwarded-for", input.forwardedFor);
+  return new Request(verifyUrl.toString(), { headers });
+}
+
 /** What the route read off the verification endpoint's response. */
 export interface VerifyHandlerResult {
   status: number;

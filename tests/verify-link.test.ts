@@ -7,6 +7,7 @@ import { accountSuspendedMessage } from "@/lib/auth/account-state";
 import {
   LINK_FAILED_PATH,
   SUSPENDED_PATH,
+  buildVerifyHandlerRequest,
   resolveVerifyOutcome,
   safeCallbackURL,
   sameOriginPath,
@@ -85,6 +86,38 @@ describe("sameOriginPath", () => {
   it("refuses foreign origins and unusable values", () => {
     expect(sameOriginPath("https://evil.test/", "http://localhost:3200")).toBeNull();
     expect(sameOriginPath(null, "http://localhost:3200")).toBeNull();
+  });
+});
+
+describe("buildVerifyHandlerRequest", () => {
+  it("maps the page params onto the endpoint with the visitor IP", () => {
+    const request = buildVerifyHandlerRequest({
+      origin: "http://localhost:3200",
+      token: "tok-1",
+      callbackURL: "/publish?state=7",
+      newUserCallbackURL: null,
+      forwardedFor: "9.9.9.9",
+    });
+    const url = new URL(request.url);
+    expect(`${url.origin}${url.pathname}`).toBe("http://localhost:3200/api/auth/magic-link/verify");
+    expect(url.searchParams.get("token")).toBe("tok-1");
+    expect(url.searchParams.get("callbackURL")).toBe("/publish?state=7");
+    expect(url.searchParams.has("newUserCallbackURL")).toBe(false);
+    expect(request.headers.get("x-forwarded-for")).toBe("9.9.9.9");
+  });
+
+  it("guards both callbacks and sends no IP header it was not given", () => {
+    const request = buildVerifyHandlerRequest({
+      origin: "http://localhost:3200",
+      token: "tok-2",
+      callbackURL: "https://evil.test/",
+      newUserCallbackURL: "//evil.test/",
+      forwardedFor: null,
+    });
+    const url = new URL(request.url);
+    expect(url.searchParams.get("callbackURL")).toBe("/");
+    expect(url.searchParams.get("newUserCallbackURL")).toBe("/");
+    expect(request.headers.has("x-forwarded-for")).toBe(false);
   });
 });
 

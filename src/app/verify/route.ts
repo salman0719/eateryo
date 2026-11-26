@@ -6,6 +6,7 @@ import { withSessionHint } from "@/lib/auth/session-hint";
 import {
   LINK_FAILED_PATH,
   SUSPENDED_PATH,
+  buildVerifyHandlerRequest,
   resolveVerifyOutcome,
   safeCallbackURL,
 } from "@/lib/auth/verify-link";
@@ -28,6 +29,14 @@ import { loopbackOrigin } from "@/lib/http/loopback";
  * mirror, so a fresh sign-in carries the flag from its first response; and
  * like every suspension surface, redirects are `no-store` (the URL holds a
  * one-time credential either way).
+ *
+ * Rate limiting stays per-visitor: the inbound `x-forwarded-for` is handed
+ * to the endpoint, so its IP bucket matches a direct hit exactly. Without
+ * it the headerless internal request resolves to no IP in production and
+ * every visitor shares one `no-trusted-ip` bucket (five verifies a minute
+ * for the whole user base). Keep this in step if
+ * `advanced.ipAddress.ipAddressHeaders` is ever configured — the default is
+ * `x-forwarded-for` only, which is all this forwards.
  */
 async function readErrorMessage(response: Response): Promise<string | null> {
   try {
@@ -63,15 +72,17 @@ export async function GET(request: Request) {
   const token = requestUrl.searchParams.get("token") ?? "";
   const callbackURL = safeCallbackURL(requestUrl.searchParams.get("callbackURL"));
 
-  const verifyUrl = new URL("/api/auth/magic-link/verify", requestUrl.origin);
-  verifyUrl.searchParams.set("token", token);
-  verifyUrl.searchParams.set("callbackURL", callbackURL);
-  const newUserCallbackURL = requestUrl.searchParams.get("newUserCallbackURL");
-  if (newUserCallbackURL) verifyUrl.searchParams.set("newUserCallbackURL", newUserCallbackURL);
-
   let handlerRes: Response;
   try {
-    handlerRes = await getAuth(loopbackOrigin(request)).handler(new Request(verifyUrl.toString()));
+    handlerRes = await getAuth(loopbackOrigin(request)).handler(
+      buildVerifyHandlerRequest({
+        origin: requestUrl.origin,
+        token,
+        callbackURL: requestUrl.searchParams.get("callbackURL"),
+        newUserCallbackURL: requestUrl.searchParams.get("newUserCallbackURL"),
+        forwardedFor: request.headers.get("x-forwarded-for"),
+      })
+    );
   } catch {
     // The endpoint itself stumbled (DB down, misconfigured secret): no
     // session could exist, so the resend path is the honest answer.
