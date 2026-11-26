@@ -4,6 +4,10 @@ import { SignInScreen } from "@/components/auth/sign-in-screen";
 import { isDevSignInEnabled } from "@/lib/auth/dev-sign-in";
 import { safeCallbackURL } from "@/lib/auth/verify-link";
 
+// `?next=` is per-request routing data: never prerender (Next 16
+// cacheComponents), like every other guarded page.
+export const instant = false;
+
 /**
  * Password + magic-link sign-in (P3) — the password door first, the emailed
  * link as the second door. No create-account form: a first visit still
