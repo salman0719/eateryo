@@ -1,13 +1,27 @@
-import { and, eq, isNull, type SQLWrapper } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql, type SQLWrapper } from "drizzle-orm";
 
 import type { PlatformDb } from "@/lib/auth/platform-admin";
 import {
   accountSuspension,
+  menu,
+  order,
   platformEvent,
+  publishedMenu,
+  restaurantMembership,
   session,
   user,
   type SuspensionReason,
 } from "@/lib/db/schema";
+
+import {
+  ADMIN_ACCOUNTS_PAGE_SIZE,
+  encodeAdminCursor,
+  type AdminAccountFilter,
+  type AdminAccountSort,
+  type AdminAccountSummary,
+  type AdminCursor,
+} from "./schema";
+import { deriveAccountStage, type AccountStage } from "./stage";
 
 /**
  * Platform operations (B1) — server-only. Suspend and restore an account
@@ -21,7 +35,11 @@ import {
  * ordering while an owner is investigated.
  */
 
-export type PlatformRepoErrorCode = "not_found" | "no_open_suspension" | "suspension_active";
+export type PlatformRepoErrorCode =
+  | "not_found"
+  | "no_open_suspension"
+  | "suspension_active"
+  | "invalid_cursor";
 
 export class PlatformRepoError extends Error {
   readonly code: PlatformRepoErrorCode;
@@ -267,4 +285,197 @@ export async function restoreAccount(
       }),
   ]);
   return { suspensionId: open[0]!.id };
+}
+
+/* ------------------------------------------------------------------ */
+/* B2 reads: one page query, no N+1                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Membership-scoped aggregates for the accounts list (B2).
+ *
+ * Every count is a correlated scalar subquery on the row's own user id,
+ * so the whole page is one round trip — never one query per account.
+ * The filter names read as stages: `taking_orders` reached ordering
+ * (a first order exists, the plan's definition of onboarded),
+ * `not_onboarded` never ordered, `suspended` holds an open suspension.
+ */
+
+/**
+ * Correlated scalars, written with table-qualified names: drizzle renders
+ * an interpolated column as a bare identifier, which turns ambiguous (or
+ * silently correlates to the wrong table) the moment the fragment joins.
+ * Spelling the tables out keeps each subquery pinned to the outer row.
+ */
+
+const cafeCountSql = sql<number>`(select count(*)::int from "restaurant_membership" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const menuCountSql = sql<number>`(select count(*)::int from "menu" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "menu"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const liveCountSql = sql<number>`(select count(*)::int from "published_menu" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "published_menu"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id" and "published_menu"."published_at" is not null)`;
+
+const orderCountSql = sql<number>`(select count(*)::int from "order" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "order"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const orders7Sql = sql<number>`(select count(*)::int from "order" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "order"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id" and "order"."created_at" > now() - interval '7 days')`;
+
+const lastOrderAtSql = sql<Date | null>`(select max("order"."created_at") from "order" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "order"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const suspendedAtSql = sql<Date | null>`(select "account_suspension"."created_at" from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null limit 1)`;
+
+/** Never-ordered accounts sort as the epoch, so the key is never null. */
+const activeKeySql = sql<Date>`coalesce((${lastOrderAtSql}), '1970-01-01 00:00:00+00'::timestamptz)`;
+
+export interface ListAccountsInput {
+  q?: string;
+  filter?: AdminAccountFilter;
+  sort?: AdminAccountSort;
+  cursor?: AdminCursor | null;
+}
+
+export interface ListAccountsResult {
+  accounts: AdminAccountSummary[];
+  nextCursor?: string;
+}
+
+/** Escape the LIKE wildcards so a search for `%` finds a `%`. */
+function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+function cursorDate(key: string): Date {
+  const date = new Date(key);
+  if (Number.isNaN(date.getTime())) {
+    throw new PlatformRepoError("invalid_cursor", "That page cursor is not valid.");
+  }
+  return date;
+}
+
+/**
+ * Raw `sql` fragments carry no type parsers: an aggregate over one can
+ * arrive as a string on drivers that hand Dates to typed columns, so both
+ * shapes normalize here instead of at each call site.
+ */
+function toDate(value: Date | string | null): Date | null {
+  if (value === null || value === undefined) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
+/** Split an `orders` cursor key (`<count>:<iso>`) back into its parts. */
+function ordersCursorKey(key: string): { count: number; at: Date } {
+  const cut = key.indexOf(":");
+  const count = cut < 0 ? NaN : Number(key.slice(0, cut));
+  const at = cut < 0 ? new Date(NaN) : new Date(key.slice(cut + 1));
+  if (!Number.isInteger(count) || count < 0 || Number.isNaN(at.getTime())) {
+    throw new PlatformRepoError("invalid_cursor", "That page cursor is not valid.");
+  }
+  return { count, at };
+}
+
+/**
+ * One 25-row page of accounts with aggregates, keyset-paginated. The
+ * keyset columns always match the sort order, so pages hold no
+ * duplicates and no gaps even while accounts sign up mid-scroll.
+ */
+export async function listAccounts(
+  db: PlatformDb,
+  input: ListAccountsInput = {}
+): Promise<ListAccountsResult> {
+  const filter = input.filter ?? "all";
+  const sort = input.sort ?? "newest";
+  const cursor = input.cursor ?? null;
+
+  const conditions: SQLWrapper[] = [];
+  const trimmed = input.q?.trim();
+  if (trimmed) {
+    const pattern = likePattern(trimmed);
+    conditions.push(
+      sql`(${user.email} ilike ${pattern} escape '\\' or ${user.name} ilike ${pattern} escape '\\')`
+    );
+  }
+  if (filter === "suspended") {
+    conditions.push(sql`exists(select 1 from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null)`);
+  } else if (filter === "taking_orders") {
+    conditions.push(sql`(${orderCountSql} > 0)`);
+  } else if (filter === "not_onboarded") {
+    conditions.push(sql`(${orderCountSql} = 0)`);
+  }
+
+  if (sort === "newest" && cursor) {
+    const at = cursorDate(cursor.key);
+    conditions.push(or(lt(user.createdAt, at), and(eq(user.createdAt, at), lt(user.id, cursor.id)))!);
+  } else if (sort === "active" && cursor) {
+    const at = cursorDate(cursor.key);
+    conditions.push(
+      or(lt(activeKeySql, at), and(eq(activeKeySql, at), lt(user.id, cursor.id)))!
+    );
+  } else if (sort === "orders" && cursor) {
+    const { count, at } = ordersCursorKey(cursor.key);
+    conditions.push(
+      or(
+        lt(orders7Sql, count),
+        and(eq(orders7Sql, count), lt(user.createdAt, at)),
+        and(eq(orders7Sql, count), eq(user.createdAt, at), lt(user.id, cursor.id))
+      )!
+    );
+  }
+
+  const orderBy =
+    sort === "active"
+      ? [desc(activeKeySql), desc(user.id)]
+      : sort === "orders"
+        ? [desc(orders7Sql), desc(user.createdAt), desc(user.id)]
+        : [desc(user.createdAt), desc(user.id)];
+
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      cafeCount: cafeCountSql,
+      menuCount: menuCountSql,
+      liveCount: liveCountSql,
+      orders7: orders7Sql,
+      orderCount: orderCountSql,
+      lastOrderAt: lastOrderAtSql,
+      suspendedAt: suspendedAtSql,
+    })
+    .from(user)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(...orderBy)
+    .limit(ADMIN_ACCOUNTS_PAGE_SIZE + 1);
+
+  const page = rows.slice(0, ADMIN_ACCOUNTS_PAGE_SIZE);
+  const accounts: AdminAccountSummary[] = page.map((row) => {
+    const stage: AccountStage = deriveAccountStage({
+      cafeCount: row.cafeCount,
+      menuCount: row.menuCount,
+      liveCount: row.liveCount,
+      orderCount: row.orderCount,
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt.toISOString(),
+      cafeCount: row.cafeCount,
+      menuCount: row.menuCount,
+      liveCount: row.liveCount,
+      orders7: row.orders7,
+      lastOrderAt: toDate(row.lastOrderAt)?.toISOString() ?? null,
+      suspended: toDate(row.suspendedAt) !== null,
+      suspendedAt: toDate(row.suspendedAt)?.toISOString() ?? null,
+      stage,
+    };
+  });
+
+  if (rows.length <= ADMIN_ACCOUNTS_PAGE_SIZE) return { accounts };
+  const last = page[page.length - 1]!;
+  const key =
+    sort === "active"
+      ? (toDate(last.lastOrderAt)?.toISOString() ?? new Date(0).toISOString())
+      : sort === "orders"
+        ? `${last.orders7}:${last.createdAt.toISOString()}`
+        : last.createdAt.toISOString();
+  return { accounts, nextCursor: encodeAdminCursor({ key, id: last.id }) };
 }

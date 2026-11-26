@@ -1,11 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
+import { createSampleMenuDocument } from "@/features/menu/sample-menu";
+import { menuDocumentSchema, type MenuDocument } from "@/features/menu/schema";
+import { createMenuForUser } from "@/features/menus/repo";
+import { listAccounts, PlatformRepoError, suspendAccount } from "@/features/platform/repo";
 import {
   adminAccountsQuerySchema,
   decodeAdminCursor,
   encodeAdminCursor,
 } from "@/features/platform/schema";
 import { ACCOUNT_STAGES, deriveAccountStage, stageIndex } from "@/features/platform/stage";
+import { publishMenuForUser } from "@/features/publishing/repo";
+import { createRestaurant } from "@/features/tenancy/repo";
+import {
+  order as orderTable,
+  restaurant as restaurantTable,
+} from "@/lib/db/schema";
+import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 
 /**
  * B2 — Reads: list, detail, stage (PGlite, no external services).
@@ -96,5 +107,183 @@ describe("admin read query contracts", () => {
     expect(decodeAdminCursor(undefined)).toBeNull();
     expect(decodeAdminCursor("not-a-cursor")).toBeNull();
     expect(decodeAdminCursor(encodeAdminCursor({ key: "", id: "" }))).toBeNull();
+  });
+});
+
+describe("accounts list query", () => {
+  let db: TestDb;
+  let actorId: string;
+
+  function menuDoc(id: string): MenuDocument {
+    return menuDocumentSchema.parse({ ...createSampleMenuDocument(), id });
+  }
+
+  beforeEach(async () => {
+    ({ db } = await createTestDb());
+    actorId = await seedUser(db, "list-actor@cafe.test", "Actor");
+  }, 30_000);
+
+  async function seedCafe(
+    tag: string,
+    options: { menu?: boolean; live?: boolean; orders?: Date[]; suspend?: boolean } = {}
+  ): Promise<string> {
+    const id = await seedUser(db, `list-${tag}@cafe.test`, `List ${tag}`);
+    const cafe = await createRestaurant(db, id, `Caf\u00e9 ${tag}`);
+    if (options.menu ?? options.live) {
+      await createMenuForUser(db, id, cafe.id, menuDoc(`menu-${tag}`));
+    }
+    if (options.live) {
+      await publishMenuForUser(db, id, `menu-${tag}`);
+    }
+    for (const at of options.orders ?? []) {
+      await db
+        .insert(orderTable)
+        .values({ restaurantId: cafe.id, menuTitle: "Lunch", tableLabel: "3", createdAt: at });
+    }
+    if (options.suspend) {
+      await suspendAccount(db, { targetUserId: id, reason: "abuse_or_spam", actorUserId: actorId });
+    }
+    return id;
+  }
+
+  it("returns counts, stage and suspension status for seeded accounts", async () => {
+    const now = new Date();
+    const ordered = await seedCafe("ordered", { menu: true, live: true, orders: [now] });
+    const drafting = await seedCafe("drafting", { menu: true });
+    const stopped = await seedCafe("stopped", { suspend: true });
+    const bare = await seedUser(db, "list-bare@cafe.test", "List bare");
+
+    const { accounts } = await listAccounts(db, {});
+    const byId = new Map(accounts.map((row) => [row.id, row]));
+    // The actor row exists too — every seeded account is listed.
+    expect(accounts.length).toBe(5);
+
+    expect(byId.get(ordered)).toMatchObject({
+      cafeCount: 1,
+      menuCount: 1,
+      liveCount: 1,
+      orders7: 1,
+      suspended: false,
+      stage: "ordering",
+    });
+    expect(byId.get(ordered)?.lastOrderAt).not.toBeNull();
+    expect(byId.get(drafting)).toMatchObject({
+      menuCount: 1,
+      liveCount: 0,
+      orders7: 0,
+      lastOrderAt: null,
+      suspended: false,
+      stage: "menu",
+    });
+    expect(byId.get(stopped)).toMatchObject({ cafeCount: 1, suspended: true, stage: "cafe" });
+    expect(byId.get(stopped)?.suspendedAt).not.toBeNull();
+    expect(byId.get(bare)).toMatchObject({
+      cafeCount: 0,
+      menuCount: 0,
+      suspended: false,
+      stage: "signed_up",
+    });
+  });
+
+  it("paginates 30 accounts without duplicates or gaps", async () => {
+    for (let n = 0; n < 30; n += 1) {
+      await seedUser(db, `list-page-${String(n).padStart(2, "0")}@cafe.test`, `Page ${n}`);
+    }
+    const seen: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const result = await listAccounts(db, cursor ? { cursor: decodeAdminCursor(cursor)! } : {});
+      // Decode through the wire format, like the route does.
+      const wire = result.nextCursor;
+      seen.push(...result.accounts.map((row) => row.id));
+      cursor = wire;
+      pages += 1;
+    } while (cursor);
+    expect(pages).toBe(2);
+    // 30 seeded plus the actor row.
+    expect(seen.length).toBe(31);
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+
+  it("searches by name or email, with wildcards escaped", async () => {
+    await seedUser(db, "list-erin@cafe.test", "Erin Espresso");
+    await seedUser(db, "list-percent@cafe.test", "100% Caf\u00e9");
+    await seedUser(db, "list-unrelated@cafe.test", "Unrelated Owner");
+
+    const byEmail = await listAccounts(db, { q: "erin@cafe" });
+    expect(byEmail.accounts.map((row) => row.email)).toEqual(["list-erin@cafe.test"]);
+    const byName = await listAccounts(db, { q: "espresso" });
+    expect(byName.accounts.map((row) => row.email)).toEqual(["list-erin@cafe.test"]);
+    // A bare % must match the literal name, not everything.
+    const byPercent = await listAccounts(db, { q: "%" });
+    expect(byPercent.accounts.map((row) => row.email)).toEqual(["list-percent@cafe.test"]);
+  });
+
+  it("filters by ordering, onboarding and suspension", async () => {
+    const now = new Date();
+    await seedCafe("filter-ordered", { menu: true, live: true, orders: [now] });
+    await seedCafe("filter-draft", { menu: true });
+    await seedCafe("filter-stopped", { suspend: true });
+    await seedUser(db, "list-filter-bare@cafe.test", "Filter bare");
+
+    const taking = await listAccounts(db, { filter: "taking_orders" });
+    expect(taking.accounts.map((row) => row.email)).toEqual(["list-filter-ordered@cafe.test"]);
+    const fresh = await listAccounts(db, { filter: "not_onboarded" });
+    expect(fresh.accounts.map((row) => row.email).sort()).toEqual(
+      ["list-actor@cafe.test", "list-filter-bare@cafe.test", "list-filter-draft@cafe.test", "list-filter-stopped@cafe.test"].sort()
+    );
+    const stopped = await listAccounts(db, { filter: "suspended" });
+    expect(stopped.accounts.map((row) => row.email)).toEqual([
+      "list-filter-stopped@cafe.test",
+    ]);
+  });
+
+  it("sorts by recent activity and 7-day volume", async () => {
+    const now = Date.now();
+    await seedCafe("sort-busy", {
+      menu: true,
+      orders: [new Date(now - 3_600_000), new Date(now - 7_200_000), new Date(now)],
+    });
+    await seedCafe("sort-quiet", { menu: true, orders: [new Date(now - 1_800_000)] });
+    await seedCafe("sort-old", { menu: true, orders: [new Date(now - 30 * 86_400_000)] });
+
+    const byVolume = await listAccounts(db, { sort: "orders" });
+    expect(byVolume.accounts.map((row) => row.email)).toEqual([
+      "list-sort-busy@cafe.test",
+      "list-sort-quiet@cafe.test",
+      "list-sort-old@cafe.test",
+      "list-actor@cafe.test",
+    ]);
+    const byActive = await listAccounts(db, { sort: "active" });
+    const emails = byActive.accounts.map((row) => row.email);
+    // Busiest ordered last (now); the 30-day-old account sorts below never-ordered.
+    expect(emails[0]).toBe("list-sort-busy@cafe.test");
+    expect(emails[emails.length - 2]).toBe("list-sort-old@cafe.test");
+    expect(emails[emails.length - 1]).toBe("list-actor@cafe.test");
+  });
+
+  it("still lists an account whose caf\u00e9 was deleted", async () => {
+    const id = await seedCafe("deleted", { menu: true });
+    const cafes = await db.select({ id: restaurantTable.id }).from(restaurantTable);
+    expect(cafes.length).toBe(1);
+    await db.delete(restaurantTable);
+    const { accounts } = await listAccounts(db, {});
+    // Memberships, menus and orders cascade away with the caf\u00e9.
+    expect(accounts.map((row) => row.id).sort()).toEqual([actorId, id].sort());
+    expect(accounts.find((row) => row.id === id)).toMatchObject({
+      cafeCount: 0,
+      menuCount: 0,
+      stage: "signed_up",
+    });
+  });
+
+  it("rejects a cursor that is not a date", async () => {
+    await expect(listAccounts(db, { cursor: { key: "not-a-date", id: "x" } })).rejects.toBeInstanceOf(
+      PlatformRepoError
+    );
+    await expect(
+      listAccounts(db, { sort: "orders", cursor: { key: "bogus", id: "x" } })
+    ).rejects.toMatchObject({ code: "invalid_cursor" });
   });
 });
