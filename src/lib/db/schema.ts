@@ -198,6 +198,8 @@ export const PLATFORM_EVENT_ACTIONS = [
   "account.restored",
   "operator.granted",
   "operator.access_revoked",
+  "password.reset",
+  "account.unlocked",
 ] as const;
 
 export type PlatformEventAction = (typeof PLATFORM_EVENT_ACTIONS)[number];
@@ -227,6 +229,30 @@ export const platformEvent = pgTable(
     actionCreatedIdx: index("platform_event_action_created_idx").on(t.action, t.createdAt),
   })
 );
+
+/**
+ * Operator-visible sign-in state for one account (B4 — operator side only).
+ *
+ * Password enforcement in the app ships with the password work, not V1:
+ * this table records what the operator panel shows and what its two
+ * actions change — never a hash, never a token. `passwordSetAt` is null
+ * until the account sets its first password (the link-only cutover);
+ * `resetRequired` + `resetSentAt` mark an outstanding forced reset;
+ * `failedAttempts` + `lockedUntil` are the 5-attempt/15-minute lockout
+ * the operator's Unlock action clears. Rows are created on demand by
+ * the actions below, so a missing row reads as "no password yet".
+ */
+export const accountAccessState = pgTable("account_access_state", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  passwordSetAt: timestamp("password_set_at"),
+  resetRequired: boolean("reset_required").notNull().default(false),
+  resetSentAt: timestamp("reset_sent_at"),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
+  updatedAt: updatedAt().$onUpdateFn(() => new Date()),
+});
 
 /**
  * A restaurant (café) tenant. `slug` is the café's public `/r/<slug>`
@@ -858,6 +884,7 @@ export const schema = {
   account,
   verification,
   platformAdmin,
+  accountAccessState,
   restaurant,
   restaurantMembership,
   restaurantInvitation,

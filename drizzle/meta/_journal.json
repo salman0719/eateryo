@@ -162,6 +162,13 @@
       "when": 1795676585166,
       "tag": "0022_flawless_queen_noir",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795692364486,
+      "tag": "0023_even_yellowjacket",
+      "breakpoints": true
     }
   ]
 }
