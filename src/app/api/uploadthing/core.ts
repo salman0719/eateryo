@@ -23,7 +23,9 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
 
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
+import { getDb } from "@/lib/db";
 import { logInfo } from "@/lib/observability/log";
 
 const f = createUploadthing();
@@ -40,6 +42,14 @@ async function requireSignedIn(message: string): Promise<{ userId: string }> {
   const userId = await getSessionUserId();
   if (!userId) {
     throw new UploadThingError({ code: "FORBIDDEN", message });
+  }
+  try {
+    await assertAccountActive(getDb(), userId);
+  } catch (error) {
+    if (error instanceof AccountStateError) {
+      throw new UploadThingError({ code: "FORBIDDEN", message: error.message });
+    }
+    throw error;
   }
   return { userId };
 }

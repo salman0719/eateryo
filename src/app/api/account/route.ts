@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { deleteAccountForUser } from "@/features/retention/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -67,10 +68,17 @@ export async function DELETE(request: Request): Promise<NextResponse> {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const result = await deleteAccountForUser(getDb(), userId);
     logInfo("account.deleted", { userId, restaurants: result.restaurants });
     return NextResponse.json(result, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof AccountStateError) {
+      return NextResponse.json(
+        { error: { code: "account_suspended", message: error.message } },
+        { status: 403 }
+      );
+    }
     await reportError("account.delete_failed", error, { userId });
     return NextResponse.json(
       { error: { code: "delete_failed", message: "Could not delete the account. Try again." } },

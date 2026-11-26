@@ -7,6 +7,7 @@ import {
   InvitationError,
 } from "@/features/tenancy/invitations";
 import { user } from "@/lib/db/schema";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -90,6 +91,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const db = getDb();
     // The address comes from the account row, never from the request body.
     const accounts = await db
@@ -117,6 +119,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof InvitationError) return mapInvitationError(error);
     return errorResponse(
       "server_db_unavailable",
