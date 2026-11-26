@@ -155,6 +155,13 @@
       "when": 1795673504956,
       "tag": "0021_living_carnage",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795676585166,
+      "tag": "0022_flawless_queen_noir",
+      "breakpoints": true
     }
   ]
 }

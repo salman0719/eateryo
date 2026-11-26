@@ -1,3 +1,4 @@
+import { isNull } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -138,6 +139,94 @@ export const platformAdmin = pgTable(
 
 /** Platform operator roles. V1 enforces `operator` only; `viewer` is V2. */
 export type PlatformAdminRole = "operator" | "viewer";
+
+/**
+ * Account suspensions (the platform safety action — B1).
+ *
+ * Suspension belongs to an ACCOUNT, never a café: diners keep ordering and
+ * published menus keep serving while an owner is investigated. One row per
+ * suspension; `liftedAt` is set on restore. The partial unique index holds
+ * at most one OPEN suspension per account — a second suspend is a conflict,
+ * never a second row. History (with its reason) survives restore, so a
+ * later operator can see why it happened. Reasons mirror the prototype's
+ * seed (`Abuse or spam`, `Owner request`) plus the `other` escape hatch.
+ */
+export const SUSPENSION_REASONS = ["abuse_or_spam", "owner_request", "other"] as const;
+
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+
+export const accountSuspension = pgTable(
+  "account_suspension",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    reason: text("reason", { enum: SUSPENSION_REASONS }).notNull(),
+    note: text("note"),
+    suspendedBy: text("suspended_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    liftedAt: timestamp("lifted_at"),
+    liftedBy: text("lifted_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    liftNote: text("lift_note"),
+  },
+  (t) => ({
+    openUnique: uniqueIndex("account_suspension_open_unique")
+      .on(t.userId)
+      .where(isNull(t.liftedAt)),
+  })
+);
+
+/**
+ * Platform audit trail (B1 records the base four; B4/B5 add families).
+ *
+ * Append-only in the repository: no update, no delete. Actor and target
+ * addresses are snapshotted so history stays readable after an account is
+ * removed; the id columns are best-effort links that null out with the
+ * user. Reads are deliberately not logged (plan §8). Mirrors
+ * `restaurant_audit_event`'s shape minus the restaurant scope — the
+ * platform has no tenant.
+ */
+export const PLATFORM_EVENT_ACTIONS = [
+  "account.suspended",
+  "account.restored",
+  "operator.granted",
+  "operator.access_revoked",
+] as const;
+
+export type PlatformEventAction = (typeof PLATFORM_EVENT_ACTIONS)[number];
+
+export const platformEvent = pgTable(
+  "platform_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    action: text("action", { enum: PLATFORM_EVENT_ACTIONS }).notNull(),
+    actorUserId: text("actor_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    /** Snapshot of the actor's address (null for the CLI bootstrap grant). */
+    actorEmail: text("actor_email"),
+    targetUserId: text("target_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    /** Snapshot of the affected account's address. */
+    targetEmail: text("target_email"),
+    /** Free-form human detail, e.g. the restore note. */
+    detail: text("detail"),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    actionCreatedIdx: index("platform_event_action_created_idx").on(t.action, t.createdAt),
+  })
+);
 
 /**
  * A restaurant (café) tenant. `slug` is the café's public `/r/<slug>`
