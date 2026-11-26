@@ -1,32 +1,40 @@
 import Link from "next/link";
 
-import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { SignInScreen } from "@/components/auth/sign-in-screen";
 import { isDevSignInEnabled } from "@/lib/auth/dev-sign-in";
+import { safeCallbackURL } from "@/lib/auth/verify-link";
 
 /**
- * Magic-link sign-in (the only human sign-in — PHASE-2.md §3.6): one field,
- * one one-time link. Sign-up happens implicitly when a new email first uses
- * a link. Diners never see this page — ordering at a table stays anonymous.
+ * Password + magic-link sign-in (P3) — the password door first, the emailed
+ * link as the second door. No create-account form: a first visit still
+ * starts with a link and a password is offered after verification, so
+ * sign-in never mints an account. Diners never see this page — ordering at
+ * a table stays anonymous.
  *
- * With `DEV_SIGN_IN_BYPASS=1` locally, the form offers the link on the page
- * instead of emailing it; production never shows that panel. The flag is read
- * here on the server, and `isDevSignInEnabled()` answers false in a production
- * build whatever the build machine had set.
+ * `?next=` carries the operator redirect (`/sign-in?next=/admin`): both
+ * doors return there after success, same-origin-guarded. With
+ * `DEV_SIGN_IN_BYPASS=1` locally, the link door offers the parked link on
+ * the page instead of emailing it; production never shows that panel.
  */
-export default function SignInPage() {
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
   const devSignIn = isDevSignInEnabled();
+  const params = await searchParams;
+  const callbackURL = safeCallbackURL(Array.isArray(params.next) ? params.next[0] : params.next);
 
   return (
     <main className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-ink-900">Sign in</h1>
         <p className="mt-2 text-sm text-ink-600">
-          Enter your email and we&apos;ll send a one-time sign-in link — no passwords to remember.
-          The link expires in 5 minutes.
+          Use the email and password for your Eateryo account.
         </p>
       </div>
 
-      <MagicLinkForm callbackURL="/" devSignIn={devSignIn} />
+      <SignInScreen callbackURL={callbackURL} devSignIn={devSignIn} />
 
       <p className="text-sm text-ink-500">
         <Link href="/" className="underline underline-offset-2 hover:text-ink-800">
