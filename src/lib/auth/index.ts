@@ -1,6 +1,6 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink } from "better-auth/plugins";
 
@@ -13,6 +13,14 @@ import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./passwords";
 
 import { sendMagicLinkEmail } from "./email";
 import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
+import {
+  clearFailedAttempts,
+  findPasswordUserId,
+  lockoutMessage,
+  readLockout,
+  recordFailedAttempt,
+  signInEmail,
+} from "./lockout";
 
 /** Magic links are single-use and expire fast (PHASE-2.md §3.6). */
 const MAGIC_LINK_EXPIRES_IN_SECONDS = 5 * 60;
@@ -20,6 +28,36 @@ const MAGIC_LINK_EXPIRES_IN_SECONDS = 5 * 60;
 export const SESSION_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
 /** Rolling refresh: the 30-day window slides forward on daily use. */
 const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
+/** The one endpoint the lockout counter guards (P6 adds the factor verify). */
+const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
+
+/**
+ * The pause as the endpoint answers it: 429 with the settled copy, so the
+ * sign-in screen can tell "wrong password" apart from "wait" without the
+ * server naming the account. The counter, not this response, is the gate.
+ */
+function accountLockedError(minutesLeft: number): APIError {
+  return new APIError("TOO_MANY_REQUESTS", {
+    code: "ACCOUNT_LOCKED",
+    message: lockoutMessage(minutesLeft),
+  });
+}
+
+/**
+ * The same pause as a finished response, for the after hook to substitute.
+ * Replacing the *response* is what carries the 429: the pipeline keeps the
+ * failing endpoint's own 401 status when an error object is swapped in, but
+ * a `Response` passes through untouched.
+ */
+function accountLockedResponse(minutesLeft: number): Response {
+  return new Response(
+    JSON.stringify({ code: "ACCOUNT_LOCKED", message: lockoutMessage(minutesLeft) }),
+    {
+      status: 429,
+      headers: { "content-type": "application/json", "cache-control": "no-store" },
+    }
+  );
+}
 
 type SendMagicLink = NonNullable<Parameters<typeof magicLink>[0]>["sendMagicLink"];
 
@@ -79,6 +117,77 @@ export function createAuth(options: CreateAuthOptions) {
           },
         },
       },
+    },
+    hooks: {
+      /**
+       * Lockout gate (P4). Five failed password attempts pause sign-in for
+       * 15 minutes per account — the row the operator's Unlock clears. The
+       * check runs before the password is even hashed, so a correct password
+       * cannot walk through a pause, and a wrong one during the pause costs
+       * nothing (the attempt never reaches the counting half). The emailed
+       * link is deliberately not gated: it is the escape hatch that needs no
+       * operator.
+       */
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== PASSWORD_SIGN_IN_PATH) return;
+        const email = signInEmail(ctx.body);
+        if (!email) return;
+
+        let lockedMinutes: number | null = null;
+        try {
+          const userId = await findPasswordUserId(options.db, email);
+          if (userId) {
+            const state = await readLockout(options.db, userId);
+            if (state.locked) lockedMinutes = state.minutesLeft;
+          }
+        } catch {
+          // Without the counter row we cannot honour the pause; the
+          // password check behind it would fail on the same DB anyway, so
+          // fail closed with the shared unavailable copy.
+          throw new APIError("SERVICE_UNAVAILABLE", {
+            message: "Sign-in is not available yet — try again shortly.",
+          });
+        }
+        if (lockedMinutes !== null) throw accountLockedError(lockedMinutes);
+      }),
+
+      /**
+       * Count the attempt (P4). A wrong password adds one failure and, on the
+       * fifth, answers the pause immediately instead of waiting for the next
+       * attempt; a correct one clears the window. A suspended account's
+       * refusal (403) is not a failed attempt — the credentials were right —
+       * and any other error leaves the counter alone.
+       */
+      after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== PASSWORD_SIGN_IN_PATH) return;
+        const email = signInEmail(ctx.body);
+        if (!email) return;
+        const returned = (ctx.context as unknown as { returned?: unknown }).returned;
+
+        try {
+          const userId = await findPasswordUserId(options.db, email);
+          if (!userId) return;
+
+          if (isAPIError(returned)) {
+            const code = (returned.body as { code?: unknown } | undefined)?.code;
+            if (code !== "INVALID_EMAIL_OR_PASSWORD") return;
+            const state = await recordFailedAttempt(options.db, userId);
+            if (state.locked) {
+              // The fifth failure is answered as the pause, so it is never a
+              // surprise: the response says what happened and for how long.
+              return accountLockedResponse(state.minutesLeft);
+            }
+            return;
+          }
+
+          if (returned && typeof returned === "object" && "user" in returned) {
+            await clearFailedAttempts(options.db, userId);
+          }
+        } catch {
+          // Counting is best-effort after the fact: a write that fails must
+          // never turn a correct sign-in into an error response.
+        }
+      }),
     },
     emailAndPassword: {
       // Password verification runs from P3 against the P2-stored credential.
