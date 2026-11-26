@@ -53,7 +53,7 @@ async function grantCommand(sql, rest) {
   const email = rest[0];
   if (!email) fail(`Missing <email> for grant.\n\n${USAGE}`, 2);
   const byIndex = rest.indexOf("--by");
-  const grantedBy = byIndex === -1 ? null : rest[byIndex + 1] ?? null;
+  const grantedBy = byIndex === -1 ? null : (rest[byIndex + 1] ?? null);
   if (byIndex !== -1 && !grantedBy) fail(`Missing address after --by.\n\n${USAGE}`, 2);
 
   const account = await findUserId(sql, email);

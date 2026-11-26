@@ -42,10 +42,7 @@ export interface GrantPlatformAdminInput {
   role?: PlatformAdminRole;
 }
 
-export type GrantResult =
-  | { status: "granted" }
-  | { status: "regranted" }
-  | { status: "already" };
+export type GrantResult = { status: "granted" } | { status: "regranted" } | { status: "already" };
 
 /**
  * Grant operator access. Idempotent: an active grant reports `already`,
@@ -82,10 +79,7 @@ export async function grantPlatformAdmin(
 export type RevokeResult = { status: "revoked" } | { status: "not_found" };
 
 /** Revoke operator access, keeping the row (and the user's cafés) intact. */
-export async function revokePlatformAdmin(
-  db: PlatformDb,
-  userId: string
-): Promise<RevokeResult> {
+export async function revokePlatformAdmin(db: PlatformDb, userId: string): Promise<RevokeResult> {
   const existing = await db
     .select({ revokedAt: platformAdmin.revokedAt })
     .from(platformAdmin)
