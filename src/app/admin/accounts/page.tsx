@@ -12,7 +12,11 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { listAccounts } from "@/features/platform/repo";
 import { decodeAdminCursor } from "@/features/platform/schema";
-import type { AdminAccountFilter, AdminAccountSort } from "@/features/platform/schema";
+import type {
+  AdminAccountFilter,
+  AdminAccountSort,
+  AdminAccountSummary,
+} from "@/features/platform/schema";
 
 // Like the layout guard above: this page reads per request, never prerenders.
 // Without it a client-side navigation trips Next 16's blocking-prerender error.
@@ -23,7 +27,17 @@ const FILTERS: { value: AdminAccountFilter; label: string }[] = [
   { value: "taking_orders", label: "Taking orders" },
   { value: "not_onboarded", label: "Not onboarded" },
   { value: "suspended", label: "Suspended" },
+  { value: "no_password", label: "No password" },
+  { value: "reset_required", label: "Reset required" },
+  { value: "locked", label: "Locked out" },
 ];
+
+const ACCESS_CHIPS: Record<AdminAccountSummary["accessChip"], { label: string; dot: string }> = {
+  locked: { label: "Locked out", dot: "bg-danger-500" },
+  reset_required: { label: "Reset required", dot: "bg-warning-500" },
+  no_password: { label: "No password", dot: "bg-ink-300" },
+  password_set: { label: "Password set", dot: "bg-success-500" },
+};
 
 const SORTS: { value: AdminAccountSort; label: string }[] = [
   { value: "newest", label: "Newest" },
@@ -110,8 +124,8 @@ export default async function AdminAccountsPage({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Accounts</h1>
         <p className="mt-1 text-sm text-ink-600">
-          Every account on the platform — search by name or email, filter by stage, sort by signup,
-          activity or volume.
+          Every account on the platform — search by name or email, filter by stage or sign-in state,
+          sort by signup, activity or volume.
         </p>
       </div>
 
@@ -198,6 +212,13 @@ export default async function AdminAccountsPage({
                     Suspended
                   </span>
                 ) : null}
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-line-200 px-2 py-0.5 text-xs font-semibold text-ink-900">
+                  <span
+                    aria-hidden="true"
+                    className={`h-1.5 w-1.5 rounded-full ${ACCESS_CHIPS[account.accessChip].dot}`}
+                  />
+                  {ACCESS_CHIPS[account.accessChip].label}
+                </span>
                 <span className="text-xs tabular-nums text-ink-500">
                   {shortDate(account.createdAt)}
                 </span>
