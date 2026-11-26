@@ -15,6 +15,8 @@ import {
   escapeEmailHtml,
 } from "@/lib/email-layout";
 
+import { toVerifyPageUrl } from "@/lib/auth/verify-link";
+
 export interface MagicLinkEmail {
   email: string;
   url: string;
@@ -86,7 +88,10 @@ export async function sendMagicLinkEmail({ email, url }: MagicLinkEmail): Promis
     return;
   }
 
-  const content = buildMagicLinkEmail({ email, url });
+  // The inbox gets the first-party page, never the raw verification URL:
+  // `/verify` walks the endpoint and routes suspended clicks to the
+  // signed-out landing instead of a raw 403.
+  const content = buildMagicLinkEmail({ email, url: toVerifyPageUrl(url) });
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
