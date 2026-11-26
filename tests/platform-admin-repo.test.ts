@@ -12,9 +12,12 @@ import {
 import { ACCOUNT_STAGES, deriveAccountStage, stageIndex } from "@/features/platform/stage";
 import { publishMenuForUser } from "@/features/publishing/repo";
 import { createRestaurant } from "@/features/tenancy/repo";
+import { getAccountDetail, listPlatformEvents } from "@/features/platform/repo";
 import {
   order as orderTable,
+  platformEvent as platformEventTable,
   restaurant as restaurantTable,
+  session as sessionTable,
 } from "@/lib/db/schema";
 import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
 
@@ -285,5 +288,137 @@ describe("accounts list query", () => {
     await expect(
       listAccounts(db, { sort: "orders", cursor: { key: "bogus", id: "x" } })
     ).rejects.toMatchObject({ code: "invalid_cursor" });
+  });
+});
+
+describe("account detail", () => {
+  let db: TestDb;
+  let actorId: string;
+
+  function menuDoc(id: string): MenuDocument {
+    return menuDocumentSchema.parse({ ...createSampleMenuDocument(), id });
+  }
+
+  beforeEach(async () => {
+    ({ db } = await createTestDb());
+    actorId = await seedUser(db, "detail-actor@cafe.test", "Actor");
+  }, 30_000);
+
+  async function seedFull(tag: string): Promise<string> {
+    const id = await seedUser(db, `detail-${tag}@cafe.test`, `Detail ${tag}`);
+    const cafe = await createRestaurant(db, id, `Caf\u00e9 ${tag}`);
+    await createMenuForUser(db, id, cafe.id, menuDoc(`menu-${tag}`));
+    await publishMenuForUser(db, id, `menu-${tag}`);
+    await db
+      .insert(orderTable)
+      .values({ restaurantId: cafe.id, menuTitle: "Lunch", tableLabel: "3" });
+    await db.insert(sessionTable).values({
+      id: `session-${tag}`,
+      userId: id,
+      token: `token-${tag}`,
+      expiresAt: new Date(Date.now() + 3_600_000),
+      userAgent: "TestBrowser/1.0",
+    });
+    return id;
+  }
+
+  it("returns membership-scoped data with no diner or network detail", async () => {
+    const id = await seedFull("full");
+    const detail = await getAccountDetail(db, id);
+
+    expect(detail.account).toMatchObject({ id, email: "detail-full@cafe.test" });
+    expect(detail.stage).toBe("ordering");
+    expect(detail.suspension).toBeNull();
+    expect(detail.cafes).toHaveLength(1);
+    expect(detail.cafes[0]).toMatchObject({ name: "Caf\u00e9 full", role: "owner" });
+    expect(detail.menus).toHaveLength(1);
+    expect(detail.menus[0]).toMatchObject({ cafeId: detail.cafes[0]!.id, live: true });
+    expect(detail.menus[0]?.slug).not.toBeNull();
+    expect(detail.usage).toEqual({ requests: 0, cap: expect.any(Number), remaining: expect.any(Number) });
+    expect(detail.orders.total).toBe(1);
+    expect(detail.orders.last7).toBe(1);
+    expect(detail.orders.lastOrderAt).not.toBeNull();
+    expect(detail.orders.recent).toHaveLength(1);
+    expect(detail.orders.recent[0]).toMatchObject({ tableLabel: "3" });
+    // One session, device label only — the address column never leaves.
+    expect(detail.sessions).toHaveLength(1);
+    expect(detail.sessions[0]).toMatchObject({ id: "session-full", userAgent: "TestBrowser/1.0" });
+    expect(detail.sessions[0]).not.toHaveProperty("ipAddress");
+    // Timeline names the milestones, newest first.
+    const kinds = detail.timeline.map((entry) => entry.kind);
+    expect(kinds).toContain("account_created");
+    expect(kinds).toContain("cafe_joined");
+    const ats = detail.timeline.map((entry) => entry.at);
+    expect([...ats].sort().reverse()).toEqual(ats);
+  });
+
+  it("shows an open suspension with its reason, history intact", async () => {
+    const id = await seedFull("stopped");
+    await suspendAccount(db, { targetUserId: id, reason: "owner_request", actorUserId: actorId });
+
+    const detail = await getAccountDetail(db, id);
+    expect(detail.suspension).toMatchObject({ reason: "owner_request", suspendedBy: actorId });
+    expect(detail.suspension?.suspendedAt).not.toBeNull();
+    expect(detail.events.map((event) => event.action)).toContain("account.suspended");
+    expect(detail.timeline.map((entry) => entry.kind)).toContain("suspended");
+  });
+
+  it("reads an account with nothing on it", async () => {
+    const id = await seedUser(db, "detail-bare@cafe.test", "Detail bare");
+    const detail = await getAccountDetail(db, id);
+    expect(detail.stage).toBe("signed_up");
+    expect(detail.cafes).toEqual([]);
+    expect(detail.menus).toEqual([]);
+    expect(detail.orders.total).toBe(0);
+    expect(detail.sessions).toEqual([]);
+    expect(detail.timeline.map((entry) => entry.kind)).toEqual(["account_created"]);
+  });
+
+  it("throws not_found for an unknown account", async () => {
+    await expect(getAccountDetail(db, "no-such-user")).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+});
+
+describe("operator log", () => {
+  let db: TestDb;
+
+  beforeEach(async () => {
+    ({ db } = await createTestDb());
+  }, 30_000);
+
+  async function seedEvents(count: number): Promise<void> {
+    const base = Date.now();
+    for (let n = 0; n < count; n += 1) {
+      await db.insert(platformEventTable).values({
+        action: n % 2 === 0 ? "account.suspended" : "account.restored",
+        actorUserId: null,
+        actorEmail: "operator@cafe.test",
+        targetUserId: null,
+        targetEmail: `target-${n}@cafe.test`,
+        detail: null,
+        createdAt: new Date(base + n * 1000),
+      });
+    }
+  }
+
+  it("pages newest-first and filters by action", async () => {
+    await seedEvents(27);
+    const first = await listPlatformEvents(db, {});
+    expect(first.events).toHaveLength(25);
+    expect(first.nextCursor).toBeTruthy();
+    // Newest first: the last seeded row leads.
+    expect(first.events[0]?.targetEmail).toBe("target-26@cafe.test");
+
+    const second = await listPlatformEvents(db, { cursor: decodeAdminCursor(first.nextCursor) });
+    expect(second.events).toHaveLength(2);
+    expect(second.nextCursor).toBeUndefined();
+    const ids = [...first.events, ...second.events].map((event) => event.id);
+    expect(new Set(ids).size).toBe(27);
+
+    const suspended = await listPlatformEvents(db, { action: "account.suspended" });
+    expect(suspended.events.length).toBe(14);
+    expect(suspended.events.every((event) => event.action === "account.suspended")).toBe(true);
   });
 });

@@ -7,19 +7,26 @@ import {
   order,
   platformEvent,
   publishedMenu,
+  restaurant,
   restaurantMembership,
   session,
   user,
+  type PlatformEventAction,
   type SuspensionReason,
 } from "@/lib/db/schema";
+import { getMonthlyUsageSummary } from "@/features/usage/repo";
 
 import {
   ADMIN_ACCOUNTS_PAGE_SIZE,
+  ADMIN_EVENTS_PAGE_SIZE,
   encodeAdminCursor,
+  type AdminAccountDetail,
   type AdminAccountFilter,
   type AdminAccountSort,
   type AdminAccountSummary,
   type AdminCursor,
+  type AdminEventsPage,
+  type AdminTimelineEntry,
 } from "./schema";
 import { deriveAccountStage, type AccountStage } from "./stage";
 
@@ -478,4 +485,289 @@ export async function listAccounts(
         ? `${last.orders7}:${last.createdAt.toISOString()}`
         : last.createdAt.toISOString();
   return { accounts, nextCursor: encodeAdminCursor({ key, id: last.id }) };
+}
+
+/* ------------------------------------------------------------------ */
+/* B2 reads: account detail + operator log                            */
+/* ------------------------------------------------------------------ */
+
+/** Recent orders and sessions shown on the detail page (support-sized). */
+const DETAIL_RECENT_ORDERS = 10;
+const DETAIL_SESSIONS = 20;
+const DETAIL_EVENTS = 20;
+
+/**
+ * One account, everything support needs to answer for it (B2).
+ *
+ * Every read is scoped by the account's own id — menus and orders join
+ * through its memberships, so nothing from another tenant can appear —
+ * and the shape carries no document bodies, no line items, no session
+ * addresses and no password material. Seven constant queries, no
+ * per-row follow-ups. Throws `not_found` for an unknown id.
+ */
+export async function getAccountDetail(
+  db: PlatformDb,
+  targetUserId: string
+): Promise<AdminAccountDetail> {
+  const header = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      cafeCount: cafeCountSql,
+      menuCount: menuCountSql,
+      liveCount: liveCountSql,
+      orderCount: orderCountSql,
+      orders7: orders7Sql,
+      lastOrderAt: lastOrderAtSql,
+    })
+    .from(user)
+    .where(eq(user.id, targetUserId))
+    .limit(1);
+  const row = header[0];
+  if (!row) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+
+  const [suspensions, memberships, menus, recentOrders, sessions, events, usage] =
+    await Promise.all([
+      db
+        .select({
+          reason: accountSuspension.reason,
+          suspendedBy: accountSuspension.suspendedBy,
+          createdAt: accountSuspension.createdAt,
+          liftedAt: accountSuspension.liftedAt,
+        })
+        .from(accountSuspension)
+        .where(eq(accountSuspension.userId, targetUserId))
+        .orderBy(desc(accountSuspension.createdAt)),
+      db
+        .select({
+          restaurantId: restaurantMembership.restaurantId,
+          role: restaurantMembership.role,
+          createdAt: restaurantMembership.createdAt,
+          name: restaurant.name,
+          slug: restaurant.slug,
+        })
+        .from(restaurantMembership)
+        .innerJoin(restaurant, eq(restaurant.id, restaurantMembership.restaurantId))
+        .where(eq(restaurantMembership.userId, targetUserId))
+        .orderBy(restaurantMembership.createdAt),
+      db
+        .select({
+          id: menu.id,
+          restaurantId: menu.restaurantId,
+          title: menu.title,
+          updatedAt: menu.updatedAt,
+          slug: publishedMenu.slug,
+          publishedAt: publishedMenu.publishedAt,
+        })
+        .from(menu)
+        .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
+        .leftJoin(publishedMenu, eq(publishedMenu.menuId, menu.id))
+        .where(eq(restaurantMembership.userId, targetUserId))
+        .orderBy(desc(menu.updatedAt)),
+      db
+        .select({
+          id: order.id,
+          restaurantId: order.restaurantId,
+          tableLabel: order.tableLabel,
+          status: order.status,
+          totalCents: order.totalCents,
+          createdAt: order.createdAt,
+        })
+        .from(order)
+        .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, order.restaurantId))
+        .where(eq(restaurantMembership.userId, targetUserId))
+        .orderBy(desc(order.createdAt))
+        .limit(DETAIL_RECENT_ORDERS),
+      db
+        .select({
+          id: session.id,
+          createdAt: session.createdAt,
+          expiresAt: session.expiresAt,
+          // No address column: support sees the device, never a raw IP.
+          userAgent: session.userAgent,
+        })
+        .from(session)
+        .where(eq(session.userId, targetUserId))
+        .orderBy(desc(session.createdAt))
+        .limit(DETAIL_SESSIONS),
+      db
+        .select({
+          id: platformEvent.id,
+          action: platformEvent.action,
+          actorEmail: platformEvent.actorEmail,
+          detail: platformEvent.detail,
+          createdAt: platformEvent.createdAt,
+        })
+        .from(platformEvent)
+        .where(eq(platformEvent.targetUserId, targetUserId))
+        .orderBy(desc(platformEvent.createdAt))
+        .limit(DETAIL_EVENTS),
+      getMonthlyUsageSummary(db, targetUserId),
+    ]);
+
+  const open = suspensions.find((entry) => entry.liftedAt === null) ?? null;
+  const stage = deriveAccountStage({
+    cafeCount: row.cafeCount,
+    menuCount: row.menuCount,
+    liveCount: row.liveCount,
+    orderCount: row.orderCount,
+  });
+
+  // Each builder is annotated on its own: kinds stay literals where they
+  // are written instead of widening through the spreads downstream.
+  const createdEntry: AdminTimelineEntry = {
+    at: row.createdAt.toISOString(),
+    kind: "account_created",
+    label: "Account created",
+  };
+  const joinedEntries: AdminTimelineEntry[] = memberships.map((m) => ({
+    at: m.createdAt.toISOString(),
+    kind: "cafe_joined" as const,
+    label: `Joined ${m.name} as ${m.role}`,
+  }));
+  const suspensionEntries: AdminTimelineEntry[] = suspensions.flatMap((entry) => [
+    {
+      at: entry.createdAt.toISOString(),
+      kind: "suspended" as const,
+      label: `Suspended — ${entry.reason}`,
+    },
+    ...(entry.liftedAt
+      ? [
+          {
+            at: entry.liftedAt.toISOString(),
+            kind: "restored" as const,
+            label: "Suspension lifted",
+          } satisfies AdminTimelineEntry,
+        ]
+      : []),
+  ]);
+  // Suspension history already covers its two actions; the rest (grants,
+  // revocations, and whatever B4/B5 add) reads straight from the log.
+  const operatorEntries: AdminTimelineEntry[] = events
+    .filter((event) => event.action !== "account.suspended" && event.action !== "account.restored")
+    .map((event) => ({
+      at: event.createdAt.toISOString(),
+      kind: "operator_event" as const,
+      label: `${event.action} by ${event.actorEmail ?? "the CLI"}`,
+    }));
+  const timeline: AdminTimelineEntry[] = [
+    createdEntry,
+    ...joinedEntries,
+    ...suspensionEntries,
+    ...operatorEntries,
+  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+
+  return {
+    account: {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt.toISOString(),
+    },
+    stage,
+    suspension: open
+      ? {
+          reason: open.reason,
+          suspendedAt: open.createdAt.toISOString(),
+          suspendedBy: open.suspendedBy,
+        }
+      : null,
+    cafes: memberships.map((m) => ({
+      id: m.restaurantId,
+      name: m.name,
+      slug: m.slug,
+      role: m.role,
+    })),
+    menus: menus.map((m) => ({
+      id: m.id,
+      cafeId: m.restaurantId,
+      title: m.title,
+      live: m.publishedAt !== null,
+      slug: m.slug,
+      updatedAt: m.updatedAt.toISOString(),
+    })),
+    usage: { requests: usage.requests, cap: usage.cap, remaining: usage.remaining },
+    orders: {
+      total: row.orderCount,
+      last7: row.orders7,
+      lastOrderAt: toDate(row.lastOrderAt)?.toISOString() ?? null,
+      recent: recentOrders.map((o) => ({
+        id: o.id,
+        cafeId: o.restaurantId,
+        tableLabel: o.tableLabel,
+        status: o.status,
+        totalCents: o.totalCents,
+        createdAt: o.createdAt.toISOString(),
+      })),
+    },
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      createdAt: s.createdAt.toISOString(),
+      expiresAt: s.expiresAt.toISOString(),
+      userAgent: s.userAgent,
+    })),
+    events: events.map((event) => ({
+      id: event.id,
+      action: event.action,
+      actorEmail: event.actorEmail,
+      detail: event.detail,
+      createdAt: event.createdAt.toISOString(),
+    })),
+    timeline,
+  };
+}
+
+export interface ListPlatformEventsInput {
+  action?: PlatformEventAction;
+  cursor?: AdminCursor | null;
+}
+
+/**
+ * The operator log, newest first, keyset-paginated (B2). The action
+ * filter takes one of the recorded base-four actions; passwords and
+ * second-factor families join it with B4/B5, which only widen the enum.
+ */
+export async function listPlatformEvents(
+  db: PlatformDb,
+  input: ListPlatformEventsInput = {}
+): Promise<AdminEventsPage> {
+  const conditions: SQLWrapper[] = [];
+  if (input.action) {
+    conditions.push(eq(platformEvent.action, input.action));
+  }
+  if (input.cursor) {
+    const at = cursorDate(input.cursor.key);
+    conditions.push(
+      or(
+        lt(platformEvent.createdAt, at),
+        and(eq(platformEvent.createdAt, at), lt(platformEvent.id, input.cursor.id))
+      )!
+    );
+  }
+  const rows = await db
+    .select({
+      id: platformEvent.id,
+      action: platformEvent.action,
+      actorEmail: platformEvent.actorEmail,
+      targetEmail: platformEvent.targetEmail,
+      detail: platformEvent.detail,
+      createdAt: platformEvent.createdAt,
+    })
+    .from(platformEvent)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(platformEvent.createdAt), desc(platformEvent.id))
+    .limit(ADMIN_EVENTS_PAGE_SIZE + 1);
+
+  const page = rows.slice(0, ADMIN_EVENTS_PAGE_SIZE);
+  const events = page.map((event) => ({
+    ...event,
+    createdAt: event.createdAt.toISOString(),
+  }));
+  if (rows.length <= ADMIN_EVENTS_PAGE_SIZE) return { events };
+  const last = page[page.length - 1]!;
+  return { events, nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }) };
 }
