@@ -2,7 +2,10 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { GET as getAccounts } from "@/app/api/admin/accounts/route";
 import { GET as getAccount } from "@/app/api/admin/accounts/[id]/route";
-import { DELETE as restoreAccountRoute, POST as suspendRoute } from "@/app/api/admin/accounts/[id]/suspension/route";
+import {
+  DELETE as restoreAccountRoute,
+  POST as suspendRoute,
+} from "@/app/api/admin/accounts/[id]/suspension/route";
 import { GET as getEvents } from "@/app/api/admin/events/route";
 import { grantPlatformAdmin } from "@/lib/auth/platform-admin";
 import { createTestDb, seedUser, type TestDb } from "./helpers/pg-test-db";
@@ -23,9 +26,7 @@ const holder: { db: TestDb | null; userId: string | null } = {
 };
 
 vi.mock("@/lib/auth/session", () => ({
-  getSessionUser: vi.fn(async () =>
-    holder.userId ? { id: holder.userId } : null
-  ),
+  getSessionUser: vi.fn(async () => (holder.userId ? { id: holder.userId } : null)),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -35,11 +36,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-function adminRequest(
-  path: string,
-  init: RequestInit = {},
-  origin?: string
-): Request {
+function adminRequest(path: string, init: RequestInit = {}, origin?: string): Request {
   const headers = new Headers(init.headers);
   if (origin) headers.set("origin", origin);
   return new Request(`http://test.local${path}`, { ...init, headers });
