@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  adminAccountsQuerySchema,
+  decodeAdminCursor,
+  encodeAdminCursor,
+} from "@/features/platform/schema";
 import { ACCOUNT_STAGES, deriveAccountStage, stageIndex } from "@/features/platform/stage";
 
 /**
@@ -66,5 +71,30 @@ describe("account stage derivation", () => {
     expect(ACCOUNT_STAGES).toEqual(["signed_up", "cafe", "menu", "published", "ordering"]);
     expect(stageIndex("signed_up")).toBe(0);
     expect(stageIndex("ordering")).toBe(ACCOUNT_STAGES.length - 1);
+  });
+});
+
+describe("admin read query contracts", () => {
+  it("defaults an empty query to all/newest without a cursor", () => {
+    expect(adminAccountsQuerySchema.parse({})).toEqual({
+      filter: "all",
+      sort: "newest",
+    });
+  });
+
+  it("trims the search text and rejects unknown filters", () => {
+    expect(adminAccountsQuerySchema.parse({ q: "  erin@cafe.test  " }).q).toBe(
+      "erin@cafe.test"
+    );
+    expect(adminAccountsQuerySchema.safeParse({ filter: "everyone" }).success).toBe(false);
+    expect(adminAccountsQuerySchema.safeParse({ sort: "oldest" }).success).toBe(false);
+  });
+
+  it("round-trips a cursor and refuses garbage", () => {
+    const cursor = { key: "2026-11-26T00:00:00.000Z", id: "user_123" };
+    expect(decodeAdminCursor(encodeAdminCursor(cursor))).toEqual(cursor);
+    expect(decodeAdminCursor(undefined)).toBeNull();
+    expect(decodeAdminCursor("not-a-cursor")).toBeNull();
+    expect(decodeAdminCursor(encodeAdminCursor({ key: "", id: "" }))).toBeNull();
   });
 });
