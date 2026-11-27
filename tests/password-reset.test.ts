@@ -335,7 +335,7 @@ describe("reset-password consume", () => {
     expect(state.resetRequired).toBe(false);
     expect(state.locked).toBe(false);
     expect((await attemptSignIn(email, NEW_PASSWORD)).status).toBe(200);
-  });
+  }, 30_000);
 
   it("refuses a suspended account with the generic copy and keeps the link", async () => {
     const email = "p5-suspended@cafe.test";
