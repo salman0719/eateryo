@@ -50,16 +50,22 @@ export interface MintedResetToken {
  */
 export async function mintPasswordResetToken(
   db: PlatformDb,
-  userId: string,
-  now: Date = new Date()
+  userId: string
 ): Promise<MintedResetToken> {
   const token = newResetToken();
-  const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MS);
-  await db.insert(passwordResetToken).values({
-    userId,
-    tokenHash: hashResetToken(token),
-    expiresAt,
-  });
+  // The expiry is stamped by the database clock, not a JavaScript Date:
+  // `expires_at` is a plain `timestamp` and a JS Date lands hours off on a
+  // non-UTC machine, which would make every fresh token read as expired
+  // (the `locked_until` lesson from P4).
+  const rows = await db
+    .insert(passwordResetToken)
+    .values({
+      userId,
+      tokenHash: hashResetToken(token),
+      expiresAt: sql`now() + (${RESET_TOKEN_TTL_MS / 1000} * interval '1 second')`,
+    })
+    .returning({ expiresAt: passwordResetToken.expiresAt });
+  const expiresAt = rows[0]?.expiresAt ?? new Date(Date.now() + RESET_TOKEN_TTL_MS);
   return { token, expiresAt };
 }
 
@@ -85,5 +91,30 @@ export async function consumePasswordResetToken(
       )
     )
     .returning({ userId: passwordResetToken.userId });
+  return rows[0] ?? null;
+}
+
+/**
+ * Read a token without spending it, for the reset screen and for
+ * validating the new password *before* the single use is burned: a typo
+ * in the new password must not eat the link. Same single answer as the
+ * burn — unknown, expired, or spent all read as null.
+ */
+export async function findValidResetToken(
+  db: PlatformDb,
+  token: string
+): Promise<{ userId: string } | null> {
+  if (!token) return null;
+  const rows = await db
+    .select({ userId: passwordResetToken.userId })
+    .from(passwordResetToken)
+    .where(
+      and(
+        eq(passwordResetToken.tokenHash, hashResetToken(token)),
+        isNull(passwordResetToken.usedAt),
+        sql`${passwordResetToken.expiresAt} > now()`
+      )
+    )
+    .limit(1);
   return rows[0] ?? null;
 }
