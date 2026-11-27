@@ -20,6 +20,10 @@ import { authClient } from "@/lib/auth-client";
  * the emailed link as the way through). The screen renders that copy
  * verbatim — it is the server's sentence, not a second opinion — and offers
  * the link door, which the counter never gates.
+ *
+ * P6 adds the handoff: an operator with a second factor answers the
+ * password correctly but has no session yet, so the server redirects the
+ * flow to the challenge screen (`/sign-in/factor`), keeping `?next=`.
  */
 export function PasswordSignInForm({
   callbackURL,
@@ -77,6 +81,12 @@ export function PasswordSignInForm({
         kind: "error",
         message: "That email and password don't match. Check them and try again.",
       });
+      return;
+    }
+    // Second factor pending (P6): no session yet, so continue on the
+    // challenge screen instead of the callback.
+    if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
+      router.push(`/sign-in/factor?next=${encodeURIComponent(callbackURL)}`);
       return;
     }
     if (data) {
