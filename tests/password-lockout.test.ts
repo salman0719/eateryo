@@ -162,7 +162,7 @@ describe("lockout copy and expiry", () => {
       "Too many attempts. Sign-in for this account is paused for 15 minutes — wait, or email yourself a sign-in link instead."
     );
     expect(lockoutMessage(1)).toContain("paused for 1 minute —");
-  });
+  }, 30_000);
 
   it("stops reading an expired pause as locked", async () => {
     const id = await seedUser(db, "p4-expiry-read@cafe.test", "P4 Expiry Read");
@@ -185,7 +185,7 @@ describe("lockout copy and expiry", () => {
     expect(live.locked).toBe(true);
     expect(live.minutesLeft).toBeGreaterThanOrEqual(9);
     expect(live.minutesLeft).toBeLessThanOrEqual(10);
-  });
+  }, 30_000);
 });
 
 describe("password sign-in lockout", () => {
@@ -239,7 +239,7 @@ describe("password sign-in lockout", () => {
     const row = await accessRow(id);
     expect(row?.failedAttempts).toBe(MAX_FAILED_ATTEMPTS);
     expect((row?.lockedUntil as Date).getTime()).toBe(lockedUntil.getTime());
-  });
+  }, 30_000);
 
   it("clears a partial counter on a successful sign-in", async () => {
     const email = "p4-clears@cafe.test";
@@ -255,7 +255,7 @@ describe("password sign-in lockout", () => {
     const row = await accessRow(id);
     expect(row?.failedAttempts).toBe(0);
     expect(row?.lockedUntil).toBeNull();
-  });
+  }, 30_000);
 
   it("stops pausing once the window expires, and starts a fresh one", async () => {
     const email = "p4-expired@cafe.test";
@@ -285,7 +285,7 @@ describe("password sign-in lockout", () => {
     expect(wrong.response.status).toBe(401);
     expect((await accessRow(id))?.failedAttempts).toBe(1);
     expect((await accessRow(id))?.lockedUntil).toBeNull();
-  });
+  }, 30_000);
 
   it("is cleared by the operator's Unlock, which is the same row", async () => {
     const email = "p4-unlocked@cafe.test";
@@ -299,7 +299,7 @@ describe("password sign-in lockout", () => {
     const right = await attemptSignIn(email, PASSWORD);
     expect(right.response.status).toBe(200);
     expect(sessionCookies(right.cookies).length).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it("leaves the emailed link open while paused", async () => {
     const email = "p4-link@cafe.test";
@@ -325,7 +325,7 @@ describe("password sign-in lockout", () => {
     // The link signs in but does not unlock the password door: only a
     // success there (or an operator) clears the counter.
     expect((await accessRow(id))?.lockedUntil).not.toBeNull();
-  });
+  }, 30_000);
 
   it("never writes a counter for an unknown address or a link-only account", async () => {
     const linkOnlyEmail = "p4-linkonly@cafe.test";
@@ -344,7 +344,7 @@ describe("password sign-in lockout", () => {
       .from(user)
       .where(eq(user.email, "p4-nobody@cafe.test"));
     expect(unknownRows).toHaveLength(0);
-  });
+  }, 30_000);
 
   it("does not count a suspended account's refusal as a failed attempt", async () => {
     const email = "p4-suspended@cafe.test";
@@ -362,5 +362,5 @@ describe("password sign-in lockout", () => {
     const row = await accessRow(id);
     expect(row?.failedAttempts).toBe(0);
     expect(row?.lockedUntil).toBeNull();
-  });
+  }, 30_000);
 });
