@@ -91,6 +91,12 @@ describe("magic-link sign-in", () => {
     await db
       .insert(user)
       .values({ id: legacyId, name: "Case Legacy", email: "Case.Legacy@cafe.test" });
+    // An unrelated mixed-case row the link never names: the heal reads our
+    // own user table, not the plugin's verification row, so it is healed too.
+    const bystanderId = crypto.randomUUID();
+    await db
+      .insert(user)
+      .values({ id: bystanderId, name: "Bystander", email: "By.Stander@cafe.test" });
 
     const request = await auth.handler(
       new Request(`${BASE_URL}/sign-in/magic-link`, {
@@ -122,6 +128,11 @@ describe("magic-link sign-in", () => {
     const rows = await db.select().from(user).where(eq(user.email, "case.legacy@cafe.test"));
     expect(rows).toHaveLength(1);
     expect(rows[0].id).toBe(legacyId);
+    // The unrelated legacy row was healed as well — proof the heal never
+    // consulted the link's verification identifier.
+    const bystanders = await db.select().from(user).where(eq(user.email, "by.stander@cafe.test"));
+    expect(bystanders).toHaveLength(1);
+    expect(bystanders[0].id).toBe(bystanderId);
   }, 30_000);
 
   it("rejects a bogus verification token without minting a session", async () => {

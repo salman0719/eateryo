@@ -7,7 +7,7 @@ import { magicLink, twoFactor } from "better-auth/plugins";
 import { eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
-import { schema, session, user, verification } from "@/lib/db/schema";
+import { schema, session, user } from "@/lib/db/schema";
 
 import type { PlatformDb } from "./platform-admin";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./passwords";
@@ -113,45 +113,38 @@ async function resolveFactorSessionUserId(
  * Accounts written outside Better Auth (direct SQL, old seeds) can hold a
  * mixed-case address while the plugin looks users up lowercased — so a
  * differently-cased link misses the row and mints a duplicate lowercased
- * account. Before the plugin's own lookup runs, resolve the pending link's
- * address case-insensitively and rewrite the stored row to the canonical
- * lowercase form; the plugin then matches the original account and no
- * second user is created. Best-effort: a heal that fails only logs, and
- * the verify proceeds exactly as it would have without it.
+ * account. Before the plugin's own lookup runs, rewrite every non-canonical
+ * stored address to lowercase; the plugin then matches the original account
+ * and no second user is created.
+ *
+ * Deliberately reads only our own `user` table — never the plugin's
+ * `verification` rows — so no identifier prefix or token-storage format
+ * (`plain` today, `hashed`/custom tomorrow) can silently break it.
+ * Best-effort: a heal that fails only logs, and the verify proceeds exactly
+ * as it would have without it. A clash (two rows sharing one lowercase
+ * form) is left alone and logged rather than violating the unique address.
  */
-async function healLegacyEmailCase(db: PlatformDb, query: unknown): Promise<void> {
+async function healLegacyEmailCase(db: PlatformDb): Promise<void> {
   try {
-    const token =
-      typeof query === "object" && query !== null && "token" in query
-        ? (query as { token?: unknown }).token
-        : null;
-    if (typeof token !== "string" || !token) return;
-    const pending = await db
-      .select({ value: verification.value })
-      .from(verification)
-      .where(eq(verification.identifier, `magic-link:${token}`))
-      .limit(1);
-    const raw = pending[0]?.value;
-    if (!raw) return;
-    let address: string | null = null;
-    try {
-      const parsed = JSON.parse(raw) as { email?: unknown };
-      if (typeof parsed.email === "string") {
-        const normalized = parsed.email.trim().toLowerCase();
-        address = normalized ? normalized : null;
-      }
-    } catch {
-      return;
-    }
-    if (!address) return;
-    const matches = await db
+    const legacy = await db
       .select({ id: user.id, email: user.email })
       .from(user)
-      .where(sql`lower(${user.email}) = ${address}`)
-      .limit(1);
-    const hit = matches[0];
-    if (!hit || hit.email === address) return;
-    await db.update(user).set({ email: address }).where(eq(user.id, hit.id));
+      .where(sql`${user.email} <> lower(${user.email})`)
+      .limit(100);
+    for (const row of legacy) {
+      const canonical = row.email.trim().toLowerCase();
+      if (!canonical || canonical === row.email) continue;
+      const clash = await db
+        .select({ id: user.id })
+        .from(user)
+        .where(sql`lower(${user.email}) = ${canonical}`)
+        .limit(2);
+      if (clash.some((candidate) => candidate.id !== row.id)) {
+        logEvent("warn", "auth.email_case_heal_skipped", { userId: row.id });
+        continue;
+      }
+      await db.update(user).set({ email: canonical }).where(eq(user.id, row.id));
+    }
   } catch (error) {
     logEvent("warn", "auth.email_case_heal_failed", { error });
   }
@@ -264,9 +257,9 @@ export function createAuth(options: CreateAuthOptions) {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === MAGIC_LINK_VERIFY_PATH) {
           // Legacy mixed-case account rows predate the lowercase invariant;
-          // rewrite the match before the plugin looks it up, so the link
+          // rewrite them before the plugin looks its user up, so the link
           // signs into the original account instead of creating a second.
-          await healLegacyEmailCase(options.db, ctx.query);
+          await healLegacyEmailCase(options.db);
           return;
         }
         if (ctx.path === FACTOR_VERIFY_TOTP_PATH) {
