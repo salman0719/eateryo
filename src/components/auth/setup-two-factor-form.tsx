@@ -49,10 +49,16 @@ export function SetupTwoFactorForm({ callbackURL }: { callbackURL: string }) {
   const codeId = useId();
   const savedId = useId();
 
+  // Only a started enrolment (URI in hand) shows the code step. A failed
+  // `enable` (wrong password) carries no URI and stays on the password
+  // form, where its error renders — otherwise a wrong password would
+  // advance to an empty verify step with no key to copy.
   const active =
-    status.kind === "code" || status.kind === "verifying" || status.kind === "error"
-      ? { totpUri: status.totpUri ?? "", backupCodes: status.backupCodes ?? [] }
-      : null;
+    status.kind === "code" || status.kind === "verifying"
+      ? { totpUri: status.totpUri, backupCodes: status.backupCodes }
+      : status.kind === "error" && status.totpUri
+        ? { totpUri: status.totpUri, backupCodes: status.backupCodes ?? [] }
+        : null;
 
   async function onEnable(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -163,7 +169,7 @@ export function SetupTwoFactorForm({ callbackURL }: { callbackURL: string }) {
       <form onSubmit={onVerify} className="flex flex-col gap-3" noValidate>
         <ol className="flex flex-col gap-1.5 rounded-xl border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
           <li>
-            <strong>Scan the code</strong> — use any authenticator app.
+            <strong>Add the key below</strong> — use any authenticator app.
           </li>
           <li>
             <strong>Enter the 6 digits</strong> — they change every 30 seconds.
