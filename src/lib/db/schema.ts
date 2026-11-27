@@ -106,6 +106,35 @@ export const verification = pgTable("verification", {
 });
 
 /**
+ * Self-serve password reset token (P5 — storage, no behaviour yet).
+ *
+ * The emailed link carries the raw token once; only its SHA-256 hash is
+ * stored, like the invitation and order-tracking tokens. Single use:
+ * consuming a valid token stamps `usedAt`, and an expired or spent token
+ * reads as invalid. 30-minute expiry per the password plan §10. B4's
+ * no-secret rule for `account_access_state` is untouched — this table
+ * holds the hash, the panel never selects it.
+ */
+export const passwordResetToken = pgTable(
+  "password_reset_token",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenUnique: uniqueIndex("password_reset_token_hash_unique").on(t.tokenHash),
+  })
+);
+
+/**
  * Better Auth `twoFactor` model (P1 — storage only, no behaviour).
  *
  * Shape confirmed against better-auth 1.7.10 (`two-factor/schema.ts`):
@@ -920,6 +949,7 @@ export const schema = {
   session,
   account,
   verification,
+  passwordResetToken,
   twoFactor,
   platformAdmin,
   accountAccessState,
