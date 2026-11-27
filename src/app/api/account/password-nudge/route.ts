@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -21,8 +21,6 @@ import { rejectCrossOrigin } from "@/lib/http/origin";
  * true }`. Error shape for both: { error: { code, message } }, no-store.
  */
 
-const NUDGE_AGE_MS = 24 * 60 * 60 * 1000;
-
 const dismissSchema = z.object({ dismissed: z.literal(true) });
 
 function errorResponse(code: string, message: string, status: number): NextResponse {
@@ -31,16 +29,22 @@ function errorResponse(code: string, message: string, status: number): NextRespo
   return response;
 }
 
-async function readEligibility(
-  db: ReturnType<typeof getDb>,
-  userId: string
-): Promise<{ hasPassword: boolean; eligible: boolean }> {
+/**
+ * True when the account is old enough, never dismissed the nudge, and has
+ * no password. Age is compared on the database clock: `created_at` is a
+ * plain `timestamp`, and a JavaScript Date comparison lands hours off on a
+ * non-UTC machine (`locked_until` taught us why).
+ */
+async function readEligibility(db: ReturnType<typeof getDb>, userId: string): Promise<boolean> {
   const users = await db
-    .select({ createdAt: user.createdAt, dismissedAt: user.passwordNudgeDismissedAt })
+    .select({
+      oldEnough: sql<boolean>`${user.createdAt} <= now() - interval '24 hours'`,
+      dismissedAt: user.passwordNudgeDismissedAt,
+    })
     .from(user)
     .where(eq(user.id, userId))
     .limit(1);
-  if (users.length === 0) return { hasPassword: false, eligible: false };
+  if (users[0]?.oldEnough !== true || users[0].dismissedAt !== null) return false;
 
   const credentials = await db
     .select({ id: account.id })
@@ -53,12 +57,7 @@ async function readEligibility(
       )
     )
     .limit(1);
-  const hasPassword = credentials.length > 0;
-  // Absolute instants, so no wall-clock zone is involved: the 24-hour
-  // floor is the same on every machine the server runs on.
-  const ageMs = Date.now() - users[0].createdAt.getTime();
-  const eligible = !hasPassword && users[0].dismissedAt === null && ageMs >= NUDGE_AGE_MS;
-  return { hasPassword, eligible };
+  return credentials.length === 0;
 }
 
 export async function GET(): Promise<NextResponse> {
@@ -73,7 +72,7 @@ export async function GET(): Promise<NextResponse> {
   }
 
   try {
-    const { eligible } = await readEligibility(getDb(), userId);
+    const eligible = await readEligibility(getDb(), userId);
     const response = NextResponse.json({ eligible });
     response.headers.set("Cache-Control", "no-store");
     return response;
@@ -107,8 +106,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const db = getDb();
-    await db.update(user).set({ passwordNudgeDismissedAt: new Date() }).where(eq(user.id, userId));
+    // Database clock here too, so the stamp sits in the same time base the
+    // eligibility read compares against.
+    await getDb()
+      .update(user)
+      .set({ passwordNudgeDismissedAt: sql`now()` })
+      .where(eq(user.id, userId));
   } catch {
     return errorResponse("server_db_unavailable", "The nudge state is not available yet.", 503);
   }

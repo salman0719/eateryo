@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,14 +27,17 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-const HOUR_MS = 60 * 60 * 1000;
-
-async function seedUserAtAge(db: TestDb, email: string, ageMs: number): Promise<string> {
+/**
+ * Age stamped with the database clock, the way production rows are: a JS
+ * Date in a plain `timestamp` lands hours off on a non-UTC machine, which
+ * would test the machine's zone instead of the 24-hour rule.
+ */
+async function seedUserAtAge(db: TestDb, email: string, hours: number): Promise<string> {
   const { seedUser } = await import("./helpers/pg-test-db");
   const id = await seedUser(db, email, "Nudge Owner");
   await db
     .update(userTable)
-    .set({ createdAt: new Date(Date.now() - ageMs) })
+    .set({ createdAt: sql`now() - ${`${hours} hours`}::interval` })
     .where(eq(userTable.id, id));
   return id;
 }
@@ -75,7 +78,7 @@ describe("GET /api/account/password-nudge", () => {
   });
 
   it("stays ineligible for an account younger than 24 hours", async () => {
-    holder.userId = await seedUserAtAge(holder.db!, "young@cafe.test", 23 * HOUR_MS);
+    holder.userId = await seedUserAtAge(holder.db!, "young@cafe.test", 23);
     const { GET } = await import("@/app/api/account/password-nudge/route");
     const response = await GET();
     expect(response.status).toBe(200);
@@ -84,7 +87,7 @@ describe("GET /api/account/password-nudge", () => {
   });
 
   it("is eligible for an old link-only account", async () => {
-    holder.userId = await seedUserAtAge(holder.db!, "old@cafe.test", 25 * HOUR_MS);
+    holder.userId = await seedUserAtAge(holder.db!, "old@cafe.test", 25);
     const { GET } = await import("@/app/api/account/password-nudge/route");
     const response = await GET();
     expect(response.status).toBe(200);
@@ -92,7 +95,7 @@ describe("GET /api/account/password-nudge", () => {
   });
 
   it("ends when a password is set, without any dismissal", async () => {
-    const id = await seedUserAtAge(holder.db!, "set@cafe.test", 90 * 24 * HOUR_MS);
+    const id = await seedUserAtAge(holder.db!, "set@cafe.test", 90 * 24);
     await seedPassword(holder.db!, id);
     holder.userId = id;
     const { GET } = await import("@/app/api/account/password-nudge/route");
@@ -101,7 +104,7 @@ describe("GET /api/account/password-nudge", () => {
   });
 
   it("never returns after dismissal, and dismissing is idempotent", async () => {
-    holder.userId = await seedUserAtAge(holder.db!, "dismissed@cafe.test", 25 * HOUR_MS);
+    holder.userId = await seedUserAtAge(holder.db!, "dismissed@cafe.test", 25);
     const routes = await import("@/app/api/account/password-nudge/route");
 
     const first = await routes.POST(sameOrigin({ dismissed: true }));
@@ -122,7 +125,7 @@ describe("GET /api/account/password-nudge", () => {
     expect((await routes.GET()).status).toBe(401);
     expect((await routes.POST(sameOrigin({ dismissed: true }))).status).toBe(401);
 
-    holder.userId = await seedUserAtAge(holder.db!, "evil@cafe.test", 25 * HOUR_MS);
+    holder.userId = await seedUserAtAge(holder.db!, "evil@cafe.test", 25);
     expect((await routes.POST(sameOrigin({ dismissed: false }))).status).toBe(400);
     const crossOrigin = await routes.POST(sameOrigin({ dismissed: true }, "https://evil.example"));
     expect(crossOrigin.status).toBe(403);

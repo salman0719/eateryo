@@ -7,12 +7,12 @@ import { account } from "@/lib/db/schema";
 
 /**
  * GET /api/account/password-status — whether the signed-in account has a
- * password: `{ hasPassword }`. The Settings password card and the
- * post-sign-in nudge both read it; the card links to `/set-password`,
- * which owns the set/change flow. Anonymous callers get 401 — a password
- * state belongs to the session that proved it, never to a stranger
- * (the sign-in oracle rule). Error shape: { error: { code, message } },
- * no-store.
+ * password: `{ hasPassword }`. The Settings password card reads it to
+ * choose between "Set a password" and "Change password" and links to
+ * `/set-password`, which owns the set/change flow. Anonymous callers get
+ * 401 — a password state belongs to the session that proved it, never to
+ * a stranger (the sign-in oracle rule). Error shape: { error: { code,
+ * message } }, no-store.
  */
 export async function GET(): Promise<NextResponse> {
   let userId: string | null;
