@@ -183,6 +183,13 @@
       "when": 1795749038803,
       "tag": "0025_broken_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795797499086,
+      "tag": "0026_omniscient_clint_barton",
+      "breakpoints": true
     }
   ]
 }

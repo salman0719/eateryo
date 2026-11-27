@@ -43,6 +43,13 @@ export const user = pgTable("user", {
   image: text("image"),
   /** Two-factor plugin flag (P1 storage only; enrolment ships in P6). */
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  /**
+   * Password-nudge dismissal: set once when the account turns down the
+   * post-sign-in password offer, so it shows at most once ever. Null
+   * means never asked or never dismissed; setting a password ends the
+   * nudge by itself (the eligibility read requires no password).
+   */
+  passwordNudgeDismissedAt: timestamp("password_nudge_dismissed_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
