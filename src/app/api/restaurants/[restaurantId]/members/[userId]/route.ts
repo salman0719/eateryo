@@ -6,6 +6,7 @@ import {
   TenancyRepoError,
   updateMemberRoleForOwner,
 } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -81,6 +82,7 @@ export async function PATCH(
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const member = await updateMemberRoleForOwner(
       getDb(),
       userId,
@@ -92,6 +94,8 @@ export async function PATCH(
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof TenancyRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not change the role. Try again.", 503);
   }
@@ -109,9 +113,12 @@ export async function DELETE(
   const { restaurantId, userId: memberUserId } = await params;
 
   try {
+    await assertAccountActive(getDb(), userId);
     await removeMemberForOwner(getDb(), userId, restaurantId, memberUserId);
     return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof TenancyRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not remove the member. Try again.", 503);
   }

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getOrderAlertPrefs, updateOrderAlertPrefsForOwner } from "@/features/orders/alerts";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -109,6 +110,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
   const email = rawEmail === "" ? null : rawEmail;
 
   try {
+    await assertAccountActive(getDb(), userId);
     const prefs = await updateOrderAlertPrefsForOwner(getDb(), userId, restaurantId, {
       enabled: parsed.data.enabled,
       email,
@@ -117,7 +119,9 @@ export async function PUT(request: Request, { params }: RouteParams) {
       return refusalResponse(userId, restaurantId, "Only an owner can change these settings.");
     }
     return noStore(NextResponse.json({ alerts: prefs }));
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse("server_db_unavailable", "Could not save the alert settings.", 503);
   }
 }

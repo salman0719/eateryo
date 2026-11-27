@@ -6,6 +6,7 @@ import {
   getOwnedRestaurantForUser,
   listRestaurantsForUser,
 } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const db = getDb();
     // The forms only render while the account owns nothing, so this closes
     // the raw endpoint and any stale-state double submit rather than a
@@ -100,7 +102,9 @@ export async function POST(request: Request) {
     }
     const restaurant = await createRestaurant(db, userId, parsed.data.name);
     return NextResponse.json({ restaurant }, { status: 201 });
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse(
       "server_db_unavailable",
       "Could not create the restaurant. Try again.",

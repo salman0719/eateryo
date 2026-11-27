@@ -148,6 +148,41 @@
       "when": 1795596903076,
       "tag": "0020_bumpy_satana",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795673504956,
+      "tag": "0021_living_carnage",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795676585166,
+      "tag": "0022_flawless_queen_noir",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795692364486,
+      "tag": "0023_even_yellowjacket",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795698950830,
+      "tag": "0024_gray_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795749038803,
+      "tag": "0025_broken_pretty_boy",
+      "breakpoints": true
     }
   ]
 }

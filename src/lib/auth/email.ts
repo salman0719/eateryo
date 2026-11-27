@@ -15,6 +15,8 @@ import {
   escapeEmailHtml,
 } from "@/lib/email-layout";
 
+import { toVerifyPageUrl } from "@/lib/auth/verify-link";
+
 export interface MagicLinkEmail {
   email: string;
   url: string;
@@ -86,7 +88,10 @@ export async function sendMagicLinkEmail({ email, url }: MagicLinkEmail): Promis
     return;
   }
 
-  const content = buildMagicLinkEmail({ email, url });
+  // The inbox gets the first-party page, never the raw verification URL:
+  // `/verify` walks the endpoint and routes suspended clicks to the
+  // signed-out landing instead of a raw 403.
+  const content = buildMagicLinkEmail({ email, url: toVerifyPageUrl(url) });
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -206,5 +211,95 @@ export async function sendInvitationEmail({
     // Provider status only — no credentials, no response body, no stack.
     console.error(`[auth] Resend invitation send failed with status ${response.status}`);
     throw new Error("Failed to send invitation email");
+  }
+}
+
+export interface PasswordResetEmail {
+  email: string;
+  url: string;
+}
+
+/** Pure branded reset body, asserted in tests and reused by the sender. */
+export function buildPasswordResetEmail({ email, url }: PasswordResetEmail): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const subject = "Reset your Eateryo password";
+  const text =
+    `Reset your Eateryo password: ${url}\n\n` +
+    `This link can be used once and expires in 30 minutes.\n` +
+    `If you didn't request this, you can ignore this email — your password stays as it is.\n`;
+  const cardInner =
+    `<tr><td align="center" style="padding:28px 28px 8px">` +
+    emailLogoMark(url) +
+    `<p style="margin:12px 0 0;font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:${EMAIL_COLORS.INK};letter-spacing:-.01em">Eateryo</p>` +
+    `<p style="margin:2px 0 0;font-family:Arial,sans-serif;font-size:12px;color:${EMAIL_COLORS.MUTED}">Menus, tables, and orders in one place</p>` +
+    `</td></tr>` +
+    `<tr><td style="padding:12px 32px 0;font-family:Arial,sans-serif">` +
+    `<h1 style="margin:0 0 8px;font-size:22px;line-height:1.25;color:${EMAIL_COLORS.INK}">Reset your password</h1>` +
+    `<p style="margin:0 0 6px;font-size:14px;line-height:1.6;color:${EMAIL_COLORS.BODY_TEXT}">Tap the button below to choose a new password. Your other sessions sign out when you do.</p>` +
+    `<p style="margin:0;font-size:13px;line-height:1.6;color:${EMAIL_COLORS.MUTED}">This link can be used <strong>once</strong> and expires in <strong>30&nbsp;minutes</strong>.</p>` +
+    `</td></tr>` +
+    `<tr><td align="center" style="padding:22px 32px 8px">` +
+    emailCtaButton("Choose a new password", url) +
+    `</td></tr>` +
+    `<tr><td style="padding:8px 32px 0;font-family:Arial,sans-serif">` +
+    `<p style="margin:0 0 4px;font-size:12px;color:${EMAIL_COLORS.MUTED}">Button not working? Paste this link into your browser:</p>` +
+    emailFallbackLink(url) +
+    `</td></tr>` +
+    `<tr><td style="padding:20px 32px 0"><hr style="border:0;border-top:1px solid ${EMAIL_COLORS.CARD_BORDER};margin:0" /></td></tr>` +
+    `<tr><td style="padding:14px 32px 26px;font-family:Arial,sans-serif">` +
+    `<p style="margin:0;font-size:12px;line-height:1.6;color:${EMAIL_COLORS.FAINT}">If you didn\u2019t request this, you can safely ignore this email.<br />This message was sent to <span style="color:${EMAIL_COLORS.MUTED}">${escapeEmailHtml(email)}</span>.</p>` +
+    `</td></tr>`;
+  const html = emailPage({
+    preheader: "Choose a new password \u2014 expires in 30 minutes.",
+    cardInner,
+  });
+  return { subject, text, html };
+}
+
+/**
+ * Password reset delivery, same contract as the other auth mail: Resend
+ * REST, no link logging in production, honest failure when unconfigured.
+ * Tests capture the link by mocking this module, the way the magic-link
+ * sender is overridden in `createAuth`.
+ */
+export async function sendPasswordResetEmail({ email, url }: PasswordResetEmail): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM;
+
+  if (!apiKey || !from) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("[auth] reset email is not configured (RESEND_API_KEY / EMAIL_FROM)");
+      throw new Error("Password reset email delivery is not configured");
+    }
+    console.warn(
+      `[auth] RESEND_API_KEY not set — reset link was NOT delivered to ${email}.\n` +
+        `[auth] Dev reset link: ${url}`
+    );
+    return;
+  }
+
+  const content = buildPasswordResetEmail({ email, url });
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject: content.subject,
+      html: content.html,
+      text: content.text,
+    }),
+  });
+
+  if (!response.ok) {
+    // Provider status only — no credentials, no response body, no stack.
+    console.error(`[auth] Resend reset send failed with status ${response.status}`);
+    throw new Error("Failed to send password reset email");
   }
 }

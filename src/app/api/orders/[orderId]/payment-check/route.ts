@@ -5,6 +5,7 @@ import { getPaymentAccount } from "@/features/payments/accounts";
 import { getStripeSecret, retrieveCheckoutSession } from "@/features/payments/provider";
 import { canTransitionPaymentStatus } from "@/features/payments/schema";
 import { getOrderForStaff } from "@/features/orders/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { order as orderTable } from "@/lib/db/schema";
@@ -54,6 +55,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   if (!userId) return errorResponse("unauthorized", "Sign in to continue.", 401);
 
   try {
+    await assertAccountActive(getDb(), userId);
     const db = getDb();
     const order = await getOrderForStaff(db, userId, orderId);
     if (!order) return errorResponse("not_found", "That order does not exist.", 404);
@@ -116,6 +118,8 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     return noStore(NextResponse.json({ paymentStatus: "paid", reconciled: true }));
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     await reportError("payments.payment_check_failed", error, { requestId, orderId });
     return errorResponse("server_db_unavailable", "Could not check the payment. Try again.", 503);
   }

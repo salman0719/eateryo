@@ -1,4 +1,4 @@
-import { magicLinkClient } from "better-auth/client/plugins";
+import { magicLinkClient, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -6,5 +6,5 @@ import { createAuthClient } from "better-auth/react";
  * Talks to /api/auth on the current origin; safe in client components.
  */
 export const authClient = createAuthClient({
-  plugins: [magicLinkClient()],
+  plugins: [magicLinkClient(), twoFactorClient()],
 });

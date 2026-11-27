@@ -421,7 +421,12 @@ sign-in.ts`, consumed once per sign-in; the publish wizard's own magic-link
   migrations (do not hand-edit `drizzle/`)
 - `src/lib/auth/`, `src/lib/auth-client.ts`, `src/app/api/auth/`,
   `src/app/sign-in/` — Better Auth magic-link config, email sender, route,
-  session guard, sign-in page. The auth route also mirrors every session
+  session guard, sign-in page. Handed-out links point at the first-party `/verify` route
+  (`src/lib/auth/verify-link.ts`), which walks the real verification endpoint
+  and sorts the answer: a minted session returns to the callback, a suspended
+  account lands on the signed-out `/suspended` page (generic copy, reason
+  stays server-side), anything else lands on sign-in with a resend path.
+  The auth route also mirrors every session
   cookie change into the readable `eateryo.session-hint` flag
   (`src/lib/auth/session-hint.ts`), which is that flag's only writer.
 - `src/lib/auth/dev-sign-in.ts`, `src/app/api/dev/magic-link/` — the

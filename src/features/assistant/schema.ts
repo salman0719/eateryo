@@ -124,6 +124,7 @@ export type AssistantStatus = z.infer<typeof assistantStatusSchema>;
 export type AssistantErrorCode =
   | "invalid_request"
   | "unauthorized"
+  | "account_suspended"
   | "cross_origin_rejected"
   | "feature_disabled"
   | "assistant_cap_reached"

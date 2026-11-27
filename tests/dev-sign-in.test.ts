@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createDevLinkStore, isDevSignInEnabled } from "@/lib/auth/dev-sign-in";
+import { toVerifyPageUrl } from "@/lib/auth/verify-link";
 
 describe("isDevSignInEnabled", () => {
   it("is off unless the flag is set", () => {
@@ -77,7 +78,8 @@ describe("the parked link is process-wide", () => {
       vi.resetModules();
       const reading = await import("@/lib/auth/dev-sign-in");
 
-      expect(reading.takeDevSignInLink("owner@cafe.test")).toBe(url);
+      // The parked link is the first-party page, like the emailed link.
+      expect(reading.takeDevSignInLink("owner@cafe.test")).toBe(toVerifyPageUrl(url));
       // Still a one-time credential: the second read finds nothing.
       expect(reading.takeDevSignInLink("owner@cafe.test")).toBeNull();
     } finally {

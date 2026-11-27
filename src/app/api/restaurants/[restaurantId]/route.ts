@@ -10,6 +10,7 @@ import {
 } from "@/features/tenancy/repo";
 import { brandAssetImageSchema } from "@/features/brand-assets/schema";
 import { dinerThemeSchema } from "@/features/diner-theme/schema";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -107,6 +108,7 @@ export async function PATCH(
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const db = getDb();
     const { name, logo, cover, dinerTheme } = parsed.data;
     // When no rename is asked for, any member reads the row so a staff
@@ -152,7 +154,9 @@ export async function PATCH(
       }
     }
     return noStore(NextResponse.json({ restaurant }));
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse(
       "server_db_unavailable",
       "Could not update the restaurant. Try again.",
@@ -173,12 +177,15 @@ export async function DELETE(
   const { restaurantId } = await params;
 
   try {
+    await assertAccountActive(getDb(), userId);
     const deleted = await deleteRestaurantForOwner(getDb(), userId, restaurantId);
     if (!deleted) {
       return refusalResponse(userId, restaurantId, "Only an owner can delete this restaurant.");
     }
     return noStore(new NextResponse(null, { status: 204 }));
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse(
       "server_db_unavailable",
       "Could not delete the restaurant. Try again.",

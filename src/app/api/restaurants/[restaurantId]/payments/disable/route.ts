@@ -5,6 +5,7 @@ import {
   getPaymentAccountForMember,
 } from "@/features/payments/accounts";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -40,6 +41,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   const { restaurantId } = await params;
 
   try {
+    await assertAccountActive(getDb(), userId);
     const member = await getRestaurantForUser(getDb(), userId, restaurantId);
     if (!member) return errorResponse("not_found", "That restaurant does not exist.", 404);
     if (member.role !== "owner") {
@@ -70,7 +72,9 @@ export async function POST(request: Request, { params }: RouteParams) {
         },
       })
     );
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse("server_db_unavailable", "Could not turn card payment off.", 503);
   }
 }

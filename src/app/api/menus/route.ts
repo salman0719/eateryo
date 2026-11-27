@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createMenuForUser, listMenusForUser, MenuRepoError } from "@/features/menus/repo";
 import { menuDocumentSchema } from "@/features/menu/schema";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const menu = await createMenuForUser(
       getDb(),
       userId,
@@ -109,6 +111,8 @@ export async function POST(request: Request) {
     response.headers.set("Cache-Control", "no-store");
     return response;
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof MenuRepoError) return mapRepoError(error);
     return errorResponse("server_db_unavailable", "Could not save the menu. Try again.", 503);
   }

@@ -1,3 +1,4 @@
+import { isNull } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -18,7 +19,8 @@ import type { DinerTheme } from "@/features/diner-theme/schema";
  * Canonical server DB schema (Drizzle, Postgres/Neon).
  *
  * Two groups of tables:
- * 1. Better Auth core tables (`user`, `session`, `account`, `verification`).
+ * 1. Better Auth tables (`user`, `session`, `account`, `verification`, plus
+ *    the two-factor plugin's `twoFactor` and its `user.twoFactorEnabled`).
  *    Table/field names follow Better Auth's contract exactly so the Drizzle
  *    adapter (see `src/lib/auth/index.ts`) finds them without remapping.
  * 2. Tenancy tables for this product (`restaurant`, `restaurant_membership`).
@@ -39,6 +41,8 @@ export const user = pgTable("user", {
   email: text("email").notNull(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** Two-factor plugin flag (P1 storage only; enrolment ships in P6). */
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -99,6 +103,221 @@ export const verification = pgTable("verification", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
+});
+
+/**
+ * Self-serve password reset token (P5 — storage, no behaviour yet).
+ *
+ * The emailed link carries the raw token once; only its SHA-256 hash is
+ * stored, like the invitation and order-tracking tokens. Single use:
+ * consuming a valid token stamps `usedAt`, and an expired or spent token
+ * reads as invalid. 30-minute expiry per the password plan §10. B4's
+ * no-secret rule for `account_access_state` is untouched — this table
+ * holds the hash, the panel never selects it.
+ */
+export const passwordResetToken = pgTable(
+  "password_reset_token",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    tokenUnique: uniqueIndex("password_reset_token_hash_unique").on(t.tokenHash),
+  })
+);
+
+/**
+ * Better Auth `twoFactor` model (P1 — storage only, no behaviour).
+ *
+ * Shape confirmed against better-auth 1.7.10 (`two-factor/schema.ts`):
+ * table `two_factor`, secret + user id indexed, `backupCodes` one JSON
+ * string, `verified` defaulting true. The plugin returns none of the
+ * secret columns to callers (`returned: false`); the repo upholds the
+ * same rule by never selecting this table outside the auth library.
+ * Backup codes are JSON by default and encrypted only when the plugin is
+ * configured with `storeBackupCodes: "encrypted"` — a P6 runtime choice,
+ * recorded here so it is not missed.
+ */
+export const twoFactor = pgTable(
+  "two_factor",
+  {
+    id: text("id").primaryKey(),
+    secret: text("secret").notNull(),
+    backupCodes: text("backup_codes").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    verified: boolean("verified").notNull().default(true),
+    failedVerificationCount: integer("failed_verification_count").notNull().default(0),
+    lockedUntil: timestamp("locked_until"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => ({
+    secretIdx: index("two_factor_secret_idx").on(t.secret),
+    userIdx: index("two_factor_user_id_idx").on(t.userId),
+  })
+);
+
+/**
+ * Platform operators (the admin panel's identity — B0).
+ *
+ * One row per user; the panel reads this table per request, server-side,
+ * and it is never exposed to the browser (no Better Auth additional field).
+ * V1 enforces operator-only: `viewer` exists in the enum for the V2
+ * read-only support role, which nothing checks yet. Revocation sets
+ * `revokedAt` instead of deleting the row, so the grant history survives;
+ * it never touches the user's café memberships. The first operators are
+ * created by the CLI script (`npm run admin:platform`), which leaves
+ * `grantedBy` null for the bootstrap grant.
+ */
+export const platformAdmin = pgTable(
+  "platform_admin",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["operator", "viewer"] })
+      .notNull()
+      .$defaultFn(() => "operator" as const),
+    grantedBy: text("granted_by"),
+    grantedAt: timestamp("granted_at").notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt().$onUpdateFn(() => new Date()),
+  },
+  (t) => ({
+    userUnique: uniqueIndex("platform_admin_user_unique").on(t.userId),
+  })
+);
+
+/** Platform operator roles. V1 enforces `operator` only; `viewer` is V2. */
+export type PlatformAdminRole = "operator" | "viewer";
+
+/**
+ * Account suspensions (the platform safety action — B1).
+ *
+ * Suspension belongs to an ACCOUNT, never a café: diners keep ordering and
+ * published menus keep serving while an owner is investigated. One row per
+ * suspension; `liftedAt` is set on restore. The partial unique index holds
+ * at most one OPEN suspension per account — a second suspend is a conflict,
+ * never a second row. History (with its reason) survives restore, so a
+ * later operator can see why it happened. Reasons mirror the prototype's
+ * seed (`Abuse or spam`, `Owner request`) plus the `other` escape hatch.
+ */
+export const SUSPENSION_REASONS = ["abuse_or_spam", "owner_request", "other"] as const;
+
+export type SuspensionReason = (typeof SUSPENSION_REASONS)[number];
+
+export const accountSuspension = pgTable(
+  "account_suspension",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    reason: text("reason", { enum: SUSPENSION_REASONS }).notNull(),
+    note: text("note"),
+    suspendedBy: text("suspended_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    liftedAt: timestamp("lifted_at"),
+    liftedBy: text("lifted_by").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    liftNote: text("lift_note"),
+  },
+  (t) => ({
+    openUnique: uniqueIndex("account_suspension_open_unique")
+      .on(t.userId)
+      .where(isNull(t.liftedAt)),
+  })
+);
+
+/**
+ * Platform audit trail (B1 records the base four; B4/B5 add families).
+ *
+ * Append-only in the repository: no update, no delete. Actor and target
+ * addresses are snapshotted so history stays readable after an account is
+ * removed; the id columns are best-effort links that null out with the
+ * user. Reads are deliberately not logged (plan §8). Mirrors
+ * `restaurant_audit_event`'s shape minus the restaurant scope — the
+ * platform has no tenant.
+ */
+export const PLATFORM_EVENT_ACTIONS = [
+  "account.suspended",
+  "account.restored",
+  "operator.granted",
+  "operator.access_revoked",
+  "password.reset",
+  "account.unlocked",
+  "two_factor.reset",
+] as const;
+
+export type PlatformEventAction = (typeof PLATFORM_EVENT_ACTIONS)[number];
+
+export const platformEvent = pgTable(
+  "platform_event",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    action: text("action", { enum: PLATFORM_EVENT_ACTIONS }).notNull(),
+    actorUserId: text("actor_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    /** Snapshot of the actor's address (null for the CLI bootstrap grant). */
+    actorEmail: text("actor_email"),
+    targetUserId: text("target_user_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
+    /** Snapshot of the affected account's address. */
+    targetEmail: text("target_email"),
+    /** Free-form human detail, e.g. the restore note. */
+    detail: text("detail"),
+    createdAt: createdAt(),
+  },
+  (t) => ({
+    actionCreatedIdx: index("platform_event_action_created_idx").on(t.action, t.createdAt),
+  })
+);
+
+/**
+ * Operator-visible sign-in state for one account (B4 — operator side only).
+ *
+ * Password enforcement in the app ships with the password work, not V1:
+ * this table records what the operator panel shows and what its two
+ * actions change — never a hash, never a token. `passwordSetAt` is null
+ * until the account sets its first password (the link-only cutover);
+ * `resetRequired` + `resetSentAt` mark an outstanding forced reset;
+ * `failedAttempts` + `lockedUntil` are the 5-attempt/15-minute lockout
+ * the operator's Unlock action clears. Rows are created on demand by
+ * the actions below, so a missing row reads as "no password yet".
+ */
+export const accountAccessState = pgTable("account_access_state", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  passwordSetAt: timestamp("password_set_at"),
+  resetRequired: boolean("reset_required").notNull().default(false),
+  resetSentAt: timestamp("reset_sent_at"),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
+  updatedAt: updatedAt().$onUpdateFn(() => new Date()),
 });
 
 /**
@@ -730,6 +949,10 @@ export const schema = {
   session,
   account,
   verification,
+  passwordResetToken,
+  twoFactor,
+  platformAdmin,
+  accountAccessState,
   restaurant,
   restaurantMembership,
   restaurantInvitation,
