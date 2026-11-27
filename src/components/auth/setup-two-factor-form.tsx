@@ -175,7 +175,8 @@ export function SetupTwoFactorForm({ callbackURL }: { callbackURL: string }) {
             <strong>Enter the 6 digits</strong> — they change every 30 seconds.
           </li>
           <li>
-            <strong>Save the recovery codes</strong> — ten single-use codes, shown once.
+            <strong>Save the recovery codes next</strong> — ten single-use codes, shown once after
+            you verify.
           </li>
         </ol>
         <div className="rounded-xl border border-line-200 bg-surface-base p-4">
