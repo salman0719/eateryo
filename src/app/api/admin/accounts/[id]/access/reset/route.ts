@@ -3,19 +3,25 @@ import { z } from "zod";
 
 import { forcePasswordReset, PlatformRepoError } from "@/features/platform/repo";
 import { requirePlatformAdminApi } from "@/lib/auth/platform-admin";
+import { sendPasswordResetEmail } from "@/lib/auth/email";
+import { mintPasswordResetToken } from "@/lib/auth/reset-tokens";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
+import { logEvent } from "@/lib/observability/log";
 
 /**
  * POST /api/admin/accounts/[id]/access/reset — force a password reset.
  *
  * The account must set a new password at next sign-in; its live
  * sessions die with the requirement, the same revocation suspension
- * performs. Recorded as `password.reset`, atomically. There is no
- * request body: the action carries no parameters. The emailed
- * 30-minute link ships with the password work, not V1 — `resetSentAt`
- * stamps when the requirement was imposed, and the audit detail says
- * the link follows, so no operator mistakes this for a sent email.
+ * performs. Recorded as `password.reset`, atomically, and the 30-minute
+ * reset link is emailed to the account (P5) — recovery that needs no
+ * operator after this click. There is no request body: the action
+ * carries no parameters.
+ *
+ * Delivery is best-effort after the state change: a send failure is
+ * logged, never a 500, so a mail outage cannot strand the requirement
+ * without its link (the account can still ask for one self-serve).
  *
  * Guard first (signed-out → 401, non-operator → plain 404), then
  * `rejectCrossOrigin`, then the atomic repo call. Unknown ids are
@@ -62,6 +68,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       targetUserId: id,
       actorUserId: operatorId,
     });
+    try {
+      const { token } = await mintPasswordResetToken(getDb(), id);
+      const url = new URL("/sign-in/reset", request.url);
+      url.searchParams.set("token", token);
+      await sendPasswordResetEmail({ email: result.targetEmail, url: url.toString() });
+    } catch (error) {
+      logEvent("error", "auth.password_reset_send_failed", { error });
+    }
     return noStore({
       reset: { resetSentAt: result.resetSentAt },
       sessionsRevoked: result.sessionsRevoked,

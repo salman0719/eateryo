@@ -10,6 +10,7 @@ import {
   POST as suspendRoute,
 } from "@/app/api/admin/accounts/[id]/suspension/route";
 import { GET as getEvents } from "@/app/api/admin/events/route";
+import { POST as resetPasswordRoute } from "@/app/api/password/reset/route";
 import { grantPlatformAdmin } from "@/lib/auth/platform-admin";
 import {
   accountAccessState,
@@ -44,6 +45,18 @@ vi.mock("@/lib/db", () => ({
     return holder.db;
   },
 }));
+
+const sentResetLinks: Array<{ email: string; url: string }> = [];
+
+vi.mock("@/lib/auth/email", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth/email")>();
+  return {
+    ...actual,
+    sendPasswordResetEmail: vi.fn(async ({ email, url }: { email: string; url: string }) => {
+      sentResetLinks.push({ email, url });
+    }),
+  };
+});
 
 function adminRequest(path: string, init: RequestInit = {}, origin?: string): Request {
   const headers = new Headers(init.headers);
@@ -207,6 +220,37 @@ describe("platform admin API contracts", () => {
       (await db.select().from(sessionTable).where(eq(sessionTable.userId, targetId))).length
     ).toBe(0);
     expect(await accessEventCount(db, targetId, "password.reset")).toBe(1);
+  });
+
+  it("forced reset emails a link that sets the password", async () => {
+    const db = holder.db!;
+    const email = "contract-reset-link@platform.test";
+    const targetId = await seedUser(db, email, "Contract Reset Link");
+    sentResetLinks.length = 0;
+
+    const response = await resetAccessRoute(
+      adminRequest(`/api/admin/accounts/${targetId}/access/reset`, { method: "POST" }),
+      { params: Promise.resolve({ id: targetId }) }
+    );
+    expect(response.status).toBe(200);
+
+    expect(sentResetLinks).toHaveLength(1);
+    expect(sentResetLinks[0].email).toBe(email);
+    const token = new URL(sentResetLinks[0].url).searchParams.get("token");
+    expect(token).toBeTruthy();
+
+    const reset = await resetPasswordRoute(
+      new Request("http://test.local/api/password/reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          token,
+          password: "a forced new horse 10?",
+          confirm: "a forced new horse 10?",
+        }),
+      })
+    );
+    expect(reset.status).toBe(200);
   });
 
   it("refuses a cross-origin reset with 403 before the guard runs", async () => {

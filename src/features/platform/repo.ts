@@ -1280,13 +1280,14 @@ export interface ForcePasswordResetInput {
  *
  * The emailed 30-minute link ships with the password work (§11), not
  * V1: `resetSentAt` stamps when the requirement was imposed, and the
- * audit detail says the link follows, so no operator mistakes this
- * for a sent email.
+ * V1: `resetSentAt` stamps when the requirement was imposed. The route
+ * sends the 30-minute reset link (P5) once this records the requirement,
+ * so the detail says the email went out.
  */
 export async function forcePasswordReset(
   db: PlatformDb,
   input: ForcePasswordResetInput
-): Promise<{ resetSentAt: string; sessionsRevoked: number }> {
+): Promise<{ resetSentAt: string; sessionsRevoked: number; targetEmail: string }> {
   const target = await accountById(db, input.targetUserId);
   if (!target) {
     throw new PlatformRepoError("not_found", "That account does not exist.");
@@ -1316,7 +1317,7 @@ export async function forcePasswordReset(
         actorEmail: actor?.email ?? null,
         targetUserId: input.targetUserId,
         targetEmail: target.email,
-        detail: "Password reset forced · the emailed link ships with password sign-in.",
+        detail: "Password reset forced · reset link emailed to the account.",
       }),
   ];
 
@@ -1330,7 +1331,11 @@ export async function forcePasswordReset(
       });
   const deleted = results[1];
   sessionsRevoked = Array.isArray(deleted) ? deleted.length : 0;
-  return { resetSentAt: resetSentAt.toISOString(), sessionsRevoked };
+  return {
+    resetSentAt: resetSentAt.toISOString(),
+    sessionsRevoked,
+    targetEmail: target.email,
+  };
 }
 
 export interface UnlockAccountInput {

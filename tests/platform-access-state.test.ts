@@ -248,8 +248,8 @@ describe("force password reset", () => {
       actorEmail: OPERATOR_EMAIL,
       targetEmail: target.email,
     });
-    // The detail never claims an email went out: the link ships later.
-    expect(events[0]!.detail).toContain("ships with password sign-in");
+    // The detail says the email went out: the route sends it (P5).
+    expect(events[0]!.detail).toContain("reset link emailed");
   });
 
   it("reports not found for an unknown account", async () => {
