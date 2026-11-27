@@ -163,8 +163,8 @@ export default async function AdminAccountDetailPage({
             {detail.access.resetRequired ? (
               <li>
                 Reset forced{" "}
-                {detail.access.resetSentAt ? shortDate(detail.access.resetSentAt) : "—"} — the
-                emailed link ships with password sign-in.
+                {detail.access.resetSentAt ? shortDate(detail.access.resetSentAt) : "—"} — a reset
+                link was emailed to the account.
               </li>
             ) : null}
             {detail.access.locked && detail.access.lockedUntil ? (

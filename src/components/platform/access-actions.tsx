@@ -4,11 +4,10 @@
  *
  * A client island on the server-rendered detail page: forcing a reset
  * posts to the access route (no body — the action carries no
- * parameters), revokes the account's sessions, and refreshes the page
- * so the chip and the log read back from the server. Unlock posts the
- * same way and clears the lockout. The emailed 30-minute link ships
- * with the password work, not V1, and the confirm copy says so — no
- * operator mistakes this for a sent email.
+ * parameters), revokes the account's sessions, emails a 30-minute reset
+ * link (P5), and refreshes the page so the chip and the log read back
+ * from the server. Unlock posts the same way and clears the lockout.
+ * Resetting the second factor (P6) kills its codes the same way.
  */
 
 "use client";
@@ -71,7 +70,7 @@ export function AccessActions({
         confirming: false,
         pending: false,
         error: null,
-        result: `${accountName} must set a new password at next sign-in — ${revoked} active session${revoked === 1 ? "" : "s"} revoked. The emailed link ships with password sign-in.`,
+        result: `${accountName} must set a new password at next sign-in — ${revoked} active session${revoked === 1 ? "" : "s"} revoked, and a reset link was emailed to the account.`,
       });
       router.refresh();
     } catch {
@@ -137,8 +136,7 @@ export function AccessActions({
             <p className="text-xs text-ink-600">
               <strong>Force a new password?</strong> This revokes every active session — an open tab
               stops working immediately — and the account must set a new password at next sign-in.
-              The emailed link itself ships with password sign-in; nothing is emailed by this
-              action.
+              This also emails the account a 30-minute reset link.
             </p>
             {reset.error ? (
               <p role="alert" className="text-xs font-medium text-danger-700">

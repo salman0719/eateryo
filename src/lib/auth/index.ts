@@ -2,7 +2,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
-import { magicLink } from "better-auth/plugins";
+import { magicLink, twoFactor } from "better-auth/plugins";
 
 import { getDb } from "@/lib/db";
 import { schema } from "@/lib/db/schema";
@@ -29,8 +29,49 @@ const MAGIC_LINK_EXPIRES_IN_SECONDS = 5 * 60;
 export const SESSION_EXPIRES_IN_SECONDS = 30 * 24 * 60 * 60;
 /** Rolling refresh: the 30-day window slides forward on daily use. */
 const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
-/** The one endpoint the lockout counter guards (P6 adds the factor verify). */
+/** The endpoints the lockout counter guards: password sign-in plus the TOTP and recovery-code challenges. */
 const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
+/** Second-factor challenge endpoints, counted against the same counter (§9). */
+const FACTOR_VERIFY_TOTP_PATH = "/two-factor/verify-totp";
+const FACTOR_VERIFY_BACKUP_PATH = "/two-factor/verify-backup-code";
+/**
+ * Factor failures that spend the shared window. Anything else — a dead
+ * challenge cookie, the plugin's own per-route throttle, a suspended
+ * refusal — leaves the counter alone.
+ */
+const FACTOR_FAILURE_CODES = new Set(["INVALID_CODE", "INVALID_BACKUP_CODE"]);
+
+/**
+ * The account behind a second-factor challenge, or null outside one.
+ * Reads the same signed challenge cookie the plugin's own verify
+ * endpoints read, then the verification row it points at. Enrolment
+ * verifies (signed in, no challenge cookie) resolve to null on purpose:
+ * a mistyped setup code must never spend the sign-in window.
+ */
+interface FactorChallengeContext {
+  getSignedCookie(name: string, secret: string): Promise<unknown>;
+  context: {
+    secret: string;
+    createAuthCookie(name: string): { name: string };
+    internalAdapter: {
+      findVerificationValue(identifier: string): Promise<{ value: unknown } | null>;
+    };
+  };
+}
+
+async function resolveTwoFactorUserId(ctx: FactorChallengeContext): Promise<string | null> {
+  try {
+    const jar = ctx.context.createAuthCookie("two_factor");
+    const signed = await ctx.getSignedCookie(jar.name, ctx.context.secret);
+    if (typeof signed !== "string" || !signed) return null;
+    const verification = await ctx.context.internalAdapter.findVerificationValue(signed);
+    return typeof verification?.value === "string" && verification.value
+      ? verification.value
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The pause as a finished response, for the after hook to substitute.
@@ -108,15 +149,36 @@ export function createAuth(options: CreateAuthOptions) {
     },
     hooks: {
       /**
-       * Lockout gate (P4). Five failed password attempts pause sign-in for
-       * 15 minutes per account — the row the operator's Unlock clears. The
-       * check runs before the password is even hashed, so a correct password
-       * cannot walk through a pause, and a wrong one during the pause costs
-       * nothing (the attempt never reaches the counting half). The emailed
-       * link is deliberately not gated: it is the escape hatch that needs no
-       * operator.
+       * Lockout gate (P4 passwords, P6 second factor). Five failed attempts
+       * pause sign-in for 15 minutes per account — the row the operator's
+       * Unlock clears. The check runs before the password or code is even
+       * verified, so a correct credential cannot walk through a pause, and
+       * a wrong one during the pause costs nothing (the attempt never
+       * reaches the counting half). The emailed link and recovery codes
+       * are deliberately not gated: they are the escape hatches that need
+       * no operator.
        */
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === FACTOR_VERIFY_TOTP_PATH) {
+          // The TOTP door is gated like the password door. Recovery codes
+          // pass through untouched — they are the way through while
+          // locked, and a success clears the pause (§9).
+          const userId = await resolveTwoFactorUserId(ctx as unknown as FactorChallengeContext);
+          if (!userId) return;
+          let lockedMinutes: number | null = null;
+          try {
+            const state = await readLockout(options.db, userId);
+            if (state.locked) lockedMinutes = state.minutesLeft;
+          } catch (error) {
+            logEvent("error", "auth.lockout_read_failed", { error });
+            throw new APIError("SERVICE_UNAVAILABLE", {
+              message: "Sign-in is not available yet — try again shortly.",
+            });
+          }
+          if (lockedMinutes !== null)
+            throw new APIError("TOO_MANY_REQUESTS", accountLockedBody(lockedMinutes));
+          return;
+        }
         if (ctx.path !== PASSWORD_SIGN_IN_PATH) return;
         const email = signInEmail(ctx.body);
         if (!email) return;
@@ -145,13 +207,47 @@ export function createAuth(options: CreateAuthOptions) {
       }),
 
       /**
-       * Count the attempt (P4). A wrong password adds one failure and, on the
-       * fifth, answers the pause immediately instead of waiting for the next
-       * attempt; a correct one clears the window. A suspended account's
-       * refusal (403) is not a failed attempt — the credentials were right —
-       * and any other error leaves the counter alone.
+       * Count the attempt (P4 passwords, P6 second factor). A wrong
+       * password or TOTP code adds one failure and, on the fifth, answers
+       * the pause immediately instead of waiting for the next attempt; a
+       * correct one clears the window, as does a spent recovery code —
+       * even while locked, which is what makes it the way through. A
+       * wrong recovery code while locked costs nothing and extends
+       * nothing. A suspended account's refusal (403) is not a failed
+       * attempt — the credentials were right — and any other error leaves
+       * the counter alone.
        */
       after: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === FACTOR_VERIFY_TOTP_PATH || ctx.path === FACTOR_VERIFY_BACKUP_PATH) {
+          const returned = (ctx.context as unknown as { returned?: unknown }).returned;
+          try {
+            // No challenge cookie (enrolment verifies) means no window to
+            // spend: setup typos never count against sign-in.
+            const userId = await resolveTwoFactorUserId(ctx as unknown as FactorChallengeContext);
+            if (!userId) return;
+
+            if (isAPIError(returned)) {
+              const code = (returned.body as { code?: unknown } | undefined)?.code;
+              if (typeof code !== "string" || !FACTOR_FAILURE_CODES.has(code)) return;
+              if (ctx.path === FACTOR_VERIFY_BACKUP_PATH) {
+                const state = await readLockout(options.db, userId);
+                if (state.locked) return;
+              }
+              const state = await recordFailedAttempt(options.db, userId);
+              if (state.locked) {
+                return accountLockedResponse(state.minutesLeft);
+              }
+              return;
+            }
+
+            if (returned && typeof returned === "object" && "user" in returned) {
+              await clearFailedAttempts(options.db, userId);
+            }
+          } catch (error) {
+            logEvent("warn", "auth.lockout_write_failed", { error });
+          }
+          return;
+        }
         if (ctx.path !== PASSWORD_SIGN_IN_PATH) return;
         const email = signInEmail(ctx.body);
         if (!email) return;
@@ -201,6 +297,17 @@ export function createAuth(options: CreateAuthOptions) {
           options.sendMagicLink ??
           (isDevSignInEnabled() ? captureDevSignInLink : sendMagicLinkEmail),
         expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
+      }),
+      twoFactor({
+        issuer: "Eateryo",
+        // The shared `account_access_state` counter is the only lockout
+        // (§9): the plugin's own per-account budget would be a second store
+        // disagreeing with the operator's Unlock, so it stays off and our
+        // hooks count the same endpoints instead.
+        accountLockout: { enabled: false },
+        // Ten single-use recovery codes, encrypted at rest (§6). The panel
+        // shows enrolled/not-enrolled, never a code.
+        backupCodeOptions: { amount: 10, storeBackupCodes: "encrypted" },
       }),
       // Must stay last: re-applies Set-Cookie headers in the Next.js handler.
       nextCookies(),
