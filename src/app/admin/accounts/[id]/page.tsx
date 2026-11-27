@@ -156,6 +156,7 @@ export default async function AdminAccountDetailPage({
             <li>
               Sign-in methods: emailed link
               {detail.access.passwordSetAt ? " · password" : " · no password yet"}
+              {detail.access.twoFactorEnrolled ? " · second factor on" : ""}
             </li>
             {detail.access.passwordSetAt ? (
               <li>Password set {shortDate(detail.access.passwordSetAt)}</li>
@@ -179,6 +180,7 @@ export default async function AdminAccountDetailPage({
             accountId={detail.account.id}
             accountName={displayName}
             chip={detail.access.chip}
+            twoFactorEnrolled={detail.access.twoFactorEnrolled}
           />
         </div>
       </Card>

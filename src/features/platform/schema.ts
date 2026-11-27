@@ -199,6 +199,8 @@ export const adminDetailAccessSchema = z.object({
   failedAttempts: z.number().int().nonnegative(),
   lockedUntil: z.string().nullable(),
   locked: z.boolean(),
+  /** TOTP enrolment — the panel shows on/off, never a code. */
+  twoFactorEnrolled: z.boolean(),
   chip: accessChipSchema,
 });
 
@@ -213,7 +215,7 @@ export const adminAccountDetailSchema = z.object({
     createdAt: z.string(),
   }),
   stage: z.enum(ACCOUNT_STAGES),
-  /** B4 Access-card state: methods, reset, lockout — no password material. */
+  /** B4 Access-card state: methods, reset, lockout, second factor — no secret material. */
   access: adminDetailAccessSchema,
   suspension: z
     .object({

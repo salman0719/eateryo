@@ -11,6 +11,7 @@ import {
   restaurant,
   restaurantMembership,
   session,
+  twoFactor,
   user,
   type PlatformEventAction,
   type SuspensionReason,
@@ -45,7 +46,12 @@ import { ACCOUNT_STAGES, deriveAccountStage, type AccountStage } from "./stage";
  */
 
 export type PlatformRepoErrorCode =
-  "not_found" | "no_open_suspension" | "suspension_active" | "not_locked" | "invalid_cursor";
+  | "not_found"
+  | "no_open_suspension"
+  | "suspension_active"
+  | "not_locked"
+  | "not_enrolled"
+  | "invalid_cursor";
 
 export class PlatformRepoError extends Error {
   readonly code: PlatformRepoErrorCode;
@@ -537,6 +543,7 @@ export async function getAccountDetail(
       id: user.id,
       name: user.name,
       email: user.email,
+      twoFactorEnrolled: user.twoFactorEnabled,
       createdAt: user.createdAt,
       cafeCount: cafeCountSql,
       menuCount: menuCountSql,
@@ -645,7 +652,9 @@ export async function getAccountDetail(
     ]);
 
   const open = suspensions.find((entry) => entry.liftedAt === null) ?? null;
-  const accessState = accessRows[0] ? toAccessState(accessRows[0]) : { ...DEFAULT_ACCESS_STATE };
+  const accessState = accessRows[0]
+    ? toAccessState({ ...accessRows[0], twoFactorEnrolled: row.twoFactorEnrolled })
+    : { ...DEFAULT_ACCESS_STATE, twoFactorEnrolled: row.twoFactorEnrolled };
   const stage = deriveAccountStage({
     cafeCount: row.cafeCount,
     menuCount: row.menuCount,
@@ -1200,6 +1209,8 @@ export interface AccountAccessState {
   failedAttempts: number;
   lockedUntil: string | null;
   locked: boolean;
+  /** TOTP enrolment for the Access card + reset action — never the secret. */
+  twoFactorEnrolled: boolean;
 }
 
 const DEFAULT_ACCESS_STATE: AccountAccessState = {
@@ -1209,6 +1220,7 @@ const DEFAULT_ACCESS_STATE: AccountAccessState = {
   failedAttempts: 0,
   lockedUntil: null,
   locked: false,
+  twoFactorEnrolled: false,
 };
 
 export function deriveAccessChip(state: AccountAccessState): AccessChip {
@@ -1226,6 +1238,7 @@ function toAccessState(row: {
   lockedUntil: Date | string | null;
   /** Compared against `now()` in SQL, beside the stored instant. */
   locked: boolean;
+  twoFactorEnrolled: boolean;
 }): AccountAccessState {
   return {
     passwordSetAt: toDate(row.passwordSetAt)?.toISOString() ?? null,
@@ -1234,6 +1247,7 @@ function toAccessState(row: {
     failedAttempts: row.failedAttempts,
     lockedUntil: toDate(row.lockedUntil)?.toISOString() ?? null,
     locked: row.locked,
+    twoFactorEnrolled: row.twoFactorEnrolled,
   };
 }
 
@@ -1262,7 +1276,15 @@ export async function getAccountAccessState(
     .where(eq(accountAccessState.userId, targetUserId))
     .limit(1);
   const row = rows[0];
-  return row ? toAccessState(row) : { ...DEFAULT_ACCESS_STATE };
+  const enrolled = await db
+    .select({ on: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, targetUserId))
+    .limit(1);
+  const twoFactorEnrolled = enrolled[0]?.on ?? false;
+  return row
+    ? toAccessState({ ...row, twoFactorEnrolled })
+    : { ...DEFAULT_ACCESS_STATE, twoFactorEnrolled };
 }
 
 export interface ForcePasswordResetInput {
@@ -1390,4 +1412,58 @@ export async function unlockAccount(
       }),
   ]);
   return { clearedAttempts: row.failedAttempts };
+}
+
+export interface ResetTwoFactorInput {
+  targetUserId: string;
+  /** Operator resetting the factor (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Reset an operator's second factor (P6, B5 audit family): the TOTP
+ * secret and its backup codes die with the row, `twoFactorEnabled`
+ * clears so the next sign-in re-enrols, and live sessions die so an
+ * open panel tab cannot keep working — recorded as `two_factor.reset`,
+ * once, atomically. With no factor enrolled it reports `not_enrolled`
+ * instead of writing a no-op event, so the log stays a record of real
+ * actions.
+ */
+export async function resetTwoFactor(
+  db: PlatformDb,
+  input: ResetTwoFactorInput
+): Promise<{ sessionsRevoked: number }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const enrolled = await db
+    .select({ on: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, input.targetUserId))
+    .limit(1);
+  if (!enrolled[0]?.on) {
+    throw new PlatformRepoError("not_enrolled", "That account has no second factor.");
+  }
+  const live = await db
+    .select({ id: session.id })
+    .from(session)
+    .where(eq(session.userId, input.targetUserId));
+
+  await runAtomically(db, [
+    (w) => w.delete(twoFactor).where(eq(twoFactor.userId, input.targetUserId)),
+    (w) => w.update(user).set({ twoFactorEnabled: false }).where(eq(user.id, input.targetUserId)),
+    (w) => w.delete(session).where(eq(session.userId, input.targetUserId)),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "two_factor.reset",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: "Second factor reset · sessions revoked, re-enrolment forced.",
+      }),
+  ]);
+  return { sessionsRevoked: live.length };
 }

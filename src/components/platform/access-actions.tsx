@@ -31,6 +31,20 @@ const INITIAL_RESET: ResetState = {
   result: null,
 };
 
+interface FactorResetState {
+  confirming: boolean;
+  pending: boolean;
+  error: string | null;
+  result: string | null;
+}
+
+const INITIAL_FACTOR_RESET: FactorResetState = {
+  confirming: false,
+  pending: false,
+  error: null,
+  result: null,
+};
+
 function errorMessage(body: { error?: { message?: string } }): string {
   if (typeof body.error?.message === "string" && body.error.message) return body.error.message;
   return "Something went wrong. Try again.";
@@ -40,15 +54,19 @@ export function AccessActions({
   accountId,
   accountName,
   chip,
+  twoFactorEnrolled,
 }: {
   accountId: string;
   accountName: string;
   chip: AccessChip;
+  /** Whether the panel may offer the second-factor reset (P6). */
+  twoFactorEnrolled: boolean;
 }) {
   const router = useRouter();
   const [reset, setReset] = useState<ResetState>(INITIAL_RESET);
   const [unlockPending, setUnlockPending] = useState(false);
   const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [factorReset, setFactorReset] = useState<FactorResetState>(INITIAL_FACTOR_RESET);
 
   async function submitReset(): Promise<void> {
     setReset((state) => ({ ...state, pending: true, error: null, result: null }));
@@ -103,6 +121,38 @@ export function AccessActions({
     } catch {
       setUnlockPending(false);
       setUnlockError("Something went wrong. Try again.");
+    }
+  }
+
+  async function submitFactorReset(): Promise<void> {
+    setFactorReset((state) => ({ ...state, pending: true, error: null, result: null }));
+    try {
+      const response = await fetch(
+        `/api/admin/accounts/${encodeURIComponent(accountId)}/access/two-factor/reset`,
+        { method: "POST" }
+      );
+      const body = (await response.json().catch(() => ({}))) as {
+        error?: { message?: string };
+        sessionsRevoked?: number;
+      };
+      if (!response.ok) {
+        setFactorReset((state) => ({ ...state, pending: false, error: errorMessage(body) }));
+        return;
+      }
+      const revoked = typeof body.sessionsRevoked === "number" ? body.sessionsRevoked : 0;
+      setFactorReset({
+        confirming: false,
+        pending: false,
+        error: null,
+        result: `${accountName}'s second factor was reset — ${revoked} active session${revoked === 1 ? "" : "s"} revoked. The next sign-in sets up a new authenticator.`,
+      });
+      router.refresh();
+    } catch {
+      setFactorReset((state) => ({
+        ...state,
+        pending: false,
+        error: "Something went wrong. Try again.",
+      }));
     }
   }
 
@@ -171,6 +221,56 @@ export function AccessActions({
           </button>
         )}
       </div>
+      {twoFactorEnrolled ? (
+        <div>
+          {factorReset.result ? (
+            <p role="status" className="text-sm text-ink-600">
+              {factorReset.result}
+            </p>
+          ) : null}
+          {factorReset.confirming ? (
+            <div className="flex flex-col gap-3 rounded-xl border border-line-200 p-3">
+              <p className="text-xs text-ink-600">
+                <strong>Reset the second factor?</strong> This deletes the authenticator secret and
+                its recovery codes, revokes every active session, and the account sets up a new
+                authenticator at next sign-in.
+              </p>
+              {factorReset.error ? (
+                <p role="alert" className="text-xs font-medium text-danger-700">
+                  {factorReset.error}
+                </p>
+              ) : null}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={submitFactorReset}
+                  disabled={factorReset.pending}
+                  className="rounded-lg bg-danger-700 px-4 py-2 text-sm font-semibold text-on-accent hover:bg-danger-800 disabled:opacity-50"
+                >
+                  {factorReset.pending ? "Resetting…" : "Reset second factor"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFactorReset((state) => ({ ...state, confirming: false, error: null }))
+                  }
+                  className="rounded-lg border border-line-200 px-4 py-2 text-sm font-medium text-ink-900"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setFactorReset((state) => ({ ...state, confirming: true }))}
+              className="rounded-lg border border-line-200 px-4 py-2 text-sm font-medium text-ink-900"
+            >
+              Reset second factor
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
