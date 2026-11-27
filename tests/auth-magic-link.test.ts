@@ -82,6 +82,48 @@ describe("magic-link sign-in", () => {
     expect(verifications).toHaveLength(0);
   }, 30_000);
 
+  it("matches the existing account when the link uses different casing (no duplicate)", async () => {
+    // A legacy row written outside Better Auth can hold a mixed-case address
+    // (seedUser normalises like production, so insert directly to simulate
+    // it). Requesting and clicking the link in another casing must sign into
+    // that same row — never mint a second lowercased account.
+    const legacyId = crypto.randomUUID();
+    await db
+      .insert(user)
+      .values({ id: legacyId, name: "Case Legacy", email: "Case.Legacy@cafe.test" });
+
+    const request = await auth.handler(
+      new Request(`${BASE_URL}/sign-in/magic-link`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "http://localhost:3000",
+        },
+        body: JSON.stringify({ email: "case.legacy@CAFE.test", callbackURL: "/" }),
+      })
+    );
+    expect(request.status).toBe(200);
+    const link = sentLinks[sentLinks.length - 1];
+    if (!link) throw new Error("no magic link captured");
+
+    const verify = await auth.handler(new Request(link));
+    const cookies = verify.headers.getSetCookie();
+    expect(cookies.length).toBeGreaterThan(0);
+
+    const cookieHeader = cookies.map((c) => c.split(";")[0]).join("; ");
+    const sessionRes = await auth.handler(
+      new Request(`${BASE_URL}/get-session`, { headers: { cookie: cookieHeader } })
+    );
+    expect(sessionRes.status).toBe(200);
+    const payload = (await sessionRes.json()) as { user?: { id?: string } | null };
+    expect(payload.user?.id).toBe(legacyId);
+
+    // Exactly one row for the address, healed to the canonical form.
+    const rows = await db.select().from(user).where(eq(user.email, "case.legacy@cafe.test"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(legacyId);
+  }, 30_000);
+
   it("rejects a bogus verification token without minting a session", async () => {
     const fake = await auth.handler(
       new Request(`${BASE_URL}/magic-link/verify?token=bogus-token&callbackURL=/`)

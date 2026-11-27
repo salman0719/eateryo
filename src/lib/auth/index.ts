@@ -4,10 +4,10 @@ import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink, twoFactor } from "better-auth/plugins";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
-import { schema, session } from "@/lib/db/schema";
+import { schema, session, user, verification } from "@/lib/db/schema";
 
 import type { PlatformDb } from "./platform-admin";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./passwords";
@@ -37,6 +37,8 @@ const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
 /** Second-factor challenge endpoints, counted against the same counter (§9). */
 const FACTOR_VERIFY_TOTP_PATH = "/two-factor/verify-totp";
 const FACTOR_VERIFY_BACKUP_PATH = "/two-factor/verify-backup-code";
+/** Magic-link verification endpoint, where legacy email case is healed. */
+const MAGIC_LINK_VERIFY_PATH = "/magic-link/verify";
 /**
  * Factor failures that spend the shared window. Anything else — a dead
  * challenge cookie, the plugin's own per-route throttle, a suspended
@@ -106,6 +108,56 @@ async function resolveFactorSessionUserId(
 }
 
 /**
+ * Legacy email-case heal for magic-link verify.
+ *
+ * Accounts written outside Better Auth (direct SQL, old seeds) can hold a
+ * mixed-case address while the plugin looks users up lowercased — so a
+ * differently-cased link misses the row and mints a duplicate lowercased
+ * account. Before the plugin's own lookup runs, resolve the pending link's
+ * address case-insensitively and rewrite the stored row to the canonical
+ * lowercase form; the plugin then matches the original account and no
+ * second user is created. Best-effort: a heal that fails only logs, and
+ * the verify proceeds exactly as it would have without it.
+ */
+async function healLegacyEmailCase(db: PlatformDb, query: unknown): Promise<void> {
+  try {
+    const token =
+      typeof query === "object" && query !== null && "token" in query
+        ? (query as { token?: unknown }).token
+        : null;
+    if (typeof token !== "string" || !token) return;
+    const pending = await db
+      .select({ value: verification.value })
+      .from(verification)
+      .where(eq(verification.identifier, `magic-link:${token}`))
+      .limit(1);
+    const raw = pending[0]?.value;
+    if (!raw) return;
+    let address: string | null = null;
+    try {
+      const parsed = JSON.parse(raw) as { email?: unknown };
+      if (typeof parsed.email === "string") {
+        const normalized = parsed.email.trim().toLowerCase();
+        address = normalized ? normalized : null;
+      }
+    } catch {
+      return;
+    }
+    if (!address) return;
+    const matches = await db
+      .select({ id: user.id, email: user.email })
+      .from(user)
+      .where(sql`lower(${user.email}) = ${address}`)
+      .limit(1);
+    const hit = matches[0];
+    if (!hit || hit.email === address) return;
+    await db.update(user).set({ email: address }).where(eq(user.id, hit.id));
+  } catch (error) {
+    logEvent("warn", "auth.email_case_heal_failed", { error });
+  }
+}
+
+/**
  * The pause as a finished response, for the after hook to substitute.
  * Replacing the *response* is what carries the 429: the pipeline keeps the
  * failing endpoint's own 401 status when an error object is swapped in, but
@@ -155,6 +207,25 @@ export function createAuth(options: CreateAuthOptions) {
       updateAge: SESSION_UPDATE_AGE_SECONDS,
     },
     databaseHooks: {
+      user: {
+        create: {
+          /**
+           * Canonical email form: every account reads lowercase, so a later
+           * sign-in with different casing matches the same row instead of
+           * minting a duplicate. Better Auth already lowercases its own
+           * lookup and create paths; this states the invariant in our
+           * config so it survives library upgrades and covers any
+           * additional-fields write that bypasses them.
+           */
+          before: async (userData) => {
+            const email = (userData as { email?: unknown }).email;
+            if (typeof email !== "string") return;
+            const normalized = email.trim().toLowerCase();
+            if (normalized && normalized !== email)
+              return { data: { ...userData, email: normalized } };
+          },
+        },
+      },
       session: {
         create: {
           /**
@@ -191,6 +262,13 @@ export function createAuth(options: CreateAuthOptions) {
        * no operator.
        */
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === MAGIC_LINK_VERIFY_PATH) {
+          // Legacy mixed-case account rows predate the lowercase invariant;
+          // rewrite the match before the plugin looks it up, so the link
+          // signs into the original account instead of creating a second.
+          await healLegacyEmailCase(options.db, ctx.query);
+          return;
+        }
         if (ctx.path === FACTOR_VERIFY_TOTP_PATH) {
           // The TOTP door is gated like the password door. Recovery codes
           // pass through untouched — they are the way through while
