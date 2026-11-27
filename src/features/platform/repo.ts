@@ -1,0 +1,1469 @@
+import { and, asc, desc, eq, isNull, lt, or, sql, type SQLWrapper } from "drizzle-orm";
+
+import type { PlatformDb } from "@/lib/auth/platform-admin";
+import {
+  accountAccessState,
+  accountSuspension,
+  menu,
+  order,
+  platformEvent,
+  publishedMenu,
+  restaurant,
+  restaurantMembership,
+  session,
+  twoFactor,
+  user,
+  type PlatformEventAction,
+  type SuspensionReason,
+} from "@/lib/db/schema";
+import { getMonthlyUsageSummary } from "@/features/usage/repo";
+
+import {
+  ADMIN_ACCOUNTS_PAGE_SIZE,
+  ADMIN_EVENTS_PAGE_SIZE,
+  encodeAdminCursor,
+  type AccessChip,
+  type AdminAccountDetail,
+  type AdminAccountFilter,
+  type AdminAccountSort,
+  type AdminAccountSummary,
+  type AdminCursor,
+  type AdminEventsPage,
+  type AdminTimelineEntry,
+} from "./schema";
+import { ACCOUNT_STAGES, deriveAccountStage, type AccountStage } from "./stage";
+
+/**
+ * Platform operations (B1) — server-only. Suspend and restore an account
+ * with the audit event, atomically: a suspension without its audit row is
+ * a bug, not a partial success, so the suspension row, the session deletes
+ * and the event commit together, as do the restore update and its event.
+ *
+ * Suspension is account-scoped: it deletes the account's `session` rows
+ * (an open tab stops working) and the sign-in gate refuses new ones, but
+ * it never touches cafés, menus, publications or orders — diners keep
+ * ordering while an owner is investigated.
+ */
+
+export type PlatformRepoErrorCode =
+  | "not_found"
+  | "no_open_suspension"
+  | "suspension_active"
+  | "not_locked"
+  | "not_enrolled"
+  | "invalid_cursor";
+
+export class PlatformRepoError extends Error {
+  readonly code: PlatformRepoErrorCode;
+
+  constructor(code: PlatformRepoErrorCode, message: string) {
+    super(message);
+    this.name = "PlatformRepoError";
+    this.code = code;
+  }
+}
+
+/**
+ * The `insert`/`update`/`delete` surface shared by a Drizzle db and its
+ * transaction — the only thing the atomic statements below are built on,
+ * so the same builders run under `db.batch` and under `db.transaction`.
+ *
+ * Builders must return the query itself, never a promise: `db.batch`
+ * inspects the builders (it calls `_prepare` on each), so an async helper
+ * breaks the batch path while silently working under `db.transaction`.
+ */
+type WriteDb = Pick<PlatformDb, "insert" | "update" | "delete">;
+
+type BatchCapableDb = PlatformDb & {
+  batch: (items: unknown[]) => Promise<unknown[]>;
+};
+
+function hasBatch(db: PlatformDb): db is BatchCapableDb {
+  return "batch" in db && typeof db.batch === "function";
+}
+
+/**
+ * Commit several statements atomically on every driver this repo runs on.
+ *
+ * Verified against the pinned drivers (drizzle-orm 0.45): the Neon HTTP
+ * driver has no interactive transactions (`db.transaction` throws) but its
+ * `db.batch` runs the statements in a single non-interactive transaction
+ * (the serverless driver's own README: "a single, non-interactive
+ * transaction"); node-postgres and PGlite have no `db.batch` but support
+ * `db.transaction`. Same statements, atomic both ways — the tests below
+ * exercise the transaction path, production takes the batch path.
+ */
+async function runAtomically(
+  db: PlatformDb,
+  build: Array<(db: WriteDb) => SQLWrapper>
+): Promise<void> {
+  if (hasBatch(db)) {
+    await db.batch(build.map((make) => make(db)));
+    return;
+  }
+  await db.transaction(async (tx) => {
+    for (const make of build) await make(tx);
+  });
+}
+
+/** Postgres unique-violation code, surfaced by all three drivers. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code: unknown }).code === "23505"
+  );
+}
+
+interface AccountSnapshot {
+  id: string;
+  email: string;
+}
+
+async function accountById(db: PlatformDb, userId: string): Promise<AccountSnapshot | null> {
+  const rows = await db
+    .select({ id: user.id, email: user.email })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export interface SuspendInput {
+  targetUserId: string;
+  reason: SuspensionReason;
+  /** Optional operator note — stays internal, like the reason. */
+  note?: string;
+  /** Operator performing the suspension (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+export interface SuspensionSummary {
+  id: string;
+  reason: SuspensionReason;
+  note: string | null;
+  createdAt: Date;
+}
+
+export interface SuspendResult {
+  suspension: SuspensionSummary;
+  /** Sessions deleted, so already-open tabs stop working. */
+  sessionsRevoked: number;
+}
+
+/**
+ * Suspend an account: open row + session deletes + `account.suspended`
+ * event, atomically. A second suspend while one is open is a conflict —
+ * the pre-check answers it cleanly and the partial unique index is the
+ * backstop for the race.
+ */
+export async function suspendAccount(db: PlatformDb, input: SuspendInput): Promise<SuspendResult> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const open = await db
+    .select({ id: accountSuspension.id })
+    .from(accountSuspension)
+    .where(
+      and(eq(accountSuspension.userId, input.targetUserId), isNull(accountSuspension.liftedAt))
+    )
+    .limit(1);
+  if (open[0]) {
+    throw new PlatformRepoError("suspension_active", "That account is already suspended.");
+  }
+
+  const note = input.note ?? null;
+  const build: Array<(db: WriteDb) => SQLWrapper> = [
+    (w) =>
+      w.insert(accountSuspension).values({
+        userId: input.targetUserId,
+        reason: input.reason,
+        note,
+        suspendedBy: input.actorUserId,
+      }),
+    (w) =>
+      w.delete(session).where(eq(session.userId, input.targetUserId)).returning({ id: session.id }),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "account.suspended",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: note,
+      }),
+  ];
+
+  // The session delete is the middle statement; its RETURNING rows are the
+  // revoked count on every driver (insert/event appends resolve driver-
+  // shaped results, so only index 1 is read).
+  let sessionsRevoked = 0;
+  try {
+    const results: unknown[] = hasBatch(db)
+      ? await db.batch(build.map((make) => make(db)))
+      : await db.transaction(async (tx) => {
+          const collected: unknown[] = [];
+          for (const make of build) collected.push(await make(tx));
+          return collected;
+        });
+    const deleted = results[1];
+    sessionsRevoked = Array.isArray(deleted) ? deleted.length : 0;
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new PlatformRepoError("suspension_active", "That account is already suspended.");
+    }
+    throw error;
+  }
+
+  const created = await db
+    .select({
+      id: accountSuspension.id,
+      reason: accountSuspension.reason,
+      note: accountSuspension.note,
+      createdAt: accountSuspension.createdAt,
+    })
+    .from(accountSuspension)
+    .where(
+      and(eq(accountSuspension.userId, input.targetUserId), isNull(accountSuspension.liftedAt))
+    )
+    .limit(1);
+  const suspension = created[0];
+  if (!suspension) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  return {
+    suspension: {
+      id: suspension.id,
+      reason: suspension.reason,
+      note: suspension.note,
+      createdAt: suspension.createdAt,
+    },
+    sessionsRevoked,
+  };
+}
+
+export interface RestoreInput {
+  targetUserId: string;
+  /** Optional operator note, recorded on the `account.restored` event. */
+  note?: string;
+  /** Operator performing the restore (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Restore an account: set `liftedAt` on the open row + `account.restored`
+ * event, atomically. The original suspension stays in history with its
+ * reason, so a later operator can see why it happened. Sign-in works
+ * immediately — the gate only looks for open rows.
+ */
+export async function restoreAccount(
+  db: PlatformDb,
+  input: RestoreInput
+): Promise<{ suspensionId: string }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const open = await db
+    .select({ id: accountSuspension.id })
+    .from(accountSuspension)
+    .where(
+      and(eq(accountSuspension.userId, input.targetUserId), isNull(accountSuspension.liftedAt))
+    )
+    .limit(1);
+  if (!open[0]) {
+    throw new PlatformRepoError("no_open_suspension", "That account has no open suspension.");
+  }
+
+  const liftNote = input.note ?? null;
+  await runAtomically(db, [
+    (w) =>
+      w
+        .update(accountSuspension)
+        .set({ liftedAt: new Date(), liftedBy: input.actorUserId, liftNote })
+        .where(and(eq(accountSuspension.id, open[0]!.id), isNull(accountSuspension.liftedAt))),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "account.restored",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: liftNote,
+      }),
+  ]);
+  return { suspensionId: open[0]!.id };
+}
+
+/* ------------------------------------------------------------------ */
+/* B2 reads: one page query, no N+1                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Membership-scoped aggregates for the accounts list (B2).
+ *
+ * Every count is a correlated scalar subquery on the row's own user id,
+ * so the whole page is one round trip — never one query per account.
+ * The filter names read as stages: `taking_orders` reached ordering
+ * (a first order exists, the plan's definition of onboarded),
+ * `not_onboarded` never ordered, `suspended` holds an open suspension.
+ */
+
+/**
+ * Correlated scalars, written with table-qualified names: drizzle renders
+ * an interpolated column as a bare identifier, which turns ambiguous (or
+ * silently correlates to the wrong table) the moment the fragment joins.
+ * Spelling the tables out keeps each subquery pinned to the outer row.
+ */
+
+const cafeCountSql = sql<number>`(select count(*)::int from "restaurant_membership" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const menuCountSql = sql<number>`(select count(*)::int from "menu" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "menu"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const liveCountSql = sql<number>`(select count(*)::int from "published_menu" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "published_menu"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id" and "published_menu"."published_at" is not null)`;
+
+const orderCountSql = sql<number>`(select count(*)::int from "order" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "order"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const orders7Sql = sql<number>`(select count(*)::int from "order" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "order"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id" and "order"."created_at" > now() - interval '7 days')`;
+
+const lastOrderAtSql = sql<Date | null>`(select max("order"."created_at") from "order" join "restaurant_membership" on "restaurant_membership"."restaurant_id" = "order"."restaurant_id" where "restaurant_membership"."user_id" = "user"."id")`;
+
+const suspendedAtSql = sql<Date | null>`(select "account_suspension"."created_at" from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null limit 1)`;
+
+/**
+ * The list's per-row sign-in chip (B4): one CASE over the left-joined
+ * access row, so the page stays one round trip. A missing row reads as
+ * `no_password` — the link-only cutover default.
+ */
+const accessChipSql = sql<AccessChip>`case when (${accountAccessState.lockedUntil} > now()) then 'locked' when (${accountAccessState.resetRequired}) then 'reset_required' when (${accountAccessState.passwordSetAt} is null) then 'no_password' else 'password_set' end`;
+
+/** Never-ordered accounts sort as the epoch, so the key is never null. */
+const activeKeySql = sql<Date>`coalesce((${lastOrderAtSql}), '1970-01-01 00:00:00+00'::timestamptz)`;
+
+export interface ListAccountsInput {
+  q?: string;
+  filter?: AdminAccountFilter;
+  sort?: AdminAccountSort;
+  cursor?: AdminCursor | null;
+}
+
+export interface ListAccountsResult {
+  accounts: AdminAccountSummary[];
+  nextCursor?: string;
+}
+
+/** Escape the LIKE wildcards so a search for `%` finds a `%`. */
+function likePattern(q: string): string {
+  return `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+}
+
+function cursorDate(key: string): Date {
+  const date = new Date(key);
+  if (Number.isNaN(date.getTime())) {
+    throw new PlatformRepoError("invalid_cursor", "That page cursor is not valid.");
+  }
+  return date;
+}
+
+/**
+ * Raw `sql` fragments carry no type parsers: an aggregate over one can
+ * arrive as a string on drivers that hand Dates to typed columns, so both
+ * shapes normalize here instead of at each call site.
+ */
+function toDate(value: Date | string | null): Date | null {
+  if (value === null || value === undefined) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
+/** Split an `orders` cursor key (`<count>:<iso>`) back into its parts. */
+function ordersCursorKey(key: string): { count: number; at: Date } {
+  const cut = key.indexOf(":");
+  const count = cut < 0 ? NaN : Number(key.slice(0, cut));
+  const at = cut < 0 ? new Date(NaN) : new Date(key.slice(cut + 1));
+  if (!Number.isInteger(count) || count < 0 || Number.isNaN(at.getTime())) {
+    throw new PlatformRepoError("invalid_cursor", "That page cursor is not valid.");
+  }
+  return { count, at };
+}
+
+/**
+ * One 25-row page of accounts with aggregates, keyset-paginated. The
+ * keyset columns always match the sort order, so pages hold no
+ * duplicates and no gaps even while accounts sign up mid-scroll.
+ */
+export async function listAccounts(
+  db: PlatformDb,
+  input: ListAccountsInput = {}
+): Promise<ListAccountsResult> {
+  const filter = input.filter ?? "all";
+  const sort = input.sort ?? "newest";
+  const cursor = input.cursor ?? null;
+
+  const conditions: SQLWrapper[] = [];
+  const trimmed = input.q?.trim();
+  if (trimmed) {
+    const pattern = likePattern(trimmed);
+    conditions.push(
+      sql`(${user.email} ilike ${pattern} escape '\\' or ${user.name} ilike ${pattern} escape '\\')`
+    );
+  }
+  if (filter === "suspended") {
+    conditions.push(
+      sql`exists(select 1 from "account_suspension" where "account_suspension"."user_id" = "user"."id" and "account_suspension"."lifted_at" is null)`
+    );
+  } else if (filter === "taking_orders") {
+    conditions.push(sql`(${orderCountSql} > 0)`);
+  } else if (filter === "not_onboarded") {
+    conditions.push(sql`(${orderCountSql} = 0)`);
+  } else if (filter === "no_password") {
+    conditions.push(
+      sql`not exists(select 1 from "account_access_state" where "account_access_state"."user_id" = "user"."id" and "account_access_state"."password_set_at" is not null)`
+    );
+  } else if (filter === "reset_required") {
+    conditions.push(
+      sql`exists(select 1 from "account_access_state" where "account_access_state"."user_id" = "user"."id" and "account_access_state"."reset_required")`
+    );
+  } else if (filter === "locked") {
+    conditions.push(
+      sql`exists(select 1 from "account_access_state" where "account_access_state"."user_id" = "user"."id" and "account_access_state"."locked_until" > now())`
+    );
+  }
+
+  if (sort === "newest" && cursor) {
+    const at = cursorDate(cursor.key);
+    conditions.push(
+      or(lt(user.createdAt, at), and(eq(user.createdAt, at), lt(user.id, cursor.id)))!
+    );
+  } else if (sort === "active" && cursor) {
+    const at = cursorDate(cursor.key);
+    conditions.push(or(lt(activeKeySql, at), and(eq(activeKeySql, at), lt(user.id, cursor.id)))!);
+  } else if (sort === "orders" && cursor) {
+    const { count, at } = ordersCursorKey(cursor.key);
+    conditions.push(
+      or(
+        lt(orders7Sql, count),
+        and(eq(orders7Sql, count), lt(user.createdAt, at)),
+        and(eq(orders7Sql, count), eq(user.createdAt, at), lt(user.id, cursor.id))
+      )!
+    );
+  }
+
+  const orderBy =
+    sort === "active"
+      ? [desc(activeKeySql), desc(user.id)]
+      : sort === "orders"
+        ? [desc(orders7Sql), desc(user.createdAt), desc(user.id)]
+        : [desc(user.createdAt), desc(user.id)];
+
+  const rows = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      cafeCount: cafeCountSql,
+      menuCount: menuCountSql,
+      liveCount: liveCountSql,
+      orders7: orders7Sql,
+      orderCount: orderCountSql,
+      lastOrderAt: lastOrderAtSql,
+      suspendedAt: suspendedAtSql,
+      accessChip: accessChipSql,
+    })
+    .from(user)
+    .leftJoin(accountAccessState, eq(accountAccessState.userId, user.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(...orderBy)
+    .limit(ADMIN_ACCOUNTS_PAGE_SIZE + 1);
+
+  const page = rows.slice(0, ADMIN_ACCOUNTS_PAGE_SIZE);
+  const accounts: AdminAccountSummary[] = page.map((row) => {
+    const stage: AccountStage = deriveAccountStage({
+      cafeCount: row.cafeCount,
+      menuCount: row.menuCount,
+      liveCount: row.liveCount,
+      orderCount: row.orderCount,
+    });
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt.toISOString(),
+      cafeCount: row.cafeCount,
+      menuCount: row.menuCount,
+      liveCount: row.liveCount,
+      orders7: row.orders7,
+      lastOrderAt: toDate(row.lastOrderAt)?.toISOString() ?? null,
+      suspended: toDate(row.suspendedAt) !== null,
+      suspendedAt: toDate(row.suspendedAt)?.toISOString() ?? null,
+      stage,
+      accessChip: row.accessChip,
+    };
+  });
+
+  if (rows.length <= ADMIN_ACCOUNTS_PAGE_SIZE) return { accounts };
+  const last = page[page.length - 1]!;
+  const key =
+    sort === "active"
+      ? (toDate(last.lastOrderAt)?.toISOString() ?? new Date(0).toISOString())
+      : sort === "orders"
+        ? `${last.orders7}:${last.createdAt.toISOString()}`
+        : last.createdAt.toISOString();
+  return { accounts, nextCursor: encodeAdminCursor({ key, id: last.id }) };
+}
+
+/* ------------------------------------------------------------------ */
+/* B2 reads: account detail + operator log                            */
+/* ------------------------------------------------------------------ */
+
+/** Recent orders and sessions shown on the detail page (support-sized). */
+const DETAIL_RECENT_ORDERS = 10;
+const DETAIL_SESSIONS = 20;
+const DETAIL_EVENTS = 20;
+
+/**
+ * One account, everything support needs to answer for it (B2).
+ *
+ * Every read is scoped by the account's own id — menus and orders join
+ * through its memberships, so nothing from another tenant can appear —
+ * and the shape carries no document bodies, no line items, no session
+ * addresses and no password material. Seven constant queries, no
+ * per-row follow-ups. Throws `not_found` for an unknown id.
+ */
+export async function getAccountDetail(
+  db: PlatformDb,
+  targetUserId: string
+): Promise<AdminAccountDetail> {
+  const header = await db
+    .select({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      secondFactorEnrolled: user.twoFactorEnabled,
+      createdAt: user.createdAt,
+      cafeCount: cafeCountSql,
+      menuCount: menuCountSql,
+      liveCount: liveCountSql,
+      orderCount: orderCountSql,
+      orders7: orders7Sql,
+      lastOrderAt: lastOrderAtSql,
+    })
+    .from(user)
+    .where(eq(user.id, targetUserId))
+    .limit(1);
+  const row = header[0];
+  if (!row) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+
+  const [suspensions, memberships, menus, recentOrders, sessions, events, usage, accessRows] =
+    await Promise.all([
+      db
+        .select({
+          reason: accountSuspension.reason,
+          suspendedBy: accountSuspension.suspendedBy,
+          createdAt: accountSuspension.createdAt,
+          liftedAt: accountSuspension.liftedAt,
+        })
+        .from(accountSuspension)
+        .where(eq(accountSuspension.userId, targetUserId))
+        .orderBy(desc(accountSuspension.createdAt)),
+      db
+        .select({
+          restaurantId: restaurantMembership.restaurantId,
+          role: restaurantMembership.role,
+          createdAt: restaurantMembership.createdAt,
+          name: restaurant.name,
+          slug: restaurant.slug,
+        })
+        .from(restaurantMembership)
+        .innerJoin(restaurant, eq(restaurant.id, restaurantMembership.restaurantId))
+        .where(eq(restaurantMembership.userId, targetUserId))
+        .orderBy(restaurantMembership.createdAt),
+      db
+        .select({
+          id: menu.id,
+          restaurantId: menu.restaurantId,
+          title: menu.title,
+          updatedAt: menu.updatedAt,
+          slug: publishedMenu.slug,
+          publishedAt: publishedMenu.publishedAt,
+        })
+        .from(menu)
+        .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, menu.restaurantId))
+        .leftJoin(publishedMenu, eq(publishedMenu.menuId, menu.id))
+        .where(eq(restaurantMembership.userId, targetUserId))
+        .orderBy(desc(menu.updatedAt)),
+      db
+        .select({
+          id: order.id,
+          restaurantId: order.restaurantId,
+          tableLabel: order.tableLabel,
+          status: order.status,
+          totalCents: order.totalCents,
+          createdAt: order.createdAt,
+        })
+        .from(order)
+        .innerJoin(restaurantMembership, eq(restaurantMembership.restaurantId, order.restaurantId))
+        .where(eq(restaurantMembership.userId, targetUserId))
+        .orderBy(desc(order.createdAt))
+        .limit(DETAIL_RECENT_ORDERS),
+      db
+        .select({
+          id: session.id,
+          createdAt: session.createdAt,
+          expiresAt: session.expiresAt,
+          // No address column: support sees the device, never a raw IP.
+          userAgent: session.userAgent,
+        })
+        .from(session)
+        .where(eq(session.userId, targetUserId))
+        .orderBy(desc(session.createdAt))
+        .limit(DETAIL_SESSIONS),
+      db
+        .select({
+          id: platformEvent.id,
+          action: platformEvent.action,
+          actorEmail: platformEvent.actorEmail,
+          detail: platformEvent.detail,
+          createdAt: platformEvent.createdAt,
+        })
+        .from(platformEvent)
+        .where(eq(platformEvent.targetUserId, targetUserId))
+        .orderBy(desc(platformEvent.createdAt))
+        .limit(DETAIL_EVENTS),
+      getMonthlyUsageSummary(db, targetUserId),
+      db
+        .select({
+          passwordSetAt: accountAccessState.passwordSetAt,
+          resetRequired: accountAccessState.resetRequired,
+          resetSentAt: accountAccessState.resetSentAt,
+          failedAttempts: accountAccessState.failedAttempts,
+          lockedUntil: accountAccessState.lockedUntil,
+          locked: sql<boolean>`coalesce(${accountAccessState.lockedUntil} > now(), false)`,
+        })
+        .from(accountAccessState)
+        .where(eq(accountAccessState.userId, targetUserId))
+        .limit(1),
+    ]);
+
+  const open = suspensions.find((entry) => entry.liftedAt === null) ?? null;
+  const accessState = accessRows[0]
+    ? toAccessState({ ...accessRows[0], secondFactorEnrolled: row.secondFactorEnrolled })
+    : { ...DEFAULT_ACCESS_STATE, secondFactorEnrolled: row.secondFactorEnrolled };
+  const stage = deriveAccountStage({
+    cafeCount: row.cafeCount,
+    menuCount: row.menuCount,
+    liveCount: row.liveCount,
+    orderCount: row.orderCount,
+  });
+
+  // Each builder is annotated on its own: kinds stay literals where they
+  // are written instead of widening through the spreads downstream.
+  const createdEntry: AdminTimelineEntry = {
+    at: row.createdAt.toISOString(),
+    kind: "account_created",
+    label: "Account created",
+  };
+  const joinedEntries: AdminTimelineEntry[] = memberships.map((m) => ({
+    at: m.createdAt.toISOString(),
+    kind: "cafe_joined" as const,
+    label: `Joined ${m.name} as ${m.role}`,
+  }));
+  const suspensionEntries: AdminTimelineEntry[] = suspensions.flatMap((entry) => [
+    {
+      at: entry.createdAt.toISOString(),
+      kind: "suspended" as const,
+      label: `Suspended — ${entry.reason}`,
+    },
+    ...(entry.liftedAt
+      ? [
+          {
+            at: entry.liftedAt.toISOString(),
+            kind: "restored" as const,
+            label: "Suspension lifted",
+          } satisfies AdminTimelineEntry,
+        ]
+      : []),
+  ]);
+  // Suspension history already covers its two actions; the rest (grants,
+  // revocations, and whatever B4/B5 add) reads straight from the log.
+  const operatorEntries: AdminTimelineEntry[] = events
+    .filter((event) => event.action !== "account.suspended" && event.action !== "account.restored")
+    .map((event) => ({
+      at: event.createdAt.toISOString(),
+      kind: "operator_event" as const,
+      label: `${event.action} by ${event.actorEmail ?? "the CLI"}`,
+    }));
+  const timeline: AdminTimelineEntry[] = [
+    createdEntry,
+    ...joinedEntries,
+    ...suspensionEntries,
+    ...operatorEntries,
+  ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+
+  return {
+    account: {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt.toISOString(),
+    },
+    stage,
+    access: { ...accessState, chip: deriveAccessChip(accessState) },
+    suspension: open
+      ? {
+          reason: open.reason,
+          suspendedAt: open.createdAt.toISOString(),
+          suspendedBy: open.suspendedBy,
+        }
+      : null,
+    cafes: memberships.map((m) => ({
+      id: m.restaurantId,
+      name: m.name,
+      slug: m.slug,
+      role: m.role,
+    })),
+    menus: menus.map((m) => ({
+      id: m.id,
+      cafeId: m.restaurantId,
+      title: m.title,
+      live: m.publishedAt !== null,
+      slug: m.slug,
+      updatedAt: m.updatedAt.toISOString(),
+    })),
+    usage: { requests: usage.requests, cap: usage.cap, remaining: usage.remaining },
+    orders: {
+      total: row.orderCount,
+      last7: row.orders7,
+      lastOrderAt: toDate(row.lastOrderAt)?.toISOString() ?? null,
+      recent: recentOrders.map((o) => ({
+        id: o.id,
+        cafeId: o.restaurantId,
+        tableLabel: o.tableLabel,
+        status: o.status,
+        totalCents: o.totalCents,
+        createdAt: o.createdAt.toISOString(),
+      })),
+    },
+    sessions: sessions.map((s) => ({
+      id: s.id,
+      createdAt: s.createdAt.toISOString(),
+      expiresAt: s.expiresAt.toISOString(),
+      userAgent: s.userAgent,
+    })),
+    events: events.map((event) => ({
+      id: event.id,
+      action: event.action,
+      actorEmail: event.actorEmail,
+      detail: event.detail,
+      createdAt: event.createdAt.toISOString(),
+    })),
+    timeline,
+  };
+}
+
+export interface ListPlatformEventsInput {
+  action?: PlatformEventAction;
+  cursor?: AdminCursor | null;
+}
+
+/**
+ * The operator log, newest first, keyset-paginated (B2). The action
+ * filter takes one of the recorded base-four actions; passwords and
+ * second-factor families join it with B4/B5, which only widen the enum.
+ */
+export async function listPlatformEvents(
+  db: PlatformDb,
+  input: ListPlatformEventsInput = {}
+): Promise<AdminEventsPage> {
+  const conditions: SQLWrapper[] = [];
+  if (input.action) {
+    conditions.push(eq(platformEvent.action, input.action));
+  }
+  if (input.cursor) {
+    const at = cursorDate(input.cursor.key);
+    conditions.push(
+      or(
+        lt(platformEvent.createdAt, at),
+        and(eq(platformEvent.createdAt, at), lt(platformEvent.id, input.cursor.id))
+      )!
+    );
+  }
+  const rows = await db
+    .select({
+      id: platformEvent.id,
+      action: platformEvent.action,
+      actorEmail: platformEvent.actorEmail,
+      targetEmail: platformEvent.targetEmail,
+      detail: platformEvent.detail,
+      createdAt: platformEvent.createdAt,
+    })
+    .from(platformEvent)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(platformEvent.createdAt), desc(platformEvent.id))
+    .limit(ADMIN_EVENTS_PAGE_SIZE + 1);
+
+  const page = rows.slice(0, ADMIN_EVENTS_PAGE_SIZE);
+  const events = page.map((event) => ({
+    ...event,
+    createdAt: event.createdAt.toISOString(),
+  }));
+  if (rows.length <= ADMIN_EVENTS_PAGE_SIZE) return { events };
+  const last = page[page.length - 1]!;
+  return {
+    events,
+    nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* B3 reads: platform overview                                        */
+/* ------------------------------------------------------------------ */
+
+/** Accounts that signed up but never started, older than this, need a nudge. */
+const OVERVIEW_STALLED_DAYS = 7;
+const OVERVIEW_STALLED_LIMIT = 5;
+
+export interface PlatformOverviewTotals {
+  accounts: number;
+  suspended: number;
+  cafes: number;
+  liveMenus: number;
+  /** Orders placed in the last 7 days, platform-wide. */
+  orders7: number;
+}
+
+export interface StalledSignup {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
+export interface PlatformOverview {
+  totals: PlatformOverviewTotals;
+  /** One entry per stage, funnel order, zeros included — never sparse. */
+  funnel: { stage: AccountStage; count: number }[];
+  /** Signed up, no café after a week, oldest first (support-sized). */
+  stalledSignups: StalledSignup[];
+}
+
+/** The same stage decision as `deriveAccountStage`, as a SQL CASE. */
+const stageCaseSql = sql<AccountStage>`case when (${orderCountSql}) > 0 then 'ordering' when (${liveCountSql}) > 0 then 'published' when (${menuCountSql}) > 0 then 'menu' when (${cafeCountSql}) > 0 then 'cafe' else 'signed_up' end`;
+
+/**
+ * The overview screen in three constant queries (B3).
+ *
+ * Totals and the funnel derive from the tables the app already owns —
+ * no counters are stored, so nothing can drift. The funnel groups by
+ * the same stage decision the list renders per row, so the two can
+ * never disagree. Recent sign-ups, open suspensions and recent actions
+ * stay on the page queries (`listAccounts`, `listPlatformEvents`)
+ * instead of growing a second shape here.
+ */
+export async function getPlatformOverview(db: PlatformDb): Promise<PlatformOverview> {
+  const [totals] = await db
+    .select({
+      accounts: sql<number>`(select count(*)::int from "user")`,
+      suspended: sql<number>`(select count(*)::int from "account_suspension" where "account_suspension"."lifted_at" is null)`,
+      cafes: sql<number>`(select count(*)::int from "restaurant")`,
+      liveMenus: sql<number>`(select count(*)::int from "published_menu" where "published_menu"."published_at" is not null)`,
+      orders7: sql<number>`(select count(*)::int from "order" where "order"."created_at" > now() - interval '7 days')`,
+    })
+    .from(user)
+    .limit(1);
+
+  const funnelRows = await db
+    .select({ stage: stageCaseSql, count: sql<number>`count(*)::int` })
+    .from(user)
+    .groupBy(stageCaseSql);
+  const funnelCounts = new Map(funnelRows.map((row) => [row.stage, row.count]));
+  const funnel = ACCOUNT_STAGES.map((stage) => ({
+    stage,
+    count: funnelCounts.get(stage) ?? 0,
+  }));
+
+  const stalled = await db
+    .select({ id: user.id, name: user.name, email: user.email, createdAt: user.createdAt })
+    .from(user)
+    .where(
+      sql`not exists(select 1 from "restaurant_membership" where "restaurant_membership"."user_id" = "user"."id") and "user"."created_at" < now() - interval '${sql.raw(String(OVERVIEW_STALLED_DAYS))} days'`
+    )
+    .orderBy(asc(user.createdAt))
+    .limit(OVERVIEW_STALLED_LIMIT);
+
+  return {
+    totals: totals ?? { accounts: 0, suspended: 0, cafes: 0, liveMenus: 0, orders7: 0 },
+    funnel,
+    stalledSignups: stalled.map((row) => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      createdAt: row.createdAt.toISOString(),
+    })),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* B3 reads: cafes, platform-wide and read-only                        */
+/* ------------------------------------------------------------------ */
+
+/** One page holds 25 cafes; the query fetches one extra to detect next. */
+const ADMIN_CAFES_PAGE_SIZE = 25;
+
+const CAFE_RECENT_ORDERS = 10;
+
+/**
+ * Correlated scalars pinned to the outer cafe row, same table-qualified
+ * style as the accounts list above.
+ */
+const cafeMemberCountSql = sql<number>`(select count(*)::int from "restaurant_membership" where "restaurant_membership"."restaurant_id" = "restaurant"."id")`;
+
+const cafeMenuCountSql = sql<number>`(select count(*)::int from "menu" where "menu"."restaurant_id" = "restaurant"."id")`;
+
+const cafeLiveCountSql = sql<number>`(select count(*)::int from "published_menu" where "published_menu"."restaurant_id" = "restaurant"."id" and "published_menu"."published_at" is not null)`;
+
+const cafeOrders7Sql = sql<number>`(select count(*)::int from "order" where "order"."restaurant_id" = "restaurant"."id" and "order"."created_at" > now() - interval '7 days')`;
+
+const cafeOrderCountSql = sql<number>`(select count(*)::int from "order" where "order"."restaurant_id" = "restaurant"."id")`;
+
+const cafeOwnerSuspendedSql = sql<boolean>`exists(select 1 from "restaurant_membership" join "account_suspension" on "account_suspension"."user_id" = "restaurant_membership"."user_id" where "restaurant_membership"."restaurant_id" = "restaurant"."id" and "restaurant_membership"."role" = 'owner' and "account_suspension"."lifted_at" is null)`;
+
+export type CafeLiveFilter = "all" | "live" | "draft";
+
+export interface ListCafesInput {
+  q?: string;
+  live?: CafeLiveFilter;
+  cursor?: AdminCursor | null;
+}
+
+export interface CafeSummary {
+  id: string;
+  name: string;
+  slug: string | null;
+  createdAt: string;
+  memberCount: number;
+  menuCount: number;
+  liveCount: number;
+  orders7: number;
+  ownerSuspended: boolean;
+}
+
+export interface ListCafesResult {
+  cafes: CafeSummary[];
+  nextCursor?: string;
+}
+
+/**
+ * One 25-row page of every cafe, newest first with keyset pagination.
+ * Operator scope is the guard, not the query: operators see all tenants.
+ * Search matches name or slug; the live filter splits cafes with a live
+ * menu from pure drafts (zero menus count as draft).
+ */
+export async function listCafes(
+  db: PlatformDb,
+  input: ListCafesInput = {}
+): Promise<ListCafesResult> {
+  const live = input.live ?? "all";
+  const cursor = input.cursor ?? null;
+  const conditions: SQLWrapper[] = [];
+
+  const trimmed = input.q?.trim();
+  if (trimmed) {
+    const pattern = likePattern(trimmed);
+    conditions.push(
+      sql`(${restaurant.name} ilike ${pattern} escape '\\' or ${restaurant.slug} ilike ${pattern} escape '\\')`
+    );
+  }
+  if (live === "live") {
+    conditions.push(sql`(${cafeLiveCountSql} > 0)`);
+  } else if (live === "draft") {
+    conditions.push(sql`(${cafeLiveCountSql} = 0)`);
+  }
+  if (cursor) {
+    const at = cursorDate(cursor.key);
+    conditions.push(
+      or(
+        lt(restaurant.createdAt, at),
+        and(eq(restaurant.createdAt, at), lt(restaurant.id, cursor.id))
+      )!
+    );
+  }
+
+  const rows = await db
+    .select({
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      createdAt: restaurant.createdAt,
+      memberCount: cafeMemberCountSql,
+      menuCount: cafeMenuCountSql,
+      liveCount: cafeLiveCountSql,
+      orders7: cafeOrders7Sql,
+      ownerSuspended: cafeOwnerSuspendedSql,
+    })
+    .from(restaurant)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(restaurant.createdAt), desc(restaurant.id))
+    .limit(ADMIN_CAFES_PAGE_SIZE + 1);
+
+  const page = rows.slice(0, ADMIN_CAFES_PAGE_SIZE);
+  const cafes: CafeSummary[] = page.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    createdAt: row.createdAt.toISOString(),
+    memberCount: row.memberCount,
+    menuCount: row.menuCount,
+    liveCount: row.liveCount,
+    orders7: row.orders7,
+    ownerSuspended: row.ownerSuspended,
+  }));
+  if (rows.length <= ADMIN_CAFES_PAGE_SIZE) return { cafes };
+  const last = page[page.length - 1]!;
+  return {
+    cafes,
+    nextCursor: encodeAdminCursor({ key: last.createdAt.toISOString(), id: last.id }),
+  };
+}
+
+export interface CafeMember {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
+  suspended: boolean;
+}
+
+export interface CafeMenu {
+  id: string;
+  title: string;
+  live: boolean;
+  slug: string | null;
+  updatedAt: string;
+}
+
+export interface CafeDetail {
+  cafe: { id: string; name: string; slug: string | null; createdAt: string };
+  ownerSuspended: boolean;
+  members: CafeMember[];
+  menus: CafeMenu[];
+  orders: {
+    total: number;
+    last7: number;
+    recent: Array<{
+      id: string;
+      tableLabel: string;
+      status: string;
+      totalCents: number | null;
+      createdAt: string;
+    }>;
+  };
+}
+
+/**
+ * One cafe with its team, menus and recent orders (B3).
+ *
+ * Read-only by construction: no update, no delete, no line items, no
+ * diner identities, no session material. Member suspension flags come
+ * from one `in (...)` lookup, not one query per member. Throws
+ * `not_found` for an unknown id.
+ */
+export async function getCafeDetail(db: PlatformDb, cafeId: string): Promise<CafeDetail> {
+  const header = await db
+    .select({
+      id: restaurant.id,
+      name: restaurant.name,
+      slug: restaurant.slug,
+      createdAt: restaurant.createdAt,
+      menuCount: cafeMenuCountSql,
+      liveCount: cafeLiveCountSql,
+      orderCount: cafeOrderCountSql,
+      orders7: cafeOrders7Sql,
+      ownerSuspended: cafeOwnerSuspendedSql,
+    })
+    .from(restaurant)
+    .where(eq(restaurant.id, cafeId))
+    .limit(1);
+  const row = header[0];
+  if (!row) {
+    throw new PlatformRepoError("not_found", "That cafe does not exist.");
+  }
+
+  const [members, menus, recentOrders] = await Promise.all([
+    db
+      .select({
+        userId: restaurantMembership.userId,
+        role: restaurantMembership.role,
+        createdAt: restaurantMembership.createdAt,
+        name: user.name,
+        email: user.email,
+      })
+      .from(restaurantMembership)
+      .innerJoin(user, eq(user.id, restaurantMembership.userId))
+      .where(eq(restaurantMembership.restaurantId, cafeId))
+      .orderBy(restaurantMembership.createdAt),
+    db
+      .select({
+        id: menu.id,
+        title: menu.title,
+        updatedAt: menu.updatedAt,
+        slug: publishedMenu.slug,
+        publishedAt: publishedMenu.publishedAt,
+      })
+      .from(menu)
+      .leftJoin(publishedMenu, eq(publishedMenu.menuId, menu.id))
+      .where(eq(menu.restaurantId, cafeId))
+      .orderBy(desc(menu.updatedAt)),
+    db
+      .select({
+        id: order.id,
+        tableLabel: order.tableLabel,
+        status: order.status,
+        totalCents: order.totalCents,
+        createdAt: order.createdAt,
+      })
+      .from(order)
+      .where(eq(order.restaurantId, cafeId))
+      .orderBy(desc(order.createdAt))
+      .limit(CAFE_RECENT_ORDERS),
+  ]);
+
+  const suspendedIds = new Set<string>();
+  if (members.length > 0) {
+    const open = await db
+      .select({ userId: accountSuspension.userId })
+      .from(accountSuspension)
+      .where(
+        and(
+          isNull(accountSuspension.liftedAt),
+          sql`${accountSuspension.userId} in (${sql.join(
+            members.map((m) => sql`${m.userId}`),
+            sql`, `
+          )})`
+        )
+      );
+    for (const entry of open) suspendedIds.add(entry.userId);
+  }
+
+  return {
+    cafe: {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: row.createdAt.toISOString(),
+    },
+    ownerSuspended: row.ownerSuspended,
+    members: members.map((m) => ({
+      userId: m.userId,
+      name: m.name,
+      email: m.email,
+      role: m.role,
+      suspended: suspendedIds.has(m.userId),
+    })),
+    menus: menus.map((m) => ({
+      id: m.id,
+      title: m.title,
+      live: m.publishedAt !== null,
+      slug: m.slug,
+      updatedAt: m.updatedAt.toISOString(),
+    })),
+    orders: {
+      total: row.orderCount,
+      last7: row.orders7,
+      recent: recentOrders.map((o) => ({
+        id: o.id,
+        tableLabel: o.tableLabel,
+        status: o.status,
+        totalCents: o.totalCents,
+        createdAt: o.createdAt.toISOString(),
+      })),
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* B4 reads + actions: operator-visible sign-in state                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What the operator panel shows about one account's sign-in (B4).
+ *
+ * Derived from `account_access_state`, which carries no hash and no
+ * token — least data by construction, so no admin query can leak
+ * password material. A missing row reads as "no password yet": the
+ * link-only cutover means most accounts have never set one, and that
+ * is a normal state, not a gap. `locked` compares `lockedUntil`
+ * against now, so an expired lockout stops reading as locked without
+ * a sweep.
+ */
+export interface AccountAccessState {
+  passwordSetAt: string | null;
+  resetRequired: boolean;
+  resetSentAt: string | null;
+  failedAttempts: number;
+  lockedUntil: string | null;
+  locked: boolean;
+  /** TOTP enrolment for the Access card + reset action — never the secret. */
+  secondFactorEnrolled: boolean;
+}
+
+const DEFAULT_ACCESS_STATE: AccountAccessState = {
+  passwordSetAt: null,
+  resetRequired: false,
+  resetSentAt: null,
+  failedAttempts: 0,
+  lockedUntil: null,
+  locked: false,
+  secondFactorEnrolled: false,
+};
+
+export function deriveAccessChip(state: AccountAccessState): AccessChip {
+  if (state.locked) return "locked";
+  if (state.resetRequired) return "reset_required";
+  if (state.passwordSetAt === null) return "no_password";
+  return "password_set";
+}
+
+function toAccessState(row: {
+  passwordSetAt: Date | string | null;
+  resetRequired: boolean;
+  resetSentAt: Date | string | null;
+  failedAttempts: number;
+  lockedUntil: Date | string | null;
+  /** Compared against `now()` in SQL, beside the stored instant. */
+  locked: boolean;
+  secondFactorEnrolled: boolean;
+}): AccountAccessState {
+  return {
+    passwordSetAt: toDate(row.passwordSetAt)?.toISOString() ?? null,
+    resetRequired: row.resetRequired,
+    resetSentAt: toDate(row.resetSentAt)?.toISOString() ?? null,
+    failedAttempts: row.failedAttempts,
+    lockedUntil: toDate(row.lockedUntil)?.toISOString() ?? null,
+    locked: row.locked,
+    secondFactorEnrolled: row.secondFactorEnrolled,
+  };
+}
+
+/**
+ * One account's sign-in state for the Access card. Throws `not_found`
+ * for an unknown id; a missing row reads as the cutover default.
+ */
+export async function getAccountAccessState(
+  db: PlatformDb,
+  targetUserId: string
+): Promise<AccountAccessState> {
+  const target = await accountById(db, targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const rows = await db
+    .select({
+      passwordSetAt: accountAccessState.passwordSetAt,
+      resetRequired: accountAccessState.resetRequired,
+      resetSentAt: accountAccessState.resetSentAt,
+      failedAttempts: accountAccessState.failedAttempts,
+      lockedUntil: accountAccessState.lockedUntil,
+      locked: sql<boolean>`coalesce(${accountAccessState.lockedUntil} > now(), false)`,
+    })
+    .from(accountAccessState)
+    .where(eq(accountAccessState.userId, targetUserId))
+    .limit(1);
+  const row = rows[0];
+  const enrolled = await db
+    .select({ on: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, targetUserId))
+    .limit(1);
+  const secondFactorEnrolled = enrolled[0]?.on ?? false;
+  return row
+    ? toAccessState({ ...row, secondFactorEnrolled })
+    : { ...DEFAULT_ACCESS_STATE, secondFactorEnrolled };
+}
+
+export interface ForcePasswordResetInput {
+  targetUserId: string;
+  /** Operator forcing the reset (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Force a password reset: the account must set a new password at next
+ * sign-in, and its live sessions die so an open tab cannot keep
+ * working — the same revocation suspension performs. Recorded as
+ * `password.reset`, atomically with the state row and the session
+ * deletes.
+ *
+ * The emailed 30-minute link ships with the password work (§11), not
+ * V1: `resetSentAt` stamps when the requirement was imposed, and the
+ * V1: `resetSentAt` stamps when the requirement was imposed. The route
+ * sends the 30-minute reset link (P5) once this records the requirement,
+ * so the detail says the email went out.
+ */
+export async function forcePasswordReset(
+  db: PlatformDb,
+  input: ForcePasswordResetInput
+): Promise<{ resetSentAt: string; sessionsRevoked: number; targetEmail: string }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const resetSentAt = new Date();
+
+  const build: Array<(db: WriteDb) => SQLWrapper> = [
+    (w) =>
+      w
+        .insert(accountAccessState)
+        .values({
+          userId: input.targetUserId,
+          resetRequired: true,
+          resetSentAt,
+        })
+        .onConflictDoUpdate({
+          target: accountAccessState.userId,
+          set: { resetRequired: true, resetSentAt },
+        }),
+    (w) =>
+      w.delete(session).where(eq(session.userId, input.targetUserId)).returning({ id: session.id }),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "password.reset",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: "Password reset forced · reset link emailed to the account.",
+      }),
+  ];
+
+  let sessionsRevoked = 0;
+  const results: unknown[] = hasBatch(db)
+    ? await db.batch(build.map((make) => make(db)))
+    : await db.transaction(async (tx) => {
+        const collected: unknown[] = [];
+        for (const make of build) collected.push(await make(tx));
+        return collected;
+      });
+  const deleted = results[1];
+  sessionsRevoked = Array.isArray(deleted) ? deleted.length : 0;
+  return {
+    resetSentAt: resetSentAt.toISOString(),
+    sessionsRevoked,
+    targetEmail: target.email,
+  };
+}
+
+export interface UnlockAccountInput {
+  targetUserId: string;
+  /** Operator clearing the lockout (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Clear the 5-attempt/15-minute lockout: the counter and the
+ * `lockedUntil` instant reset together, recorded as
+ * `account.unlocked`, atomically. With nothing to clear — no row, no
+ * attempts, no live lock — it reports `not_locked` instead of writing
+ * a no-op event, so the log stays a record of real actions.
+ */
+export async function unlockAccount(
+  db: PlatformDb,
+  input: UnlockAccountInput
+): Promise<{ clearedAttempts: number }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const rows = await db
+    .select({
+      failedAttempts: accountAccessState.failedAttempts,
+      locked: sql<boolean>`coalesce(${accountAccessState.lockedUntil} > now(), false)`,
+    })
+    .from(accountAccessState)
+    .where(eq(accountAccessState.userId, input.targetUserId))
+    .limit(1);
+  const row = rows[0];
+  if (!row || (row.failedAttempts === 0 && !row.locked)) {
+    throw new PlatformRepoError("not_locked", "That account is not locked out.");
+  }
+
+  await runAtomically(db, [
+    (w) =>
+      w
+        .update(accountAccessState)
+        .set({ failedAttempts: 0, lockedUntil: null })
+        .where(eq(accountAccessState.userId, input.targetUserId)),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "account.unlocked",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: `Sign-in unlocked · cleared ${row.failedAttempts} failed attempt${row.failedAttempts === 1 ? "" : "s"}.`,
+      }),
+  ]);
+  return { clearedAttempts: row.failedAttempts };
+}
+
+export interface ResetTwoFactorInput {
+  targetUserId: string;
+  /** Operator resetting the factor (the API guard guarantees one). */
+  actorUserId: string;
+}
+
+/**
+ * Reset an operator's second factor (P6, B5 audit family): the TOTP
+ * secret and its backup codes die with the row, `twoFactorEnabled`
+ * clears so the next sign-in re-enrols, and live sessions die so an
+ * open panel tab cannot keep working — recorded as `two_factor.reset`,
+ * once, atomically. With no factor enrolled it reports `not_enrolled`
+ * instead of writing a no-op event, so the log stays a record of real
+ * actions.
+ */
+export async function resetTwoFactor(
+  db: PlatformDb,
+  input: ResetTwoFactorInput
+): Promise<{ sessionsRevoked: number }> {
+  const target = await accountById(db, input.targetUserId);
+  if (!target) {
+    throw new PlatformRepoError("not_found", "That account does not exist.");
+  }
+  const actor = await accountById(db, input.actorUserId);
+  const enrolled = await db
+    .select({ on: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, input.targetUserId))
+    .limit(1);
+  if (!enrolled[0]?.on) {
+    throw new PlatformRepoError("not_enrolled", "That account has no second factor.");
+  }
+  const live = await db
+    .select({ id: session.id })
+    .from(session)
+    .where(eq(session.userId, input.targetUserId));
+
+  await runAtomically(db, [
+    (w) => w.delete(twoFactor).where(eq(twoFactor.userId, input.targetUserId)),
+    (w) => w.update(user).set({ twoFactorEnabled: false }).where(eq(user.id, input.targetUserId)),
+    (w) => w.delete(session).where(eq(session.userId, input.targetUserId)),
+    (w) =>
+      w.insert(platformEvent).values({
+        action: "two_factor.reset",
+        actorUserId: input.actorUserId,
+        actorEmail: actor?.email ?? null,
+        targetUserId: input.targetUserId,
+        targetEmail: target.email,
+        detail: "Second factor reset · sessions revoked, re-enrolment forced.",
+      }),
+  ]);
+  return { sessionsRevoked: live.length };
+}

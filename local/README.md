@@ -13,14 +13,12 @@ do not rely on it existing on another machine.
 
 ## Before you start
 
-1. Read the folder index below.
-2. Look for an existing folder whose purpose fits. Search by purpose, not by
+1. Look for an existing folder whose purpose fits. Search by purpose, not by
    exact name; a broader folder with a new subfolder is usually better than a
    near-duplicate.
-3. If nothing fits and the work is more than a single disposable file, create a
-   lowercase kebab-case topic folder and add it to the index in the same
-   change.
-4. Keep the root of `local/` for this README and genuinely cross-topic files.
+2. If nothing fits and the work is more than a single disposable file, create a
+   lowercase kebab-case topic folder.
+3. Keep the root of `local/` for this README and genuinely cross-topic files.
    One-off scripts, outputs, and data belong in a topic folder.
 
 ## Outputs
@@ -36,36 +34,7 @@ do not rely on it existing on another machine.
   finding again.
 - Name sample images descriptively (`cafe-clean-01.jpg`,
   `takeaway-lowlight-01.jpg`). Keep at least one clean and one difficult menu
-  in `samples/menus/` for extraction tests (PLAN.md Phase 3).
-
-## Folder index
-
-| Folder                          | Use for                                                        |
-| ------------------------------- | -------------------------------------------------------------- |
-| `ab/`                           | provider A/B extraction harness, fixtures and results          |
-| `ai-assistant-rnd/`             | AI assistant scope, spike and implementation draft             |
-| `crawler/`                      | menu-sample downloader and collected samples                   |
-| `email-prototype/`              | email template prototype                                       |
-| `gate-logs/`                    | lint/typecheck/test/build logs from earlier steps              |
-| `home-screen-refactor/`         | state-ownership sketch and flows for the shell split           |
-| `issues/`                       | the local issue log; see `issues/README.md`                    |
-| `logo-concepts/`                | logo exploration and exports                                   |
-| `notes/`                        | working notes that do not belong in repo docs                  |
-| `performance/`                  | performance experiments and results                            |
-| `prototype/`                    | interactive prototypes                                         |
-| `prototype/brand-assets/`       | logo & cover upload flow prototypes                            |
-| `prototype/diner-ordering-lab/` | diner page themes, mobile category navigation and dish layouts |
-| `research/`                     | research reports, including `research/staff-access/`           |
-| `samples/`                      | menu images and manual test samples                            |
-| `scratch/` | throwaway experiments and repro files |
-| `stripe-payments/` | Stripe preview acceptance matrix (`acceptance.html`) |
-| `study/`                        | UI study captures                                              |
-| `theme-studio/`                 | local theme tooling and backups                                |
-| `tmp/`                          | disposable files                                               |
-| `worktrees/`                    | local git worktrees                                            |
-
-Add a row when you add a folder. Keep the table current rather than letting
-folders become anonymous.
+  image around for extraction tests (PLAN.md Phase 3).
 
 ## Serious findings
 

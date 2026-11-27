@@ -32,6 +32,7 @@ import {
   type AssistantContextRestaurant,
 } from "@/lib/ai/assistant/prompt";
 import { requestAssistantProposal } from "@/lib/ai/assistant/propose";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { reportError } from "@/lib/observability/alerts";
@@ -211,6 +212,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     return errorResponse("feature_disabled", PUBLIC_MESSAGES.feature_disabled, 403);
   }
   const userId = context.user.id;
+
+  try {
+    await assertAccountActive(getDb(), userId);
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
+    return errorResponse("server_db_unavailable", PUBLIC_MESSAGES.db_unavailable, 503);
+  }
 
   let payload: unknown;
   try {

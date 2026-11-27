@@ -11,6 +11,7 @@ import {
 import type { ProviderName, ProviderUsage } from "@/lib/ai/provider";
 import { buildProviderChain } from "@/lib/ai/provider-config";
 import { extractMenuFromImages, ServiceError } from "@/lib/ai/service";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { alertOps, reportError } from "@/lib/observability/alerts";
@@ -60,6 +61,18 @@ async function checkAllowance(request: Request, requestId: string): Promise<Next
     const db = getDb();
     const userId = await sessionUser();
     if (userId) {
+      try {
+        await assertAccountActive(db, userId);
+      } catch (error) {
+        if (error instanceof AccountStateError) {
+          return NextResponse.json(
+            { error: { code: "account_suspended", message: error.message } },
+            { status: 403 }
+          );
+        }
+        // Bookkeeping failure: fall through — the extraction fails on its
+        // own below when the database is truly unreachable.
+      }
       const usage = await getMonthlyUsageSummary(db, userId);
       if (usage.remaining <= 0) {
         logEvent("warn", "extract.cap_reached", {

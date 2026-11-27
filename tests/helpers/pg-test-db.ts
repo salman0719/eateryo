@@ -25,6 +25,8 @@ export type TestDb = Awaited<ReturnType<typeof createTestDb>>["db"];
 export async function seedUser(db: TestDb, email: string, name: string): Promise<string> {
   const { user } = await import("@/lib/db/schema");
   const id = crypto.randomUUID();
-  await db.insert(user).values({ id, name, email });
+  // Production rows read lowercase (the auth config normalises on create);
+  // seeds follow the same invariant so a mixed-case link meets the row.
+  await db.insert(user).values({ id, name, email: email.trim().toLowerCase() });
   return id;
 }

@@ -7,6 +7,7 @@ import {
   TableRepoError,
 } from "@/features/tables/repo";
 import { getRestaurantForUser, TenancyRepoError } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -114,12 +115,15 @@ export async function PUT(request: Request, { params }: RestaurantParams) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const restaurant =
       "ensure" in parsed.data
         ? await ensureRestaurantSlugForUser(getDb(), userId, restaurantId)
         : await setRestaurantSlugForUser(getDb(), userId, restaurantId, parsed.data.slug);
     return noStore(NextResponse.json({ restaurant }));
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof TableRepoError) return mapTableError(error);
     return errorResponse(
       "server_db_unavailable",

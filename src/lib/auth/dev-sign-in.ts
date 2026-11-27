@@ -22,6 +22,8 @@
  *   Better Auth gives the link itself.
  */
 
+import { toVerifyPageUrl } from "@/lib/auth/verify-link";
+
 /** Matches the magic-link expiry the auth config sets. */
 const DEV_LINK_TTL_MS = 5 * 60 * 1000;
 
@@ -107,7 +109,9 @@ export async function captureDevSignInLink({
     // Unreachable through the auth config, and never a silent success.
     throw new Error("Dev sign-in bypass is not enabled");
   }
-  getDevLinkStore().remember(email, url);
+  // Park the first-party page, like the emailed link: the dev panel walks
+  // `/verify`, so a suspended account meets the landing here too.
+  getDevLinkStore().remember(email, toVerifyPageUrl(url));
 }
 
 /** The pending link for this address, consumed on read; null when unavailable. */

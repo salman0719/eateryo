@@ -7,6 +7,7 @@ import {
   setPaymentModeForOwner,
 } from "@/features/payments/accounts";
 import { getRestaurantForUser } from "@/features/tenancy/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -122,6 +123,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     // Online needs a real connection; the counter is always allowed.
     if (parsed.data.mode === "online") {
       const current = await getPaymentAccountForMember(getDb(), userId, restaurantId);
@@ -146,7 +148,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     }
     const currencyWarnings = await getLiveMenuCurrencyWarnings(getDb(), userId, restaurantId);
     return noStore(NextResponse.json({ account: serialize(updated, currencyWarnings) }));
-  } catch {
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     return errorResponse("server_db_unavailable", "Could not change the payment mode.", 503);
   }
 }

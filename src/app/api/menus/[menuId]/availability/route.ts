@@ -8,6 +8,7 @@ import {
   setMenuAvailabilityForUser,
   TableRepoError,
 } from "@/features/tables/repo";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getSessionUserId } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
@@ -101,6 +102,7 @@ export async function PUT(request: Request, { params }: MenuParams) {
   }
 
   try {
+    await assertAccountActive(getDb(), userId);
     const saved = await setMenuAvailabilityForUser(
       getDb(),
       userId,
@@ -110,6 +112,8 @@ export async function PUT(request: Request, { params }: MenuParams) {
     );
     return noStore(NextResponse.json(saved));
   } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
     if (error instanceof TableRepoError) {
       switch (error.code) {
         case "not_found":

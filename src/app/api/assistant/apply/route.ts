@@ -5,6 +5,7 @@ import { applyProposalRequestSchema } from "@/features/assistant/proposal";
 import { resolveFeatureContext } from "@/features/flags/server";
 import { getMenuWithRoleForUser, MenuRepoError, updateMenuForUser } from "@/features/menus/repo";
 import { can } from "@/features/tenancy/policy";
+import { AccountStateError, assertAccountActive } from "@/lib/auth/account-state";
 import { getDb } from "@/lib/db";
 import { rejectCrossOrigin } from "@/lib/http/origin";
 import { logEvent, requestIdFrom } from "@/lib/observability/log";
@@ -91,6 +92,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     return errorResponse("feature_disabled", PUBLIC_MESSAGES.feature_disabled, 403);
   }
   const userId = context.user.id;
+
+  try {
+    await assertAccountActive(getDb(), userId);
+  } catch (error) {
+    if (error instanceof AccountStateError)
+      return errorResponse("account_suspended", error.message, 403);
+    return errorResponse("server_db_unavailable", PUBLIC_MESSAGES.db_unavailable, 503);
+  }
 
   let body: unknown;
   try {
