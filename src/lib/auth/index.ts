@@ -4,12 +4,15 @@ import { APIError, createAuthMiddleware, isAPIError } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { magicLink, twoFactor } from "better-auth/plugins";
 
-import { getDb } from "@/lib/db";
-import { schema } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
-import { accountSuspendedMessage, openSuspension } from "./account-state";
+import { getDb } from "@/lib/db";
+import { schema, session } from "@/lib/db/schema";
+
 import type { PlatformDb } from "./platform-admin";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./passwords";
+
+import { accountSuspendedMessage, isTwoFactorEnrolled, openSuspension } from "./account-state";
 
 import { sendMagicLinkEmail } from "./email";
 import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
@@ -68,6 +71,35 @@ async function resolveTwoFactorUserId(ctx: FactorChallengeContext): Promise<stri
     return typeof verification?.value === "string" && verification.value
       ? verification.value
       : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The account a verified code just signed in. A success consumes the
+ * challenge, so the cookie above no longer resolves — instead read the
+ * fresh session the success sets and follow it to its owner. Anything
+ * unrecognised (or a non-ok answer) means no window to clear.
+ */
+async function resolveFactorSessionUserId(
+  db: PlatformDb,
+  ctx: FactorChallengeContext,
+  res: Response
+): Promise<string | null> {
+  try {
+    const jar = ctx.context.createAuthCookie("session_token");
+    const prefix = `${jar.name}=`;
+    const hit = res.headers.getSetCookie().find((cookie) => cookie.startsWith(prefix));
+    if (!hit) return null;
+    const token = decodeURIComponent(hit.slice(prefix.length).split(";")[0] ?? "");
+    if (!token) return null;
+    const rows = await db
+      .select({ userId: session.userId })
+      .from(session)
+      .where(eq(session.token, token))
+      .limit(1);
+    return rows[0]?.userId ?? null;
   } catch {
     return null;
   }
@@ -221,12 +253,12 @@ export function createAuth(options: CreateAuthOptions) {
         if (ctx.path === FACTOR_VERIFY_TOTP_PATH || ctx.path === FACTOR_VERIFY_BACKUP_PATH) {
           const returned = (ctx.context as unknown as { returned?: unknown }).returned;
           try {
-            // No challenge cookie (enrolment verifies) means no window to
-            // spend: setup typos never count against sign-in.
-            const userId = await resolveTwoFactorUserId(ctx as unknown as FactorChallengeContext);
-            if (!userId) return;
-
             if (isAPIError(returned)) {
+              // A failure leaves the challenge live, so the cookie still
+              // resolves — but enrolment verifies carry none, and setup
+              // typos must never spend the sign-in window.
+              const userId = await resolveTwoFactorUserId(ctx as unknown as FactorChallengeContext);
+              if (!userId) return;
               const code = (returned.body as { code?: unknown } | undefined)?.code;
               if (typeof code !== "string" || !FACTOR_FAILURE_CODES.has(code)) return;
               if (ctx.path === FACTOR_VERIFY_BACKUP_PATH) {
@@ -240,9 +272,23 @@ export function createAuth(options: CreateAuthOptions) {
               return;
             }
 
-            if (returned && typeof returned === "object" && "user" in returned) {
-              await clearFailedAttempts(options.db, userId);
+            // A success consumes the challenge, so the cookie no longer
+            // resolves — follow the fresh session the success sets instead.
+            // An ok answer here is a correct code, and it clears the
+            // window, locked or not.
+            let userId: string | null = null;
+            if (returned instanceof Response && returned.ok) {
+              userId = await resolveFactorSessionUserId(
+                options.db,
+                ctx as unknown as FactorChallengeContext,
+                returned
+              );
+            } else if (returned && typeof returned === "object" && "user" in returned) {
+              const user = (returned as { user?: { id?: unknown } }).user;
+              userId = typeof user?.id === "string" ? user.id : null;
             }
+            if (!userId) return;
+            await clearFailedAttempts(options.db, userId);
           } catch (error) {
             logEvent("warn", "auth.lockout_write_failed", { error });
           }
@@ -270,7 +316,13 @@ export function createAuth(options: CreateAuthOptions) {
           }
 
           if (returned && typeof returned === "object" && "user" in returned) {
-            await clearFailedAttempts(options.db, userId);
+            // A challenged sign-in still carries the user internally while
+            // the password door stays shut behind the code: only a completed
+            // sign-in clears the window, so an enrolled account keeps its
+            // failures until the code (or a spent recovery code) lands.
+            if (!(await isTwoFactorEnrolled(options.db, userId))) {
+              await clearFailedAttempts(options.db, userId);
+            }
           }
         } catch (error) {
           // Counting is best-effort after the fact: a write that fails must
