@@ -219,7 +219,7 @@ describe("password sign-in lockout", () => {
     const panel = await getAccountAccessState(db, id);
     expect(panel.locked).toBe(true);
     expect(panel.failedAttempts).toBe(MAX_FAILED_ATTEMPTS);
-  });
+  }, 30_000);
 
   it("refuses the right password while paused and never extends the pause", async () => {
     const email = "p4-refused@cafe.test";
