@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 
-import { accountAccessState, accountSuspension } from "@/lib/db/schema";
+import { accountAccessState, accountSuspension, user } from "@/lib/db/schema";
 import { contactEmail } from "@/lib/site";
 
 import type { PlatformDb } from "./platform-admin";
@@ -56,6 +56,21 @@ export function accountSuspendedMessage(): string {
   return email
     ? `This account is suspended. Contact ${email} for help.`
     : "This account is suspended. Contact support for help.";
+}
+
+/**
+ * Whether the account completed TOTP enrolment (P6). The plugin sets
+ * `user.twoFactorEnabled` when the setup code verifies and the reset
+ * clears it; the admin layout reads this — never the secret table — to
+ * force enrolment before `/admin` loads.
+ */
+export async function isTwoFactorEnrolled(db: PlatformDb, userId: string): Promise<boolean> {
+  const rows = await db
+    .select({ enrolled: user.twoFactorEnabled })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1);
+  return rows[0]?.enrolled ?? false;
 }
 
 /**

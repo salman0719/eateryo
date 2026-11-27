@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { isPlatformAdmin } from "@/lib/auth/platform-admin";
+import { isTwoFactorEnrolled } from "@/lib/auth/account-state";
 import { getSessionUser } from "@/lib/auth/session";
 import { AdminNav } from "@/components/platform/admin-nav";
 import { getDb } from "@/lib/db";
@@ -46,6 +47,17 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     allowed = false;
   }
   if (!allowed) notFound();
+
+  // Operators without a second factor set one up first (P6): the panel
+  // holds every café's data, so a password alone is not enough to open
+  // it. The setup screen lives outside `/admin`, so this cannot loop.
+  let enrolled = false;
+  try {
+    enrolled = await isTwoFactorEnrolled(getDb(), account.id);
+  } catch {
+    enrolled = false;
+  }
+  if (!enrolled) redirect("/sign-in/factor/setup?next=/admin");
 
   return (
     <div className="min-h-dvh bg-surface-50 text-ink-900">
