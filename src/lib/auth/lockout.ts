@@ -165,6 +165,14 @@ export function lockoutMessage(minutesLeft: number): string {
   return `Too many attempts. Sign-in for this account is paused for ${minutes} ${unit} — wait, or email yourself a sign-in link instead.`;
 }
 
+/** The one pause body the endpoint answers, whatever the transport. */
+export function accountLockedBody(minutesLeft: number): {
+  code: "ACCOUNT_LOCKED";
+  message: string;
+} {
+  return { code: "ACCOUNT_LOCKED", message: lockoutMessage(minutesLeft) };
+}
+
 /** The address a `/sign-in/email` body names, lowercased like the library. */
 export function signInEmail(body: unknown): string | null {
   if (typeof body !== "object" || body === null) return null;

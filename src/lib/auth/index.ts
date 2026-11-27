@@ -13,10 +13,11 @@ import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./passwords";
 
 import { sendMagicLinkEmail } from "./email";
 import { captureDevSignInLink, isDevSignInEnabled } from "./dev-sign-in";
+import { logEvent } from "@/lib/observability/log";
 import {
+  accountLockedBody,
   clearFailedAttempts,
   findPasswordUserId,
-  lockoutMessage,
   readLockout,
   recordFailedAttempt,
   signInEmail,
@@ -32,31 +33,18 @@ const SESSION_UPDATE_AGE_SECONDS = 24 * 60 * 60;
 const PASSWORD_SIGN_IN_PATH = "/sign-in/email";
 
 /**
- * The pause as the endpoint answers it: 429 with the settled copy, so the
- * sign-in screen can tell "wrong password" apart from "wait" without the
- * server naming the account. The counter, not this response, is the gate.
- */
-function accountLockedError(minutesLeft: number): APIError {
-  return new APIError("TOO_MANY_REQUESTS", {
-    code: "ACCOUNT_LOCKED",
-    message: lockoutMessage(minutesLeft),
-  });
-}
-
-/**
- * The same pause as a finished response, for the after hook to substitute.
+ * The pause as a finished response, for the after hook to substitute.
  * Replacing the *response* is what carries the 429: the pipeline keeps the
  * failing endpoint's own 401 status when an error object is swapped in, but
- * a `Response` passes through untouched.
+ * a `Response` passes through untouched. The before hook answers the same
+ * pause by throwing `APIError` with the shared `accountLockedBody`, so the
+ * shape lives in one place (`lockout.ts`) and the two hooks cannot drift.
  */
 function accountLockedResponse(minutesLeft: number): Response {
-  return new Response(
-    JSON.stringify({ code: "ACCOUNT_LOCKED", message: lockoutMessage(minutesLeft) }),
-    {
-      status: 429,
-      headers: { "content-type": "application/json", "cache-control": "no-store" },
-    }
-  );
+  return new Response(JSON.stringify(accountLockedBody(minutesLeft)), {
+    status: 429,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
 }
 
 type SendMagicLink = NonNullable<Parameters<typeof magicLink>[0]>["sendMagicLink"];
@@ -140,15 +128,20 @@ export function createAuth(options: CreateAuthOptions) {
             const state = await readLockout(options.db, userId);
             if (state.locked) lockedMinutes = state.minutesLeft;
           }
-        } catch {
+        } catch (error) {
           // Without the counter row we cannot honour the pause; the
           // password check behind it would fail on the same DB anyway, so
           // fail closed with the shared unavailable copy.
+          logEvent("error", "auth.lockout_read_failed", { error });
           throw new APIError("SERVICE_UNAVAILABLE", {
             message: "Sign-in is not available yet — try again shortly.",
           });
         }
-        if (lockedMinutes !== null) throw accountLockedError(lockedMinutes);
+        // 429 with the settled copy, so the screen can tell "wrong
+        // password" apart from "wait" without the server naming the
+        // account. The counter, not this error, is the gate.
+        if (lockedMinutes !== null)
+          throw new APIError("TOO_MANY_REQUESTS", accountLockedBody(lockedMinutes));
       }),
 
       /**
@@ -183,9 +176,11 @@ export function createAuth(options: CreateAuthOptions) {
           if (returned && typeof returned === "object" && "user" in returned) {
             await clearFailedAttempts(options.db, userId);
           }
-        } catch {
+        } catch (error) {
           // Counting is best-effort after the fact: a write that fails must
-          // never turn a correct sign-in into an error response.
+          // never turn a correct sign-in into an error response. It is
+          // still logged, or a dead counter would look like no attack.
+          logEvent("warn", "auth.lockout_write_failed", { error });
         }
       }),
     },
