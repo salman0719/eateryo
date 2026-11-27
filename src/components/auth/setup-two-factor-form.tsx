@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent } from "react";
 
+import { QrCode } from "@/components/menu-editor/qr-code";
 import { authClient } from "@/lib/auth-client";
 
 /**
  * Forced TOTP setup (P6) — scan, verify, save the recovery codes.
  *
  * Settled copy from the prototype: one scan and one code, ten single-use
- * recovery codes shown once and never again. No QR image dependency: the
- * manual key from the `otpauth://` URI is what authenticator apps accept
- * as typed entry, so it is rendered grouped for copying instead.
+ * recovery codes shown once and never again. The QR is generated in the
+ * browser from the `otpauth://` URI (no image service); the manual key
+ * stays beside it as the fallback, rendered grouped for copying.
  * Server messages render verbatim; the enable response (URI + codes) is
  * held in component state and never written anywhere else.
  */
@@ -29,6 +30,19 @@ function secretOf(totpUri: string): string {
   } catch {
     return "";
   }
+}
+
+export function activeEnrolmentForStatus(status: Status): {
+  totpUri: string;
+  backupCodes: string[];
+} | null {
+  if (status.kind === "code" || status.kind === "verifying") {
+    return { totpUri: status.totpUri, backupCodes: status.backupCodes };
+  }
+  if (status.kind === "error" && status.totpUri) {
+    return { totpUri: status.totpUri, backupCodes: status.backupCodes ?? [] };
+  }
+  return null;
 }
 
 function grouped(secret: string): string {
@@ -53,12 +67,7 @@ export function SetupTwoFactorForm({ callbackURL }: { callbackURL: string }) {
   // `enable` (wrong password) carries no URI and stays on the password
   // form, where its error renders — otherwise a wrong password would
   // advance to an empty verify step with no key to copy.
-  const active =
-    status.kind === "code" || status.kind === "verifying"
-      ? { totpUri: status.totpUri, backupCodes: status.backupCodes }
-      : status.kind === "error" && status.totpUri
-        ? { totpUri: status.totpUri, backupCodes: status.backupCodes ?? [] }
-        : null;
+  const active = activeEnrolmentForStatus(status);
 
   async function onEnable(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -169,7 +178,7 @@ export function SetupTwoFactorForm({ callbackURL }: { callbackURL: string }) {
       <form onSubmit={onVerify} className="flex flex-col gap-3" noValidate>
         <ol className="flex flex-col gap-1.5 rounded-xl border border-line-200 bg-surface-base p-4 text-sm text-ink-700">
           <li>
-            <strong>Add the key below</strong> — use any authenticator app.
+            <strong>Scan the code</strong> — use any authenticator app.
           </li>
           <li>
             <strong>Enter the 6 digits</strong> — they change every 30 seconds.
@@ -179,16 +188,19 @@ export function SetupTwoFactorForm({ callbackURL }: { callbackURL: string }) {
             you verify.
           </li>
         </ol>
-        <div className="rounded-xl border border-line-200 bg-surface-base p-4">
-          <p className="text-xs font-medium text-ink-500">Can&apos;t scan? Enter this key:</p>
-          <p className="mt-1 font-mono text-sm text-ink-900">{grouped(secret)}</p>
-          <button
-            type="button"
-            onClick={() => onCopy(secret)}
-            className="mt-1 text-sm font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900"
-          >
-            {copied ? "Copied" : "Copy key"}
-          </button>
+        <div className="flex items-center gap-4 rounded-xl border border-line-200 bg-surface-base p-4">
+          <QrCode value={active.totpUri} alt="Two-factor setup QR code" size={128} />
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-ink-500">Can&apos;t scan? Enter this key:</p>
+            <p className="mt-1 font-mono text-sm break-all text-ink-900">{grouped(secret)}</p>
+            <button
+              type="button"
+              onClick={() => onCopy(secret)}
+              className="mt-1 text-sm font-medium text-ink-600 underline underline-offset-2 hover:text-ink-900"
+            >
+              {copied ? "Copied" : "Copy key"}
+            </button>
+          </div>
         </div>
         <div>
           <label htmlFor={codeId} className="text-sm font-medium text-ink-700">
