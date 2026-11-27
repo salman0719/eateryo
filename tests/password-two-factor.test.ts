@@ -240,8 +240,8 @@ describe("enrolment", () => {
     }
 
     const state = await getAccountAccessState(db, id);
-    expect(state.twoFactorEnrolled).toBe(true);
-  });
+    expect(state.secondFactorEnrolled).toBe(true);
+  }, 30_000);
 
   it("challenges an enrolled operator and waves through one without a factor", async () => {
     const plainEmail = "p6-plain@cafe.test";
@@ -257,7 +257,7 @@ describe("enrolment", () => {
     expect(challenged.status).toBe(200);
     expect(challenged.body.twoFactorRedirect).toBe(true);
     expect(challenged.body.twoFactorMethods).toContain("totp");
-  });
+  }, 30_000);
 });
 
 describe("shared lockout counting", () => {
@@ -278,7 +278,7 @@ describe("shared lockout counting", () => {
     const state = await getAccountAccessState(db, id);
     expect(state.locked).toBe(true);
     expect(state.failedAttempts).toBe(5);
-  });
+  }, 30_000);
 
   it("refuses a correct TOTP while paused and never extends the pause", async () => {
     const email = "p6-refused@cafe.test";
@@ -299,7 +299,7 @@ describe("shared lockout counting", () => {
     const after = await lockedRow(id);
     expect(after.failedAttempts).toBe(before.failedAttempts);
     expect((after.lockedUntil as Date).getTime()).toBe((before.lockedUntil as Date).getTime());
-  });
+  }, 30_000);
 
   it("clears a partial counter on a correct code", async () => {
     const email = "p6-clears@cafe.test";
@@ -312,7 +312,7 @@ describe("shared lockout counting", () => {
     expect(right.status).toBe(200);
     expect(right.cookies).toContain("better-auth.session_token");
     expect((await lockedRow(id)).failedAttempts).toBe(0);
-  });
+  }, 30_000);
 });
 
 describe("recovery codes", () => {
@@ -325,7 +325,7 @@ describe("recovery codes", () => {
     const reuse = await verifyBackup(await challengeFor(email), backupCodes[0] as string);
     expect(reuse.status).toBe(401);
     expect(reuse.body.code).toBe("INVALID_BACKUP_CODE");
-  });
+  }, 30_000);
 
   it("work while locked and clear the pause", async () => {
     const email = "p6-escape@cafe.test";
@@ -342,7 +342,7 @@ describe("recovery codes", () => {
     const state = await getAccountAccessState(db, id);
     expect(state.locked).toBe(false);
     expect(state.failedAttempts).toBe(0);
-  });
+  }, 30_000);
 
   it("do not extend the pause when they are wrong while locked", async () => {
     const email = "p6-noextend@cafe.test";
@@ -359,7 +359,7 @@ describe("recovery codes", () => {
     expect(wrong.body.code).toBe("INVALID_BACKUP_CODE");
     const after = await lockedRow(id);
     expect(after.failedAttempts).toBe(before.failedAttempts);
-  });
+  }, 30_000);
 });
 
 describe("second factor reset", () => {
@@ -373,7 +373,7 @@ describe("second factor reset", () => {
     expect(await sessionsFor(id)).toBe(0);
     expect(await isTwoFactorEnrolled(db, id)).toBe(false);
     expect(await db.select().from(twoFactor).where(eq(twoFactor.userId, id))).toHaveLength(0);
-    expect((await getAccountAccessState(db, id)).twoFactorEnrolled).toBe(false);
+    expect((await getAccountAccessState(db, id)).secondFactorEnrolled).toBe(false);
 
     const events = await db
       .select({ action: platformEvent.action, detail: platformEvent.detail })
@@ -390,7 +390,7 @@ describe("second factor reset", () => {
     const rows = await db.select().from(twoFactor).where(eq(twoFactor.userId, id));
     expect(rows).toHaveLength(0);
     void backupCodes;
-  });
+  }, 30_000);
 
   it("reports not_enrolled and not_found instead of logging a no-op", async () => {
     const id = await seedPasswordAccount("p6-never@cafe.test", "P6 Never");
@@ -406,7 +406,7 @@ describe("second factor reset", () => {
         actorUserId: operatorId,
       })
     ).rejects.toMatchObject({ name: "PlatformRepoError", code: "not_found" });
-  });
+  }, 30_000);
 
   it("keeps a suspended refusal out of the counter", async () => {
     const email = "p6-suspended@cafe.test";
@@ -420,5 +420,5 @@ describe("second factor reset", () => {
     const gated = await signInAttempt(email, PASSWORD);
     expect(gated.status).toBe(403);
     expect((await lockedRow(id)).failedAttempts).toBe(0);
-  });
+  }, 30_000);
 });

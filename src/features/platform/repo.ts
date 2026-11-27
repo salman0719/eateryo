@@ -543,7 +543,7 @@ export async function getAccountDetail(
       id: user.id,
       name: user.name,
       email: user.email,
-      twoFactorEnrolled: user.twoFactorEnabled,
+      secondFactorEnrolled: user.twoFactorEnabled,
       createdAt: user.createdAt,
       cafeCount: cafeCountSql,
       menuCount: menuCountSql,
@@ -653,8 +653,8 @@ export async function getAccountDetail(
 
   const open = suspensions.find((entry) => entry.liftedAt === null) ?? null;
   const accessState = accessRows[0]
-    ? toAccessState({ ...accessRows[0], twoFactorEnrolled: row.twoFactorEnrolled })
-    : { ...DEFAULT_ACCESS_STATE, twoFactorEnrolled: row.twoFactorEnrolled };
+    ? toAccessState({ ...accessRows[0], secondFactorEnrolled: row.secondFactorEnrolled })
+    : { ...DEFAULT_ACCESS_STATE, secondFactorEnrolled: row.secondFactorEnrolled };
   const stage = deriveAccountStage({
     cafeCount: row.cafeCount,
     menuCount: row.menuCount,
@@ -1210,7 +1210,7 @@ export interface AccountAccessState {
   lockedUntil: string | null;
   locked: boolean;
   /** TOTP enrolment for the Access card + reset action — never the secret. */
-  twoFactorEnrolled: boolean;
+  secondFactorEnrolled: boolean;
 }
 
 const DEFAULT_ACCESS_STATE: AccountAccessState = {
@@ -1220,7 +1220,7 @@ const DEFAULT_ACCESS_STATE: AccountAccessState = {
   failedAttempts: 0,
   lockedUntil: null,
   locked: false,
-  twoFactorEnrolled: false,
+  secondFactorEnrolled: false,
 };
 
 export function deriveAccessChip(state: AccountAccessState): AccessChip {
@@ -1238,7 +1238,7 @@ function toAccessState(row: {
   lockedUntil: Date | string | null;
   /** Compared against `now()` in SQL, beside the stored instant. */
   locked: boolean;
-  twoFactorEnrolled: boolean;
+  secondFactorEnrolled: boolean;
 }): AccountAccessState {
   return {
     passwordSetAt: toDate(row.passwordSetAt)?.toISOString() ?? null,
@@ -1247,7 +1247,7 @@ function toAccessState(row: {
     failedAttempts: row.failedAttempts,
     lockedUntil: toDate(row.lockedUntil)?.toISOString() ?? null,
     locked: row.locked,
-    twoFactorEnrolled: row.twoFactorEnrolled,
+    secondFactorEnrolled: row.secondFactorEnrolled,
   };
 }
 
@@ -1281,10 +1281,10 @@ export async function getAccountAccessState(
     .from(user)
     .where(eq(user.id, targetUserId))
     .limit(1);
-  const twoFactorEnrolled = enrolled[0]?.on ?? false;
+  const secondFactorEnrolled = enrolled[0]?.on ?? false;
   return row
-    ? toAccessState({ ...row, twoFactorEnrolled })
-    : { ...DEFAULT_ACCESS_STATE, twoFactorEnrolled };
+    ? toAccessState({ ...row, secondFactorEnrolled })
+    : { ...DEFAULT_ACCESS_STATE, secondFactorEnrolled };
 }
 
 export interface ForcePasswordResetInput {

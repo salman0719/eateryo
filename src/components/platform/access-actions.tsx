@@ -54,13 +54,13 @@ export function AccessActions({
   accountId,
   accountName,
   chip,
-  twoFactorEnrolled,
+  secondFactorEnrolled,
 }: {
   accountId: string;
   accountName: string;
   chip: AccessChip;
   /** Whether the panel may offer the second-factor reset (P6). */
-  twoFactorEnrolled: boolean;
+  secondFactorEnrolled: boolean;
 }) {
   const router = useRouter();
   const [reset, setReset] = useState<ResetState>(INITIAL_RESET);
@@ -221,7 +221,7 @@ export function AccessActions({
           </button>
         )}
       </div>
-      {twoFactorEnrolled ? (
+      {secondFactorEnrolled ? (
         <div>
           {factorReset.result ? (
             <p role="status" className="text-sm text-ink-600">

@@ -82,7 +82,7 @@ describe("access-state reads", () => {
         failedAttempts: 5,
         lockedUntil: lockedAt,
         locked: true,
-        twoFactorEnrolled: false,
+        secondFactorEnrolled: false,
       })
     ).toBe("locked");
     expect(
@@ -93,7 +93,7 @@ describe("access-state reads", () => {
         failedAttempts: 0,
         lockedUntil: null,
         locked: false,
-        twoFactorEnrolled: false,
+        secondFactorEnrolled: false,
       })
     ).toBe("reset_required");
     expect(
@@ -104,7 +104,7 @@ describe("access-state reads", () => {
         failedAttempts: 0,
         lockedUntil: null,
         locked: false,
-        twoFactorEnrolled: false,
+        secondFactorEnrolled: false,
       })
     ).toBe("password_set");
   });
@@ -198,7 +198,7 @@ describe("access state in list and detail", () => {
       "passwordSetAt",
       "resetRequired",
       "resetSentAt",
-      "twoFactorEnrolled",
+      "secondFactorEnrolled",
     ]);
   });
 });

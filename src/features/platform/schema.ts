@@ -200,7 +200,7 @@ export const adminDetailAccessSchema = z.object({
   lockedUntil: z.string().nullable(),
   locked: z.boolean(),
   /** TOTP enrolment — the panel shows on/off, never a code. */
-  twoFactorEnrolled: z.boolean(),
+  secondFactorEnrolled: z.boolean(),
   chip: accessChipSchema,
 });
 
