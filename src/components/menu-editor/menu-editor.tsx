@@ -714,7 +714,13 @@ export function MenuEditor({
           />
         )}
       </ScrollArrowStrip>
-      <div className="flex min-w-0 items-center gap-2 pb-1.5 sm:ml-auto sm:shrink-0">
+      <div
+        className={
+          undoLabel
+            ? "flex min-w-0 items-center gap-2 pb-1.5 sm:ml-auto sm:shrink-0"
+            : "hidden min-w-0 items-center gap-2 pb-1.5 sm:ml-auto sm:flex sm:shrink-0"
+        }
+      >
         {undoLabel && (
           <button
             type="button"
@@ -1001,7 +1007,7 @@ export function MenuEditor({
       {tabStrip}
       {subTab === "categories" ? (
         <>
-          <div className="text-xs leading-5 text-ink-600">
+          <div className="-mt-2 -mb-2 text-xs leading-snug text-ink-600 sm:mt-0 sm:mb-0">
             {onStartPublish && accountCheckFailed ? (
               <p>
                 We couldn&apos;t check your account just now, so publishing is paused.{" "}
