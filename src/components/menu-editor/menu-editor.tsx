@@ -1001,7 +1001,7 @@ export function MenuEditor({
       {tabStrip}
       {subTab === "categories" ? (
         <>
-          <div className="rounded-2xl border border-line-200 bg-surface-base px-4 py-3 text-xs leading-5 text-ink-600">
+          <div className="text-xs leading-5 text-ink-600">
             {onStartPublish && accountCheckFailed ? (
               <p>
                 We couldn&apos;t check your account just now, so publishing is paused.{" "}
