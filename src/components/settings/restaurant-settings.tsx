@@ -652,7 +652,7 @@ function TeamCard({
               key={member.userId}
               className="flex flex-wrap items-center gap-3 rounded-xl border border-line-200 px-3 py-2"
             >
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 w-full sm:w-auto sm:flex-1">
                 <p className="text-sm font-medium text-ink-900">
                   {member.name.trim() ? member.name : member.email}
                   {member.userId === currentUserId && (
@@ -702,7 +702,7 @@ function TeamCard({
           <ul className="mt-2 space-y-2">
             {pending.map((invitation) => (
               <li key={invitation.id} className="flex flex-wrap items-center gap-3">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 w-full sm:w-auto sm:flex-1">
                   <p className="truncate text-sm font-medium text-ink-900">{invitation.email}</p>
                   <p className="text-[11px] leading-4 text-ink-500">
                     {invitation.role === "owner" ? "Owner" : "Staff"} · invited by{" "}
