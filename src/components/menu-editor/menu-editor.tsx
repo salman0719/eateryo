@@ -1177,7 +1177,7 @@ export function MenuEditor({
                   data-menu-section={selectedCategory.id}
                   id={`menu-section-${selectedCategory.id}`}
                   aria-label={`Category ${selectedCategory.name}`}
-                  className={`${selection.itemId ? "hidden lg:block " : ""}scroll-mt-4 rounded-2xl border border-line-200 bg-surface-base`}
+                  className={`${selection.itemId ? "hidden lg:block " : ""}scroll-mt-4 overflow-clip rounded-2xl border border-line-200 bg-surface-base`}
                 >
                   {/* One category on the canvas: its band holds the name, the
               count, and the one thing that acts on the category itself.
@@ -1186,11 +1186,11 @@ export function MenuEditor({
 
               It is sticky for the same reason the inspector's header is: a
               long category scrolls the section's name away, and the name is
-              the one fact the rows under it belong to. The section cannot
-              clip its corners (`overflow-hidden` would make it the sticky
-              containing block and the band would never leave the card), so
-              the band rounds its own top edge instead. */}
-                  <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2">
+              the one fact the rows under it belong to. The section clips its
+              corners with `overflow: clip` — unlike `hidden` it is not a
+              scroll container, so the band still sticks — and the band
+              paints square into them instead of rounding a mismatched edge. */}
+                  <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2">
                     <h2 className="min-w-[9rem] flex-1 truncate px-1 text-base font-semibold text-ink-900">
                       {selectedCategory.name || "Untitled category"}
                     </h2>

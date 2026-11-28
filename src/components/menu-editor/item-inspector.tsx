@@ -144,12 +144,13 @@ export function ItemInspector({
   }
 
   return (
-    <div className="rounded-2xl border border-line-200 bg-surface-base">
+    <div className="overflow-clip rounded-2xl border border-line-200 bg-surface-base">
       {/* Sticky so the dish's name and its way out stay in view while a
-          long form scrolls under them. The card itself cannot clip its
-          corners (`overflow-hidden` would trap this), so the header and
-          footer round their own edges. */}
-      <div className="sticky top-0 z-10 flex items-start gap-2 rounded-t-2xl border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
+          long form scrolls under them. The card clips its own corners with
+          `overflow: clip` — unlike `hidden` it is not a scroll container,
+          so the sticky header keeps working — and the header paints square
+          into them instead of rounding a mismatched edge. */}
+      <div className="sticky top-0 z-10 flex items-start gap-2 border-b border-line-200 bg-linear-to-b from-accent-100 to-surface-base px-3 py-2.5">
         {/* On a phone the inspector has replaced the list, so its way out is
             a back chevron and belongs on the leading edge — with a second
             Done beside Next in the footer, where the thumb is. Beside the
@@ -534,7 +535,7 @@ export function ItemInspector({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 rounded-b-2xl border-t border-line-200 bg-surface-50 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-line-200 bg-surface-50 px-3 py-2">
         <button type="button" onClick={onDuplicate} className={smallButton}>
           Duplicate
         </button>
