@@ -44,6 +44,7 @@ import { CategoryStrip } from "./category-strip";
 import { DuplicateReview } from "./duplicate-review";
 import { describeExtractionSource } from "@/features/menu/source-label";
 import type { EditorMode } from "@/features/navigation/routes";
+import type { DinerTheme } from "@/features/diner-theme/schema";
 import {
   defaultEditorSubTab,
   editorTabCounts,
@@ -67,6 +68,7 @@ import {
   type DeleteUndo,
 } from "@/features/menu/undo";
 
+import { DinerThemeProvider } from "@/components/order/diner-theme";
 import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { PhoneFrame } from "@/components/ui/phone-frame";
 import { PreviewBrandBar } from "./preview-brand-bar";
@@ -146,6 +148,11 @@ interface MenuEditorProps {
   restaurantLogo?: import("@/features/brand-assets/schema").BrandAssetImage | null;
   restaurantCover?: import("@/features/brand-assets/schema").BrandAssetImage | null;
   /**
+   * The café's diner look, worn live by the Preview tab — the same theme a
+   * table card shows. Null (or absent) renders the shipped Eucalyptus.
+   */
+  restaurantTheme?: DinerTheme | null;
+  /**
    * The café these assets belong to. Present when the menu lives in an
    * account café; absent for a browser-only menu, which has no café to
    * brand — the preview then shows no Change buttons.
@@ -186,6 +193,7 @@ export function MenuEditor({
   restaurantName = null,
   restaurantLogo = null,
   restaurantCover = null,
+  restaurantTheme = null,
   restaurantId = null,
   onBrandChanged,
   accountCheckFailed = false,
@@ -817,13 +825,18 @@ export function MenuEditor({
               // track shrinks it on a narrow `lg`, and it never exceeds 420.
               widthClass="max-w-[420px]"
             >
-              <OrderPagePreview
-                doc={doc}
-                restaurantName={restaurantName}
-                restaurantLogo={restaurantLogo}
-                restaurantCover={restaurantCover}
-                draftAheadOfLive={needsPublish}
-              />
+              {/* The preview wears the café's diner look — the same theme a
+              table card shows — instead of always rendering the shipped
+              default. Eucalyptus (null) is today's look, unchanged. */}
+              <DinerThemeProvider theme={restaurantTheme}>
+                <OrderPagePreview
+                  doc={doc}
+                  restaurantName={restaurantName}
+                  restaurantLogo={restaurantLogo}
+                  restaurantCover={restaurantCover}
+                  draftAheadOfLive={needsPublish}
+                />
+              </DinerThemeProvider>
             </PhoneFrame>
           </div>
           {publishing && canManage && (

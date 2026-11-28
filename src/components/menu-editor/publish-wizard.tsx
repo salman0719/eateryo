@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { MagicLinkForm } from "@/components/auth/magic-link-form";
+import { DinerThemeProvider } from "@/components/order/diner-theme";
 import { OrderPagePreview } from "@/components/order/order-page-preview";
 import { JourneySteps } from "@/components/ui/journey-steps";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -307,12 +308,14 @@ export function PublishWizard({
 
           <aside className="flex flex-col gap-2">
             <PhoneFrame label="Diner page at a table">
-              <OrderPagePreview
-                doc={doc}
-                restaurantName={restaurantName}
-                restaurantLogo={successBrand?.logo ?? null}
-                restaurantCover={successBrand?.cover ?? null}
-              />
+              <DinerThemeProvider theme={successBrand?.dinerTheme ?? null}>
+                <OrderPagePreview
+                  doc={doc}
+                  restaurantName={restaurantName}
+                  restaurantLogo={successBrand?.logo ?? null}
+                  restaurantCover={successBrand?.cover ?? null}
+                />
+              </DinerThemeProvider>
             </PhoneFrame>
             <p className="text-center text-xs text-ink-500">
               Ordering is off in this preview; a real table card turns it on.
@@ -474,24 +477,33 @@ export function PublishWizard({
 
         <aside className="flex flex-col gap-2">
           <PhoneFrame label="What a table card opens">
-            <OrderPagePreview
-              doc={doc}
-              restaurantName={
-                choice.kind === "existing" || choice.kind === "create" ? choice.name : null
-              }
-              restaurantLogo={
+            <DinerThemeProvider
+              theme={
                 choice.kind === "existing"
-                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.logo ??
-                    null)
+                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)
+                      ?.dinerTheme ?? null)
                   : null
               }
-              restaurantCover={
-                choice.kind === "existing"
-                  ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.cover ??
-                    null)
-                  : null
-              }
-            />
+            >
+              <OrderPagePreview
+                doc={doc}
+                restaurantName={
+                  choice.kind === "existing" || choice.kind === "create" ? choice.name : null
+                }
+                restaurantLogo={
+                  choice.kind === "existing"
+                    ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.logo ??
+                      null)
+                    : null
+                }
+                restaurantCover={
+                  choice.kind === "existing"
+                    ? (ownedRestaurants.find((restaurant) => restaurant.id === choice.id)?.cover ??
+                      null)
+                    : null
+                }
+              />
+            </DinerThemeProvider>
           </PhoneFrame>
           <p className="text-center text-xs text-ink-500">
             Ordering is off in this preview; a real table card turns it on.

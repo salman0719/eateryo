@@ -1513,6 +1513,11 @@ export function AppShell() {
                       (restaurant) => restaurant.id === activeRestaurantId
                     )?.cover ?? null
                   }
+                  restaurantTheme={
+                    ownedRestaurantsForAccount.find(
+                      (restaurant) => restaurant.id === activeRestaurantId
+                    )?.dinerTheme ?? null
+                  }
                   restaurantId={activeRestaurantId}
                   onBrandChanged={(updated) => workspace.addRestaurant(updated)}
                   onStartPublish={() =>
