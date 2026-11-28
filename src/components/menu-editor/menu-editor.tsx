@@ -328,6 +328,39 @@ export function MenuEditor({
     if (nextId) applySelection({ categoryId: selectedCategory.id, itemId: nextId });
   }
 
+  /**
+   * Phones show the inspector in place of the list: tapping a dish deep in
+   * a long category would leave the new card below the fold, so its top is
+   * brought into view. Desktop keeps the list beside the card and never
+   * moves. Runs only when the picked dish changes — typing in the form
+   * re-renders without touching the scroll.
+   */
+  const inspectorRef = useRef<HTMLDivElement | null>(null);
+  const prevInspectedItemId = useRef<string | null>(null);
+  useEffect(() => {
+    const current = selection.itemId;
+    const opened = current !== null && current !== prevInspectedItemId.current;
+    prevInspectedItemId.current = current;
+    if (!opened) return;
+    if (
+      typeof window === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      window.matchMedia("(min-width: 1024px)").matches
+    ) {
+      return;
+    }
+    const target = inspectorRef.current;
+    if (!target) return;
+    requestAnimationFrame(() => {
+      try {
+        const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      } catch {
+        // Older browsers without scrollIntoView options — leave the scroll alone.
+      }
+    });
+  }, [selection.itemId]);
+
   // Duplicate review (flags only, never auto-deletes — see duplicates.ts).
   // Dismissals are remembered per document, in session state and localStorage.
   const [dismissedMap, setDismissedMap] = useState<Record<string, string[]>>({});
@@ -1256,7 +1289,7 @@ export function MenuEditor({
                 )}
               </div>
               {selectedItem && selectedCategory ? (
-                <div className="lg:sticky lg:top-4">
+                <div ref={inspectorRef} className="scroll-mt-2 lg:sticky lg:top-4">
                   <ItemInspector
                     doc={doc}
                     categoryId={selectedCategory.id}
