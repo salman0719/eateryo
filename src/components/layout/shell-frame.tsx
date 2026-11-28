@@ -289,7 +289,7 @@ export function ShellFrame({
                   onClick={phone.onToggleMore}
                   aria-expanded={phone.moreOpen}
                   aria-current={phone.screenInMore ? "page" : undefined}
-                  className={`flex min-h-[56px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
+                  className={`flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-700 ${
                     phone.moreOpen || phone.screenInMore ? "text-accent-700" : "text-ink-500"
                   }`}
                 >
