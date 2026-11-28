@@ -10,6 +10,7 @@ import { MenusPage } from "@/components/pages/menus-page";
 import { OrdersPage } from "@/components/pages/orders-page";
 import { SettingsPage } from "@/components/pages/settings-page";
 import { TablesPage } from "@/components/pages/tables-page";
+import { PasswordNudgeBanner } from "@/components/auth/password-nudge-banner";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { HeightReveal } from "@/components/ui/height-reveal";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -1350,6 +1351,12 @@ export function AppShell() {
           Reload when you&apos;re back online and it will try again.
         </p>
       )}
+
+      {/* Password nudge, signed in only: a link-only account older than
+            24 hours gets one offer of a password, never twice (the
+            dismissal is per account). Invisible until the eligibility read
+            answers, so most sessions render nothing here. */}
+      {signedIn && <PasswordNudgeBanner />}
 
       {/* Q7 resume banner, signed out only: the way back for anyone
             who wandered off with a saved-but-unpublished draft. Signed out

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { AccountDangerZone, AccountExportCard } from "@/components/launch/data-controls";
+import { AccountPasswordCard } from "@/components/settings/account-password-card";
 import { CommitInput } from "@/components/menu-editor/fields";
 import { BrandCard } from "@/components/settings/brand-card";
 import { DinerLookCard } from "@/components/settings/diner-look-card";
@@ -282,6 +283,7 @@ export function RestaurantSettings() {
       {signedIn && (
         <>
           <AccountExportCard />
+          <AccountPasswordCard />
           <AccountDangerZone />
         </>
       )}
