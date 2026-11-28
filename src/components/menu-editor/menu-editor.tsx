@@ -670,7 +670,7 @@ export function MenuEditor({
   const tabStrip = (
     <div
       data-print-hide
-      className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 border-b border-line-200"
+      className="flex flex-col gap-y-1 border-b border-line-200 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-x-3"
     >
       <ScrollArrowStrip as="tablist" label="Menu sections">
         <EditorTab
@@ -714,7 +714,7 @@ export function MenuEditor({
           />
         )}
       </ScrollArrowStrip>
-      <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 pb-1.5">
+      <div className="flex min-w-0 items-center gap-2 pb-1.5 sm:ml-auto sm:shrink-0">
         {undoLabel && (
           <button
             type="button"
