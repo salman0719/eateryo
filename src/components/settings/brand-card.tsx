@@ -168,7 +168,14 @@ export function BrandCard({
         const busy = working || state.status === "checking";
         const slot = SLOT_COPY[kind];
         return (
-          <div key={kind} className="mt-4 flex gap-3">
+          <div
+            key={kind}
+            className={
+              kind === "logo"
+                ? "mt-4 flex min-w-0 gap-3"
+                : "mt-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start"
+            }
+          >
             {copy ? (
               // eslint-disable-next-line @next/next/no-img-element -- brand asset served straight from the CDN at its stored size
               <img
@@ -181,7 +188,7 @@ export function BrandCard({
                 className={
                   kind === "logo"
                     ? "h-20 w-20 shrink-0 rounded-2xl border border-line-200 object-cover"
-                    : "h-24 w-full max-w-xs shrink-0 rounded-xl border border-line-200 object-cover"
+                    : "h-32 w-full rounded-xl border border-line-200 object-cover sm:h-24 sm:max-w-xs sm:shrink-0"
                 }
               />
             ) : (
@@ -190,7 +197,7 @@ export function BrandCard({
                 className={
                   kind === "logo"
                     ? "flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-dashed border-line-300 bg-surface-base text-sm font-bold text-ink-400"
-                    : "flex h-24 w-full max-w-xs shrink-0 items-center justify-center rounded-xl border border-dashed border-line-300 bg-surface-base px-3 text-center text-xs text-ink-400"
+                    : "flex h-32 w-full items-center justify-center rounded-xl border border-dashed border-line-300 bg-surface-base px-3 text-center text-xs text-ink-400 sm:h-24 sm:max-w-xs sm:shrink-0"
                 }
               >
                 {kind === "logo"
