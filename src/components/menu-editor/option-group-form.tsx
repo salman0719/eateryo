@@ -152,7 +152,8 @@ export function OptionGroupForm({
                   }
                 />
                 <CommitNumber
-                  label="Extra"
+                  label="Added price"
+                  placeholder="0 if included"
                   value={choice.priceDelta}
                   onCommit={(priceDelta) =>
                     onChange({
