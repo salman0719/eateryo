@@ -238,7 +238,7 @@ export function ModifiersPanel({ doc, canManage, onChange, onClose }: ModifiersP
                 className="rounded-xl border border-line-200 bg-surface-base p-3"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="min-w-0 flex-1 text-sm font-medium text-ink-900">
+                  <p className="min-w-0 w-full text-sm font-medium text-ink-900 sm:w-auto sm:flex-1">
                     {template.name}
                     <span className="ml-2 text-xs font-normal text-ink-500">
                       {describeTemplate(template)} · on {used} {used === 1 ? "dish" : "dishes"}
